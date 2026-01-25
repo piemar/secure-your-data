@@ -94,7 +94,7 @@ export function Leaderboard() {
                 <div>
                   <p className="text-sm text-muted-foreground">Total Time</p>
                   <p className="text-2xl font-bold">
-                    {formatTime(getTotalTime(sortedLeaderboard[userRank - 1] || { labTimes: {} }))}
+                    {formatTime(getTotalTime(sortedLeaderboard[userRank - 1] as LeaderboardEntry))}
                   </p>
                 </div>
               </div>

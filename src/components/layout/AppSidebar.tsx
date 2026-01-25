@@ -1,7 +1,6 @@
 import {
   Presentation,
   FlaskConical,
-  FileText,
   ChevronLeft,
   ChevronRight,
   Database,
@@ -9,17 +8,22 @@ import {
   Key,
   Trophy,
   Lock,
+  LogOut,
+  Crown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigation } from '@/contexts/NavigationContext';
+import { useRole } from '@/contexts/RoleContext';
 import { useLab } from '@/context/LabContext';
 import type { Section } from '@/types';
+import { Button } from '@/components/ui/button';
 
 interface NavItem {
   id: Section;
   label: string;
   icon: React.ElementType;
   subLabel?: string;
+  moderatorOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -28,6 +32,7 @@ const navItems: NavItem[] = [
     label: 'Presentation',
     icon: Presentation,
     subLabel: '45 min • 25 slides',
+    moderatorOnly: true,
   },
   {
     id: 'setup',
@@ -40,6 +45,7 @@ const navItems: NavItem[] = [
     label: 'Leaderboard',
     icon: Trophy,
     subLabel: 'Rankings & Scores',
+    moderatorOnly: true,
   },
   {
     id: 'lab1',
@@ -59,17 +65,15 @@ const navItems: NavItem[] = [
     icon: Key,
     subLabel: '34 min • GDPR',
   },
-  {
-    id: 'cheatsheet',
-    label: 'SA Cheat Sheet',
-    icon: FileText,
-    subLabel: 'Quick Reference',
-  },
 ];
 
 export function AppSidebar() {
   const { currentSection, setSection, sidebarOpen, toggleSidebar } = useNavigation();
   const { isLabAccessible } = useLab();
+  const { isModerator, logout, role } = useRole();
+
+  // Filter nav items based on role
+  const visibleNavItems = navItems.filter(item => !item.moderatorOnly || isModerator);
 
   return (
     <aside
@@ -91,9 +95,24 @@ export function AppSidebar() {
         )}
       </div>
 
+      {/* Moderator Badge */}
+      {isModerator && sidebarOpen && (
+        <div className="mx-2 mt-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
+          <div className="flex items-center gap-2 text-primary text-sm font-medium">
+            <Crown className="w-4 h-4" />
+            Moderator Mode
+          </div>
+        </div>
+      )}
+      {isModerator && !sidebarOpen && (
+        <div className="mx-2 mt-2 flex justify-center">
+          <Crown className="w-5 h-5 text-primary" />
+        </div>
+      )}
+
       {/* Navigation */}
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentSection === item.id;
           const isLocked = (item.id === 'lab2' || item.id === 'lab3') && !isLabAccessible(parseInt(item.id.replace('lab', '')));
@@ -136,8 +155,8 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {/* Keyboard shortcuts hint */}
-      {sidebarOpen && (
+      {/* Keyboard shortcuts hint - only for moderators */}
+      {isModerator && sidebarOpen && (
         <div className="p-4 border-t border-sidebar-border">
           <div className="text-xs text-muted-foreground space-y-1">
             <div className="flex items-center justify-between">
@@ -158,6 +177,22 @@ export function AppSidebar() {
           </div>
         </div>
       )}
+
+      {/* Role indicator and logout */}
+      <div className="p-2 border-t border-sidebar-border">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={logout}
+          className={cn(
+            'w-full justify-start gap-2 text-muted-foreground hover:text-foreground',
+            !sidebarOpen && 'justify-center px-0'
+          )}
+        >
+          <LogOut className="w-4 h-4" />
+          {sidebarOpen && <span>Switch Role</span>}
+        </Button>
+      </div>
 
       {/* Collapse toggle */}
       <button

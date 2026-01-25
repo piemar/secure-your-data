@@ -126,31 +126,6 @@ export function NewPresentationView() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-
-        <div className="flex items-center gap-2">
-          {/* Generate Template Button */}
-          <Button
-            onClick={handleGenerateTemplate}
-            disabled={isGeneratingTemplate}
-            variant="ghost"
-            size="sm"
-            className="gap-2 text-muted-foreground hover:text-foreground"
-          >
-            <FileDown className="w-4 h-4" />
-            {isGeneratingTemplate ? 'Generating...' : 'Download Template'}
-          </Button>
-
-          {/* Export Presentation Button */}
-          <Button
-            onClick={handleExport}
-            disabled={isExporting}
-            className="gap-2"
-            variant="outline"
-          >
-            <Download className="w-4 h-4" />
-            {isExporting ? 'Exporting...' : 'Export to PowerPoint'}
-          </Button>
-        </div>
       </div>
 
       {/* Slide viewer */}
