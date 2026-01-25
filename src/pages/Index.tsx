@@ -1,13 +1,43 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { MainLayout } from '@/components/layout/MainLayout';
+import { PresentationView } from '@/components/presentation/PresentationView';
+import { useNavigation } from '@/contexts/NavigationContext';
+
+function ContentRouter() {
+  const { currentSection } = useNavigation();
+
+  switch (currentSection) {
+    case 'presentation':
+      return <PresentationView />;
+    case 'lab1':
+    case 'lab2':
+    case 'lab3':
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center p-8">
+            <h2 className="text-2xl font-bold mb-4">Lab {currentSection.replace('lab', '')} Coming Soon</h2>
+            <p className="text-muted-foreground">Step-by-step hands-on lab guides will be available here.</p>
+          </div>
+        </div>
+      );
+    case 'cheatsheet':
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center p-8">
+            <h2 className="text-2xl font-bold mb-4">SA Cheat Sheet Coming Soon</h2>
+            <p className="text-muted-foreground">Quick reference guides and flowcharts will be available here.</p>
+          </div>
+        </div>
+      );
+    default:
+      return <PresentationView />;
+  }
+}
 
 const Index = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
-    </div>
+    <MainLayout>
+      <ContentRouter />
+    </MainLayout>
   );
 };
 
