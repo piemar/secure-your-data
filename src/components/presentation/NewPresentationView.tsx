@@ -2,8 +2,9 @@ import { useState, useCallback } from 'react';
 import { pptxSlides, sections } from './slidesPPTXData';
 import { SlideViewer } from './SlideViewer';
 import { Button } from '@/components/ui/button';
-import { Download, List, ChevronDown } from 'lucide-react';
+import { Download, List, ChevronDown, FileDown } from 'lucide-react';
 import { exportToPPTX } from '@/utils/exportToPPTX';
+import { generateBrandedTemplate } from '@/utils/generateTemplate';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
@@ -18,6 +19,7 @@ import { cn } from '@/lib/utils';
 export function NewPresentationView() {
   const [currentSlide, setCurrentSlide] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
+  const [isGeneratingTemplate, setIsGeneratingTemplate] = useState(false);
 
   const totalSlides = pptxSlides.length;
   const slide = pptxSlides[currentSlide - 1];
@@ -48,6 +50,19 @@ export function NewPresentationView() {
       toast.error('Failed to export presentation');
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleGenerateTemplate = async () => {
+    setIsGeneratingTemplate(true);
+    try {
+      await generateBrandedTemplate('MongoDB-Branded-Template');
+      toast.success('Branded template generated successfully!');
+    } catch (error) {
+      console.error('Template generation failed:', error);
+      toast.error('Failed to generate template');
+    } finally {
+      setIsGeneratingTemplate(false);
     }
   };
 
@@ -112,15 +127,30 @@ export function NewPresentationView() {
           </DropdownMenu>
         </div>
 
-        <Button
-          onClick={handleExport}
-          disabled={isExporting}
-          className="gap-2"
-          variant="outline"
-        >
-          <Download className="w-4 h-4" />
-          {isExporting ? 'Exporting...' : 'Export to PowerPoint'}
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Generate Template Button */}
+          <Button
+            onClick={handleGenerateTemplate}
+            disabled={isGeneratingTemplate}
+            variant="ghost"
+            size="sm"
+            className="gap-2 text-muted-foreground hover:text-foreground"
+          >
+            <FileDown className="w-4 h-4" />
+            {isGeneratingTemplate ? 'Generating...' : 'Download Template'}
+          </Button>
+
+          {/* Export Presentation Button */}
+          <Button
+            onClick={handleExport}
+            disabled={isExporting}
+            className="gap-2"
+            variant="outline"
+          >
+            <Download className="w-4 h-4" />
+            {isExporting ? 'Exporting...' : 'Export to PowerPoint'}
+          </Button>
+        </div>
       </div>
 
       {/* Slide viewer */}
