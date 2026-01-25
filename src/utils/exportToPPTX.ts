@@ -1,5 +1,5 @@
 import PptxGenJS from 'pptxgenjs';
-import { htmlToPptxText } from 'html2pptx';
+import { htmlToPptxText } from 'html2pptxgenjs';
 import { SlideData } from '@/components/presentation/slidesPPTXData';
 
 // MongoDB brand colors (hex without #)
