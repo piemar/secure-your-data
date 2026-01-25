@@ -2,95 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* MongoDB SA Enablement Platform - Dark Developer Theme */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 220 13% 5%;
+    --foreground: 210 20% 85%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 220 13% 8%;
+    --card-foreground: 210 20% 90%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 220 13% 10%;
+    --popover-foreground: 210 20% 90%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 145 100% 46%;
+    --primary-foreground: 220 13% 5%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 220 13% 15%;
+    --secondary-foreground: 210 20% 90%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 220 13% 12%;
+    --muted-foreground: 215 15% 55%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 145 100% 46%;
+    --accent-foreground: 220 13% 5%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 220 13% 18%;
+    --input: 220 13% 18%;
+    --ring: 145 100% 46%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* MongoDB specific colors */
+    --mongodb-green: 145 100% 46%;
+    --mongodb-green-glow: 145 100% 46% / 0.3;
+    --mongodb-dark: 220 13% 5%;
+    --mongodb-darker: 220 15% 3%;
+    --mongodb-gray: 220 13% 12%;
+    --mongodb-light-gray: 215 15% 55%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Code block colors */
+    --code-bg: 220 15% 6%;
+    --code-border: 220 13% 15%;
+    --code-keyword: 280 80% 70%;
+    --code-string: 145 100% 50%;
+    --code-comment: 215 15% 45%;
+    --code-function: 200 100% 70%;
+    --code-number: 30 100% 65%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    /* Sidebar */
+    --sidebar-background: 220 15% 6%;
+    --sidebar-foreground: 210 20% 85%;
+    --sidebar-primary: 145 100% 46%;
+    --sidebar-primary-foreground: 220 13% 5%;
+    --sidebar-accent: 220 13% 12%;
+    --sidebar-accent-foreground: 210 20% 90%;
+    --sidebar-border: 220 13% 15%;
+    --sidebar-ring: 145 100% 46%;
 
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Progress & Status */
+    --success: 145 100% 46%;
+    --warning: 45 100% 50%;
+    --info: 200 100% 50%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --background: 220 13% 5%;
+    --foreground: 210 20% 85%;
   }
 }
 
@@ -99,7 +80,188 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--mongodb-dark));
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+}
+
+@layer components {
+  /* Terminal-style code blocks */
+  .code-block {
+    @apply relative rounded-lg border font-mono text-sm;
+    background: hsl(var(--code-bg));
+    border-color: hsl(var(--code-border));
+  }
+
+  .code-block-header {
+    @apply flex items-center justify-between px-4 py-2 border-b;
+    border-color: hsl(var(--code-border));
+    background: hsl(var(--mongodb-gray));
+  }
+
+  .code-block-content {
+    @apply p-4 overflow-x-auto;
+  }
+
+  /* MongoDB green glow effect */
+  .glow-green {
+    box-shadow: 0 0 20px hsl(var(--mongodb-green-glow)),
+                0 0 40px hsl(var(--mongodb-green-glow));
+  }
+
+  .glow-green-subtle {
+    box-shadow: 0 0 10px hsl(var(--mongodb-green-glow));
+  }
+
+  /* Slide styles */
+  .slide-container {
+    @apply relative flex flex-col h-full overflow-hidden;
+    background: linear-gradient(135deg, hsl(var(--mongodb-dark)) 0%, hsl(var(--mongodb-darker)) 100%);
+  }
+
+  .slide-content {
+    @apply flex-1 p-8 overflow-y-auto;
+  }
+
+  /* Progress indicator */
+  .progress-step {
+    @apply relative flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium transition-all duration-300;
+  }
+
+  .progress-step.completed {
+    @apply bg-primary text-primary-foreground;
+  }
+
+  .progress-step.active {
+    @apply border-2 border-primary text-primary;
+    background: hsl(var(--mongodb-green-glow));
+  }
+
+  .progress-step.pending {
+    @apply bg-muted text-muted-foreground;
+  }
+
+  /* Interactive poll bars */
+  .poll-bar {
+    @apply h-10 rounded transition-all duration-700 ease-out;
+    background: linear-gradient(90deg, hsl(var(--primary)) 0%, hsl(145 100% 35%) 100%);
+  }
+
+  /* Lab step cards */
+  .lab-step-card {
+    @apply rounded-lg border transition-all duration-300;
+    background: hsl(var(--card));
+    border-color: hsl(var(--border));
+  }
+
+  .lab-step-card.active {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.3);
+  }
+
+  .lab-step-card.completed {
+    border-color: hsl(var(--success));
+  }
+
+  /* Cheat sheet sections */
+  .cheat-section {
+    @apply rounded-lg border p-4;
+    background: hsl(var(--card));
+    border-color: hsl(var(--border));
+  }
+
+  /* Keyboard shortcut badges */
+  .kbd {
+    @apply inline-flex items-center justify-center px-2 py-1 text-xs font-mono rounded;
+    background: hsl(var(--muted));
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 2px 0 hsl(var(--border));
+  }
+
+  /* Timer display */
+  .timer-display {
+    @apply font-mono text-lg tabular-nums;
+  }
+
+  .timer-display.warning {
+    @apply text-yellow-500;
+  }
+
+  .timer-display.danger {
+    @apply text-red-500 animate-pulse;
+  }
+}
+
+@layer utilities {
+  /* Animation utilities */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.3s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { 
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to { 
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes scaleIn {
+    from { 
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to { 
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* Gradient text */
+  .text-gradient-green {
+    background: linear-gradient(135deg, hsl(145 100% 50%) 0%, hsl(145 100% 70%) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 }
