@@ -1,652 +1,544 @@
 import { LabView } from './LabView';
-
-const lab3Steps = [
-  {
-    title: 'Understand the Right to Erasure Pattern',
-    estimatedTime: '5 min',
-    description: 'Learn the "One DEK per User" pattern that enables GDPR-compliant crypto-shredding. When a user requests deletion, you delete their DEK - making their data permanently indecipherable.',
-    tips: [
-      'Crypto-shredding is faster than finding and deleting all user data',
-      'The data remains in the database but is cryptographically inaccessible',
-      'This pattern requires CSFLE (not QE) due to DEK flexibility',
-      'Each user gets a unique DEK identified by their user ID',
-      'WARNING: For millions of users, ensure your KMS service limits support the number of keys',
-    ],
-    codeBlocks: [
-      {
-        filename: 'Pattern Overview',
-        language: 'text',
-        code: `GDPR Article 17: Right to Erasure ("Right to be Forgotten")
-
-Traditional Approach:
-  1. Find all user data across all collections
-  2. Delete each document/field
-  3. Clear backups, logs, caches
-  4. Prove complete deletion (hard!)
-
-Crypto-Shredding Approach:
-  1. Each user has their own DEK
-  2. All user's sensitive data encrypted with their DEK
-  3. On erasure request: DELETE THE DEK
-  4. Data becomes permanently unreadable
-  5. No need to touch actual data documents!
-
-Benefits:
-  ✓ Instant "deletion" - just remove one key
-  ✓ Works even if data is in backups
-  ✓ Auditable - show DEK deletion timestamp
-  ✓ Simpler compliance proof`,
-      },
-    ],
-  },
-  {
-    title: 'Set Up the One-DEK-Per-User Architecture',
-    estimatedTime: '7 min',
-    description: 'Create a system where each user gets their own Data Encryption Key. The key alt name will match the user ID for easy lookup.',
-    codeBlocks: [
-      {
-        filename: 'config-gdpr.js',
-        language: 'javascript',
-        code: `// config-gdpr.js - Right to Erasure Configuration
-const path = require("path");
-
-module.exports = {
-  mongoUri: process.env.MONGODB_URI || "mongodb+srv://<user>:<pass>@cluster.mongodb.net/",
-  
-  keyVaultDb: "encryption",
-  keyVaultColl: "__keyVault",
-  
-  // User data collection
-  userDataDb: "gdpr_demo",
-  userDataColl: "user_profiles",
-
-  // Using local key provider for demo (use KMS in production!)
-  kmsProviders: {
-    local: {
-      key: Buffer.alloc(96), // 96-byte local master key (demo only!)
-    },
-  },
-
-  cryptSharedPath: path.join(__dirname, "lib", "mongo_crypt_v1.dylib"),
-};
-
-// IMPORTANT: In production, use a real KMS (AWS/Azure/GCP)
-// The local provider stores the key in memory - NOT secure!`,
-      },
-      {
-        filename: 'setup-user-keys.js',
-        language: 'javascript',
-        code: `// setup-user-keys.js - Create per-user DEKs
-const { MongoClient } = require("mongodb");
-const { ClientEncryption } = require("mongodb-client-encryption");
-const crypto = require("crypto");
-const config = require("./config-gdpr");
-
-// Generate a proper local master key (demo purposes)
-const localMasterKey = crypto.randomBytes(96);
-config.kmsProviders.local.key = localMasterKey;
-
-async function createUserDEK(encryption, userId) {
-  // Check if DEK already exists for this user
-  const client = encryption._client;
-  const keyVault = client.db(config.keyVaultDb).collection(config.keyVaultColl);
-  
-  const existing = await keyVault.findOne({ keyAltNames: \`user_\${userId}\` });
-  if (existing) {
-    console.log(\`  DEK already exists for user \${userId}\`);
-    return existing._id;
-  }
-
-  // Create new DEK with user-specific alt name
-  const dataKeyId = await encryption.createDataKey("local", {
-    keyAltNames: [\`user_\${userId}\`],
-  });
-
-  console.log(\`  Created DEK for user \${userId}: \${dataKeyId.toString("hex").substring(0, 16)}...\`);
-  return dataKeyId;
-}
-
-async function setupUserKeys() {
-  const client = new MongoClient(config.mongoUri);
-  
-  try {
-    await client.connect();
-
-    // Ensure key vault index
-    const keyVault = client.db(config.keyVaultDb).collection(config.keyVaultColl);
-    await keyVault.createIndex(
-      { keyAltNames: 1 },
-      { unique: true, partialFilterExpression: { keyAltNames: { $exists: true } } }
-    );
-
-    const encryption = new ClientEncryption(client, {
-      keyVaultNamespace: \`\${config.keyVaultDb}.\${config.keyVaultColl}\`,
-      kmsProviders: config.kmsProviders,
-    });
-
-    // Create DEKs for sample users
-    console.log("Creating per-user DEKs...");
-    const userIds = ["user_001", "user_002", "user_003", "user_004", "user_005"];
-    
-    for (const userId of userIds) {
-      await createUserDEK(encryption, userId);
-    }
-
-    console.log("\\n✓ Per-user DEK setup complete");
-
-    // Show key vault contents
-    const allKeys = await keyVault.find().toArray();
-    console.log(\`\\nKey Vault now contains \${allKeys.length} DEKs:\`);
-    allKeys.forEach(k => {
-      console.log(\`  - \${k.keyAltNames?.[0] || "unnamed"}\`);
-    });
-
-  } finally {
-    await client.close();
-  }
-}
-
-// Export for reuse
-module.exports = { localMasterKey };
-
-setupUserKeys().catch(console.error);`,
-      },
-    ],
-    expectedOutput: `Creating per-user DEKs...
-  Created DEK for user user_001: 64a3b2c1d0e9f8a7...
-  Created DEK for user user_002: 75b4c3d2e1f0a9b8...
-  Created DEK for user user_003: 86c5d4e3f2b1a0c9...
-  Created DEK for user user_004: 97d6e5f4a3c2b1d0...
-  Created DEK for user user_005: a8e7f6b5c4d3e2f1...
-
-✓ Per-user DEK setup complete
-
-Key Vault now contains 5 DEKs:
-  - user_user_001
-  - user_user_002
-  - user_user_003
-  - user_user_004
-  - user_user_005`,
-  },
-  {
-    title: 'Insert User Data with Per-User Encryption',
-    estimatedTime: '8 min',
-    description: 'Insert user profile data where each user\'s sensitive fields are encrypted with their personal DEK.',
-    codeBlocks: [
-      {
-        filename: 'insert-user-data.js',
-        language: 'javascript',
-        code: `// insert-user-data.js - Insert data with per-user DEKs
-const { MongoClient } = require("mongodb");
-const { ClientEncryption } = require("mongodb-client-encryption");
-const crypto = require("crypto");
-const config = require("./config-gdpr");
-
-// Use same master key as setup
-const localMasterKey = crypto.randomBytes(96);
-config.kmsProviders.local.key = localMasterKey;
-
-async function insertUserData() {
-  const client = new MongoClient(config.mongoUri);
-  
-  try {
-    await client.connect();
-
-    const encryption = new ClientEncryption(client, {
-      keyVaultNamespace: \`\${config.keyVaultDb}.\${config.keyVaultColl}\`,
-      kmsProviders: config.kmsProviders,
-    });
-
-    const collection = client.db(config.userDataDb).collection(config.userDataColl);
-    
-    // Clear existing data
-    await collection.deleteMany({});
-
-    // Sample user data
-    const users = [
-      { id: "user_001", name: "Alice Johnson", email: "alice@example.com", ssn: "111-22-3333", phone: "+1-555-0101" },
-      { id: "user_002", name: "Bob Smith", email: "bob@example.com", ssn: "444-55-6666", phone: "+1-555-0102" },
-      { id: "user_003", name: "Carol White", email: "carol@example.com", ssn: "777-88-9999", phone: "+1-555-0103" },
-      { id: "user_004", name: "David Brown", email: "david@example.com", ssn: "123-45-6789", phone: "+1-555-0104" },
-      { id: "user_005", name: "Eva Martinez", email: "eva@example.com", ssn: "987-65-4321", phone: "+1-555-0105" },
-    ];
-
-    console.log("Inserting user data with per-user encryption...\\n");
-
-    for (const user of users) {
-      // Get this user's DEK by alt name
-      const keyAltName = \`user_\${user.id}\`;
-
-      // Encrypt sensitive fields with user's DEK
-      const encryptedSSN = await encryption.encrypt(user.ssn, {
-        keyAltName: keyAltName,
-        algorithm: "AEAD_AES_256_CBC_HMAC_SHA_512-Random",
-      });
-
-      const encryptedPhone = await encryption.encrypt(user.phone, {
-        keyAltName: keyAltName,
-        algorithm: "AEAD_AES_256_CBC_HMAC_SHA_512-Random",
-      });
-
-      const encryptedEmail = await encryption.encrypt(user.email, {
-        keyAltName: keyAltName,
-        algorithm: "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic",
-      });
-
-      // Insert document with encrypted fields
-      await collection.insertOne({
-        userId: user.id,
-        name: user.name,  // Not encrypted (for display)
-        email: encryptedEmail,
-        ssn: encryptedSSN,
-        phone: encryptedPhone,
-        keyAltName: keyAltName,  // Track which DEK was used
-        createdAt: new Date(),
-        gdprConsent: true,
-      });
-
-      console.log(\`  ✓ Inserted \${user.name} (encrypted with \${keyAltName})\`);
-    }
-
-    console.log(\`\\n✓ Inserted \${users.length} users with per-user encryption\`);
-
-  } finally {
-    await client.close();
-  }
-}
-
-insertUserData().catch(console.error);`,
-      },
-    ],
-    expectedOutput: `Inserting user data with per-user encryption...
-
-  ✓ Inserted Alice Johnson (encrypted with user_user_001)
-  ✓ Inserted Bob Smith (encrypted with user_user_002)
-  ✓ Inserted Carol White (encrypted with user_user_003)
-  ✓ Inserted David Brown (encrypted with user_user_004)
-  ✓ Inserted Eva Martinez (encrypted with user_user_005)
-
-✓ Inserted 5 users with per-user encryption`,
-  },
-  {
-    title: 'Simulate Right to Erasure Request',
-    estimatedTime: '10 min',
-    description: 'Simulate a GDPR erasure request by deleting a user\'s DEK. After deletion, their data becomes permanently unreadable.',
-    codeBlocks: [
-      {
-        filename: 'right-to-erasure.js',
-        language: 'javascript',
-        code: `// right-to-erasure.js - Implement crypto-shredding
-const { MongoClient } = require("mongodb");
-const { ClientEncryption } = require("mongodb-client-encryption");
-const crypto = require("crypto");
-const config = require("./config-gdpr");
-
-const localMasterKey = crypto.randomBytes(96);
-config.kmsProviders.local.key = localMasterKey;
-
-async function processErasureRequest(targetUserId) {
-  const client = new MongoClient(config.mongoUri);
-  
-  try {
-    await client.connect();
-    
-    const encryption = new ClientEncryption(client, {
-      keyVaultNamespace: \`\${config.keyVaultDb}.\${config.keyVaultColl}\`,
-      kmsProviders: config.kmsProviders,
-    });
-
-    const keyVault = client.db(config.keyVaultDb).collection(config.keyVaultColl);
-    const userCollection = client.db(config.userDataDb).collection(config.userDataColl);
-    const keyAltName = \`user_\${targetUserId}\`;
-
-    console.log("=== GDPR Right to Erasure Request ===");
-    console.log(\`Target User: \${targetUserId}\\n\`);
-
-    // Step 1: Verify user exists and show current data
-    console.log("Step 1: Verify user data exists");
-    const userDoc = await userCollection.findOne({ userId: targetUserId });
-    if (!userDoc) {
-      console.log("  User not found!");
-      return;
-    }
-    console.log(\`  Found user: \${userDoc.name}\`);
-    console.log(\`  SSN field type: \${userDoc.ssn._bsontype}\`);
-
-    // Try to decrypt BEFORE deletion
-    console.log("\\nStep 2: Verify we CAN decrypt before erasure");
-    try {
-      const decryptedSSN = await encryption.decrypt(userDoc.ssn);
-      console.log(\`  ✓ SSN decrypts successfully: \${decryptedSSN}\`);
-    } catch (e) {
-      console.log(\`  ✗ Decryption failed: \${e.message}\`);
-    }
-
-    // Step 3: DELETE THE DEK (crypto-shredding!)
-    console.log("\\nStep 3: DELETE USER'S DEK (Crypto-Shredding)");
-    const deleteResult = await keyVault.deleteOne({ keyAltNames: keyAltName });
-    
-    if (deleteResult.deletedCount === 1) {
-      console.log(\`  ✓ DEK deleted for \${keyAltName}\`);
-      console.log(\`  Timestamp: \${new Date().toISOString()}\`);
-    } else {
-      console.log("  ✗ DEK not found");
-    }
-
-    // Step 4: Verify data is now UNREADABLE
-    console.log("\\nStep 4: Verify data is now UNREADABLE");
-    console.log("  Attempting to decrypt user's SSN...");
-    
-    try {
-      await encryption.decrypt(userDoc.ssn);
-      console.log("  ✗ ERROR: Data still readable!");
-    } catch (e) {
-      console.log(\`  ✓ Decryption FAILED as expected: "cannot find key"\`);
-      console.log("  ✓ User's data is now cryptographically inaccessible!");
-    }
-
-    // Step 5: Verify OTHER users are unaffected
-    console.log("\\nStep 5: Verify other users are UNAFFECTED");
-    const otherUsers = await userCollection.find({ 
-      userId: { $ne: targetUserId } 
-    }).limit(2).toArray();
-
-    for (const other of otherUsers) {
-      try {
-        const decrypted = await encryption.decrypt(other.ssn);
-        console.log(\`  ✓ \${other.name}'s data still accessible: \${decrypted}\`);
-      } catch (e) {
-        console.log(\`  ✗ \${other.name}'s data inaccessible (unexpected)\`);
-      }
-    }
-
-    // Summary
-    console.log("\\n=== Erasure Complete ===");
-    console.log(\`User \${targetUserId}'s data has been crypto-shredded.\`);
-    console.log("The data documents still exist but are permanently unreadable.");
-    console.log("This satisfies GDPR Article 17 requirements.\\n");
-
-    // Audit log entry
-    const auditLog = {
-      action: "GDPR_RIGHT_TO_ERASURE",
-      userId: targetUserId,
-      keyAltName: keyAltName,
-      timestamp: new Date(),
-      method: "crypto-shredding",
-      dekDeleted: true,
-      dataDocumentsRetained: true,
-      note: "User DEK deleted - all user data is now cryptographically inaccessible"
-    };
-    console.log("Audit Log Entry:", JSON.stringify(auditLog, null, 2));
-
-  } finally {
-    await client.close();
-  }
-}
-
-// Process erasure for user_003 (Carol White)
-processErasureRequest("user_003").catch(console.error);`,
-      },
-    ],
-    expectedOutput: `=== GDPR Right to Erasure Request ===
-Target User: user_003
-
-Step 1: Verify user data exists
-  Found user: Carol White
-  SSN field type: Binary
-
-Step 2: Verify we CAN decrypt before erasure
-  ✓ SSN decrypts successfully: 777-88-9999
-
-Step 3: DELETE USER'S DEK (Crypto-Shredding)
-  ✓ DEK deleted for user_user_003
-  Timestamp: 2024-01-15T14:30:00.000Z
-
-Step 4: Verify data is now UNREADABLE
-  Attempting to decrypt user's SSN...
-  ✓ Decryption FAILED as expected: "cannot find key"
-  ✓ User's data is now cryptographically inaccessible!
-
-Step 5: Verify other users are UNAFFECTED
-  ✓ Alice Johnson's data still accessible: 111-22-3333
-  ✓ Bob Smith's data still accessible: 444-55-6666
-
-=== Erasure Complete ===
-User user_003's data has been crypto-shredded.
-The data documents still exist but are permanently unreadable.
-This satisfies GDPR Article 17 requirements.`,
-  },
-  {
-    title: 'Verify Crypto-Shredding Effectiveness',
-    estimatedTime: '5 min',
-    description: 'Run a comprehensive verification to confirm that the target user\'s data is truly inaccessible while all other users remain unaffected.',
-    codeBlocks: [
-      {
-        filename: 'verify-erasure.js',
-        language: 'javascript',
-        code: `// verify-erasure.js - Comprehensive verification
-const { MongoClient } = require("mongodb");
-const { ClientEncryption } = require("mongodb-client-encryption");
-const crypto = require("crypto");
-const config = require("./config-gdpr");
-
-const localMasterKey = crypto.randomBytes(96);
-config.kmsProviders.local.key = localMasterKey;
-
-async function verifyErasure() {
-  const client = new MongoClient(config.mongoUri);
-  
-  try {
-    await client.connect();
-
-    const encryption = new ClientEncryption(client, {
-      keyVaultNamespace: \`\${config.keyVaultDb}.\${config.keyVaultColl}\`,
-      kmsProviders: config.kmsProviders,
-    });
-
-    const keyVault = client.db(config.keyVaultDb).collection(config.keyVaultColl);
-    const userCollection = client.db(config.userDataDb).collection(config.userDataColl);
-
-    console.log("=== Crypto-Shredding Verification Report ===\\n");
-
-    // 1. Key Vault Status
-    console.log("1. Key Vault Status:");
-    const allKeys = await keyVault.find().toArray();
-    console.log(\`   Total DEKs: \${allKeys.length}\`);
-    console.log("   Active keys:");
-    allKeys.forEach(k => console.log(\`     - \${k.keyAltNames?.[0]}\`));
-
-    // 2. User Data Accessibility
-    console.log("\\n2. User Data Accessibility Matrix:");
-    console.log("   " + "-".repeat(60));
-    console.log("   | User ID    | Name           | SSN Accessible | Status    |");
-    console.log("   " + "-".repeat(60));
-
-    const allUsers = await userCollection.find().toArray();
-    
-    for (const user of allUsers) {
-      let ssnAccessible = false;
-      let ssnValue = "N/A";
-      
-      try {
-        ssnValue = await encryption.decrypt(user.ssn);
-        ssnAccessible = true;
-      } catch (e) {
-        ssnValue = "[SHREDDED]";
-      }
-
-      const status = ssnAccessible ? "Active" : "ERASED";
-      const statusIcon = ssnAccessible ? "✓" : "✗";
-      
-      console.log(\`   | \${user.userId.padEnd(10)} | \${user.name.padEnd(14)} | \${String(ssnAccessible).padEnd(14)} | \${statusIcon} \${status.padEnd(7)} |\`);
-    }
-    
-    console.log("   " + "-".repeat(60));
-
-    // 3. Summary
-    const erasedCount = allUsers.filter(async u => {
-      try {
-        await encryption.decrypt(u.ssn);
-        return false;
-      } catch {
-        return true;
-      }
-    }).length;
-
-    console.log("\\n3. Summary:");
-    console.log(\`   Total users in database: \${allUsers.length}\`);
-    console.log(\`   DEKs remaining: \${allKeys.length}\`);
-    console.log(\`   Users with inaccessible data: \${allUsers.length - allKeys.length}\`);
-    
-    console.log("\\n4. Compliance Notes:");
-    console.log("   ✓ Erased users' data remains in database (for referential integrity)");
-    console.log("   ✓ Without DEK, data is cryptographically equivalent to random bytes");
-    console.log("   ✓ Backup systems containing this data are also effectively erased");
-    console.log("   ✓ Audit trail preserved for compliance verification");
-
-  } finally {
-    await client.close();
-  }
-}
-
-verifyErasure().catch(console.error);`,
-      },
-    ],
-    expectedOutput: `=== Crypto-Shredding Verification Report ===
-
-1. Key Vault Status:
-   Total DEKs: 4
-   Active keys:
-     - user_user_001
-     - user_user_002
-     - user_user_004
-     - user_user_005
-
-2. User Data Accessibility Matrix:
-   ------------------------------------------------------------
-   | User ID    | Name           | SSN Accessible | Status    |
-   ------------------------------------------------------------
-   | user_001   | Alice Johnson  | true           | ✓ Active  |
-   | user_002   | Bob Smith      | true           | ✓ Active  |
-   | user_003   | Carol White    | false          | ✗ ERASED  |
-   | user_004   | David Brown    | true           | ✓ Active  |
-   | user_005   | Eva Martinez   | true           | ✓ Active  |
-   ------------------------------------------------------------
-
-3. Summary:
-   Total users in database: 5
-   DEKs remaining: 4
-   Users with inaccessible data: 1
-
-4. Compliance Notes:
-   ✓ Erased users' data remains in database (for referential integrity)
-   ✓ Without DEK, data is cryptographically equivalent to random bytes
-   ✓ Backup systems containing this data are also effectively erased
-   ✓ Audit trail preserved for compliance verification`,
-  },
-  {
-    title: 'Document the Compliance Process',
-    estimatedTime: '5 min',
-    description: 'Create proper documentation and audit trails for GDPR compliance. This is essential for proving erasure to regulators.',
-    codeBlocks: [
-      {
-        filename: 'compliance-documentation.md',
-        language: 'markdown',
-        code: `# GDPR Right to Erasure - Implementation Documentation
-
-## Architecture Overview
-
-This system implements GDPR Article 17 "Right to Erasure" using the 
-**crypto-shredding** pattern with MongoDB Client-Side Field Level Encryption.
-
-### Key Principles
-
-1. **One DEK Per User**: Each user's sensitive data is encrypted with a 
-   unique Data Encryption Key (DEK) identified by \`user_{userId}\`.
-
-2. **Centralized Key Vault**: All DEKs stored in the \`__keyVault\` collection,
-   protected by a Customer Master Key (CMK) in the KMS.
-
-3. **Crypto-Shredding**: On erasure request, the user's DEK is deleted.
-   Without the DEK, the encrypted data is cryptographically random.
-
-## Erasure Process
-
-### Step 1: Receive Request
-- Verify requester identity (authentication)
-- Log request receipt with timestamp
-
-### Step 2: Locate User DEK
-- Query key vault: \`{ keyAltNames: "user_{userId}" }\`
-- Verify DEK exists
-
-### Step 3: Delete DEK
-- Execute: \`keyVault.deleteOne({ keyAltNames: "user_{userId}" })\`
-- Record deletion timestamp
-
-### Step 4: Verify Erasure
-- Attempt to decrypt user data (should fail)
-- Generate verification report
-
-### Step 5: Audit Trail
-- Log all actions with timestamps
-- Retain audit log (this is NOT user data)
-
-## Audit Log Schema
-
-\`\`\`javascript
-{
-  action: "GDPR_RIGHT_TO_ERASURE",
-  userId: "user_003",
-  keyAltName: "user_user_003",
-  requestedAt: ISODate("2024-01-15T14:00:00Z"),
-  processedAt: ISODate("2024-01-15T14:30:00Z"),
-  dekDeleted: true,
-  verificationPassed: true,
-  processor: "system",
-  notes: "Erasure completed within 24 hours of request"
-}
-\`\`\`
-
-## Compliance Benefits
-
-| Requirement | Implementation |
-|------------|----------------|
-| Complete erasure | DEK deletion = data inaccessible |
-| Timely processing | Instant effect on deletion |
-| Backup coverage | Backups also become unreadable |
-| Proof of erasure | Audit log + verification report |
-| Reversibility | NOT reversible (by design) |`,
-      },
-    ],
-    tips: [
-      'Keep audit logs for at least 3 years for GDPR compliance',
-      'Test the erasure process regularly in non-production environments',
-      'Document the process for regulatory inquiries',
-      'Consider implementing a "soft delete" waiting period before DEK deletion',
-    ],
-  },
-];
+import { validatorUtils } from '@/utils/validatorUtils';
+import { useLab } from '@/context/LabContext';
 
 export function Lab3RightToErasure() {
+  const { mongoUri, awsRegion, verifiedTools } = useLab();
+  const suffix = verifiedTools['suffix']?.path || 'suffix';
+  const aliasName = `alias/mongodb-lab-key-${suffix}`;
+
+  const lab3Steps = [
+    {
+      id: 'l3s1',
+      title: 'Step 1: Explicit Encryption for Migration',
+      estimatedTime: '15 min',
+      description: 'When migrating existing plaintext data to CSFLE, you cannot use automatic encryption because the driver expects to find ciphertext. You must use the "Explicit Encryption" API to encrypt each field manually. This step demonstrates migrating data from a legacy collection to a secure, encrypted collection.',
+      tips: [
+        'ACTION REQUIRED: Run the Node.js script below to migrate plaintext data to encrypted format.',
+        'MIGRATION STRATEGY: Read from legacy collection → Encrypt each field explicitly → Write to secure collection.',
+        'EXPLICIT ENCRYPTION: Use `encryption.encrypt()` for each field that needs encryption during migration.',
+        'SA NUANCE: Deterministic encryption is critical during migration if you intend to maintain existing query capabilities on PII.',
+        'VERIFICATION: After migration, query the secure collection without CSFLE to see Binary ciphertext - proving encryption worked!'
+      ],
+      codeBlocks: [
+        {
+          filename: 'migrateToCSFLE.cjs (Node.js - Create this file)',
+          language: 'javascript',
+          code: `const { MongoClient, ClientEncryption } = require("mongodb");
+const { fromSSO } = require("@aws-sdk/credential-providers");
+
+const uri = "${mongoUri}";
+const keyVaultNamespace = "encryption.__keyVault";
+
+async function run() {
+  // Get SSO credentials - MongoDB will use these automatically
+  const credentials = await fromSSO()();
+
+  const kmsProviders = {
+    aws: credentials
+  };
+
+  const client = await MongoClient.connect(uri);
+  
+  // Get the DEK (from Lab 1)
+  const keyVaultDB = client.db("encryption");
+  const keyDoc = await keyVaultDB.collection("__keyVault").findOne({ 
+    keyAltNames: "user-${suffix}-ssn-key" 
+  });
+
+  if (!keyDoc) {
+    throw new Error("DEK not found! Run createKey.cjs from Lab 1 first.");
+  }
+
+  const dekId = keyDoc._id;
+  console.log(\`Using DEK: \${dekId.toString()}\`);
+
+  // Initialize ClientEncryption for explicit encryption
+  const encryption = new ClientEncryption(client, {
+    keyVaultNamespace,
+    kmsProviders,
+  });
+
+  // Source collection (plaintext)
+  const legacyDB = client.db("medical");
+  const legacyCollection = legacyDB.collection("patients_legacy");
+  
+  // Create sample legacy data if it doesn't exist
+  const legacyCount = await legacyCollection.countDocuments();
+  if (legacyCount === 0) {
+    console.log("Creating sample legacy data...");
+    await legacyCollection.insertMany([
+      { name: "John Doe", ssn: "111-22-3333", dob: "1980-01-01" },
+      { name: "Jane Smith", ssn: "444-55-6666", dob: "1985-05-15" },
+      { name: "Bob Johnson", ssn: "777-88-9999", dob: "1990-10-20" }
+    ]);
+    console.log("Created 3 sample documents in patients_legacy collection");
+  }
+
+  // Target collection (encrypted)
+  const secureCollection = legacyDB.collection("patients_secure");
+
+  // Migration: Read plaintext, encrypt explicitly, write to secure collection
+  console.log("\\n=== Migrating data with Explicit Encryption ===");
+  const legacyDocs = await legacyCollection.find({}).toArray();
+  
+  let migratedCount = 0;
+  for (const doc of legacyDocs) {
+    // Explicit encryption: encrypt the SSN field
+    const encryptedSSN = await encryption.encrypt(doc.ssn, {
+  algorithm: "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic",
+  keyId: dekId
+});
+
+    // Insert into secure collection with encrypted SSN
+    await secureCollection.insertOne({
+      ...doc,
+      ssn: encryptedSSN
+    });
+    migratedCount++;
+    console.log(\`Migrated: \${doc.name} (SSN encrypted)\`);
+  }
+
+  console.log(\`\\n✓ Migration complete! Migrated \${migratedCount} documents.\`);
+  console.log(\`✓ Legacy collection: medical.patients_legacy (plaintext)\`);
+  console.log(\`✓ Secure collection: medical.patients_secure (encrypted)\`);
+
+  // Verify: Query secure collection without CSFLE to show ciphertext
+  console.log("\\n=== Verification: Querying secure collection (no CSFLE) ===");
+  const sampleDoc = await secureCollection.findOne({ name: "John Doe" });
+  console.log(\`Name: \${sampleDoc.name}\`);
+  console.log(\`SSN (encrypted): \${sampleDoc.ssn.constructor.name} - Binary ciphertext\`);
+  console.log(\`✓ Data is encrypted in the database!\`);
+
+  await client.close();
+}
+
+run().catch(console.error);`,
+          skeleton: `// 1. Connect to MongoDB and get SSO credentials
+// 2. Look up the DEK by keyAltName from Lab 1
+// 3. Initialize ClientEncryption for explicit encryption
+// 4. Read documents from legacy collection (plaintext)
+// 5. For each document, encrypt the SSN field using encryption.encrypt()
+// 6. Insert encrypted documents into secure collection
+// 7. Verify encryption by querying without CSFLE (should see Binary)`
+        },
+        {
+          filename: 'Terminal - Run the script',
+          language: 'bash',
+          code: `# Run in your terminal:
+node migrateToCSFLE.cjs
+
+# Expected Output:
+# Using DEK: <UUID>
+# Created 3 sample documents in patients_legacy collection
+# === Migrating data with Explicit Encryption ===
+# Migrated: John Doe (SSN encrypted)
+# Migrated: Jane Smith (SSN encrypted)
+# Migrated: Bob Johnson (SSN encrypted)
+# ✓ Migration complete! Migrated 3 documents.
+# ✓ Legacy collection: medical.patients_legacy (plaintext)
+# ✓ Secure collection: medical.patients_secure (encrypted)
+# === Verification: Querying secure collection (no CSFLE) ===
+# Name: John Doe
+# SSN (encrypted): Binary - Binary ciphertext
+# ✓ Data is encrypted in the database!`
+        }
+      ],
+      onVerify: async () => validatorUtils.checkMigration(mongoUri)
+    },
+    {
+      id: 'l3s2',
+      title: 'Step 2: Multi-Tenant Isolation with KeyAltNames',
+      estimatedTime: '12 min',
+      description: 'Implement a SaaS-safe architecture where each tenant has their own DEK. Use the KeyAltName field to programmatically retrieve the correct key for each tenant request. This ensures complete data isolation between tenants - a key compromise for one tenant does not affect others.',
+      tips: [
+        'ACTION REQUIRED: Run the Node.js script below to create tenant-specific DEKs and demonstrate multi-tenant data isolation.',
+        'TENANT ISOLATION: By using 1 DEK per Tenant, you ensure that a key compromise for one customer does not affect others.',
+        'KEY LOOKUP: Use keyAltNames like "tenant-{tenantId}" to dynamically retrieve the correct DEK for each tenant.',
+        'SCALABILITY: The __keyVault can store millions of keys. Ensure the unique index is present (Verified in Lab 1).',
+        'BEST PRACTICE: Use template literals in schemaMap to dynamically set keyAltName based on the current tenant context.'
+      ],
+      codeBlocks: [
+        {
+          filename: 'multiTenantIsolation.cjs (Node.js - Create this file)',
+          language: 'javascript',
+          code: `const { MongoClient, ClientEncryption } = require("mongodb");
+const { fromSSO } = require("@aws-sdk/credential-providers");
+
+const uri = "${mongoUri}";
+const keyVaultNamespace = "encryption.__keyVault";
+
+async function run() {
+  // Get SSO credentials - MongoDB will use these automatically
+  const credentials = await fromSSO()();
+
+  const kmsProviders = {
+    aws: credentials
+  };
+
+  const client = await MongoClient.connect(uri);
+  const encryption = new ClientEncryption(client, {
+    keyVaultNamespace,
+    kmsProviders,
+  });
+
+  // Create DEKs for different tenants
+  const tenants = ["acme", "contoso", "fabrikam"];
+  
+  console.log("=== Creating Tenant-Specific DEKs ===");
+  for (const tenantId of tenants) {
+    const keyAltName = \`tenant-\${tenantId}\`;
+    
+    // Check if DEK already exists
+    const keyVaultDB = client.db("encryption");
+    const existingKey = await keyVaultDB.collection("__keyVault").findOne({ 
+      keyAltNames: keyAltName 
+    });
+
+    if (existingKey) {
+      console.log(\`✓ DEK already exists for tenant: \${tenantId}\`);
+    } else {
+      const dekId = await encryption.createDataKey("aws", {
+        masterKey: { 
+          key: "${aliasName}", 
+          region: "${awsRegion || 'eu-central-1'}" 
+        },
+        keyAltNames: [keyAltName]
+      });
+      console.log(\`✓ Created DEK for tenant: \${tenantId} (UUID: \${dekId.toString()})\`);
+    }
+  }
+
+  // Demonstrate multi-tenant data insertion
+  console.log("\\n=== Multi-Tenant Data Insertion ===");
+  const saasDB = client.db("saas");
+  
+  for (const tenantId of tenants) {
+    const keyAltName = \`tenant-\${tenantId}\`;
+    
+    // Look up the tenant's DEK
+    const keyVaultDB = client.db("encryption");
+    const keyDoc = await keyVaultDB.collection("__keyVault").findOne({ 
+      keyAltNames: keyAltName 
+    });
+
+    if (!keyDoc) {
+      throw new Error(\`DEK not found for tenant: \${tenantId}\`);
+    }
+
+    const dekId = keyDoc._id;
+
+    // Create schema map for this tenant
+const schemaMap = {
+  "saas.app": {
+        bsonType: "object",
+        encryptMetadata: {
+          keyId: [dekId],
+          algorithm: "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
+        },
+        properties: {
+          customerData: {
+            encrypt: {
+              bsonType: "string",
+              algorithm: "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic",
+              keyId: [dekId]
+            }
+          }
+        }
+      }
+    };
+
+    // Insert data for this tenant using CSFLE
+    const tenantClient = new MongoClient(uri, {
+      autoEncryption: {
+        keyVaultNamespace,
+        kmsProviders,
+        schemaMap
+      }
+    });
+
+    await tenantClient.connect();
+    const tenantCollection = tenantClient.db("saas").collection("app");
+    
+    await tenantCollection.insertOne({
+      tenantId: tenantId,
+      customerData: \`Sensitive data for \${tenantId}\`,
+      timestamp: new Date()
+    });
+
+    console.log(\`✓ Inserted encrypted data for tenant: \${tenantId}\`);
+    await tenantClient.close();
+  }
+
+  // Verify tenant isolation: Query each tenant's data
+  console.log("\\n=== Verifying Tenant Isolation ===");
+  const keyVaultDB = client.db("encryption");
+  
+  for (const tenantId of tenants) {
+    const keyAltName = \`tenant-\${tenantId}\`;
+    const keyDoc = await keyVaultDB.collection("__keyVault").findOne({ 
+      keyAltNames: keyAltName 
+    });
+    
+    if (keyDoc) {
+      console.log(\`✓ Tenant \${tenantId}: DEK exists (\${keyDoc._id.toString()})\`);
+    }
+  }
+
+  console.log("\\n✓ Multi-tenant isolation setup complete!");
+  console.log("✓ Each tenant has its own DEK, ensuring data isolation");
+
+  await client.close();
+}
+
+run().catch(console.error);`,
+          skeleton: `// 1. Connect to MongoDB and get SSO credentials
+// 2. Create DEKs for multiple tenants (acme, contoso, fabrikam)
+// 3. For each tenant:
+//    - Look up their DEK by keyAltName
+//    - Create a schemaMap with that tenant's DEK
+//    - Insert encrypted data using CSFLE client
+// 4. Verify that each tenant has their own DEK in the key vault`
+        },
+        {
+          filename: 'Terminal - Run the script',
+          language: 'bash',
+          code: `# Run in your terminal:
+node multiTenantIsolation.cjs
+
+# Expected Output:
+# === Creating Tenant-Specific DEKs ===
+# ✓ Created DEK for tenant: acme (UUID: ...)
+# ✓ Created DEK for tenant: contoso (UUID: ...)
+# ✓ Created DEK for tenant: fabrikam (UUID: ...)
+# === Multi-Tenant Data Insertion ===
+# ✓ Inserted encrypted data for tenant: acme
+# ✓ Inserted encrypted data for tenant: contoso
+# ✓ Inserted encrypted data for tenant: fabrikam
+# === Verifying Tenant Isolation ===
+# ✓ Tenant acme: DEK exists (...)
+# ✓ Tenant contoso: DEK exists (...)
+# ✓ Tenant fabrikam: DEK exists (...)
+# ✓ Multi-tenant isolation setup complete!`
+        }
+      ],
+      onVerify: async () => validatorUtils.checkTenantDEKs(mongoUri)
+    },
+    {
+      id: 'l3s3',
+      title: 'Step 3: Key Rotation (RewrapManyDataKey)',
+      estimatedTime: '15 min',
+      description: 'Rotate the Customer Master Key (CMK) without re-encrypting the actual data. This "Envelope Rotation" is a preferred compliance strategy for SAs. The rewrapManyDataKey() operation updates the DEK metadata to use a new CMK, but the encrypted data itself never changes - this is the power of envelope encryption!',
+      tips: [
+        'ACTION REQUIRED: Run the Node.js script below to rotate a DEK to use a new CMK.',
+        'SA TIP: Use rewrapManyDataKey() to update the DEKs with a new CMK. This is a metadata-only operation and is extremely fast.',
+        'COMPLIANCE: Regularly rotating the CMK is a standard requirement for SOC2 and PCI-DSS.',
+        'ENVELOPE ENCRYPTION: The actual encrypted data never changes - only the DEK\'s CMK reference is updated.',
+        'PREREQUISITE: Before rotation, ensure the NEW CMK exists and is accessible (see Step 4).',
+        'IMPORTANT: The old CMK must still be accessible during rotation (to decrypt the DEK for rewrapping).'
+      ],
+      codeBlocks: [
+        {
+          filename: 'rotateCMK.cjs (Node.js - Create this file)',
+          language: 'javascript',
+          code: `const { MongoClient, ClientEncryption } = require("mongodb");
+const { fromSSO } = require("@aws-sdk/credential-providers");
+
+const uri = "${mongoUri}";
+const keyVaultNamespace = "encryption.__keyVault";
+
+async function run() {
+  // Get SSO credentials - MongoDB will use these automatically
+  const credentials = await fromSSO()();
+
+  const kmsProviders = {
+    aws: credentials
+  };
+
+  const client = await MongoClient.connect(uri);
+  const encryption = new ClientEncryption(client, {
+    keyVaultNamespace,
+    kmsProviders,
+  });
+
+  // Rotate the DEK from Lab 1
+  const keyAltName = "user-${suffix}-ssn-key";
+  
+  console.log("=== Key Rotation: RewrapManyDataKey ===");
+  console.log(\`Rotating DEK with keyAltName: \${keyAltName}\`);
+
+  // Check if DEK exists
+  const keyVaultDB = client.db("encryption");
+  const keyDoc = await keyVaultDB.collection("__keyVault").findOne({ 
+    keyAltNames: keyAltName 
+  });
+
+  if (!keyDoc) {
+    throw new Error(\`DEK with keyAltName "\${keyAltName}" not found. Run createKey.cjs first.\`);
+  }
+
+  console.log(\`Found DEK: \${keyDoc._id.toString()}\`);
+
+  // NOTE: In production, you would use a NEW CMK alias here
+  // For this lab, we'll use the same CMK to demonstrate the rewrap operation
+  // In real scenarios, create a new CMK first: alias/mongodb-lab-key-v2
+  const newCMKAlias = "${aliasName}"; // Same key for demo
+  
+  console.log(\`\\nRotating DEK to use CMK: \${newCMKAlias}\`);
+  console.log("NOTE: In production, use a NEW CMK alias here!");
+
+  try {
+    // RewrapManyDataKey: Updates the DEK's CMK without re-encrypting data
+    const result = await encryption.rewrapManyDataKey(
+      { keyAltNames: keyAltName }, // Filter: which DEKs to rotate
+      {
+        provider: "aws",
+        masterKey: {
+          key: newCMKAlias,
+          region: "${awsRegion || 'eu-central-1'}"
+        }
+      }
+    );
+
+    console.log(\`\\n✓ Rotation complete!\`);
+    console.log(\`  - Matched DEKs: \${result.bulkWriteResult.matchedCount}\`);
+    console.log(\`  - Modified DEKs: \${result.bulkWriteResult.modifiedCount}\`);
+    
+    if (result.bulkWriteResult.modifiedCount > 0) {
+      console.log(\`\\n✓ DEK successfully rewrapped with new CMK\`);
+      console.log(\`✓ No data re-encryption required - this is envelope encryption!\`);
+    } else {
+      console.log(\`\\n⚠️  No DEKs were modified. They may already be using this CMK.\`);
+    }
+
+  } catch (error) {
+    console.error("\\n✗ Rotation failed:", error.message);
+    console.error("Common causes:");
+    console.error("  - New CMK doesn't exist or isn't accessible");
+    console.error("  - IAM permissions missing for new CMK");
+    console.error("  - Old CMK access lost (can't decrypt DEK to rewrap)");
+    throw error;
+  }
+
+  await client.close();
+}
+
+run().catch(console.error);`,
+          skeleton: `// 1. Connect to MongoDB and get SSO credentials
+// 2. Initialize ClientEncryption
+// 3. Look up the DEK by keyAltName that you want to rotate
+// 4. Call rewrapManyDataKey() with:
+//    - Filter: { keyAltNames: "..." } to select which DEKs to rotate
+//    - New CMK configuration: { provider: "aws", masterKey: { key: "NEW_ALIAS", region: "..." } }
+// 5. Check the result to see how many DEKs were modified
+// Note: This is a metadata-only operation - encrypted data never changes!`
+        },
+        {
+          filename: 'Terminal - Run the script',
+          language: 'bash',
+          code: `# Run in your terminal:
+node rotateCMK.cjs
+
+# Expected Output:
+# === Key Rotation: RewrapManyDataKey ===
+# Rotating DEK with keyAltName: user-<suffix>-ssn-key
+# Found DEK: <UUID>
+# Rotating DEK to use CMK: alias/mongodb-lab-key-<suffix>
+# ✓ Rotation complete!
+#   - Matched DEKs: 1
+#   - Modified DEKs: 1
+# ✓ DEK successfully rewrapped with new CMK
+# ✓ No data re-encryption required - this is envelope encryption!`
+        }
+      ],
+      onVerify: async () => validatorUtils.checkKeyRotation(mongoUri, `user-${suffix}-ssn-key`)
+    },
+    {
+      id: 'l3s4',
+      title: 'Step 4: Infrastructure: Rotation Readiness Check',
+      estimatedTime: '8 min',
+      description: 'Before rotating keys in MongoDB, you must verify that the new CMK exists and is accessible. Use the AWS CLI to check infrastructure readiness. This step ensures that rotation will succeed and helps prevent production issues.',
+      tips: [
+        'ACTION REQUIRED: Run the AWS CLI commands below to verify the new CMK exists and is accessible.',
+        'SA NUANCE: Rotation will fail if the driver cannot "Decrypt" with the old key or "Encrypt" with the new one.',
+        'PREREQUISITE: Create a new CMK in AWS KMS before attempting rotation in production.',
+        'VERIFICATION: Check that the new CMK alias exists, is enabled, and your IAM user has access.',
+        'MONITORING: SAs should recommend checking CloudWatch logs for KMS usage during a rewrap operation.',
+        'BEST PRACTICE: Always verify infrastructure readiness before performing key rotation in production.'
+      ],
+      codeBlocks: [
+        {
+          filename: 'AWS CLI - Verify New CMK Exists',
+          language: 'bash',
+          code: `# 1. List all KMS aliases to find your new CMK
+aws kms list-aliases --query "Aliases[?contains(AliasName, 'mongodb')].AliasName" --output table
+
+# 2. Verify the NEW key exists and is enabled
+aws kms describe-key --key-id "${aliasName}"
+
+# Expected Output: Should show KeyState: "Enabled"
+
+# 3. Check key policy to ensure your IAM user has access
+aws kms get-key-policy --key-id "${aliasName}" --policy-name default --output text
+
+# 4. Verify you can use the key (test encryption/decryption)
+aws kms encrypt --key-id "${aliasName}" --plaintext "test" --output text --query CiphertextBlob
+
+# Expected Output: Base64-encoded ciphertext (proves you can encrypt)
+
+# 5. Test decryption
+aws kms decrypt --ciphertext-blob <paste-ciphertext-from-step-4> --output text --query Plaintext
+
+# Expected Output: "dGVzdA==" (base64 for "test") - proves you can decrypt
+
+# ✓ If all steps succeed, your infrastructure is ready for rotation!`,
+          skeleton: `# 1. List KMS aliases to find your CMK
+# 2. Describe the key to verify it's enabled
+# 3. Get key policy to check IAM permissions
+# 4. Test encryption with the new key
+# 5. Test decryption with the new key
+# If all succeed, infrastructure is ready!`
+        },
+        {
+          filename: 'Note: Creating a New CMK for Rotation',
+          language: 'markdown',
+          code: `**For Production Rotation:**
+
+Before running rotateCMK.cjs, create a NEW CMK in AWS:
+
+\`\`\`bash
+# Create a new CMK for rotation
+aws kms create-key --description "MongoDB Lab Key V2" --region eu-central-1
+
+# Create an alias for the new key
+aws kms create-alias --alias-name alias/mongodb-lab-key-v2 --target-key-id <KEY_ID>
+
+# Update rotateCMK.cjs to use: alias/mongodb-lab-key-v2
+\`\`\`
+
+For this lab demo, we use the same CMK to demonstrate the rewrap operation.`
+        }
+      ],
+      onVerify: async () => validatorUtils.checkKmsAlias(aliasName)
+    }
+  ];
+
   return (
     <LabView
       labNumber={3}
-      title="Right to Erasure (GDPR) with CSFLE"
-      description="Implement the GDPR Right to Erasure using crypto-shredding. Learn the 'One DEK per User' pattern where deleting a user's encryption key renders their data permanently inaccessible."
+      title="Advanced Patterns & Governance"
+      description="Elevate your SA skills by mastering complex production patterns. Learn to migrate legacy data explicitly, manage per-tenant key isolation, and perform lifecycle rotations for enterprise compliance."
       duration="34 min"
       prerequisites={[
-        'MongoDB Atlas cluster (M10+ recommended)',
-        'Node.js 18+ installed',
-        'Understanding of CSFLE basics (Lab 1)',
-        'Familiarity with GDPR Article 17 requirements',
+        'Successful completion of Lab 1 & 2',
+        'Familiarity with JS Async/Await',
+        'Understanding of Envelope Encryption principles'
       ]}
       objectives={[
-        'Understand the crypto-shredding pattern for GDPR compliance',
-        'Implement One-DEK-per-User architecture',
-        'Execute a Right to Erasure request',
-        'Verify that erased data is truly inaccessible',
-        'Document the process for compliance audits',
+        'Implement Explicit Encryption API for bulk migration',
+        'Design Multi-Tenant schemas using KeyAltNames',
+        'Execute high-compliance CMK rotations',
+        'Defend the "One DEK per compliance category" architecture'
       ]}
       steps={lab3Steps}
     />

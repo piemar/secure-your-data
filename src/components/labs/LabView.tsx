@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CheckCircle, Clock, RotateCcw, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { LabStep } from './LabStep';
+import { useLab } from '@/context/LabContext';
 
 interface Step {
+  id: string;
   title: string;
   estimatedTime: string;
   description: string;
@@ -16,6 +18,8 @@ interface Step {
   expectedOutput?: string;
   troubleshooting?: string[];
   tips?: string[];
+  documentationUrl?: string;
+  onVerify?: () => Promise<{ success: boolean; message: string }>;
 }
 
 interface LabViewProps {
@@ -37,16 +41,44 @@ export function LabView({
   objectives,
   steps,
 }: LabViewProps) {
+  const { startLab, completeLab, userEmail } = useLab();
   const storageKey = `lab${labNumber}-progress`;
-  
+  const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
+
   const [completedSteps, setCompletedSteps] = useState<number[]>(() => {
     const saved = localStorage.getItem(storageKey);
     return saved ? JSON.parse(saved) : [];
   });
 
+  // Start lab tracking on mount and send heartbeat
+  useEffect(() => {
+    startLab(labNumber);
+    
+    // Send heartbeat every 30 seconds to update time tracking
+    const heartbeatInterval = setInterval(() => {
+      if (userEmail) {
+        fetch('/api/leaderboard/heartbeat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: userEmail,
+            labNumber
+          })
+        }).catch(console.error);
+      }
+    }, 30000);
+    
+    return () => clearInterval(heartbeatInterval);
+  }, [labNumber, startLab, userEmail]);
+
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify(completedSteps));
-  }, [completedSteps, storageKey]);
+    
+    // Check if all steps are completed
+    if (completedSteps.length === steps.length) {
+      completeLab(labNumber);
+    }
+  }, [completedSteps, storageKey, steps.length, labNumber, completeLab]);
 
   const toggleStep = (stepIndex: number) => {
     setCompletedSteps((prev) =>
@@ -54,6 +86,18 @@ export function LabView({
         ? prev.filter((s) => s !== stepIndex)
         : [...prev, stepIndex]
     );
+  };
+
+  const scrollToNextStep = (currentIndex: number) => {
+    const nextIndex = currentIndex + 1;
+    if (nextIndex < steps.length && stepRefs.current[nextIndex]) {
+      setTimeout(() => {
+        stepRefs.current[nextIndex]?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }, 300); // Wait for collapse animation
+    }
   };
 
   const resetProgress = () => {
@@ -130,19 +174,27 @@ export function LabView({
         <div className="space-y-4">
           <h2 className="text-xl font-semibold mb-4">Lab Steps</h2>
           {steps.map((step, index) => (
-            <LabStep
+            <div
               key={index}
-              stepNumber={index + 1}
-              title={step.title}
-              estimatedTime={step.estimatedTime}
-              description={step.description}
-              codeBlocks={step.codeBlocks}
-              expectedOutput={step.expectedOutput}
-              troubleshooting={step.troubleshooting}
-              tips={step.tips}
-              isCompleted={completedSteps.includes(index)}
-              onComplete={() => toggleStep(index)}
-            />
+              ref={(el) => (stepRefs.current[index] = el)}
+            >
+              <LabStep
+                stepId={step.id}
+                stepNumber={index + 1}
+                title={step.title}
+                estimatedTime={step.estimatedTime}
+                description={step.description}
+                codeBlocks={step.codeBlocks}
+                expectedOutput={step.expectedOutput}
+                troubleshooting={step.troubleshooting}
+                tips={step.tips}
+                documentationUrl={step.documentationUrl}
+                isCompleted={completedSteps.includes(index)}
+                onComplete={() => toggleStep(index)}
+                onVerify={step.onVerify}
+                onSuccess={() => scrollToNextStep(index)}
+              />
+            </div>
           ))}
         </div>
 
