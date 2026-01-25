@@ -192,6 +192,23 @@ export const validatorUtils = {
     /**
      * System check for installed CLI tools via Vite bridge.
      */
+    /**
+     * Verifies that a specific DEK exists in the key vault by keyAltName.
+     */
+    checkDataKey: async (uri: string, keyAltName: string): Promise<ValidationResult> => {
+        try {
+            const uriParam = uri ? `uri=${encodeURIComponent(uri)}&` : '';
+            const response = await fetch(`/api/verify-datakey?${uriParam}keyAltName=${encodeURIComponent(keyAltName)}`);
+            const data = await response.json();
+            return { success: data.success, message: data.message };
+        } catch (error) {
+            return { success: false, message: 'Bridge connection failed. Ensure npm run dev is active.' };
+        }
+    },
+
+    /**
+     * System check for installed CLI tools via Vite bridge.
+     */
     checkToolInstalled: async (toolName: string): Promise<ValidationResult> => {
         const toolLower = toolName.toLowerCase();
         let queryLabel: string;

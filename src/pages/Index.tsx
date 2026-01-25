@@ -5,9 +5,11 @@ import { Lab2QueryableEncryption } from '@/components/labs/Lab2QueryableEncrypti
 import { Lab3RightToErasure } from '@/components/labs/Lab3RightToErasure';
 import { LabSetupWizard } from '@/components/labs/LabSetupWizard';
 import { Leaderboard } from '@/components/labs/Leaderboard';
+import { RoleSelection } from '@/components/RoleSelection';
 import { useNavigation } from '@/contexts/NavigationContext';
+import { useRole } from '@/contexts/RoleContext';
 import { useLab } from '@/context/LabContext';
-import { AlertCircle, Lock } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useEffect } from 'react';
@@ -16,6 +18,7 @@ import { useLocation } from 'react-router-dom';
 function ContentRouter() {
   const { currentSection, setSection } = useNavigation();
   const { isLabAccessible, isLabCompleted } = useLab();
+  const { isModerator } = useRole();
   const location = useLocation();
 
   // Sync URL with navigation context
@@ -27,10 +30,18 @@ function ContentRouter() {
 
   switch (currentSection) {
     case 'presentation':
+      // Only moderators see presentation
+      if (!isModerator) {
+        return <LabSetupWizard />;
+      }
       return <NewPresentationView />;
     case 'setup':
       return <LabSetupWizard />;
     case 'leaderboard':
+      // Only moderators see leaderboard
+      if (!isModerator) {
+        return <LabSetupWizard />;
+      }
       return <Leaderboard />;
     case 'lab1':
       return <Lab1CSFLE />;
@@ -82,21 +93,23 @@ function ContentRouter() {
         );
       }
       return <Lab3RightToErasure />;
-    case 'cheatsheet':
-      return (
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center p-8">
-            <h2 className="text-2xl font-bold mb-4">SA Cheat Sheet Coming Soon</h2>
-            <p className="text-muted-foreground">Quick reference guides and flowcharts will be available here.</p>
-          </div>
-        </div>
-      );
     default:
+      // Default to setup for attendees, presentation for moderators
+      if (!isModerator) {
+        return <LabSetupWizard />;
+      }
       return <NewPresentationView />;
   }
 }
 
 const Index = () => {
+  const { role } = useRole();
+
+  // Show role selection if no role is selected
+  if (!role) {
+    return <RoleSelection />;
+  }
+
   return (
     <MainLayout>
       <ContentRouter />
