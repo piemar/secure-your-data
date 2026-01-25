@@ -238,8 +238,9 @@ Encrypted fields configured:
   - email: equality`,
     tips: [
       'QE automatically creates a separate DEK for each encrypted field',
-      'The contention factor for range queries affects both security and performance',
-      'Higher contention = better security but slower queries',
+      'The contention factor (0-16) affects write throughput - higher prevents frequency analysis but slows writes',
+      'Min/Max boundaries are critical for Range indexes to optimize token generation',
+      'Sparsity (default 1) can be increased to reduce storage overhead at the cost of query precision',
     ],
   },
   {

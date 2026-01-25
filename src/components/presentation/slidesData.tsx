@@ -1,10 +1,10 @@
 import { ReactNode } from 'react';
 import { InteractivePoll } from './InteractivePoll';
 import { StorageChallenge } from './StorageChallenge';
-import { 
-  EnvelopeEncryptionDiagram, 
-  EscEcocDiagram, 
-  RightToErasureFlowchart 
+import {
+  EnvelopeEncryptionDiagram,
+  EscEcocDiagram,
+  RightToErasureFlowchart
 } from './ArchitectureDiagrams';
 import { CodeBlock } from '@/components/ui/code-block';
 import { Shield, Lock, Database, Key, AlertTriangle, CheckCircle, XCircle, Cloud, Server } from 'lucide-react';
@@ -448,7 +448,7 @@ Why envelope encryption?
           <div className="p-6 rounded-lg bg-card border border-border">
             <h3 className="text-lg font-semibold mb-4">Encrypted Multi-Maps (EMMs)</h3>
             <p className="text-muted-foreground mb-4">
-              QE uses a data structure called an Encrypted Multi-Map that allows the server to 
+              QE uses a data structure called an Encrypted Multi-Map that allows the server to
               compute comparisons without seeing plaintext.
             </p>
             <CodeBlock
@@ -465,7 +465,7 @@ token_lt_100000 = encrypt(range_token(100000, LT))
           <div className="p-6 rounded-lg bg-card border border-border">
             <h3 className="text-lg font-semibold mb-4">Structured Encryption</h3>
             <p className="text-muted-foreground mb-4">
-              The server stores encrypted "tokens" that encode order relationships. 
+              The server stores encrypted "tokens" that encode order relationships.
               It can test {">"} and {"<"} without decrypting.
             </p>
             <div className="space-y-2">
@@ -489,7 +489,7 @@ token_lt_100000 = encrypt(range_token(100000, LT))
           </div>
         </div>
         <CalloutBox type="info" title="Private Querying">
-          QE also implements "private querying" - query patterns are redacted from logs, 
+          QE also implements "private querying" - query patterns are redacted from logs,
           hiding even the <em>existence</em> of queries from database operators.
         </CalloutBox>
       </div>
@@ -672,8 +672,8 @@ Key rotation workflow (using rewrapManyDataKey):
         <SlideTitle subtitle="GDPR Article 17 compliance">Crypto-Shredding at Scale</SlideTitle>
         <RightToErasureFlowchart />
         <CalloutBox type="success" title="One DEK Per User Pattern">
-          <p>Assign each user their own DEK. When erasure is requested, simply delete their DEK from the Key Vault. 
-          All their data becomes cryptographically indecipherable - including in backups.</p>
+          <p>Assign each user their own DEK. When erasure is requested, simply delete their DEK from the Key Vault.
+            All their data becomes cryptographically indecipherable - including in backups.</p>
         </CalloutBox>
       </div>
     ),
@@ -777,38 +777,45 @@ Architecture tip: You can use DIFFERENT KMS providers for different DEKs.
         <div className="grid grid-cols-2 gap-8">
           <div className="p-6 rounded-lg bg-card border border-border">
             <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <span className="text-2xl">🤖</span> Automatic Encryption
+              <span className="text-2xl">🤖</span> Automatic
             </h3>
             <p className="text-muted-foreground mb-4">
-              Define a JSON schema. Driver handles encryption/decryption transparently.
+              Best for Queryable Encryption (MongoDB 7.0+). Define fields on the collection.
             </p>
             <CodeBlock
-              code={`// Schema definition
-{
-  "bsonType": "object",
-  "properties": {
-    "ssn": {
-      "encrypt": {
-        "bsonType": "string",
-        "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
+              code={`// Queryable Encryption (MongoDB 7.0+)
+const encryptedFields = {
+  fields: [
+    {
+      path: "ssn",
+      bsonType: "string",
+      queries: { queryType: "equality" }
+    },
+    {
+      path: "salary",
+      bsonType: "int",
+      queries: { 
+        queryType: "range",
+        min: 0, max: 1000000 
       }
     }
-  }
-}`}
-              language="json"
-              filename="encryption-schema.json"
+  ]
+};
+
+await db.createCollection("employees", { encryptedFields });`}
+              language="javascript"
+              filename="qe-auto-encryption.js"
             />
-            <div className="mt-4 text-sm text-primary">Best for: New applications</div>
           </div>
           <div className="p-6 rounded-lg bg-card border border-border">
             <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <span className="text-2xl">👩‍💻</span> Explicit Encryption
+              <span className="text-2xl">👩‍💻</span> Manual/Explicit
             </h3>
             <p className="text-muted-foreground mb-4">
-              Call encrypt/decrypt methods directly. Full control in application code.
+              Full control in application code. Call encrypt/decrypt methods directly.
             </p>
             <CodeBlock
-              code={`// Manual encryption
+              code={`// Manual/Explicit encryption
 const encryptedSSN = await clientEncryption.encrypt(
   "123-45-6789",
   {
@@ -821,7 +828,7 @@ await collection.insertOne({ ssn: encryptedSSN });`}
               language="javascript"
               filename="explicit-encrypt.js"
             />
-            <div className="mt-4 text-sm text-primary">Best for: Retrofitting existing apps</div>
+            <div className="mt-4 text-sm text-primary">Best for: Conditional logic or legacy apps</div>
           </div>
         </div>
       </div>
@@ -868,10 +875,14 @@ Both use the same underlying crypto - it's just about developer experience.`,
             ['$group/$sum', <XCircle key="29" className="w-5 h-5 text-destructive" />, <XCircle key="30" className="w-5 h-5 text-destructive" />, <XCircle key="31" className="w-5 h-5 text-destructive" />, <XCircle key="32" className="w-5 h-5 text-destructive" />],
           ]}
         />
-        <CalloutBox type="warning" title="Current Limitations">
-          <p>Sorting, text search, and aggregations ($group, $sum) are NOT supported on encrypted fields. 
-          Design your schema so these operations target non-sensitive fields.</p>
-        </CalloutBox>
+        <div className="mt-6 grid grid-cols-2 gap-4">
+          <CalloutBox type="warning" title="Current Limitations">
+            <p className="text-sm">Sorting and aggregations ($group, $sum) are NOT supported on encrypted fields. Design your schema accordingly.</p>
+          </CalloutBox>
+          <CalloutBox type="info" title="Contention Factor">
+            <p className="text-sm">QE <code>contention</code> (0-16) balances write throughput vs query security. Higher values add "noise" to prevent frequency analysis but increase internal write ops.</p>
+          </CalloutBox>
+        </div>
       </div>
     ),
     speakerNotes: `This is the practical "what works" slide. Print this for customer conversations.
@@ -951,7 +962,7 @@ Example: salary field
         </div>
         <div className="mt-6 p-4 rounded-lg bg-muted/30">
           <p className="text-sm text-muted-foreground">
-            <strong>Best Practice:</strong> Design your schema so that sorting, searching, and aggregation 
+            <strong>Best Practice:</strong> Design your schema so that sorting, searching, and aggregation
             operations target non-sensitive fields. Encrypt only what needs protection.
           </p>
         </div>
@@ -1075,28 +1086,28 @@ Sizing guidance:
 
 // 2. Rewrap all DEKs with new CMK
 await clientEncryption.rewrapManyDataKey(
-  { }, // filter - empty = all keys
-  {
-    provider: "aws",
-    masterKey: {
-      key: "arn:aws:kms:...:key/NEW-KEY-ID",
-      region: "us-east-1"
-    }
-  }
-);
+      {}, // filter - empty = all keys
+      {
+        provider: "aws",
+        masterKey: {
+          key: "arn:aws:kms:...:key/NEW-KEY-ID",
+          region: "us-east-1"
+        }
+      }
+    );
 
 // 3. Retire old CMK after confirmation
 // No data re-encryption needed!`}
               language="javascript"
               filename="key-rotation.js"
             />
-          </div>
-        </div>
+          </div >
+        </div >
         <CalloutBox type="success" title="Zero-Downtime Rotation">
-          <p>Key rotation only re-encrypts DEKs, not your actual data. 
-          A collection with millions of documents can be rotated in seconds.</p>
+          <p>Key rotation only re-encrypts DEKs, not your actual data.
+            A collection with millions of documents can be rotated in seconds.</p>
         </CalloutBox>
-      </div>
+      </div >
     ),
     speakerNotes: `Key rotation is a compliance requirement for many customers. Here's how it works.
 
@@ -1432,8 +1443,8 @@ The key: Don't argue features. Understand their specific concerns and address th
           </div>
         </div>
         <CalloutBox type="warning" title="Honest Qualification">
-          <p>If a customer needs real-time aggregations or full-text search on the encrypted fields themselves, 
-          CSFLE/QE may not be the right fit. Better to be honest than have a failed implementation.</p>
+          <p>If a customer needs real-time aggregations or full-text search on the encrypted fields themselves,
+            CSFLE/QE may not be the right fit. Better to be honest than have a failed implementation.</p>
         </CalloutBox>
       </div>
     ),
