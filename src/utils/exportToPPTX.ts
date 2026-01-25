@@ -1,5 +1,4 @@
 import PptxGenJS from 'pptxgenjs';
-import { htmlToPptxText } from 'html2pptx';
 import { SlideData } from '@/components/presentation/slidesPPTXData';
 
 // MongoDB brand colors (hex without #)
@@ -24,33 +23,6 @@ const SLIDE = {
   margin: 0.4,
   contentStart: 1.1,
 };
-
-/**
- * Convert plain text with markers to HTML for html2pptx processing
- */
-function textToHtml(text: string): string {
-  // Convert markdown-style formatting to HTML
-  let html = text
-    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
-    .replace(/__(.*?)__/g, '<b>$1</b>')
-    .replace(/\*(.*?)\*/g, '<i>$1</i>')
-    .replace(/_(.*?)_/g, '<i>$1</i>');
-  return html;
-}
-
-/**
- * Create HTML bullet list for conversion
- */
-function bulletsToHtml(bullets: string[], highlightFirst = false): string {
-  const items = bullets.map((bullet, i) => {
-    const content = textToHtml(bullet);
-    if (highlightFirst && i === 0) {
-      return `<li><span style="color: #00ED64">${content}</span></li>`;
-    }
-    return `<li>${content}</li>`;
-  });
-  return `<ul>${items.join('')}</ul>`;
-}
 
 export async function exportToPPTX(slides: SlideData[], filename: string = 'MongoDB-CSFLE-QE-Presentation') {
   const pptx = new PptxGenJS();
@@ -136,7 +108,7 @@ export async function exportToPPTX(slides: SlideData[], filename: string = 'Mong
     title: 'MONGODB_TITLE',
     background: { color: COLORS.background },
     objects: [
-      // Gradient-like effect with rectangles
+      // Top accent bar
       {
         rect: {
           x: 0,
@@ -174,13 +146,10 @@ export async function exportToPPTX(slides: SlideData[], filename: string = 'Mong
   // Generate slides
   slides.forEach((slideData, index) => {
     if (index === 0) {
-      // Title slide - special layout
       createTitleSlide(pptx, slideData);
     } else if (slideData.sectionNumber === 0 && slideData.section === 'Agenda') {
-      // Agenda slide
       createAgendaSlide(pptx, slideData);
     } else {
-      // Regular content slide
       createContentSlide(pptx, slideData);
     }
   });
@@ -193,7 +162,7 @@ function createTitleSlide(pptx: PptxGenJS, slideData: SlideData) {
   const slide = pptx.addSlide({ masterName: 'MONGODB_TITLE' });
   const { exportContent } = slideData;
 
-  // Shield icon simulation (using shape)
+  // Shield icon simulation
   slide.addShape('rect', {
     x: 4.25,
     y: 1.0,
@@ -215,11 +184,8 @@ function createTitleSlide(pptx: PptxGenJS, slideData: SlideData) {
     valign: 'middle',
   });
 
-  // Main title using html2pptx
-  const titleHtml = `<h1><span style="color: #00ED64">${exportContent.title}</span></h1>`;
-  const titleText = htmlToPptxText(titleHtml);
-  
-  slide.addText(titleText.length > 0 ? titleText : exportContent.title, {
+  // Main title
+  slide.addText(exportContent.title, {
     x: 0.5,
     y: 2.6,
     w: 9,
@@ -231,13 +197,10 @@ function createTitleSlide(pptx: PptxGenJS, slideData: SlideData) {
     align: 'center',
   });
 
-  // Subtitle using html2pptx
+  // Subtitle
   if (exportContent.subtitle) {
     const subtitleLines = exportContent.subtitle.split('\n');
-    const subtitleHtml = `<p>${subtitleLines[0] || ''}</p>`;
-    const subtitleText = htmlToPptxText(subtitleHtml);
-    
-    slide.addText(subtitleText.length > 0 ? subtitleText : (subtitleLines[0] || ''), {
+    slide.addText(subtitleLines[0] || '', {
       x: 0.5,
       y: 3.5,
       w: 9,
@@ -247,12 +210,8 @@ function createTitleSlide(pptx: PptxGenJS, slideData: SlideData) {
       fontFace: 'Arial',
       align: 'center',
     });
-    
     if (subtitleLines[1]) {
-      const line2Html = `<p><b><span style="color: #00ED64">${subtitleLines[1]}</span></b></p>`;
-      const line2Text = htmlToPptxText(line2Html);
-      
-      slide.addText(line2Text.length > 0 ? line2Text : subtitleLines[1], {
+      slide.addText(subtitleLines[1], {
         x: 0.5,
         y: 4.0,
         w: 9,
@@ -266,7 +225,6 @@ function createTitleSlide(pptx: PptxGenJS, slideData: SlideData) {
     }
   }
 
-  // Speaker notes
   if (exportContent.notes) {
     slide.addNotes(exportContent.notes);
   }
@@ -276,11 +234,8 @@ function createAgendaSlide(pptx: PptxGenJS, slideData: SlideData) {
   const slide = pptx.addSlide({ masterName: 'MONGODB_MASTER' });
   const { exportContent } = slideData;
 
-  // Title using html2pptx
-  const titleHtml = `<h2><span style="color: #00ED64">${exportContent.title}</span></h2>`;
-  const titleText = htmlToPptxText(titleHtml);
-  
-  slide.addText(titleText.length > 0 ? titleText : exportContent.title, {
+  // Title
+  slide.addText(exportContent.title, {
     x: SLIDE.margin,
     y: 0.3,
     w: 9,
@@ -320,11 +275,8 @@ function createAgendaSlide(pptx: PptxGenJS, slideData: SlideData) {
     const num = match ? match[1].padStart(2, '0') : `0${i + 1}`;
     const text = match ? match[2] : bullet;
 
-    // Number with html2pptx
-    const numHtml = `<b><span style="color: #00ED64">${num}</span></b>`;
-    const numText = htmlToPptxText(numHtml);
-    
-    slide.addText(numText.length > 0 ? numText : num, {
+    // Number
+    slide.addText(num, {
       x: x + 0.1,
       y: y + 0.08,
       w: 0.4,
@@ -335,11 +287,8 @@ function createAgendaSlide(pptx: PptxGenJS, slideData: SlideData) {
       fontFace: 'Arial',
     });
 
-    // Text content
-    const contentHtml = `<p>${textToHtml(text)}</p>`;
-    const contentText = htmlToPptxText(contentHtml);
-    
-    slide.addText(contentText.length > 0 ? contentText : text, {
+    // Text
+    slide.addText(text, {
       x: x + 0.55,
       y: y + 0.1,
       w: colWidth - 0.7,
@@ -367,15 +316,12 @@ function createContentSlide(pptx: PptxGenJS, slideData: SlideData) {
       y: 0.2,
       w: 2.2,
       h: 0.28,
-      fill: { color: '1a3a2a' }, // Dark green
+      fill: { color: '1a3a2a' },
       line: { color: COLORS.primaryDark, pt: 1 },
       rectRadius: 0.05,
     });
 
-    const sectionHtml = `<b><span style="color: #00ED64">0${slideData.sectionNumber}  ${slideData.section.toUpperCase()}</span></b>`;
-    const sectionText = htmlToPptxText(sectionHtml);
-    
-    slide.addText(sectionText.length > 0 ? sectionText : `0${slideData.sectionNumber}  ${slideData.section.toUpperCase()}`, {
+    slide.addText(`0${slideData.sectionNumber}  ${slideData.section.toUpperCase()}`, {
       x: SLIDE.margin + 0.1,
       y: 0.21,
       w: 2,
@@ -387,12 +333,9 @@ function createContentSlide(pptx: PptxGenJS, slideData: SlideData) {
     });
   }
 
-  // Title with html2pptx
+  // Title
   const titleY = slideData.sectionNumber > 0 ? 0.55 : 0.25;
-  const titleHtml = `<h2><span style="color: #00ED64">${exportContent.title}</span></h2>`;
-  const titleText = htmlToPptxText(titleHtml);
-  
-  slide.addText(titleText.length > 0 ? titleText : exportContent.title, {
+  slide.addText(exportContent.title, {
     x: SLIDE.margin,
     y: titleY,
     w: 9,
@@ -459,14 +402,11 @@ function createContentSlide(pptx: PptxGenJS, slideData: SlideData) {
     contentY += 0.35 + exportContent.table.rows.length * 0.35 + 0.2;
   }
 
-  // Add bullets if present using html2pptx
+  // Add bullets if present
   if (exportContent.bullets && exportContent.bullets.length > 0) {
-    // Convert bullets to HTML and then to pptx text
-    const bulletsHtml = bulletsToHtml(exportContent.bullets);
-    const bulletsPptxText = htmlToPptxText(bulletsHtml);
-    
-    // Create a card-like background for bullets
     const bulletHeight = Math.min(exportContent.bullets.length * 0.4 + 0.3, 4);
+    
+    // Card background for bullets
     slide.addShape('roundRect', {
       x: SLIDE.margin,
       y: contentY,
@@ -477,48 +417,33 @@ function createContentSlide(pptx: PptxGenJS, slideData: SlideData) {
       rectRadius: 0.08,
     });
 
-    // Use html2pptx converted text if available, fallback to manual bullet creation
-    if (bulletsPptxText.length > 0) {
-      slide.addText(bulletsPptxText, {
-        x: SLIDE.margin + 0.2,
-        y: contentY + 0.15,
-        w: 8.8,
-        h: bulletHeight - 0.3,
-        valign: 'top',
+    // Create bullet text with proper formatting
+    const bulletTextParts: PptxGenJS.TextProps[] = exportContent.bullets.map((bullet) => ({
+      text: bullet,
+      options: {
+        bullet: { 
+          type: 'bullet' as const, 
+          code: '25CF',
+          color: COLORS.primary,
+        },
         color: COLORS.text,
         fontSize: 12,
         fontFace: 'Arial',
-      });
-    } else {
-      // Fallback to manual bullet creation
-      const bulletTextParts: PptxGenJS.TextProps[] = exportContent.bullets.map((bullet) => ({
-        text: bullet,
-        options: {
-          bullet: { 
-            type: 'bullet' as const, 
-            code: '25CF', // Filled circle
-            color: COLORS.primary,
-          },
-          color: COLORS.text,
-          fontSize: 12,
-          fontFace: 'Arial',
-          breakLine: true,
-          paraSpaceAfter: 8,
-          indentLevel: 0,
-        },
-      }));
+        breakLine: true,
+        paraSpaceAfter: 8,
+        indentLevel: 0,
+      },
+    }));
 
-      slide.addText(bulletTextParts, {
-        x: SLIDE.margin + 0.2,
-        y: contentY + 0.15,
-        w: 8.8,
-        h: bulletHeight - 0.3,
-        valign: 'top',
-      });
-    }
+    slide.addText(bulletTextParts, {
+      x: SLIDE.margin + 0.2,
+      y: contentY + 0.15,
+      w: 8.8,
+      h: bulletHeight - 0.3,
+      valign: 'top',
+    });
   }
 
-  // Speaker notes
   if (exportContent.notes) {
     slide.addNotes(exportContent.notes);
   }
