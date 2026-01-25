@@ -13,8 +13,9 @@ interface RoleContextType {
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
-// Simple obfuscation - PIN stored as reversed base64
-const OBFUSCATED_PIN = '==QNzUDM'; // 163500 reversed base64
+// Simple obfuscation - PIN stored as reversed base64  
+// btoa("163500") = "MTYzNTAw", reversed = "wATNzYTM"
+const OBFUSCATED_PIN = 'wATNzYTM'; // 163500 reversed base64
 
 function deobfuscatePin(): string {
   try {
