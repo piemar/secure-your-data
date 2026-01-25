@@ -10,6 +10,7 @@ const lab3Steps = [
       'The data remains in the database but is cryptographically inaccessible',
       'This pattern requires CSFLE (not QE) due to DEK flexibility',
       'Each user gets a unique DEK identified by their user ID',
+      'WARNING: For millions of users, ensure your KMS service limits support the number of keys',
     ],
     codeBlocks: [
       {
