@@ -1,635 +1,510 @@
 import { LabView } from './LabView';
-
-const lab2Steps = [
-  {
-    title: 'Configure Azure Key Vault',
-    estimatedTime: '10 min',
-    description: 'Create an Azure Key Vault and register an application in Azure AD for authentication. This will store your Customer Master Key.',
-    tips: [
-      'Use a dedicated Key Vault for MongoDB encryption',
-      'Enable soft-delete and purge protection for production',
-      'Note down the Vault URI, Tenant ID, Client ID, and Client Secret',
-    ],
-    codeBlocks: [
-      {
-        filename: 'Azure CLI - Create Key Vault',
-        language: 'bash',
-        code: `# Login to Azure
-az login
-
-# Create resource group (if needed)
-az group create --name mongodb-encryption-rg --location eastus
-
-# Create Key Vault with soft-delete enabled
-az keyvault create \\
-  --name mongodb-qe-vault \\
-  --resource-group mongodb-encryption-rg \\
-  --location eastus \\
-  --enable-soft-delete true \\
-  --enable-purge-protection true
-
-# Create a key for MongoDB encryption
-az keyvault key create \\
-  --vault-name mongodb-qe-vault \\
-  --name mongodb-qe-key \\
-  --kty RSA \\
-  --size 4096
-
-# Note the key identifier (kid) from the output`,
-      },
-      {
-        filename: 'Azure CLI - Register Application',
-        language: 'bash',
-        code: `# Register an application in Azure AD
-az ad app create --display-name "MongoDB-QE-App"
-
-# Note the appId (this is your Client ID)
-
-# Create a service principal
-az ad sp create --id <APP_ID>
-
-# Create a client secret (valid for 2 years)
-az ad app credential reset \\
-  --id <APP_ID> \\
-  --append \\
-  --years 2
-
-# Note the password (this is your Client Secret)
-
-# Grant the app access to Key Vault keys
-az keyvault set-policy \\
-  --name mongodb-qe-vault \\
-  --spn <APP_ID> \\
-  --key-permissions get unwrapKey wrapKey`,
-      },
-    ],
-    expectedOutput: `{
-  "appId": "12345678-1234-1234-1234-123456789012",
-  "password": "your-client-secret-here",
-  "tenant": "your-tenant-id-here"
-}`,
-  },
-  {
-    title: 'Set Up Project for Queryable Encryption',
-    estimatedTime: '5 min',
-    description: 'Initialize a Node.js project with dependencies for Queryable Encryption. QE requires MongoDB 7.0+ and specific driver versions.',
-    codeBlocks: [
-      {
-        filename: 'Terminal',
-        language: 'bash',
-        code: `# Create project directory
-mkdir mongodb-qe-lab && cd mongodb-qe-lab
-
-# Initialize npm project
-npm init -y
-
-# Install dependencies (note: mongodb 6.0+ required for QE)
-npm install mongodb@6.3 mongodb-client-encryption
-
-# Download crypt_shared library for your platform
-# macOS ARM64:
-curl -O https://downloads.mongodb.com/osx/mongo_crypt_shared_v1-macos-arm64-enterprise-7.0.0.tgz
-
-# Extract
-tar -xzf mongo_crypt_shared_v1-*.tgz`,
-      },
-      {
-        filename: 'config.js',
-        language: 'javascript',
-        code: `// config.js - Queryable Encryption Configuration
-const path = require("path");
-
-module.exports = {
-  mongoUri: process.env.MONGODB_URI || "mongodb+srv://<user>:<pass>@cluster.mongodb.net/",
-  
-  // Key vault namespace
-  keyVaultDb: "encryption",
-  keyVaultColl: "__keyVault",
-  
-  // Encrypted database/collection
-  encryptedDb: "hr",
-  encryptedColl: "employees",
-
-  // Azure Key Vault configuration
-  kmsProviders: {
-    azure: {
-      tenantId: process.env.AZURE_TENANT_ID,
-      clientId: process.env.AZURE_CLIENT_ID,
-      clientSecret: process.env.AZURE_CLIENT_SECRET,
-    },
-  },
-
-  // Azure Master Key
-  masterKey: {
-    keyVaultEndpoint: "https://mongodb-qe-vault.vault.azure.net",
-    keyName: "mongodb-qe-key",
-  },
-
-  cryptSharedPath: path.join(__dirname, "lib", "mongo_crypt_v1.dylib"),
-};`,
-      },
-    ],
-    troubleshooting: [
-      'QE requires MongoDB 7.0+ server and driver 6.0+',
-      'Ensure your Atlas cluster is M10+ and version 7.0+',
-    ],
-  },
-  {
-    title: 'Create Encrypted Collection with QE Schema',
-    estimatedTime: '7 min',
-    description: 'Use createEncryptedCollection() to set up a collection with Queryable Encryption. This automatically creates the necessary metadata collections (.esc, .ecoc).',
-    codeBlocks: [
-      {
-        filename: 'setup-qe-collection.js',
-        language: 'javascript',
-        code: `// setup-qe-collection.js - Create QE Encrypted Collection
-const { MongoClient } = require("mongodb");
-const { ClientEncryption } = require("mongodb-client-encryption");
-const config = require("./config");
-
-async function setupQECollection() {
-  const client = new MongoClient(config.mongoUri);
-  
-  try {
-    await client.connect();
-    console.log("Connected to MongoDB");
-
-    // Create key vault index
-    const keyVaultColl = client.db(config.keyVaultDb).collection(config.keyVaultColl);
-    await keyVaultColl.createIndex(
-      { keyAltNames: 1 },
-      { unique: true, partialFilterExpression: { keyAltNames: { $exists: true } } }
-    );
-
-    // Initialize ClientEncryption
-    const encryption = new ClientEncryption(client, {
-      keyVaultNamespace: \`\${config.keyVaultDb}.\${config.keyVaultColl}\`,
-      kmsProviders: config.kmsProviders,
-    });
-
-    // Define encrypted fields - CRITICAL: Each field needs its own DEK in QE!
-    const encryptedFieldsMap = {
-      fields: [
-        {
-          path: "ssn",
-          bsonType: "string",
-          queries: { queryType: "equality" }, // Equality queries on SSN
-        },
-        {
-          path: "salary",
-          bsonType: "int",
-          queries: { 
-            queryType: "range",  // Range queries on salary!
-            contention: 4,       // Balance security vs performance
-            min: 0,
-            max: 1000000,
-          },
-        },
-        {
-          path: "email",
-          bsonType: "string",
-          queries: { queryType: "equality" },
-        },
-      ],
-    };
-
-    // Drop existing collection if present
-    try {
-      await client.db(config.encryptedDb).collection(config.encryptedColl).drop();
-      console.log("Dropped existing collection");
-    } catch (e) {
-      // Collection doesn't exist, that's fine
-    }
-
-    // Create encrypted collection - this creates DEKs automatically!
-    const { collection, encryptedFields } = await encryption.createEncryptedCollection(
-      client.db(config.encryptedDb),
-      config.encryptedColl,
-      {
-        provider: "azure",
-        createCollectionOptions: { encryptedFields: encryptedFieldsMap },
-        masterKey: config.masterKey,
-      }
-    );
-
-    console.log("✓ Created encrypted collection:", config.encryptedColl);
-    console.log("✓ Created metadata collections: .esc, .ecoc, .ecc");
-    console.log("\\nEncrypted fields configured:");
-    encryptedFields.fields.forEach(f => {
-      console.log(\`  - \${f.path}: \${f.queries?.queryType || 'encrypt only'}\`);
-    });
-
-  } finally {
-    await client.close();
-  }
-}
-
-setupQECollection().catch(console.error);`,
-      },
-    ],
-    expectedOutput: `Connected to MongoDB
-Dropped existing collection
-✓ Created encrypted collection: employees
-✓ Created metadata collections: .esc, .ecoc, .ecc
-
-Encrypted fields configured:
-  - ssn: equality
-  - salary: range
-  - email: equality`,
-    tips: [
-      'QE automatically creates a separate DEK for each encrypted field',
-      'The contention factor (0-16) affects write throughput - higher prevents frequency analysis but slows writes',
-      'Min/Max boundaries are critical for Range indexes to optimize token generation',
-      'Sparsity (default 1) can be increased to reduce storage overhead at the cost of query precision',
-    ],
-  },
-  {
-    title: 'Insert Data and Execute Range Queries',
-    estimatedTime: '10 min',
-    description: 'Insert employee records with encrypted fields and demonstrate range queries on the encrypted salary field.',
-    codeBlocks: [
-      {
-        filename: 'app-qe.js',
-        language: 'javascript',
-        code: `// app-qe.js - QE with Range Queries
-const { MongoClient } = require("mongodb");
-const config = require("./config");
-
-async function main() {
-  // Create auto-encrypting client
-  const encryptedClient = new MongoClient(config.mongoUri, {
-    autoEncryption: {
-      keyVaultNamespace: \`\${config.keyVaultDb}.\${config.keyVaultColl}\`,
-      kmsProviders: config.kmsProviders,
-      extraOptions: {
-        cryptSharedLibPath: config.cryptSharedPath,
-      },
-    },
-  });
-
-  try {
-    await encryptedClient.connect();
-    const collection = encryptedClient.db(config.encryptedDb).collection(config.encryptedColl);
-
-    // Clear existing data
-    await collection.deleteMany({});
-
-    // Insert sample employees
-    const employees = [
-      { name: "Alice Johnson", ssn: "111-22-3333", salary: 75000, email: "alice@corp.com", department: "Engineering" },
-      { name: "Bob Smith", ssn: "444-55-6666", salary: 85000, email: "bob@corp.com", department: "Engineering" },
-      { name: "Carol White", ssn: "777-88-9999", salary: 120000, email: "carol@corp.com", department: "Management" },
-      { name: "David Brown", ssn: "123-45-6789", salary: 95000, email: "david@corp.com", department: "Sales" },
-      { name: "Eva Martinez", ssn: "987-65-4321", salary: 65000, email: "eva@corp.com", department: "HR" },
-    ];
-
-    await collection.insertMany(employees);
-    console.log(\`Inserted \${employees.length} employees\\n\`);
-
-    // DEMO 1: Equality query on encrypted SSN
-    console.log("=== Query 1: Equality on SSN ===");
-    const bySSN = await collection.findOne({ ssn: "123-45-6789" });
-    console.log("Found:", bySSN?.name, "- SSN:", bySSN?.ssn);
-
-    // DEMO 2: Range query on encrypted salary! (QE exclusive feature)
-    console.log("\\n=== Query 2: Range on Salary ($gte $lte) ===");
-    const salaryRange = await collection.find({
-      salary: { $gte: 70000, $lte: 100000 }
-    }).toArray();
-    console.log(\`Employees with salary $70k-$100k (\${salaryRange.length}):\`);
-    salaryRange.forEach(e => console.log(\`  - \${e.name}: $\${e.salary}\`));
-
-    // DEMO 3: Greater than on encrypted field
-    console.log("\\n=== Query 3: Salary > $90,000 ===");
-    const highEarners = await collection.find({
-      salary: { $gt: 90000 }
-    }).toArray();
-    console.log(\`High earners (\${highEarners.length}):\`);
-    highEarners.forEach(e => console.log(\`  - \${e.name}: $\${e.salary}\`));
-
-    // DEMO 4: Combined encrypted + plaintext query
-    console.log("\\n=== Query 4: Engineering + Salary > $80k ===");
-    const engHighEarners = await collection.find({
-      department: "Engineering",  // Plaintext field
-      salary: { $gt: 80000 }      // Encrypted field with range!
-    }).toArray();
-    engHighEarners.forEach(e => console.log(\`  - \${e.name}: $\${e.salary}\`));
-
-  } finally {
-    await encryptedClient.close();
-  }
-}
-
-main().catch(console.error);`,
-      },
-    ],
-    expectedOutput: `Inserted 5 employees
-
-=== Query 1: Equality on SSN ===
-Found: David Brown - SSN: 123-45-6789
-
-=== Query 2: Range on Salary ($gte $lte) ===
-Employees with salary $70k-$100k (3):
-  - Alice Johnson: $75000
-  - Bob Smith: $85000
-  - David Brown: $95000
-
-=== Query 3: Salary > $90,000 ===
-High earners (2):
-  - Carol White: $120000
-  - David Brown: $95000
-
-=== Query 4: Engineering + Salary > $80k ===
-  - Bob Smith: $85000`,
-  },
-  {
-    title: 'Explore .esc and .ecoc Collections',
-    estimatedTime: '7 min',
-    description: 'Dive into the internal metadata collections that power Queryable Encryption. Understanding these is crucial for operations and troubleshooting.',
-    codeBlocks: [
-      {
-        filename: 'inspect-metadata.js',
-        language: 'javascript',
-        code: `// inspect-metadata.js - Explore QE Internal Collections
-const { MongoClient } = require("mongodb");
-const config = require("./config");
-
-async function inspectMetadata() {
-  const client = new MongoClient(config.mongoUri);
-  
-  try {
-    await client.connect();
-    const db = client.db(config.encryptedDb);
-
-    // List all collections in the database
-    console.log("=== Collections in", config.encryptedDb, "===");
-    const collections = await db.listCollections().toArray();
-    collections.forEach(c => {
-      const type = c.name.startsWith("enxcol_") ? "(QE metadata)" : "";
-      console.log(\`  - \${c.name} \${type}\`);
-    });
-
-    // ESC = Encrypted State Collection
-    // Stores encrypted search tokens for equality queries
-    console.log("\\n=== ESC (Encrypted State Collection) ===");
-    const escName = \`enxcol_.\${config.encryptedColl}.esc\`;
-    const escColl = db.collection(escName);
-    const escCount = await escColl.countDocuments();
-    console.log(\`Document count: \${escCount}\`);
-    const escSample = await escColl.findOne();
-    if (escSample) {
-      console.log("Sample document keys:", Object.keys(escSample));
-      console.log("  _id type:", typeof escSample._id);
-      console.log("  value type:", escSample.value?._bsontype || typeof escSample.value);
-    }
-
-    // ECOC = Encrypted Compaction Collection
-    // Tracks metadata for compaction operations
-    console.log("\\n=== ECOC (Encrypted Compaction Collection) ===");
-    const ecocName = \`enxcol_.\${config.encryptedColl}.ecoc\`;
-    const ecocColl = db.collection(ecocName);
-    const ecocCount = await ecocColl.countDocuments();
-    console.log(\`Document count: \${ecocCount}\`);
-
-    // ECC = Encrypted Counter Collection  
-    // Used for range queries
-    console.log("\\n=== ECC (Encrypted Counter Collection) ===");
-    const eccName = \`enxcol_.\${config.encryptedColl}.ecc\`;
-    const eccColl = db.collection(eccName);
-    const eccCount = await eccColl.countDocuments();
-    console.log(\`Document count: \${eccCount}\`);
-    console.log("(ECC is used for range query indexes)");
-
-    // Storage analysis
-    console.log("\\n=== Storage Overhead Analysis ===");
-    const mainStats = await db.command({ collStats: config.encryptedColl });
-    const escStats = await db.command({ collStats: escName });
-    
-    console.log(\`Main collection size: \${(mainStats.size / 1024).toFixed(2)} KB\`);
-    console.log(\`ESC collection size: \${(escStats.size / 1024).toFixed(2)} KB\`);
-    console.log(\`Overhead ratio: \${(escStats.size / mainStats.size).toFixed(2)}x\`);
-
-  } finally {
-    await client.close();
-  }
-}
-
-inspectMetadata().catch(console.error);`,
-      },
-    ],
-    expectedOutput: `=== Collections in hr ===
-  - employees 
-  - enxcol_.employees.esc (QE metadata)
-  - enxcol_.employees.ecoc (QE metadata)
-  - enxcol_.employees.ecc (QE metadata)
-
-=== ESC (Encrypted State Collection) ===
-Document count: 15
-Sample document keys: [ '_id', 'value' ]
-  _id type: object
-  value type: Binary
-
-=== ECOC (Encrypted Compaction Collection) ===
-Document count: 5
-
-=== ECC (Encrypted Counter Collection) ===
-Document count: 10
-(ECC is used for range query indexes)
-
-=== Storage Overhead Analysis ===
-Main collection size: 2.34 KB
-ESC collection size: 5.67 KB
-Overhead ratio: 2.42x`,
-    tips: [
-      'ESC grows with unique encrypted values - monitor its size',
-      'ECOC is used during compaction operations',
-      'ECC is specific to range queries - grows with range index usage',
-      'Expect 2-3x storage overhead for encrypted fields with range indexes',
-    ],
-  },
-  {
-    title: 'Analyze Query Performance with Profiler',
-    estimatedTime: '5 min',
-    description: 'Use MongoDB profiler to understand how queries on encrypted fields are executed and their performance characteristics.',
-    codeBlocks: [
-      {
-        filename: 'analyze-performance.js',
-        language: 'javascript',
-        code: `// analyze-performance.js - Profile QE Queries
-const { MongoClient } = require("mongodb");
-const config = require("./config");
-
-async function analyzePerformance() {
-  const client = new MongoClient(config.mongoUri);
-  
-  try {
-    await client.connect();
-    const db = client.db(config.encryptedDb);
-
-    // Enable profiling (level 2 = all operations)
-    await db.command({ profile: 2, slowms: 0 });
-    console.log("Profiling enabled\\n");
-
-    // Create encrypted client for queries
-    const encryptedClient = new MongoClient(config.mongoUri, {
-      autoEncryption: {
-        keyVaultNamespace: \`\${config.keyVaultDb}.\${config.keyVaultColl}\`,
-        kmsProviders: config.kmsProviders,
-        extraOptions: { cryptSharedLibPath: config.cryptSharedPath },
-      },
-    });
-    await encryptedClient.connect();
-    const collection = encryptedClient.db(config.encryptedDb).collection(config.encryptedColl);
-
-    // Run test queries
-    console.log("Running test queries...");
-    
-    const start1 = Date.now();
-    await collection.findOne({ ssn: "123-45-6789" });
-    console.log(\`  Equality query: \${Date.now() - start1}ms\`);
-
-    const start2 = Date.now();
-    await collection.find({ salary: { $gte: 50000, $lte: 100000 } }).toArray();
-    console.log(\`  Range query: \${Date.now() - start2}ms\`);
-
-    // Analyze profile results
-    console.log("\\n=== Profile Analysis ===");
-    const profiles = await db.collection("system.profile")
-      .find({ ns: \`\${config.encryptedDb}.\${config.encryptedColl}\` })
-      .sort({ ts: -1 })
-      .limit(5)
-      .toArray();
-
-    profiles.forEach((p, i) => {
-      console.log(\`\\nQuery \${i + 1}:\`);
-      console.log(\`  Operation: \${p.op}\`);
-      console.log(\`  Duration: \${p.millis}ms\`);
-      console.log(\`  Docs examined: \${p.docsExamined}\`);
-      console.log(\`  Keys examined: \${p.keysExamined}\`);
-      if (p.planSummary) {
-        console.log(\`  Plan: \${p.planSummary}\`);
-      }
-    });
-
-    // Disable profiling
-    await db.command({ profile: 0 });
-    
-    await encryptedClient.close();
-  } finally {
-    await client.close();
-  }
-}
-
-analyzePerformance().catch(console.error);`,
-      },
-    ],
-    tips: [
-      'Range queries examine more index entries than equality queries',
-      'First query is slower due to DEK retrieval from KMS',
-      'Subsequent queries benefit from DEK caching',
-      'Monitor docsExamined vs nReturned ratio for efficiency',
-    ],
-  },
-  {
-    title: 'Verify DEK-per-Field Requirement',
-    estimatedTime: '5 min',
-    description: 'Confirm that Queryable Encryption creates a separate DEK for each encrypted field, unlike CSFLE which can share DEKs.',
-    codeBlocks: [
-      {
-        filename: 'verify-deks.js',
-        language: 'javascript',
-        code: `// verify-deks.js - Verify separate DEKs per field
-const { MongoClient } = require("mongodb");
-const config = require("./config");
-
-async function verifyDEKs() {
-  const client = new MongoClient(config.mongoUri);
-  
-  try {
-    await client.connect();
-    
-    // Query the key vault to see all DEKs
-    const keyVault = client.db(config.keyVaultDb).collection(config.keyVaultColl);
-    const deks = await keyVault.find().toArray();
-
-    console.log("=== Data Encryption Keys in Key Vault ===\\n");
-    console.log(\`Total DEKs: \${deks.length}\\n\`);
-
-    deks.forEach((dek, i) => {
-      console.log(\`DEK \${i + 1}:\`);
-      console.log(\`  Key ID: \${dek._id.toString("hex").substring(0, 16)}...\`);
-      console.log(\`  Alt Names: \${dek.keyAltNames?.join(", ") || "(none)"}\`);
-      console.log(\`  Created: \${dek.creationDate}\`);
-      console.log(\`  KMS Provider: \${Object.keys(dek.masterKey || {})[0] || "unknown"}\`);
-      console.log();
-    });
-
-    // Important observation
-    console.log("=== Key Observation ===");
-    console.log("In Queryable Encryption, each encrypted field (ssn, salary, email)");
-    console.log("has its own DEK. This is DIFFERENT from CSFLE where you CAN share DEKs.");
-    console.log();
-    console.log("Why separate DEKs in QE?");
-    console.log("  1. Metadata binding - each field's encrypted indexes are tied to its DEK");
-    console.log("  2. Security isolation - compromising one field doesn't affect others");
-    console.log("  3. Granular key rotation - rotate keys per field as needed");
-
-  } finally {
-    await client.close();
-  }
-}
-
-verifyDEKs().catch(console.error);`,
-      },
-    ],
-    expectedOutput: `=== Data Encryption Keys in Key Vault ===
-
-Total DEKs: 3
-
-DEK 1:
-  Key ID: 64a3b2c1d0e9f8...
-  Alt Names: (none)
-  Created: 2024-01-15T10:30:00.000Z
-  KMS Provider: azure
-
-DEK 2:
-  Key ID: 75b4c3d2e1f0a9...
-  Alt Names: (none)
-  Created: 2024-01-15T10:30:00.000Z
-  KMS Provider: azure
-
-DEK 3:
-  Key ID: 86c5d4e3f2b1a0...
-  Alt Names: (none)
-  Created: 2024-01-15T10:30:00.000Z
-  KMS Provider: azure
-
-=== Key Observation ===
-In Queryable Encryption, each encrypted field (ssn, salary, email)
-has its own DEK. This is DIFFERENT from CSFLE where you CAN share DEKs.`,
-  },
-];
+import { validatorUtils } from '@/utils/validatorUtils';
+import { useLab } from '@/context/LabContext';
 
 export function Lab2QueryableEncryption() {
+  const { mongoUri, awsRegion, verifiedTools } = useLab();
+  const suffix = verifiedTools['suffix']?.path || 'suffix';
+  const aliasName = `alias/mongodb-lab-key-${suffix}`;
+
+  const lab2Steps = [
+    {
+      id: 'l2s1',
+      title: 'Step 1: Create Data Encryption Keys (DEKs) for QE',
+      estimatedTime: '10 min',
+      description: 'Before defining encrypted fields, you need to create Data Encryption Keys (DEKs) for each field you want to encrypt. Unlike CSFLE, QE requires a separate DEK for each encrypted field. Create DEKs for both salary (range queries) and taxId (equality queries). We will use keyAltNames to reference them, making the code more maintainable.',
+      tips: [
+        'ACTION REQUIRED: Run the Node.js script below to create two DEKs - one for salary and one for taxId.',
+        'BEST PRACTICE: Using keyAltNames (like "qe-salary-dek") is better than hardcoding UUIDs - easier to maintain and rotate.',
+        'SA NUANCE: Bound Metadata. In QE, the metadata collections (.esc, .ecoc) are tied to a specific field and its DEK.',
+        'COMPLIANCE: This 1-to-1 mapping allows for granular rotation without impacting other fields.',
+        'VERIFICATION: Use the "Check My Progress" button to verify the DEKs were created successfully.',
+      ],
+      codeBlocks: [
+        {
+          filename: 'createQEDeks.cjs (Node.js - Create this file)',
+          language: 'javascript',
+          code: `const { MongoClient, ClientEncryption } = require("mongodb");
+const { fromSSO } = require("@aws-sdk/credential-providers");
+
+const uri = "${mongoUri}";
+const keyVaultNamespace = "encryption.__keyVault";
+
+async function run() {
+  const credentials = await fromSSO()();
+
+  const kmsProviders = {
+    aws: credentials
+  };
+
+  const client = await MongoClient.connect(uri);
+  const encryption = new ClientEncryption(client, {
+    keyVaultNamespace,
+    kmsProviders,
+  });
+
+  // Create DEK for salary (range queries)
+  const salaryDekId = await encryption.createDataKey("aws", {
+    masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" },
+    keyAltNames: ["qe-salary-dek"]
+  });
+  console.log("Salary Altname: qe-salary-dek, Salary DEK UUID:", salaryDekId.toString());
+
+  // Create DEK for taxId (equality queries)
+  const taxDekId = await encryption.createDataKey("aws", {
+    masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" },
+    keyAltNames: ["qe-taxid-dek"]
+  });
+  console.log("TaxId Altname: qe-taxid-dek,  DEK UUID:", taxDekId.toString());
+
+  await client.close();
+}
+
+run().catch(console.error);`,
+          skeleton: `// Create createQEDeks.cjs file
+// Use ClientEncryption to create two DEKs:
+// 1. One for salary field (keyAltName: "qe-salary-dek")
+// 2. One for taxId field (keyAltName: "qe-taxid-dek")
+// Save the UUIDs - you'll need them next!`
+        },
+        {
+          filename: 'Terminal - Run the script',
+          language: 'bash',
+          code: `# Run in your terminal (NOT mongosh):
+node createQEDeks.cjs
+
+# Expected Output:
+# Salary Altname: qe-salary-dek, Salary DEK UUID: 7274650f-1ea0-48e1-b47e-33d3bba95a21
+# TaxId Altname: qe-taxid-dek,  DEK UUID: a1b2c3d4-5e6f-7890-abcd-ef1234567890
+# (Your UUIDs will be different)`
+        },
+      ],
+      onVerify: async () => validatorUtils.checkQEDEKs(mongoUri)
+    },
+    {
+      id: 'l2s2',
+      title: 'Step 2: Create QE Collection with Encrypted Fields',
+      estimatedTime: '15 min',
+      description: 'Create the collection with the encryptedFields configuration. This single step defines which fields to encrypt AND creates the collection. MongoDB will automatically create the system catalog (.esc) and context cache (.ecoc) collections. We use keyAltNames to look up the DEKs, making the code cleaner and more maintainable.',
+      tips: [
+        'ACTION REQUIRED: Run either the Node.js script OR the mongosh commands below to create the collection.',
+        'BEST PRACTICE: Look up DEKs by keyAltNames instead of hardcoding UUIDs - easier to maintain and rotate.',
+        'AUTOMATIC METADATA: MongoDB automatically creates .enxcol_.employees.esc and .enxcol_.employees.ecoc collections.',
+        'QUERY TYPES: Both fields use "equality" queries. Range queries are supported on MongoDB 8.0+ server but require client library updates.',
+        'CURRENT LIMITATION: Even with mongodb@7.0.0 and mongodb-client-encryption@7.0.0, client-side validation rejects "range" queryType.',
+        'SERVER SUPPORT: MongoDB 8.0.18 server accepts range queries, but client libraries need updates for full support.',
+        'WORKAROUND: Use equality queries for now. Range queries will work once client libraries are updated.',
+        'IMPORTANT: You can only create a collection with encryptedFields ONCE. If it already exists, drop it first: db.employees.drop()'
+      ],
+      codeBlocks: [
+        {
+          filename: 'createQECollection.cjs (Node.js - Create this file)',
+          language: 'javascript',
+          code: `const { MongoClient } = require("mongodb");
+
+const uri = "${mongoUri}";
+const keyVaultNamespace = "encryption.__keyVault";
+
+async function run() {
+  const client = await MongoClient.connect(uri);
+  
+  // Look up DEKs by their keyAltNames (BEST PRACTICE)
+  const keyVaultDB = client.db("encryption");
+  const salaryKeyDoc = await keyVaultDB.collection("__keyVault").findOne({ 
+    keyAltNames: "qe-salary-dek" 
+  });
+  const taxKeyDoc = await keyVaultDB.collection("__keyVault").findOne({ 
+    keyAltNames: "qe-taxid-dek" 
+  });
+
+  if (!salaryKeyDoc || !taxKeyDoc) {
+    throw new Error("DEKs not found! Run createQEDeks.cjs first.");
+  }
+
+  const salaryDekId = salaryKeyDoc._id;
+  const taxDekId = taxKeyDoc._id;
+
+  // Define encryptedFields configuration
+  const encryptedFields = {
+  fields: [
+    {
+      path: "salary",
+      bsonType: "int",
+      keyId: salaryDekId,
+        queries: { queryType: "equality" }
+    },
+    {
+      path: "taxId",
+      bsonType: "string",
+      keyId: taxDekId,
+      queries: { queryType: "equality" }
+    }
+  ]
+  };
+
+  // Create the collection with encryptedFields
+  const db = client.db("hr");
+  await db.createCollection("employees", { encryptedFields });
+  console.log("Collection 'employees' created with encryptedFields!");
+  console.log("MongoDB automatically created .esc and .ecoc metadata collections.");
+
+  await client.close();
+}
+
+run().catch(console.error);`,
+          skeleton: `// Connect to MongoDB
+// Look up DEKs from key vault using keyAltNames
+// Define encryptedFields with the DEK UUIDs
+// Create collection with encryptedFields option`
+        },
+        {
+          filename: 'Terminal - Run the Node.js script',
+          language: 'bash',
+          code: `# Run in your terminal (NOT mongosh):
+node createQECollection.cjs
+
+# Expected Output:
+# Collection 'employees' created with encryptedFields!
+# MongoDB automatically created .esc and .ecoc metadata collections.`
+        },
+        {
+          filename: 'Alternative: mongosh (MongoDB Shell)',
+          language: 'javascript',
+          code: `# Connect to MongoDB
+mongosh "${mongoUri}"
+
+# Switch to encryption database to look up DEKs
+use encryption
+
+# Look up DEKs by keyAltNames
+const salaryKeyDoc = db.getCollection("__keyVault").findOne({ keyAltNames: "qe-salary-dek" });
+const taxKeyDoc = db.getCollection("__keyVault").findOne({ keyAltNames: "qe-taxid-dek" });
+
+# Get the UUIDs
+const salaryDekId = salaryKeyDoc._id;
+const taxDekId = taxKeyDoc._id;
+
+# Switch to hr database
+use hr
+
+# Define encryptedFields configuration
+const encryptedFields = {
+  fields: [
+    {
+      path: "salary",
+      bsonType: "int",
+      keyId: salaryDekId,
+      queries: [
+        {
+          queryType: "range",
+          min: 0,
+          max: 1000000,
+          sparsity: 4
+        }
+      ]
+    },
+    {
+      path: "taxId",
+      bsonType: "string",
+      keyId: taxDekId,
+      queries: { queryType: "equality" }
+    }
+  ]
+};
+
+# Create the collection with encryptedFields
+db.createCollection("employees", { encryptedFields });
+
+# Verify metadata collections were created
+db.getCollectionNames().filter(c => c.includes("enxcol"))
+
+# Expected Output:
+# [ 'enxcol_.employees.esc', 'enxcol_.employees.ecoc' ]`
+        }
+      ],
+      onVerify: async () => validatorUtils.checkQECollection('hr', 'employees', mongoUri)
+    },
+    {
+      id: 'l2s3',
+      title: 'Step 3: Insert Test Data with Encrypted Fields',
+      estimatedTime: '8 min',
+      description: 'Before you can test queries, you need to insert documents with encrypted fields. Use a QE-enabled client connection to insert data. The fields defined in encryptedFields will be automatically encrypted. You can use either Node.js or mongosh.',
+      tips: [
+        'ACTION REQUIRED: Run either the Node.js script OR mongosh commands below to insert test documents.',
+        'QE CLIENT: You must use a MongoDB client configured with Queryable Encryption to insert encrypted data.',
+        'AUTO-ENCRYPTION: Fields defined in encryptedFields are automatically encrypted on insert.',
+        'TEST DATA: Insert at least 3-5 documents with different salary values to test range queries.',
+        'IMPORTANT: In mongosh, you need to use a QE-enabled connection string or configure encryption.'
+      ],
+      codeBlocks: [
+        {
+          filename: 'insertQEData.cjs (Node.js - Create this file)',
+          language: 'javascript',
+          code: `const { MongoClient } = require("mongodb");
+const { fromSSO } = require("@aws-sdk/credential-providers");
+
+const uri = "${mongoUri}";
+
+async function run() {
+  // Get SSO credentials (same as createQEDeks.cjs)
+  const ssoCredentials = fromSSO();
+  const credentials = await ssoCredentials();
+
+  // Connect with QE enabled using SSO credentials
+  const client = new MongoClient(uri, {
+    autoEncryption: {
+      keyVaultNamespace: "encryption.__keyVault",
+      kmsProviders: {
+        aws: credentials
+      }
+    }
+  });
+
+  await client.connect();
+  const db = client.db("hr");
+  const collection = db.collection("employees");
+
+  // Insert test documents
+  await collection.insertMany([
+    { name: "Alice Johnson", salary: 75000, taxId: "123-45-6789", department: "Engineering" },
+    { name: "Bob Smith", salary: 95000, taxId: "987-65-4321", department: "Sales" },
+    { name: "Carol White", salary: 55000, taxId: "456-78-9012", department: "Marketing" },
+    { name: "David Brown", salary: 85000, taxId: "321-54-9876", department: "Engineering" },
+    { name: "Eve Davis", salary: 65000, taxId: "789-12-3456", department: "HR" }
+  ]);
+
+  console.log("Inserted 5 test documents with encrypted salary and taxId fields!");
+  
+  await client.close();
+}
+
+run().catch(console.error);`,
+          skeleton: `// Create a QE-enabled MongoDB client
+// Connect to the "hr" database
+// Insert multiple test documents with salary and taxId fields
+// The fields will be automatically encrypted based on your encryptedFields configuration`
+        },
+        {
+          filename: 'Terminal - Run the Node.js script',
+          language: 'bash',
+          code: `# Run in your terminal (NOT mongosh):
+node insertQEData.cjs
+
+# Expected Output:
+# Inserted 5 test documents with encrypted salary and taxId fields!`
+        },
+      ],
+      onVerify: async () => validatorUtils.checkQERangeQuery('hr', 'employees', mongoUri)
+    },
+    {
+      id: 'l2s4',
+      title: 'Step 4: Query Encrypted Data - QE vs Non-QE Client Comparison',
+      estimatedTime: '15 min',
+      description: 'Demonstrate the power of Queryable Encryption by comparing queries with a QE-enabled client vs a standard client. This side-by-side comparison shows how QE allows you to query encrypted data while a standard client only sees Binary ciphertext. Test various query types: equality, range, prefix, and suffix.',
+      tips: [
+        'ACTION REQUIRED: Run the Node.js script below to see the difference between QE-enabled and standard clients.',
+        'BREAKTHROUGH FEATURE: QE allows querying encrypted data without decrypting first - a standard client only sees Binary ciphertext!',
+        'QUERY TYPES: QE supports Equality, Range, Prefix, and Suffix queries on encrypted fields.',
+        'NOTE: Prefix/Suffix queries work best when fields are configured with prefix/suffix queryType. With equality queries, regex may work but is not optimal.',
+        'DEMO POWER: This side-by-side comparison is your most powerful SA tool for demonstrating QE capabilities.',
+        'IMPORTANT: Without QE, you cannot query encrypted fields - you only see Binary data. With QE, queries work transparently.'
+      ],
+      codeBlocks: [
+        {
+          filename: 'queryQERange.cjs (Node.js - Create this file)',
+          language: 'javascript',
+          code: `const { MongoClient } = require("mongodb");
+const { fromSSO } = require("@aws-sdk/credential-providers");
+
+const uri = "${mongoUri}";
+
+async function run() {
+  // Get SSO credentials
+  const ssoCredentials = fromSSO();
+  const credentials = await ssoCredentials();
+
+  // ============================================
+  // 1. STANDARD CLIENT (NO QE) - Shows Binary Data
+  // ============================================
+  console.log("\\n=== WITHOUT Queryable Encryption ===");
+  const clientStandard = new MongoClient(uri);
+  await clientStandard.connect();
+  const standardDb = clientStandard.db("hr");
+  const standardCollection = standardDb.collection("employees");
+
+  // Query with standard client - encrypted fields show as Binary
+  const docStandard = await standardCollection.findOne({ name: "Alice Johnson" });
+  console.log("\\nDocument retrieved with STANDARD client:");
+  console.log("Name:", docStandard.name);
+  console.log("Salary (encrypted):", docStandard.salary); // Binary(...)
+  console.log("TaxId (encrypted):", docStandard.taxId); // Binary(...)
+  console.log("\\n⚠️  Cannot query encrypted fields - only see Binary ciphertext!");
+
+  // Try to query by salary - WON'T WORK without QE
+  console.log("\\nTrying range query on salary (will return empty):");
+  const rangeAttempt = await standardCollection.find({
+    salary: { $gt: 60000, $lt: 90000 }
+  }).toArray();
+  console.log(\`Found: \${rangeAttempt.length} documents (query doesn't work on Binary data)\`);
+
+  await clientStandard.close();
+
+  // ============================================
+  // 2. QE-ENABLED CLIENT - Shows Decrypted Data & Queries Work
+  // ============================================
+  console.log("\\n\\n=== WITH Queryable Encryption ===");
+  const clientQE = new MongoClient(uri, {
+    autoEncryption: {
+      keyVaultNamespace: "encryption.__keyVault",
+      kmsProviders: {
+        aws: credentials
+      }
+    }
+  });
+
+  await clientQE.connect();
+  const qeDb = clientQE.db("hr");
+  const qeCollection = qeDb.collection("employees");
+
+  // Query with QE client - fields are automatically decrypted
+  const docQE = await qeCollection.findOne({ name: "Alice Johnson" });
+  console.log("\\nDocument retrieved with QE-ENABLED client:");
+  console.log("Name:", docQE.name);
+  console.log("Salary (decrypted):", docQE.salary); // 75000
+  console.log("TaxId (decrypted):", docQE.taxId); // "123-45-6789"
+  console.log("\\n✅ Fields are automatically decrypted!");
+
+  // ============================================
+  // 3. EQUALITY QUERIES
+  // ============================================
+  console.log("\\n\\n=== Equality Query: Find by taxId ===");
+  const equalityResult = await qeCollection.findOne({
+    taxId: "123-45-6789"
+  });
+  if (equalityResult) {
+    console.log(\`Found: \${equalityResult.name} - Salary: $\${equalityResult.salary}\`);
+  }
+
+  // ============================================
+  // 4. RANGE QUERIES
+  // ============================================
+  console.log("\\n=== Range Query: Salary between 60000 and 90000 ===");
+  const rangeResults = await qeCollection.find({
+    salary: { $gt: 60000, $lt: 90000 }
+  }).toArray();
+  console.log(\`Found \${rangeResults.length} employees:\`);
+  rangeResults.forEach(emp => {
+    console.log(\`  - \${emp.name}: $\${emp.salary} (\${emp.department})\`);
+  });
+
+  console.log("\\n=== Greater Than Query: Salary > 80000 ===");
+  const gtResults = await qeCollection.find({
+    salary: { $gt: 80000 }
+  }).toArray();
+  console.log(\`Found \${gtResults.length} employees:\`);
+  gtResults.forEach(emp => {
+    console.log(\`  - \${emp.name}: $\${emp.salary}\`);
+  });
+
+  // ============================================
+  // 5. PREFIX QUERIES (on taxId field)
+  // ============================================
+  console.log("\\n=== Prefix Query: TaxId starts with '123' ===");
+  const prefixResults = await qeCollection.find({
+    taxId: { $regex: /^123/ }
+  }).toArray();
+  console.log(\`Found \${prefixResults.length} employees with taxId starting with '123':\`);
+  prefixResults.forEach(emp => {
+    console.log(\`  - \${emp.name}: \${emp.taxId}\`);
+  });
+
+  // ============================================
+  // 6. SUFFIX QUERIES (on taxId field)
+  // ============================================
+  console.log("\\n=== Suffix Query: TaxId ends with '6789' ===");
+  const suffixResults = await qeCollection.find({
+    taxId: { $regex: /6789$/ }
+  }).toArray();
+  console.log(\`Found \${suffixResults.length} employees with taxId ending with '6789':\`);
+  suffixResults.forEach(emp => {
+    console.log(\`  - \${emp.name}: \${emp.taxId}\`);
+  });
+
+  await clientQE.close();
+  console.log("\\n\\n✅ QE allows querying encrypted data - this is the breakthrough!");
+}
+
+run().catch(console.error);`,
+          skeleton: `// 1. Create a STANDARD client (no QE) - query and show Binary data
+// 2. Create a QE-ENABLED client with autoEncryption
+// 3. Compare outputs: Standard shows Binary, QE shows decrypted values
+// 4. Execute various query types:
+//    - Equality queries (taxId)
+//    - Range queries (salary with $gt, $lt)
+//    - Prefix queries (taxId starts with...)
+//    - Suffix queries (taxId ends with...)
+// Show how QE enables querying encrypted data!`
+        },
+        {
+          filename: 'Terminal - Run the Node.js script',
+          language: 'bash',
+          code: `# Run in your terminal (NOT mongosh):
+node queryQERange.cjs
+
+# Expected Output:
+# === WITHOUT Queryable Encryption ===
+# Document retrieved with STANDARD client:
+# Name: Alice Johnson
+# Salary (encrypted): Binary(...)
+# TaxId (encrypted): Binary(...)
+# ⚠️  Cannot query encrypted fields - only see Binary ciphertext!
+#
+# === WITH Queryable Encryption ===
+# Document retrieved with QE-ENABLED client:
+# Name: Alice Johnson
+# Salary (decrypted): 75000
+# TaxId (decrypted): "123-45-6789"
+# ✅ Fields are automatically decrypted!
+#
+# === Equality Query: Find by taxId ===
+# Found: Alice Johnson - Salary: $75000
+#
+# === Range Query: Salary between 60000 and 90000 ===
+# Found 3 employees:
+#   - Alice Johnson: $75000 (Engineering)
+#   - David Brown: $85000 (Engineering)
+#   - Eve Davis: $65000 (HR)
+#
+# === Prefix Query: TaxId starts with '123' ===
+# Found 1 employees...
+#
+# === Suffix Query: TaxId ends with '6789' ===
+# Found 1 employees...`
+        },
+      ],
+      onVerify: async () => validatorUtils.checkQERangeQuery('hr', 'employees', mongoUri)
+    }
+  ];
+
   return (
     <LabView
       labNumber={2}
-      title="Queryable Encryption with Azure Key Vault"
-      description="Implement Queryable Encryption with range query support using Azure Key Vault. Learn to configure encrypted collections, execute range queries on encrypted salary data, and explore the internal metadata collections."
+      title="Queryable Encryption & Range Deep-Dive"
+      description="Master the breakthrough Queryable Encryption (QE) feature. Learn to query encrypted data using equality, range, prefix, and suffix queries. Compare QE-enabled vs standard clients to see the power of querying encrypted data without decrypting first."
       duration="45 min"
       prerequisites={[
-        'MongoDB Atlas cluster M10+ on version 7.0+',
-        'Azure subscription with Key Vault access',
-        'Azure CLI installed and configured',
-        'Node.js 18+ installed',
-        'Completed Lab 1 (recommended)',
+        'MongoDB 8.0+ Atlas Cluster',
+        'AWS KMS CMK from Lab 1',
+        'Node.js 20+ with MongoDB driver >= 6.1.0 (6.x series) or >= 7.x',
+        'mongodb-client-encryption >= 6.1.0+ (for 6.x driver) or >= 7.x (for 7.x driver)',
+        'Required for range queries: mongodb@6.1.0+ or mongodb@7.x with compatible mongodb-client-encryption',
+        'Lab uses: mongodb@6.19.0 and mongodb-client-encryption@6.5.0 (installed via npm install)'
       ]}
       objectives={[
-        'Configure Azure Key Vault for MongoDB encryption',
-        'Create encrypted collections with range query support',
-        'Execute equality and range queries on encrypted fields',
-        'Explore .esc, .ecoc, and .ecc metadata collections',
-        'Understand DEK-per-field requirement in QE',
+        'Configure QE with field-level DEK binding',
+        'Compare QE-enabled vs standard client behavior',
+        'Execute Equality, Range, Prefix, and Suffix queries on encrypted data',
+        'Understand how QE enables querying encrypted data transparently'
       ]}
       steps={lab2Steps}
     />

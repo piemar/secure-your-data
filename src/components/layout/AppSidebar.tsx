@@ -1,15 +1,18 @@
-import { 
-  Presentation, 
-  FlaskConical, 
-  FileText, 
+import {
+  Presentation,
+  FlaskConical,
+  FileText,
   ChevronLeft,
   ChevronRight,
   Database,
   Shield,
   Key,
+  Trophy,
+  Lock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigation } from '@/contexts/NavigationContext';
+import { useLab } from '@/context/LabContext';
 import type { Section } from '@/types';
 
 interface NavItem {
@@ -20,33 +23,45 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { 
-    id: 'presentation', 
-    label: 'Presentation', 
+  {
+    id: 'presentation',
+    label: 'Presentation',
     icon: Presentation,
     subLabel: '45 min • 25 slides',
   },
-  { 
-    id: 'lab1', 
-    label: 'Lab 1: CSFLE', 
+  {
+    id: 'setup',
+    label: 'Lab Setup',
+    icon: FlaskConical,
+    subLabel: 'Environment Config',
+  },
+  {
+    id: 'leaderboard',
+    label: 'Leaderboard',
+    icon: Trophy,
+    subLabel: 'Rankings & Scores',
+  },
+  {
+    id: 'lab1',
+    label: 'Lab 1: CSFLE',
     icon: Database,
     subLabel: '34 min • AWS KMS',
   },
-  { 
-    id: 'lab2', 
-    label: 'Lab 2: QE Range', 
+  {
+    id: 'lab2',
+    label: 'Lab 2: QE Range',
     icon: Shield,
     subLabel: '34 min • Profiler',
   },
-  { 
-    id: 'lab3', 
-    label: 'Lab 3: Erasure', 
+  {
+    id: 'lab3',
+    label: 'Lab 3: Erasure',
     icon: Key,
     subLabel: '34 min • GDPR',
   },
-  { 
-    id: 'cheatsheet', 
-    label: 'SA Cheat Sheet', 
+  {
+    id: 'cheatsheet',
+    label: 'SA Cheat Sheet',
     icon: FileText,
     subLabel: 'Quick Reference',
   },
@@ -54,6 +69,7 @@ const navItems: NavItem[] = [
 
 export function AppSidebar() {
   const { currentSection, setSection, sidebarOpen, toggleSidebar } = useNavigation();
+  const { isLabAccessible } = useLab();
 
   return (
     <aside
@@ -80,30 +96,37 @@ export function AppSidebar() {
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentSection === item.id;
-          
+          const isLocked = (item.id === 'lab2' || item.id === 'lab3') && !isLabAccessible(parseInt(item.id.replace('lab', '')));
+
           return (
             <button
               key={item.id}
-              onClick={() => setSection(item.id)}
+              onClick={() => !isLocked && setSection(item.id)}
+              disabled={isLocked}
               className={cn(
-                'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-left group',
+                'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-left group relative',
                 isActive
                   ? 'bg-primary/10 text-primary border border-primary/20'
+                  : isLocked
+                  ? 'text-muted-foreground opacity-50 cursor-not-allowed'
                   : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
               )}
             >
-              <Icon 
+              {isLocked && sidebarOpen && (
+                <Lock className="absolute right-2 w-4 h-4 text-muted-foreground" />
+              )}
+              <Icon
                 className={cn(
                   'w-5 h-5 flex-shrink-0',
-                  isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-sidebar-foreground'
-                )} 
+                  isActive ? 'text-primary' : isLocked ? 'text-muted-foreground' : 'text-muted-foreground group-hover:text-sidebar-foreground'
+                )}
               />
               {sidebarOpen && (
-                <div className="flex flex-col min-w-0">
+                <div className="flex flex-col min-w-0 flex-1">
                   <span className="text-sm font-medium truncate">{item.label}</span>
                   {item.subLabel && (
                     <span className="text-xs text-muted-foreground truncate">
-                      {item.subLabel}
+                      {isLocked ? 'Complete Lab 1 first' : item.subLabel}
                     </span>
                   )}
                 </div>

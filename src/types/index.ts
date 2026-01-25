@@ -73,4 +73,4 @@ export interface Poll {
 }
 
 // Navigation
-export type Section = 'presentation' | 'lab1' | 'lab2' | 'lab3' | 'cheatsheet';
+export type Section = 'presentation' | 'setup' | 'lab1' | 'lab2' | 'lab3' | 'cheatsheet' | 'leaderboard';
