@@ -1,5 +1,5 @@
 import { MainLayout } from '@/components/layout/MainLayout';
-import { PresentationView } from '@/components/presentation/PresentationView';
+import { NewPresentationView } from '@/components/presentation/NewPresentationView';
 import { useNavigation } from '@/contexts/NavigationContext';
 
 function ContentRouter() {
@@ -7,7 +7,7 @@ function ContentRouter() {
 
   switch (currentSection) {
     case 'presentation':
-      return <PresentationView />;
+      return <NewPresentationView />;
     case 'lab1':
     case 'lab2':
     case 'lab3':
@@ -29,7 +29,7 @@ function ContentRouter() {
         </div>
       );
     default:
-      return <PresentationView />;
+      return <NewPresentationView />;
   }
 }
 
