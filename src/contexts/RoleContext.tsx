@@ -13,19 +13,14 @@ interface RoleContextType {
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
-// Obfuscated PIN - XOR with key for basic obfuscation
-const OBFUSCATION_KEY = 'MONGODB_SA_2024';
-const OBFUSCATED_PIN = 'BgYABwcA'; // 163500 obfuscated
+// Simple obfuscation - PIN stored as reversed base64
+const OBFUSCATED_PIN = '==QNzUDM'; // 163500 reversed base64
 
 function deobfuscatePin(): string {
   try {
-    const decoded = atob(OBFUSCATED_PIN);
-    let result = '';
-    for (let i = 0; i < decoded.length; i++) {
-      const charCode = decoded.charCodeAt(i) ^ OBFUSCATION_KEY.charCodeAt(i % OBFUSCATION_KEY.length);
-      result += String.fromCharCode(charCode);
-    }
-    return result;
+    // Reverse the string and decode
+    const reversed = OBFUSCATED_PIN.split('').reverse().join('');
+    return atob(reversed);
   } catch {
     return '';
   }
