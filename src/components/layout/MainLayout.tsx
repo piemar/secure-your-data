@@ -1,8 +1,9 @@
 import { ReactNode } from 'react';
 import { AppSidebar } from './AppSidebar';
-import { NavigationProvider } from '@/contexts/NavigationContext';
+import { NavigationProvider, useNavigation } from '@/contexts/NavigationContext';
 import { useRole } from '@/contexts/RoleContext';
 import { Crown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -21,16 +22,29 @@ function ModeratorBadge() {
   );
 }
 
+function LayoutContent({ children }: MainLayoutProps) {
+  const { sidebarOpen } = useNavigation();
+  
+  return (
+    <div className="flex min-h-screen w-full bg-background">
+      <AppSidebar />
+      <main 
+        className={cn(
+          'flex-1 overflow-y-auto relative transition-all duration-300',
+          sidebarOpen ? 'ml-64' : 'ml-16'
+        )}
+      >
+        <ModeratorBadge />
+        {children}
+      </main>
+    </div>
+  );
+}
+
 export function MainLayout({ children }: MainLayoutProps) {
   return (
     <NavigationProvider>
-      <div className="flex min-h-screen w-full bg-background">
-        <AppSidebar />
-        <main className="flex-1 overflow-hidden relative">
-          <ModeratorBadge />
-          {children}
-        </main>
-      </div>
+      <LayoutContent>{children}</LayoutContent>
     </NavigationProvider>
   );
 }

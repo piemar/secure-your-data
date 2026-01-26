@@ -54,7 +54,7 @@ function ContentRouter() {
                 <Lock className="h-4 w-4" />
                 <AlertTitle>Lab 2 Locked</AlertTitle>
                 <AlertDescription className="mt-2">
-                  You must complete Lab 1 before accessing Lab 2. Please finish all steps in Lab 1: CSFLE Core first.
+                  You must complete Lab 1 before accessing Lab 2. Please finish all steps in Lab 1: CSFLE Fundamentals first.
                   {isLabCompleted(1) ? (
                     <p className="mt-2 text-sm text-muted-foreground">Note: Make sure you've verified all steps in Lab 1.</p>
                   ) : (
@@ -78,7 +78,7 @@ function ContentRouter() {
                 <Lock className="h-4 w-4" />
                 <AlertTitle>Lab 3 Locked</AlertTitle>
                 <AlertDescription className="mt-2">
-                  You must complete Lab 1 before accessing Lab 3. Please finish all steps in Lab 1: CSFLE Core first.
+                  You must complete Lab 1 before accessing Lab 3. Please finish all steps in Lab 1: CSFLE Fundamentals first.
                   {isLabCompleted(1) ? (
                     <p className="mt-2 text-sm text-muted-foreground">Note: Make sure you've verified all steps in Lab 1.</p>
                   ) : (
