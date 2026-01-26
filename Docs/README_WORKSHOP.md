@@ -2,7 +2,7 @@
 ## Complete Self-Paced Learning Guide
 
 > **For Solutions Architects & Security Engineers**  
-> Estimated Time: ~2.75 hours (45 min presentation + 120 min labs) | Difficulty: Intermediate to Advanced
+> Estimated Time: ~1.5 hours (45 min presentation + 45 min labs) | Difficulty: Intermediate to Advanced
 
 ---
 
@@ -46,11 +46,11 @@ By the end of this workshop, you will be able to:
 | Section | Duration | Type |
 |---------|----------|------|
 | Presentation (Slides 1-21) | 45 min | Conceptual |
-| Lab 1: CSFLE Fundamentals with AWS KMS | 45 min | Hands-on |
-| Lab 2: Queryable Encryption & Range Queries | 45 min | Hands-on |
-| Lab 3: Migration & Multi-Tenant Patterns | 30 min | Hands-on |
-| **Total Hands-On Time** | **120 min** | **2 hours** |
-| **Total Workshop Time** | **165 min** | **~2.75 hours** |
+| Lab 1: CSFLE Fundamentals with AWS KMS | 15 min | Hands-on |
+| Lab 2: Queryable Encryption & Range Queries | 15 min | Hands-on |
+| Lab 3: Migration & Multi-Tenant Patterns | 15 min | Hands-on |
+| **Total Hands-On Time** | **45 min** | **45 minutes** |
+| **Total Workshop Time** | **90 min** | **~1.5 hours** |
 
 ---
 
@@ -524,7 +524,7 @@ Use these to qualify opportunities and uncover encryption needs:
 
 ## 10. Lab 1: CSFLE Fundamentals with AWS KMS
 
-**Duration**: 45 minutes  
+**Duration**: 15 minutes  
 **Objective**: Implement Client-Side Field Level Encryption with AWS KMS
 
 > **Lab Guide**: See `Docs/Enablement/Lab_1_CSFLE_AWS.md` for detailed step-by-step instructions.
@@ -836,7 +836,7 @@ testUnencrypted();
 
 ## 11. Lab 2: Queryable Encryption & Range Queries
 
-**Duration**: 45 minutes  
+**Duration**: 15 minutes  
 **Objective**: Implement Queryable Encryption with range queries on encrypted numeric data
 
 > **Lab Guide**: See `Docs/Enablement/Lab_2_QE_AWS.md` for detailed step-by-step instructions.
@@ -1106,7 +1106,7 @@ compactQE();
 
 ## 12. Lab 3: Migration & Multi-Tenant Patterns
 
-**Duration**: 30 minutes  
+**Duration**: 15 minutes  
 **Difficulty**: Advanced  
 **Objective**: Implement data migration and multi-tenant encryption patterns
 
@@ -1581,9 +1581,9 @@ Outcome:  Data becomes cryptographically indecipherable garbage
 ### Workshop Materials (Included)
 
 **Lab Guides**:
-- `Docs/Enablement/Lab_1_CSFLE_AWS.md` - Lab 1: CSFLE Fundamentals (45 min)
-- `Docs/Enablement/Lab_2_QE_AWS.md` - Lab 2: Queryable Encryption (45 min)
-- `Docs/Enablement/Lab_3_Patterns.md` - Lab 3: Migration & Multi-Tenant (30 min)
+- `Docs/Enablement/Lab_1_CSFLE_AWS.md` - Lab 1: CSFLE Fundamentals (15 min)
+- `Docs/Enablement/Lab_2_QE_AWS.md` - Lab 2: Queryable Encryption (15 min)
+- `Docs/Enablement/Lab_3_Patterns.md` - Lab 3: Migration & Multi-Tenant (15 min)
 
 **Reference Guides**:
 - `Docs/Guides/SA_CSFLE_QE_CheatSheet.md` - Quick reference cheat sheet

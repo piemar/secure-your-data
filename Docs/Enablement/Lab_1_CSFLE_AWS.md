@@ -14,7 +14,7 @@
 ### AWS Console / CLI
 1.  **Create a CMK**:
     ```bash
-    aws kms create-key --description "MongoDB CSFLE Lab" --region eu-north-1
+    aws kms create-key --description "MongoDB CSFLE Lab" --region eu-central-1
     ```
 2.  **Define IAM Permissions**: Create an IAM user with the following policy:
     ```json
@@ -24,7 +24,7 @@
         {
           "Effect": "Allow",
           "Action": ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey"],
-          "Resource": "arn:aws:kms:eu-north-1:ACCOUNT_ID:key/KEY_ID"
+          "Resource": "arn:aws:kms:eu-central-1:ACCOUNT_ID:key/KEY_ID"
         }
       ]
     }
@@ -65,8 +65,8 @@ async function main() {
   // 1. Create Data Encryption Key (DEK)
   const dekId = await encryption.createDataKey("aws", {
     masterKey: {
-      key: "arn:aws:kms:eu-north-1:ACCOUNT_ID:key/KEY_ID",
-      region: "eu-north-1"
+      key: "arn:aws:kms:eu-central-1:ACCOUNT_ID:key/KEY_ID",
+      region: "eu-central-1"
     },
     keyAltNames: ["lab1-key"]
   });
@@ -149,8 +149,8 @@ encryption = ClientEncryption(
 dek_id = encryption.create_data_key(
     "aws",
     master_key={
-        "key": "arn:aws:kms:eu-north-1:ACCOUNT_ID:key/KEY_ID",
-        "region": "eu-north-1"
+        "key": "arn:aws:kms:eu-central-1:ACCOUNT_ID:key/KEY_ID",
+        "region": "eu-central-1"
     },
     key_alt_names=["lab1-key-python"]
 )
