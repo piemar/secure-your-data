@@ -2,7 +2,7 @@
 ## Complete Self-Paced Learning Guide
 
 > **For Solutions Architects & Security Engineers**  
-> Estimated Time: 2.5–3 hours | Difficulty: Intermediate to Advanced
+> Estimated Time: ~2.75 hours (45 min presentation + 120 min labs) | Difficulty: Intermediate to Advanced
 
 ---
 
@@ -17,9 +17,9 @@
 7. [Key Management](#7-key-management)
 8. [Competitive Positioning](#8-competitive-positioning)
 9. [Discovery Questions & Objection Handling](#9-discovery-questions--objection-handling)
-10. [Lab 1: CSFLE Core & Infrastructure](#10-lab-1-csfle-core--infrastructure)
+10. [Lab 1: CSFLE Fundamentals with AWS KMS](#10-lab-1-csfle-fundamentals-with-aws-kms)
 11. [Lab 2: Queryable Encryption & Range Queries](#11-lab-2-queryable-encryption--range-queries)
-12. [Lab 3: Right to Erasure & Advanced Patterns](#12-lab-3-right-to-erasure--advanced-patterns)
+12. [Lab 3: Migration & Multi-Tenant Patterns](#12-lab-3-migration--multi-tenant-patterns)
 13. [SA Quick Reference Cheat Sheet](#13-sa-quick-reference-cheat-sheet)
 14. [Troubleshooting FAQ](#14-troubleshooting-faq)
 15. [Additional Resources](#15-additional-resources)
@@ -46,9 +46,11 @@ By the end of this workshop, you will be able to:
 | Section | Duration | Type |
 |---------|----------|------|
 | Presentation (Slides 1-21) | 45 min | Conceptual |
-| Lab 1: CSFLE Fundamentals | 60 min | Hands-on |
-| Lab 2: Queryable Encryption | 60 min | Hands-on |
-| Lab 3: Right to Erasure | 60 min | Hands-on |
+| Lab 1: CSFLE Fundamentals with AWS KMS | 45 min | Hands-on |
+| Lab 2: Queryable Encryption & Range Queries | 45 min | Hands-on |
+| Lab 3: Migration & Multi-Tenant Patterns | 30 min | Hands-on |
+| **Total Hands-On Time** | **120 min** | **2 hours** |
+| **Total Workshop Time** | **165 min** | **~2.75 hours** |
 
 ---
 
@@ -100,15 +102,16 @@ export AWS_KEY_REGION="us-east-1"
 
 Most organizations encrypt data **at rest** (TDE) and **in transit** (TLS), but this leaves a critical gap:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    TRADITIONAL ENCRYPTION                    │
-├─────────────────────────────────────────────────────────────┤
-│  [App] ──TLS──▶ [Database] ──TDE──▶ [Disk]                  │
-│                     │                                        │
-│              ⚠️ PLAINTEXT HERE                               │
-│              (DBAs, admins, backups see everything)          │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+graph LR
+    A[Application] -->|TLS Encrypted| B[Database]
+    B -->|TDE Encrypted| C[Disk]
+    B -.->|⚠️ PLAINTEXT IN MEMORY| D[DBAs/Admins/Backups<br/>Can See Everything]
+    
+    style A fill:#e1f5ff
+    style B fill:#fff4e1
+    style C fill:#e1f5ff
+    style D fill:#ffcccc
 ```
 
 **The Problem**: With TDE, data is decrypted in memory. Database administrators, cloud operators, and anyone with backup access can see plaintext sensitive data.
@@ -125,15 +128,14 @@ Listen for these in customer conversations:
 
 ### The MongoDB Solution
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                  MONGODB IN-USE ENCRYPTION                   │
-├─────────────────────────────────────────────────────────────┤
-│  [App + Keys] ──Ciphertext──▶ [Database] ──▶ [Disk]         │
-│       │                            │                         │
-│   ✅ ENCRYPTED                 ✅ ENCRYPTED                  │
-│   (Only app sees plaintext)    (Never decrypted)            │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+graph LR
+    A[Application + Keys<br/>✅ ENCRYPTED<br/>Only app sees plaintext] -->|Ciphertext| B[Database<br/>✅ ENCRYPTED<br/>Never decrypted]
+    B -->|Ciphertext| C[Disk<br/>✅ ENCRYPTED]
+    
+    style A fill:#c8e6c9
+    style B fill:#c8e6c9
+    style C fill:#c8e6c9
 ```
 
 **Key Insight**: MongoDB **never** sees plaintext. Not in memory, not in logs, not in backups. True zero-trust.
@@ -197,43 +199,50 @@ Data is encrypted **client-side** (in your application) before being sent to Mon
 
 ### Architecture Diagram
 
+```mermaid
+flowchart TD
+    subgraph APP["🖥️ APPLICATION LAYER"]
+        A1[Application Code]
+        A2[MongoDB Driver<br/>Auto-Encrypt]
+        A3[libmongocrypt]
+        A1 --> A2 --> A3
+    end
+    
+    subgraph KMS["🔐 KMS PROVIDER"]
+        K1[CMK<br/>Customer Master Key<br/>━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br/>• AWS KMS / Azure / GCP<br/>• Wraps/unwraps DEKs<br/>• Never leaves KMS]
+    end
+    
+    subgraph MONGO["🗄️ MONGODB ATLAS"]
+        M1[encryption.__keyVault<br/>━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br/>Wrapped DEKs<br/>Encrypted by CMK]
+        M2[Your Collections<br/>━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br/>Ciphertext Data<br/>Never decrypted]
+    end
+    
+    A3 <-->|Unwrap DEK| K1
+    K1 -->|Store Wrapped DEK| M1
+    A3 -->|Encrypted Data| M2
+    
+    style APP fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style KMS fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    style MONGO fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px
+    style A1 fill:#bbdefb
+    style A2 fill:#90caf9
+    style A3 fill:#64b5f6
+    style K1 fill:#ffe0b2,stroke:#f57c00,stroke-width:2px
+    style M1 fill:#e1bee7
+    style M2 fill:#ce93d8
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         YOUR APPLICATION                             │
-│  ┌─────────────────┐    ┌──────────────────┐    ┌────────────────┐  │
-│  │   Application   │───▶│  MongoDB Driver  │───▶│  libmongocrypt │  │
-│  │     Code        │    │  (Auto-Encrypt)  │    │  (Crypto Ops)  │  │
-│  └─────────────────┘    └──────────────────┘    └───────┬────────┘  │
-└─────────────────────────────────────────────────────────┼───────────┘
-                                                          │
-                    ┌─────────────────────────────────────┼──────┐
-                    │                                     ▼      │
-                    │  ┌──────────────────────────────────────┐  │
-                    │  │           KMS Provider               │  │
-                    │  │   (AWS / Azure / GCP / KMIP)         │  │
-                    │  │                                      │  │
-                    │  │   CMK (Customer Master Key)          │  │
-                    │  │   └── Wraps DEKs                     │  │
-                    │  └──────────────────────────────────────┘  │
-                    │                YOUR INFRASTRUCTURE          │
-                    └─────────────────────────────────────────────┘
-                                          │
-                                          ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         MONGODB ATLAS                                │
-│  ┌─────────────────────────┐    ┌────────────────────────────────┐  │
-│  │   encryption.__keyVault │    │     Your Collections           │  │
-│  │   (Encrypted DEKs)      │    │     (Ciphertext only)          │  │
-│  │                         │    │                                │  │
-│  │   { _id: UUID,          │    │   { ssn: Binary(6),            │  │
-│  │     keyMaterial: "..." }│    │     salary: Binary(6) }        │  │
-│  └─────────────────────────┘    └────────────────────────────────┘  │
-│                                                                      │
-│   ⛔ MongoDB NEVER sees plaintext                                    │
-│   ⛔ DBAs cannot decrypt without KMS access                          │
-│   ⛔ Backups contain only ciphertext                                 │
-└─────────────────────────────────────────────────────────────────────┘
-```
+
+**Data Flow**:
+1. Application requests DEK unwrapping from KMS
+2. KMS unwraps DEK using CMK (returns to application in memory)
+3. Application encrypts data using unwrapped DEK
+4. MongoDB stores encrypted data and wrapped DEKs
+
+**Security Guarantees**:
+- ⛔ MongoDB NEVER sees plaintext
+- ⛔ DBAs cannot decrypt without KMS access
+- ⛔ Backups contain only ciphertext
+- ✅ Encryption happens client-side before data reaches MongoDB
 
 ### Who Sees What?
 
@@ -356,33 +365,14 @@ await collection.insertOne({ ssn: encrypted });
 
 MongoDB uses a two-tier key hierarchy:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    ENVELOPE ENCRYPTION                       │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│   ┌────────────────────────────────────────────┐            │
-│   │  CMK (Customer Master Key)                 │            │
-│   │  Location: Your KMS (AWS, Azure, GCP)      │            │
-│   │  Purpose: Wraps/unwraps DEKs               │            │
-│   │  Rotation: Annual (transparent)            │            │
-│   └─────────────────────┬──────────────────────┘            │
-│                         │ Wraps                              │
-│                         ▼                                    │
-│   ┌────────────────────────────────────────────┐            │
-│   │  DEK (Data Encryption Key)                 │            │
-│   │  Location: encryption.__keyVault           │            │
-│   │  Purpose: Encrypts actual data             │            │
-│   │  Stored: Encrypted by CMK                  │            │
-│   └─────────────────────┬──────────────────────┘            │
-│                         │ Encrypts                           │
-│                         ▼                                    │
-│   ┌────────────────────────────────────────────┐            │
-│   │  Your Sensitive Data                       │            │
-│   │  (SSN, salary, medical records, etc.)      │            │
-│   └────────────────────────────────────────────┘            │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    A[CMK<br/>Customer Master Key<br/>━━━━━━━━━━━━━━━━<br/>Location: Your KMS<br/>AWS / Azure / GCP<br/>Purpose: Wraps/unwraps DEKs<br/>Rotation: Annual transparent] -->|Wraps| B[DEK<br/>Data Encryption Key<br/>━━━━━━━━━━━━━━━━<br/>Location: encryption.__keyVault<br/>Purpose: Encrypts actual data<br/>Stored: Encrypted by CMK]
+    B -->|Encrypts| C[Your Sensitive Data<br/>━━━━━━━━━━━━━━━━<br/>SSN, salary,<br/>medical records, etc.]
+    
+    style A fill:#ffccbc,stroke:#ff5722,stroke-width:3px
+    style B fill:#c5e1a5,stroke:#689f38,stroke-width:2px
+    style C fill:#b3e5fc,stroke:#0288d1,stroke-width:2px
 ```
 
 ### Supported KMS Providers
@@ -532,10 +522,12 @@ Use these to qualify opportunities and uncover encryption needs:
 
 ---
 
-## 10. Lab 1: CSFLE Core & Infrastructure
+## 10. Lab 1: CSFLE Fundamentals with AWS KMS
 
-**Duration**: 60 minutes  
+**Duration**: 45 minutes  
 **Objective**: Implement Client-Side Field Level Encryption with AWS KMS
+
+> **Lab Guide**: See `Docs/Enablement/Lab_1_CSFLE_AWS.md` for detailed step-by-step instructions.
 
 ### Prerequisites Checklist
 
@@ -844,8 +836,10 @@ testUnencrypted();
 
 ## 11. Lab 2: Queryable Encryption & Range Queries
 
-**Duration**: 60 minutes  
+**Duration**: 45 minutes  
 **Objective**: Implement Queryable Encryption with range queries on encrypted numeric data
+
+> **Lab Guide**: See `Docs/Enablement/Lab_2_QE_AWS.md` for detailed step-by-step instructions.
 
 ### Prerequisites
 
@@ -1110,31 +1104,104 @@ compactQE();
 
 ---
 
-## 12. Lab 3: Right to Erasure & Advanced Patterns
+## 12. Lab 3: Migration & Multi-Tenant Patterns
 
-**Duration**: 60 minutes  
-**Objective**: Implement GDPR-compliant cryptographic erasure and advanced patterns
+**Duration**: 30 minutes  
+**Difficulty**: Advanced  
+**Objective**: Implement data migration and multi-tenant encryption patterns
+
+> **Lab Guide**: See `Docs/Enablement/Lab_3_Patterns.md` for detailed step-by-step instructions.
+
+### Prerequisites
+
+- Completed Labs 1 & 2
+- Understanding of CSFLE and QE fundamentals
+
+### Learning Objectives
+
+- Migrate existing plaintext data to an encrypted state
+- Implement per-tenant isolation using `keyAltNames`
+- Manage key rotation for a single tenant without impacting others
+- Understand metadata management for large-scale DEK deployments
+
+---
+
+### Part 1: Data Migration Pattern
+
+**Duration**: 15 minutes
+
+**Scenario**: You have existing plaintext data that needs to be migrated to an encrypted collection.
+
+**Key Concepts**:
+- Use explicit encryption API for bulk migration operations
+- Progress tracking and error handling
+- Validation after migration
+
+---
+
+### Part 2: Multi-Tenant Key Isolation
+
+**Duration**: 15 minutes
+
+**Scenario**: SaaS application where each tenant must have separate encryption keys for data isolation.
+
+**Key Concepts**:
+- Per-tenant DEK creation using `keyAltNames`
+- Dynamic schema configuration per tenant
+- Tenant data isolation verification
+
+---
+
+### Key Rotation Procedures
+
+**CMK Rotation** (Low Impact):
+- AWS KMS supports automatic annual rotation
+- Use `rewrapManyDataKey()` for zero-downtime rotation
+- No data re-encryption required
+
+**DEK Rotation** (High Impact):
+- Requires data re-encryption
+- Plan for maintenance window
+- Update schemaMap after rotation
+
+---
+
+### Lab 3 Summary
+
+✅ **Migration** requires explicit encryption API for bulk operations  
+✅ **Multi-tenant** uses `keyAltNames` for per-tenant key isolation  
+✅ **CMK rotation** is transparent and handled by AWS KMS  
+✅ **DEK rotation** requires data re-encryption (plan accordingly)
+
+---
+
+## 13. Advanced Pattern: Right to Erasure (GDPR)
+
+**Note**: This pattern is covered in the main workshop content. For hands-on implementation, refer to the code examples in Section 12 above.
 
 ### The Crypto-Shredding Pattern
 
 **GDPR Article 17** (Right to Erasure) requires that personal data be deleted upon request. With encryption, you can achieve this cryptographically:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                 CRYPTO-SHREDDING PATTERN                     │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│   1 User ──────▶ 1 Unique DEK ──────▶ All User's PII         │
-│                                                              │
-│   DELETE THE DEK ═══▶ Data becomes mathematically            │
-│                       indecipherable garbage                 │
-│                                                              │
-│   ✅ Works across backups                                    │
-│   ✅ Works across replicas                                   │
-│   ✅ Works across secondary indexes                          │
-│   ✅ Instant compliance (no data rewrite needed)             │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+graph LR
+    A[1 User] -->|Assigned| B[1 Unique DEK]
+    B -->|Encrypts| C[All User's PII<br/>Email, Address,<br/>Medical Records, etc.]
+    B -.->|DELETE THE DEK| D[Data becomes<br/>mathematically<br/>indecipherable garbage]
+    
+    E[✅ Works across backups] 
+    F[✅ Works across replicas]
+    G[✅ Works across secondary indexes]
+    H[✅ Instant compliance<br/>no data rewrite needed]
+    
+    style A fill:#e1f5ff
+    style B fill:#fff4e1,stroke:#ff9800,stroke-width:3px
+    style C fill:#f3e5f5
+    style D fill:#ffcccc,stroke:#f44336,stroke-width:2px
+    style E fill:#c8e6c9
+    style F fill:#c8e6c9
+    style G fill:#c8e6c9
+    style H fill:#c8e6c9
 ```
 
 ### Step 1: User Signup with DEK Provisioning
@@ -1404,36 +1471,24 @@ async function rotateCMK(tenantKeyAltName, newCmkArn) {
 rotateCMK("tenant-acme-corp-dek", "arn:aws:kms:us-east-1:123456789012:key/NEW-KEY");
 ```
 
-### Lab 3 Summary
-
-✅ Implemented 1-user-1-DEK pattern  
-✅ Executed GDPR Article 17 crypto-shredding  
-✅ Verified data becomes indecipherable after key deletion  
-✅ Implemented multi-tenant key isolation  
-✅ Performed zero-downtime CMK rotation  
-
 ---
 
-## 13. SA Quick Reference Cheat Sheet
+## 14. SA Quick Reference Cheat Sheet
 
 ### Decision Tree: CSFLE vs. QE
 
-```
-Do you need Range queries ($gt, $lt)?
-│
-├── YES ──▶ Use Queryable Encryption (MongoDB 8.0+)
-│            • Separate DEK per encrypted field
-│            • Account for 2-3x storage factor
-│
-└── NO ──▶ Do you need Equality queries ($eq)?
-            │
-            ├── YES ──▶ Use CSFLE Deterministic
-            │            • Mature, low overhead
-            │            • Shared DEKs allowed
-            │
-            └── NO ──▶ Use CSFLE Randomized
-                        • Maximum security
-                        • No pattern leakage
+```mermaid
+flowchart TD
+    Start{Do you need<br/>Range queries<br/>$gt, $lt?} -->|YES| QE[Use Queryable Encryption<br/>MongoDB 8.0+<br/>━━━━━━━━━━━━━━━━<br/>• Separate DEK per encrypted field<br/>• Account for 2-3x storage factor]
+    Start -->|NO| Equality{Do you need<br/>Equality queries<br/>$eq?}
+    Equality -->|YES| CSFLE_Det[Use CSFLE Deterministic<br/>━━━━━━━━━━━━━━━━<br/>• Mature, low overhead<br/>• Shared DEKs allowed]
+    Equality -->|NO| CSFLE_Rand[Use CSFLE Randomized<br/>━━━━━━━━━━━━━━━━<br/>• Maximum security<br/>• No pattern leakage]
+    
+    style Start fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style Equality fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style QE fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+    style CSFLE_Det fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style CSFLE_Rand fill:#ffccbc,stroke:#e64a19,stroke-width:2px
 ```
 
 ### Query Operator Support Matrix
@@ -1476,7 +1531,7 @@ Outcome:  Data becomes cryptographically indecipherable garbage
 
 ---
 
-## 14. Troubleshooting FAQ
+## 15. Troubleshooting FAQ
 
 ### Common Errors & Solutions
 
@@ -1514,7 +1569,7 @@ Outcome:  Data becomes cryptographically indecipherable garbage
 
 ---
 
-## 15. Additional Resources
+## 16. Additional Resources
 
 ### Official Documentation
 
@@ -1525,11 +1580,19 @@ Outcome:  Data becomes cryptographically indecipherable garbage
 
 ### Workshop Materials (Included)
 
-- `Docs/Enablement/Lab_1_CSFLE_AWS.md` - Detailed Lab 1 guide
-- `Docs/Enablement/Lab_2_QE_AWS.md` - Detailed Lab 2 guide
-- `Docs/Enablement/Lab_3_Patterns.md` - Advanced patterns
-- `Docs/Guides/SA_CSFLE_QE_CheatSheet.md` - Quick reference
-- `Docs/PRESENTATION_CONTENT_PROMPT.md` - Full presentation content
+**Lab Guides**:
+- `Docs/Enablement/Lab_1_CSFLE_AWS.md` - Lab 1: CSFLE Fundamentals (45 min)
+- `Docs/Enablement/Lab_2_QE_AWS.md` - Lab 2: Queryable Encryption (45 min)
+- `Docs/Enablement/Lab_3_Patterns.md` - Lab 3: Migration & Multi-Tenant (30 min)
+
+**Reference Guides**:
+- `Docs/Guides/SA_CSFLE_QE_CheatSheet.md` - Quick reference cheat sheet
+- `Docs/Guides/Migration_Upgrade_Guide.md` - Comprehensive migration guide
+- `Docs/Guides/Performance_Benchmarks_Guide.md` - Performance benchmarks & sizing
+- `Docs/Guides/Security_Best_Practices_Guide.md` - Security best practices & threat model
+
+**Presentation Materials**:
+- `Docs/PRESENTATION_CONTENT_PROMPT.md` - Full presentation content (21 slides)
 
 ### Video Resources
 

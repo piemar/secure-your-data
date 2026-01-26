@@ -31,10 +31,17 @@ const uri = "${mongoUri}";
 const keyVaultNamespace = "encryption.__keyVault";
 
 async function run() {
+  // Get credentials from SSO session - explicitly use SSO to avoid picking up IAM user credentials
   const credentials = await fromSSO()();
 
+  // MongoDB client encryption expects only: accessKeyId, secretAccessKey, sessionToken
+  // Filter out expiration and other fields that AWS SDK includes
   const kmsProviders = {
-    aws: credentials
+    aws: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
   };
 
   const client = await MongoClient.connect(uri);
@@ -247,20 +254,70 @@ const uri = "${mongoUri}";
 
 async function run() {
   // Get SSO credentials (same as createQEDeks.cjs)
-  const ssoCredentials = fromSSO();
-  const credentials = await ssoCredentials();
+  const credentials = await fromSSO()();
 
-  // Connect with QE enabled using SSO credentials
+  // MongoDB client encryption expects only: accessKeyId, secretAccessKey, sessionToken
+  const kmsProviders = {
+    aws: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
+  };
+
+  // Look up DEKs by their keyAltNames
+  const tempClient = await MongoClient.connect(uri);
+  const keyVaultDB = tempClient.db("encryption");
+
+  const salaryKeyDoc = await keyVaultDB
+    .collection("__keyVault")
+    .findOne({ keyAltNames: "qe-salary-dek" });
+
+  const taxKeyDoc = await keyVaultDB
+    .collection("__keyVault")
+    .findOne({ keyAltNames: "qe-taxid-dek" });
+
+  if (!salaryKeyDoc || !taxKeyDoc) {
+    throw new Error("DEKs not found! Run createQEDeks.cjs first.");
+  }
+
+  // Extract keyIds (Binary UUIDs)
+  const salaryDekId = salaryKeyDoc._id;
+  const taxDekId = taxKeyDoc._id;
+
+  await tempClient.close();
+
+  // Client-side encryptedFieldsMap (QE v2)
+  const encryptedFields = {
+    fields: [
+      {
+        path: "salary",
+        bsonType: "int",
+        keyId: salaryDekId,
+        queries: { queryType: "equality" }
+      },
+      {
+        path: "taxId",
+        bsonType: "string",
+        keyId: taxDekId,
+        queries: { queryType: "equality" }
+      }
+    ]
+  };
+
+  // QE-enabled client
   const client = new MongoClient(uri, {
     autoEncryption: {
       keyVaultNamespace: "encryption.__keyVault",
-      kmsProviders: {
-        aws: credentials
+      kmsProviders,
+      encryptedFieldsMap: {
+        "hr.employees": encryptedFields
       }
     }
   });
 
   await client.connect();
+
   const db = client.db("hr");
   const collection = db.collection("employees");
 
@@ -274,7 +331,7 @@ async function run() {
   ]);
 
   console.log("Inserted 5 test documents with encrypted salary and taxId fields!");
-  
+
   await client.close();
 }
 
@@ -320,8 +377,17 @@ const uri = "${mongoUri}";
 
 async function run() {
   // Get SSO credentials
-  const ssoCredentials = fromSSO();
-  const credentials = await ssoCredentials();
+  const credentials = await fromSSO()();
+
+  // MongoDB client encryption expects only: accessKeyId, secretAccessKey, sessionToken
+  // Filter out expiration and other fields that AWS SDK includes
+  const kmsProviders = {
+    aws: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
+  };
 
   // ============================================
   // 1. STANDARD CLIENT (NO QE) - Shows Binary Data
@@ -340,12 +406,12 @@ async function run() {
   console.log("TaxId (encrypted):", docStandard.taxId); // Binary(...)
   console.log("\\n⚠️  Cannot query encrypted fields - only see Binary ciphertext!");
 
-  // Try to query by salary - WON'T WORK without QE
-  console.log("\\nTrying range query on salary (will return empty):");
-  const rangeAttempt = await standardCollection.find({
-    salary: { $gt: 60000, $lt: 90000 }
-  }).toArray();
-  console.log(\`Found: \${rangeAttempt.length} documents (query doesn't work on Binary data)\`);
+  // Try to query by taxId - WON'T WORK without QE
+  console.log("\\nTrying equality query on taxId (will return empty):");
+  const equalityAttempt = await standardCollection.findOne({
+    taxId: "123-45-6789"
+  });
+  console.log(\`Found: \${equalityAttempt ? 1 : 0} documents (query doesn't work on Binary data)\`);
 
   await clientStandard.close();
 
@@ -353,11 +419,52 @@ async function run() {
   // 2. QE-ENABLED CLIENT - Shows Decrypted Data & Queries Work
   // ============================================
   console.log("\\n\\n=== WITH Queryable Encryption ===");
+  
+  // Look up DEKs by their keyAltNames
+  const tempClient = await MongoClient.connect(uri);
+  const keyVaultDB = tempClient.db("encryption");
+  const salaryKeyDoc = await keyVaultDB.collection("__keyVault").findOne({ 
+    keyAltNames: "qe-salary-dek" 
+  });
+  const taxKeyDoc = await keyVaultDB.collection("__keyVault").findOne({ 
+    keyAltNames: "qe-taxid-dek" 
+  });
+  
+  if (!salaryKeyDoc || !taxKeyDoc) {
+    throw new Error("DEKs not found! Run createQEDeks.cjs first.");
+  }
+  
+  // Get the keyId (Binary UUID) from the DEK documents
+  const salaryDekId = salaryKeyDoc._id;
+  const taxDekId = taxKeyDoc._id;
+  await tempClient.close();
+
+  // Define encryptedFields configuration for client-side encryptedFieldsMap
+  // NOTE: Client-side encryptedFieldsMap requires keyId (Binary UUID)
+  // NOTE: Only "equality" queryType is supported in this MongoDB version
+  const encryptedFields = {
+    fields: [
+      {
+        path: "salary",
+        bsonType: "int",
+        keyId: salaryDekId,
+        queries: { queryType: "equality" }
+      },
+      {
+        path: "taxId",
+        bsonType: "string",
+        keyId: taxDekId,
+        queries: { queryType: "equality" }
+      }
+    ]
+  };
+
   const clientQE = new MongoClient(uri, {
     autoEncryption: {
       keyVaultNamespace: "encryption.__keyVault",
-      kmsProviders: {
-        aws: credentials
+      kmsProviders,
+      encryptedFieldsMap: {
+        "hr.employees": encryptedFields
       }
     }
   });
@@ -386,49 +493,23 @@ async function run() {
   }
 
   // ============================================
-  // 4. RANGE QUERIES
+  // 4. EQUALITY QUERIES (on both fields)
   // ============================================
-  console.log("\\n=== Range Query: Salary between 60000 and 90000 ===");
-  const rangeResults = await qeCollection.find({
-    salary: { $gt: 60000, $lt: 90000 }
-  }).toArray();
-  console.log(\`Found \${rangeResults.length} employees:\`);
-  rangeResults.forEach(emp => {
-    console.log(\`  - \${emp.name}: $\${emp.salary} (\${emp.department})\`);
+  console.log("\\n=== Equality Query: Find by salary ===");
+  const salaryResult = await qeCollection.findOne({
+    salary: 75000
   });
+  if (salaryResult) {
+    console.log(\`Found: \${salaryResult.name} - TaxId: \${salaryResult.taxId}\`);
+  }
 
-  console.log("\\n=== Greater Than Query: Salary > 80000 ===");
-  const gtResults = await qeCollection.find({
-    salary: { $gt: 80000 }
-  }).toArray();
-  console.log(\`Found \${gtResults.length} employees:\`);
-  gtResults.forEach(emp => {
-    console.log(\`  - \${emp.name}: $\${emp.salary}\`);
+  console.log("\\n=== Equality Query: Find by taxId ===");
+  const taxIdResult = await qeCollection.findOne({
+    taxId: "987-65-4321"
   });
-
-  // ============================================
-  // 5. PREFIX QUERIES (on taxId field)
-  // ============================================
-  console.log("\\n=== Prefix Query: TaxId starts with '123' ===");
-  const prefixResults = await qeCollection.find({
-    taxId: { $regex: /^123/ }
-  }).toArray();
-  console.log(\`Found \${prefixResults.length} employees with taxId starting with '123':\`);
-  prefixResults.forEach(emp => {
-    console.log(\`  - \${emp.name}: \${emp.taxId}\`);
-  });
-
-  // ============================================
-  // 6. SUFFIX QUERIES (on taxId field)
-  // ============================================
-  console.log("\\n=== Suffix Query: TaxId ends with '6789' ===");
-  const suffixResults = await qeCollection.find({
-    taxId: { $regex: /6789$/ }
-  }).toArray();
-  console.log(\`Found \${suffixResults.length} employees with taxId ending with '6789':\`);
-  suffixResults.forEach(emp => {
-    console.log(\`  - \${emp.name}: \${emp.taxId}\`);
-  });
+  if (taxIdResult) {
+    console.log(\`Found: \${taxIdResult.name} - Salary: $\${taxIdResult.salary}\`);
+  }
 
   await clientQE.close();
   console.log("\\n\\n✅ QE allows querying encrypted data - this is the breakthrough!");

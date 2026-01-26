@@ -155,7 +155,7 @@ By the end of this session, you'll be able to:
 - Handle GDPR/HIPAA compliance questions with confidence
 - Differentiate our solution from competitors like Oracle TDE and Cosmos DB
 
-We have 45 minutes of presentation followed by three 34-minute hands-on labs.`,
+We have 45 minutes of presentation followed by three hands-on labs (Lab 1: 45 min, Lab 2: 45 min, Lab 3: 30 min - total 120 min).`,
   },
   {
     id: 2,
@@ -1354,7 +1354,7 @@ This question separates "encryption at rest" conversations from true data protec
             },
             {
               objection: '"It\'s too complex to implement"',
-              response: 'Automatic encryption uses a schema definition - your app code doesn\'t change. We have working labs that take 30 minutes.',
+              response: 'Automatic encryption uses a schema definition - your app code doesn\'t change. We have working labs that take 45 minutes (Lab 1 & 2) and 30 minutes (Lab 3).',
             },
             {
               objection: '"Our compliance team is fine with TDE"',
@@ -1389,7 +1389,7 @@ This question separates "encryption at rest" conversations from true data protec
 
 "Too complex"
 - Automatic encryption: define schema, done
-- Labs take 30-45 minutes
+- Labs take 45-45-30 minutes (120 min total)
 - We have reference architectures
 
 "Compliance is OK with TDE"
@@ -1472,25 +1472,25 @@ The key: Qualify early. A failed POC is worse than a declined engagement.`,
     section: 'Labs',
     content: (
       <div className="max-w-4xl mx-auto">
-        <SlideTitle subtitle="Hands-on time">Three 34-Minute Labs</SlideTitle>
+        <SlideTitle subtitle="Hands-on time">Three Labs (120 min total)</SlideTitle>
         <div className="grid grid-cols-3 gap-6">
           {[
             {
-              title: 'Lab 1: CSFLE & Troubleshooting',
-              time: '34 min',
+              title: 'Lab 1: CSFLE Fundamentals',
+              time: '45 min',
               topics: ['AWS KMS setup', 'Automatic encryption', 'crypt_shared debugging', 'BSON Subtype 6 verification'],
               difficulty: 'Intermediate',
             },
             {
-              title: 'Lab 2: QE Range Queries',
-              time: '34 min',
+              title: 'Lab 2: Queryable Encryption',
+              time: '45 min',
               topics: ['Range query on salary', 'Inspect .esc/.ecoc', 'Profiler analysis', 'DEK per field verification'],
               difficulty: 'Advanced',
             },
             {
-              title: 'Lab 3: Right to Erasure',
-              time: '34 min',
-              topics: ['1 DEK per user pattern', 'Insert with unique DEKs', 'Crypto-shredding demo', 'Verify selective erasure'],
+              title: 'Lab 3: Migration & Multi-Tenant',
+              time: '30 min',
+              topics: ['Data migration patterns', 'Per-tenant key isolation', 'Key rotation procedures', 'Multi-tenant verification'],
               difficulty: 'Advanced',
             },
           ].map((lab, i) => (
@@ -1513,26 +1513,26 @@ The key: Qualify early. A failed POC is worse than a declined engagement.`,
     ),
     speakerNotes: `Here are the three hands-on labs you'll complete after this presentation.
 
-Lab 1: CSFLE Fundamentals
+Lab 1: CSFLE Fundamentals (45 min)
 - Set up AWS KMS integration
 - Implement automatic encryption
 - Intentionally break crypt_shared to learn debugging
 - Verify encrypted data in Atlas
 
-Lab 2: QE Deep-Dive
+Lab 2: Queryable Encryption (45 min)
 - Implement range queries on salary field
 - Actually explore the .esc and .ecoc collections
 - Understand how QE stores metadata
 - Verify DEK-per-field requirement
 
-Lab 3: GDPR Implementation
-- Implement the "1 DEK per user" pattern
-- Insert data for multiple users
-- Delete one user's DEK
-- Verify that user's data is undecryptable
-- Verify other users unaffected
+Lab 3: Migration & Multi-Tenant Patterns (30 min)
+- Migrate plaintext data to encrypted format
+- Implement per-tenant key isolation using KeyAltNames
+- Perform key rotation procedures
+- Verify multi-tenant data isolation
 
-Each lab is 34 minutes with step-by-step instructions and checkpoints.`,
+Total hands-on time: 120 minutes (2 hours)
+Each lab is self-paced with step-by-step instructions and checkpoints.`,
   },
   {
     id: 25,

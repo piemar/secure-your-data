@@ -31,11 +31,17 @@ const uri = "${mongoUri}";
 const keyVaultNamespace = "encryption.__keyVault";
 
 async function run() {
-  // Get SSO credentials - MongoDB will use these automatically
+  // Get credentials from SSO session - explicitly use SSO to avoid picking up IAM user credentials
   const credentials = await fromSSO()();
 
+  // MongoDB client encryption expects only: accessKeyId, secretAccessKey, sessionToken
+  // Filter out expiration and other fields that AWS SDK includes
   const kmsProviders = {
-    aws: credentials
+    aws: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
   };
 
   const client = await MongoClient.connect(uri);
@@ -169,11 +175,17 @@ const uri = "${mongoUri}";
 const keyVaultNamespace = "encryption.__keyVault";
 
 async function run() {
-  // Get SSO credentials - MongoDB will use these automatically
+  // Get credentials from SSO session - explicitly use SSO to avoid picking up IAM user credentials
   const credentials = await fromSSO()();
 
+  // MongoDB client encryption expects only: accessKeyId, secretAccessKey, sessionToken
+  // Filter out expiration and other fields that AWS SDK includes
   const kmsProviders = {
-    aws: credentials
+    aws: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
   };
 
   const client = await MongoClient.connect(uri);
@@ -348,11 +360,17 @@ const uri = "${mongoUri}";
 const keyVaultNamespace = "encryption.__keyVault";
 
 async function run() {
-  // Get SSO credentials - MongoDB will use these automatically
+  // Get credentials from SSO session - explicitly use SSO to avoid picking up IAM user credentials
   const credentials = await fromSSO()();
 
+  // MongoDB client encryption expects only: accessKeyId, secretAccessKey, sessionToken
+  // Filter out expiration and other fields that AWS SDK includes
   const kmsProviders = {
-    aws: credentials
+    aws: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
   };
 
   const client = await MongoClient.connect(uri);
@@ -479,7 +497,11 @@ aws kms describe-key --key-id "${aliasName}"
 # Expected Output: Should show KeyState: "Enabled"
 
 # 3. Check key policy to ensure your IAM user has access
-aws kms get-key-policy --key-id "${aliasName}" --policy-name default --output text
+# First, get the key ID from the alias:
+KEY_ID=$(aws kms describe-key --key-id "${aliasName}" --region eu-central-1 --query 'KeyMetadata.KeyId' --output text)
+
+# Then use the key ID to get the policy:
+aws kms get-key-policy --key-id $KEY_ID --policy-name default --region eu-central-1
 
 # 4. Verify you can use the key (test encryption/decryption)
 aws kms encrypt --key-id "${aliasName}" --plaintext "test" --output text --query CiphertextBlob
@@ -526,9 +548,9 @@ For this lab demo, we use the same CMK to demonstrate the rewrap operation.`
   return (
     <LabView
       labNumber={3}
-      title="Advanced Patterns & Governance"
+      title="Migration & Multi-Tenant Patterns"
       description="Elevate your SA skills by mastering complex production patterns. Learn to migrate legacy data explicitly, manage per-tenant key isolation, and perform lifecycle rotations for enterprise compliance."
-      duration="34 min"
+      duration="30 min"
       prerequisites={[
         'Successful completion of Lab 1 & 2',
         'Familiarity with JS Async/Await',

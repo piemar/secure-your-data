@@ -49,21 +49,21 @@ const navItems: NavItem[] = [
   },
   {
     id: 'lab1',
-    label: 'Lab 1: CSFLE',
+    label: 'Lab 1: CSFLE Fundamentals',
     icon: Database,
-    subLabel: '34 min • AWS KMS',
+    subLabel: '45 min • AWS KMS',
   },
   {
     id: 'lab2',
-    label: 'Lab 2: QE Range',
+    label: 'Lab 2: Queryable Encryption',
     icon: Shield,
-    subLabel: '34 min • Profiler',
+    subLabel: '45 min • Range Queries',
   },
   {
     id: 'lab3',
-    label: 'Lab 3: Erasure',
+    label: 'Lab 3: Migration & Multi-Tenant',
     icon: Key,
-    subLabel: '34 min • GDPR',
+    subLabel: '30 min • Advanced Patterns',
   },
 ];
 
@@ -78,7 +78,7 @@ export function AppSidebar() {
   return (
     <aside
       className={cn(
-        'relative flex flex-col h-screen border-r border-sidebar-border bg-sidebar transition-all duration-300',
+        'fixed left-0 top-0 flex flex-col h-screen border-r border-sidebar-border bg-sidebar transition-all duration-300 z-40',
         sidebarOpen ? 'w-64' : 'w-16'
       )}
     >
