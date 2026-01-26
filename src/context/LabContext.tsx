@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { addPoints, completeLab as updateLeaderboardLab, startLab as updateLeaderboardStart } from '@/utils/leaderboardUtils';
 
 interface LabState {
     mongoUri: string;
@@ -120,24 +121,14 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setCurrentScore(prev => prev + points);
         }
         
-        // Log points to MongoDB Atlas
+        // Update leaderboard with points
         const email = userEmail || localStorage.getItem('userEmail') || '';
         if (email) {
             // Determine lab number from stepId (e.g., "lab1-step1" -> 1)
             const labMatch = stepId.match(/lab(\d+)/i);
             const labNumber = labMatch ? parseInt(labMatch[1]) : 1;
             
-            fetch('/api/leaderboard/add-points', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email,
-                    stepId,
-                    labNumber,
-                    points,
-                    assisted
-                })
-            }).catch(console.error);
+            addPoints(email, points, labNumber);
         }
     };
 
@@ -163,19 +154,10 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setCompletedLabs(updated);
             localStorage.setItem('completedLabs', JSON.stringify(updated));
             
-            // Report to leaderboard API
+            // Update leaderboard
             const email = userEmail || localStorage.getItem('userEmail') || '';
             if (email) {
-                fetch('/api/leaderboard/complete-lab', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email: email,
-                        labNumber,
-                        score: currentScore,
-                        timestamp: Date.now()
-                    })
-                }).catch(console.error);
+                updateLeaderboardLab(email, labNumber, currentScore);
             }
         }
     };
@@ -186,18 +168,10 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setLabStartTimes(updated);
             localStorage.setItem('labStartTimes', JSON.stringify(updated));
             
-            // Report to leaderboard API
+            // Update leaderboard
             const email = userEmail || localStorage.getItem('userEmail') || '';
             if (email) {
-                fetch('/api/leaderboard/start-lab', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email: email,
-                        labNumber,
-                        timestamp: Date.now()
-                    })
-                }).catch(console.error);
+                updateLeaderboardStart(email, labNumber);
             }
         }
     };
