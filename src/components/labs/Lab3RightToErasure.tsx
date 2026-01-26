@@ -6,6 +6,7 @@ export function Lab3RightToErasure() {
   const { mongoUri, awsRegion, verifiedTools } = useLab();
   const suffix = verifiedTools['suffix']?.path || 'suffix';
   const aliasName = `alias/mongodb-lab-key-${suffix}`;
+  const cryptSharedLibPath = verifiedTools['mongoCryptShared']?.path || '';
 
   const lab3Steps = [
     {
@@ -260,12 +261,17 @@ const schemaMap = {
       }
     };
 
-    // Insert data for this tenant using CSFLE
+    // Insert data for this tenant using CSFLE${cryptSharedLibPath ? `
+    const extraOptions = {
+      cryptSharedLibPath: "${cryptSharedLibPath}",
+      cryptSharedLibRequired: false
+    };` : ''}
+
     const tenantClient = new MongoClient(uri, {
       autoEncryption: {
         keyVaultNamespace,
         kmsProviders,
-        schemaMap
+        schemaMap${cryptSharedLibPath ? ',\n        ...extraOptions' : ''}
       }
     });
 

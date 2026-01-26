@@ -257,7 +257,7 @@ By the end of this session, you'll be able to:
             { num: '05', title: 'Key Management & KMS', desc: 'Envelope encryption, rotation' },
             { num: '06', title: 'Competitive Positioning', desc: 'vs Oracle, PostgreSQL, cloud DBs' },
             { num: '07', title: 'Discovery & Objection Handling', desc: 'Questions to ask, FAQs' },
-            { num: '08', title: 'Hands-On Lab', desc: 'AWS KMS + Azure Key Vault' },
+            { num: '08', title: 'Hands-On Lab', desc: '3 Labs with AWS KMS' },
           ].map((item, i) => (
             <div key={i} className="flex items-start gap-4 p-4 rounded-lg bg-card border border-border hover:border-primary/50 transition-colors">
               <div className="text-2xl font-bold text-primary">{item.num}</div>
@@ -281,7 +281,7 @@ By the end of this session, you'll be able to:
         '05 Key Management & KMS - Envelope encryption, rotation',
         '06 Competitive Positioning - vs Oracle, PostgreSQL, cloud DBs',
         '07 Discovery & Objection Handling - Questions to ask, FAQs',
-        '08 Hands-On Lab - AWS KMS + Azure Key Vault',
+        '08 Hands-On Lab - 3 Labs with AWS KMS',
       ],
       notes: "Here's our agenda for this session.",
     },
@@ -1456,11 +1456,11 @@ Alternatives:
       <div className="max-w-4xl mx-auto">
         <SectionHeader number="08" title="Hands-On Lab" />
         <SlideTitle>Lab Overview</SlideTitle>
-        <div className="grid grid-cols-2 gap-8 mb-6">
+        <div className="grid grid-cols-3 gap-6 mb-6">
           <div className="p-6 rounded-lg bg-card border border-border">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-bold">Lab 1: CSFLE with AWS KMS</h3>
-              <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">45 min</span>
+              <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">15 min</span>
             </div>
             <ul className="space-y-2">
               {[
@@ -1476,17 +1476,36 @@ Alternatives:
               ))}
             </ul>
           </div>
-          <div className="p-6 rounded-lg bg-card border border-primary">
+          <div className="p-6 rounded-lg bg-card border border-border">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold">Lab 2: QE with Azure Key Vault</h3>
-              <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">45 min</span>
+              <h3 className="text-xl font-bold">Lab 2: Queryable Encryption with AWS KMS</h3>
+              <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">15 min</span>
             </div>
             <ul className="space-y-2">
               {[
-                'Configure Azure Key Vault with managed identity',
+                'Create DEKs for QE fields',
                 'Set up encrypted collection with QE schema',
-                'Execute range queries on encrypted salary field',
+                'Execute equality queries on encrypted fields',
                 'Compare CSFLE vs QE behavior',
+              ].map((item, i) => (
+                <li key={i} className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="w-4 h-4 text-primary flex-shrink-0" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="p-6 rounded-lg bg-card border border-border">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold">Lab 3: Migration & Multi-Tenant Patterns</h3>
+              <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">15 min</span>
+            </div>
+            <ul className="space-y-2">
+              {[
+                'Migrate plaintext data to CSFLE',
+                'Implement multi-tenant isolation with KeyAltNames',
+                'Rotate CMK using rewrapManyDataKey',
+                'GDPR right to erasure with crypto shredding',
               ].map((item, i) => (
                 <li key={i} className="flex items-center gap-2 text-sm">
                   <CheckCircle className="w-4 h-4 text-primary flex-shrink-0" />
@@ -1499,7 +1518,7 @@ Alternatives:
         <div className="p-4 rounded-lg bg-muted/30 border border-border">
           <h4 className="font-semibold mb-2">Prerequisites</h4>
           <div className="flex flex-wrap gap-2">
-            {['MongoDB Atlas M10+', 'AWS account with KMS', 'Azure subscription', 'Node.js 18+', 'mongosh 2.0+'].map((item, i) => (
+            {['MongoDB Atlas M10+', 'AWS account with KMS', 'Node.js 18+', 'mongosh 2.0+'].map((item, i) => (
               <span key={i} className="px-3 py-1 rounded bg-card border border-border text-sm">
                 ✓ {item}
               </span>
@@ -1510,27 +1529,34 @@ Alternatives:
     ),
     speakerNotes: `Lab overview:
 
-Lab 1: CSFLE with AWS KMS (45 min)
+Lab 1: CSFLE with AWS KMS (15 min)
 - Configure AWS KMS, create CMK
 - Set up key vault collection
 - Implement automatic encryption
 - Query and verify
 
-Lab 2: Queryable Encryption with Azure Key Vault (45 min)
-- Configure Azure Key Vault
-- Set up encrypted collection with QE
-- Execute range queries
-- Compare CSFLE vs QE
+Lab 2: Queryable Encryption with AWS KMS (15 min)
+- Create DEKs for QE fields
+- Set up encrypted collection with QE schema
+- Execute equality queries on encrypted fields
+- Compare CSFLE vs QE behavior
 
-Prerequisites: Atlas M10+, AWS account, Azure subscription, Node.js 18+, mongosh 2.0+`,
+Lab 3: Migration & Multi-Tenant Patterns (15 min)
+- Migrate plaintext data to CSFLE
+- Implement multi-tenant isolation with KeyAltNames
+- Rotate CMK using rewrapManyDataKey
+- GDPR right to erasure with crypto shredding
+
+Prerequisites: Atlas M10+, AWS account with KMS, Node.js 18+, mongosh 2.0+`,
     exportContent: {
       title: 'Hands-On Lab Overview',
       bullets: [
-        'Lab 1: CSFLE with AWS KMS (45 min) - KMS setup, key vault, automatic encryption',
-        'Lab 2: QE with Azure Key Vault (45 min) - Range queries, CSFLE vs QE comparison',
-        'Prerequisites: Atlas M10+, AWS account, Azure subscription, Node.js 18+, mongosh 2.0+',
+        'Lab 1: CSFLE with AWS KMS (15 min) - KMS setup, key vault, automatic encryption',
+        'Lab 2: Queryable Encryption with AWS KMS (15 min) - Equality queries, CSFLE vs QE comparison',
+        'Lab 3: Migration & Multi-Tenant Patterns (15 min) - Data migration, multi-tenant isolation, CMK rotation, GDPR right to erasure',
+        'Prerequisites: Atlas M10+, AWS account with KMS, Node.js 18+, mongosh 2.0+',
       ],
-      notes: 'Two labs covering both CSFLE and Queryable Encryption with different KMS providers.',
+      notes: 'Three labs covering CSFLE, Queryable Encryption, and advanced patterns - all using AWS KMS.',
     },
   },
 

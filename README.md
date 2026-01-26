@@ -8,9 +8,9 @@ This interactive web application provides a comprehensive, self-paced learning e
 
 - **📊 Interactive Presentation Mode**: Navigate through slides covering encryption concepts, architecture, competitive positioning, and use cases
 - **🧪 Hands-On Labs**: Three guided labs with step-by-step instructions, code examples, and progress tracking
-  - **Lab 1**: CSFLE Fundamentals with AWS KMS (45 min)
-  - **Lab 2**: Queryable Encryption & Range Queries (45 min)
-  - **Lab 3**: Migration & Multi-Tenant Patterns (30 min)
+  - **Lab 1**: CSFLE Fundamentals with AWS KMS (15 min)
+  - **Lab 2**: Queryable Encryption & Range Queries (15 min)
+  - **Lab 3**: Migration & Multi-Tenant Patterns (15 min)
 - **✅ Built-in Verification**: Check your progress with automated validation tools
 - **📈 Leaderboard**: Track your progress and compete with others (client-side tracking)
 - **💡 Solution Reveals**: Get hints and full solutions when you need help (with score adjustments)

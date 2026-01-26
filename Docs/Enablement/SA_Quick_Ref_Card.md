@@ -34,7 +34,7 @@
 
 ## 4. Key Management Best Practices
 - **Envelope Encryption**: CMK (in KMS) wraps the DEK (in Key Vault).
-- **AWS KMS**: Use `eu-north-1` for Nordics; co-locate with compute.
+- **AWS KMS**: Use `eu-central-1` for Nordics; co-locate with compute.
 - **Auto-Rotation**: Enable annual CMK rotation in AWS (Zero application impact).
 - **Crypto-Shredding**: 1 DEK per User ➔ Delete DEK = Compliance with GDPR Art 17.
 - **Rewrap**: Use `rewrapManyDataKey()` to update CMK without data rewrite.
