@@ -34,6 +34,7 @@ export const LabSetupWizard: React.FC = () => {
     const [errorMap, setErrorMap] = useState<Record<string, string>>({});
     const [showAtlasHelp, setShowAtlasHelp] = useState(false);
     const [showSSOConfig, setShowSSOConfig] = useState(false);
+    const [cryptSharedLibPath, setCryptSharedLibPath] = useState(verifiedTools.mongoCryptShared?.path || '');
 
     // Auto-fill name from email when email changes
     useEffect(() => {
@@ -62,7 +63,10 @@ export const LabSetupWizard: React.FC = () => {
     // Sync local verify state from context on mount
     useEffect(() => {
         if (mongoUri) setPhase('ready');
-    }, [mongoUri]);
+        if (verifiedTools.mongoCryptShared?.path) {
+            setCryptSharedLibPath(verifiedTools.mongoCryptShared.path);
+        }
+    }, [mongoUri, verifiedTools.mongoCryptShared]);
 
     const verifyTool = async (id: string, label: string) => {
         // Clear previous error
@@ -98,6 +102,88 @@ export const LabSetupWizard: React.FC = () => {
                 setErrorMap(prev => ({ ...prev, [id]: errorMsg }));
                 toast.error(errorMsg);
                 setVerifiedTool('atlas', false, '');
+            }
+            setLoadingMap(prev => ({ ...prev, [id]: false }));
+            return;
+        }
+
+        // Check mongo_crypt_shared library
+        if (id === 'mongoCryptShared') {
+            setLoadingMap(prev => ({ ...prev, [id]: true }));
+            try {
+                if (!cryptSharedLibPath) {
+                    setErrorMap(prev => ({ ...prev, [id]: 'Please provide the path to mongo_crypt_v1.dylib' }));
+                    toast.error('Please provide the path to mongo_crypt_v1.dylib');
+                    setVerifiedTool(id, false, '');
+                    setLoadingMap(prev => ({ ...prev, [id]: false }));
+                    return;
+                }
+
+                // Basic client-side validation
+                const trimmedPath = cryptSharedLibPath.trim();
+                if (!trimmedPath.endsWith('.dylib')) {
+                    setErrorMap(prev => ({ ...prev, [id]: 'Path should end with .dylib. Make sure you provide the full path to mongo_crypt_v1.dylib' }));
+                    toast.error('Path should end with .dylib');
+                    setVerifiedTool(id, false, '');
+                    setLoadingMap(prev => ({ ...prev, [id]: false }));
+                    return;
+                }
+
+                // Check if file exists via API
+                const apiUrl = `/api/check-file?path=${encodeURIComponent(trimmedPath)}`;
+                let checkResult;
+                try {
+                    checkResult = await fetch(apiUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                } catch (fetchError) {
+                    // Network error - might be CORS or server not running
+                    const errorMsg = fetchError instanceof Error ? fetchError.message : 'Network error';
+                    throw new Error(`Cannot connect to server: ${errorMsg}. Make sure the dev server is running and restart it if you just updated vite.config.ts`);
+                }
+                
+                if (!checkResult.ok) {
+                    let errorText = 'Unknown error';
+                    try {
+                        errorText = await checkResult.text();
+                    } catch (e) {
+                        // Ignore
+                    }
+                    throw new Error(`Server error (${checkResult.status}): ${errorText.substring(0, 200)}`);
+                }
+                
+                let checkData;
+                try {
+                    const responseText = await checkResult.text();
+                    if (!responseText || responseText.trim() === '') {
+                        throw new Error('Empty response from server');
+                    }
+                    checkData = JSON.parse(responseText);
+                } catch (jsonError) {
+                    // If response is not JSON, it might be HTML (404 page)
+                    throw new Error(`Server returned invalid response. The API endpoint might not be working. Please restart the dev server.`);
+                }
+                
+                if (checkData.success && checkData.exists) {
+                    toast.success('mongo_crypt_shared library verified!');
+                    setVerifiedTool(id, true, trimmedPath);
+                    setErrorMap(prev => ({ ...prev, [id]: '' }));
+                } else {
+                    const errorMsg = checkData.message || 'Library file not found at the specified path';
+                    setErrorMap(prev => ({ ...prev, [id]: errorMsg }));
+                    toast.error(errorMsg);
+                    setVerifiedTool(id, false, '');
+                }
+            } catch (e) {
+                const errorMsg = e instanceof Error ? e.message : String(e);
+                const fullError = `Verification failed: ${errorMsg}`;
+                console.error('mongoCryptShared verification error:', e);
+                setErrorMap(prev => ({ ...prev, [id]: fullError }));
+                toast.error(fullError);
+                setVerifiedTool(id, false, '');
             }
             setLoadingMap(prev => ({ ...prev, [id]: false }));
             return;
@@ -225,7 +311,7 @@ export const LabSetupWizard: React.FC = () => {
             accessKeyId: '',
             secretAccessKey: '',
             keyArn: '',
-            region: 'eu-north-1'
+            region: 'eu-central-1'
         });
         setPhase('ready');
         toast.success("Environment Activated! Ready for Lab 1.");
@@ -634,6 +720,85 @@ export const LabSetupWizard: React.FC = () => {
                                 >
                                     {loadingMap['libmongocrypt'] ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <ShieldEllipsis className="w-3 h-3 mr-2" />}
                                     {verifiedTools.libmongocrypt.verified ? "Available" : "Check Availability"}
+                                </Button>
+                            </div>
+
+                            {/* mongo_crypt_shared - Queryable Encryption Shared Library */}
+                            <div className="p-4 rounded-xl bg-card border border-border shadow-sm flex flex-col justify-between">
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-sm font-bold">mongo_crypt_shared</Label>
+                                        {verifiedTools.mongoCryptShared.verified && <CheckCircle2 className="w-4 h-4 text-green-500" />}
+                                        {errorMap['mongoCryptShared'] && !verifiedTools.mongoCryptShared.verified && <AlertTriangle className="w-4 h-4 text-red-500" />}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <p className="text-xs font-semibold text-muted-foreground">Queryable Encryption Shared Library</p>
+                                        <p className="text-[10px] text-muted-foreground">Required for Queryable Encryption (Lab 2). Download and unpack based on your Mac architecture.</p>
+                                        
+                                        <details className="mt-2">
+                                            <summary className="text-[10px] font-semibold text-primary cursor-pointer hover:underline">📥 Download Instructions</summary>
+                                            <div className="mt-2 p-2 bg-muted/50 rounded border border-border text-[10px] space-y-2">
+                                                <p className="font-semibold">1. Check your Mac architecture:</p>
+                                                <code className="block p-1 bg-background rounded text-[9px]">uname -m</code>
+                                                <p className="text-muted-foreground">Returns: <code className="bg-background px-1 rounded">arm64</code> (Apple Silicon) or <code className="bg-background px-1 rounded">x86_64</code> (Intel)</p>
+                                                
+                                                <p className="font-semibold mt-2">2. Download the appropriate version:</p>
+                                                <p className="text-muted-foreground">For <strong>Intel (x86_64)</strong> Macs:</p>
+                                                <code className="block p-1 bg-background rounded text-[9px] break-all">curl -O https://downloads.mongodb.com/osx/mongo_crypt_shared_v1-macos-x86_64-enterprise-8.2.3.tgz</code>
+                                                
+                                                <p className="text-muted-foreground mt-1">For <strong>Apple Silicon (arm64)</strong> Macs:</p>
+                                                <code className="block p-1 bg-background rounded text-[9px] break-all">curl -O https://downloads.mongodb.com/osx/mongo_crypt_shared_v1-macos-arm64-enterprise-8.2.3.tgz</code>
+                                                
+                                                <p className="font-semibold mt-2">3. Create a directory and unpack:</p>
+                                                <code className="block p-1 bg-background rounded text-[9px]">mkdir -p ~/mongo_crypt_shared</code>
+                                                <code className="block p-1 bg-background rounded text-[9px]">tar -xzf mongo_crypt_shared_v1-macos-*-enterprise-8.2.3.tgz -C ~/mongo_crypt_shared</code>
+                                                
+                                                <p className="font-semibold mt-2">4. Find the library path:</p>
+                                                <code className="block p-1 bg-background rounded text-[9px]">find ~/mongo_crypt_shared -name "mongo_crypt_v1.dylib"</code>
+                                                <p className="text-muted-foreground text-[9px]">Example path: <code className="bg-background px-1 rounded">~/mongo_crypt_shared/lib/mongo_crypt_v1.dylib</code></p>
+                                                
+                                                <p className="font-semibold mt-2">5. Enter the full path below:</p>
+                                                <p className="text-muted-foreground text-[9px]">Use the absolute path (e.g., <code className="bg-background px-1 rounded">/Users/yourname/mongo_crypt_shared/lib/mongo_crypt_v1.dylib</code>)</p>
+                                            </div>
+                                        </details>
+
+                                        <div className="space-y-1 mt-2">
+                                            <Label htmlFor="cryptSharedLibPath" className="text-[10px]">Library Path:</Label>
+                                            <Input
+                                                id="cryptSharedLibPath"
+                                                type="text"
+                                                placeholder="/Users/yourname/mongo_crypt_shared/lib/mongo_crypt_v1.dylib"
+                                                value={cryptSharedLibPath}
+                                                onChange={(e) => {
+                                                    setCryptSharedLibPath(e.target.value);
+                                                    if (errorMap['mongoCryptShared']) {
+                                                        setErrorMap(prev => ({ ...prev, mongoCryptShared: '' }));
+                                                    }
+                                                }}
+                                                className="text-[10px] h-8"
+                                                disabled={verifiedTools.mongoCryptShared.verified}
+                                            />
+                                        </div>
+
+                                        {verifiedTools.mongoCryptShared.path && (
+                                            <p className="text-[10px] text-green-600 font-mono mt-1">Verified: {verifiedTools.mongoCryptShared.path}</p>
+                                        )}
+                                        {errorMap['mongoCryptShared'] && !verifiedTools.mongoCryptShared.verified && (
+                                            <div className="mt-2 p-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded text-[10px]">
+                                                <p className="text-red-600 dark:text-red-300">{errorMap['mongoCryptShared']}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <Button
+                                    variant={verifiedTools.mongoCryptShared.verified ? "outline" : "secondary"}
+                                    size="sm"
+                                    className="mt-4 w-full"
+                                    disabled={loadingMap['mongoCryptShared'] || verifiedTools.mongoCryptShared.verified || !cryptSharedLibPath}
+                                    onClick={() => verifyTool('mongoCryptShared', 'mongo_crypt_shared')}
+                                >
+                                    {loadingMap['mongoCryptShared'] ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <ShieldEllipsis className="w-3 h-3 mr-2" />}
+                                    {verifiedTools.mongoCryptShared.verified ? "Verified" : "Verify Path"}
                                 </Button>
                             </div>
                         </div>

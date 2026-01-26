@@ -54,7 +54,8 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         mongodb: { verified: false, path: '' },
         mongodbClientEncryption: { verified: false, path: '' },
         awsSdkCredentialProviders: { verified: false, path: '' },
-        libmongocrypt: { verified: false, path: '' }
+        libmongocrypt: { verified: false, path: '' },
+        mongoCryptShared: { verified: false, path: '' }
     });
     const [userSuffix, setUserSuffixState] = useState('');
     const [userEmail, setUserEmailState] = useState('');
@@ -77,7 +78,7 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const resetProgress = () => {
         setMongoUri('');
-        setAwsCreds({ awsAccessKeyId: '', awsSecretAccessKey: '', awsKeyArn: '', awsRegion: 'eu-north-1' });
+        setAwsCreds({ awsAccessKeyId: '', awsSecretAccessKey: '', awsKeyArn: '', awsRegion: 'eu-central-1' });
         setCurrentScore(0);
         setCompletedSteps([]);
         setAssistedSteps([]);
@@ -90,7 +91,8 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             mongodb: { verified: false, path: '' },
             mongodbClientEncryption: { verified: false, path: '' },
             awsSdkCredentialProviders: { verified: false, path: '' },
-            libmongocrypt: { verified: false, path: '' }
+            libmongocrypt: { verified: false, path: '' },
+            mongoCryptShared: { verified: false, path: '' }
         });
         setUserSuffix('');
         // Don't reset email - keep it persistent

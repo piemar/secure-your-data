@@ -33,8 +33,8 @@ const config = {
   keyVaultNamespace: "encryption.__keyVault",
   awsAccessKeyId: "YOUR_ACCESS_KEY_ID",
   awsSecretAccessKey: "YOUR_SECRET_ACCESS_KEY",
-  awsKeyArn: "arn:aws:kms:eu-north-1:YOUR_ACCOUNT:key/YOUR_KEY_ID",
-  awsKeyRegion: "eu-north-1",
+  awsKeyArn: "arn:aws:kms:eu-central-1:YOUR_ACCOUNT:key/YOUR_KEY_ID",
+  awsKeyRegion: "eu-central-1",
   cryptSharedPath: "/path/to/mongo_crypt_v1.so"
 };
 
@@ -364,7 +364,7 @@ verifyIsolation().catch(console.error);
 
 ```bash
 # Enable automatic rotation
-aws kms enable-key-rotation --key-id YOUR_KEY_ID --region eu-north-1
+aws kms enable-key-rotation --key-id YOUR_KEY_ID --region eu-central-1
 ```
 
 ### DEK Rotation (High Impact)

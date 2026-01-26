@@ -4,7 +4,7 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 import { exec } from "child_process";
-import { writeFileSync, readFileSync, existsSync } from "fs";
+import { writeFileSync, readFileSync, existsSync, statSync } from "fs";
 import { MongoClient } from "mongodb";
 
 // Obfuscated MongoDB connection string for leaderboard storage (for GitHub safety)
@@ -142,12 +142,16 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
+  optimizeDeps: {
+    // Exclude the problematic polyfill package from pre-bundling
+    exclude: ['@esbuild-plugins/node-globals-polyfill'],
+  },
   plugins: [
     react(),
     mode === "development" && componentTagger(),
     // Polyfills for Node.js modules required by html2pptx
+    // Using minimal config to avoid Vite 7 compatibility issues
     nodePolyfills({
-      include: ['buffer', 'stream', 'util', 'process', 'events'],
       globals: {
         Buffer: true,
         global: true,
@@ -1007,6 +1011,110 @@ export default defineConfig(({ mode }) => ({
               });
               return;
             }
+          }
+
+          if (req.url && req.url.startsWith('/api/check-file')) {
+            try {
+              const url = new URL(req.url, `http://${req.headers.host}`);
+              let filePath = decodeURIComponent(url.searchParams.get('path') || '');
+              
+              if (!filePath) {
+                res.setHeader('Content-Type', 'application/json');
+                res.statusCode = 400;
+                res.end(JSON.stringify({ success: false, exists: false, message: 'File path is required' }));
+                return;
+              }
+              
+              // Remove trailing slash if present
+              filePath = filePath.replace(/\/$/, '');
+              
+              // Basic security: prevent directory traversal (but allow absolute paths)
+              if (filePath.includes('..')) {
+                res.setHeader('Content-Type', 'application/json');
+                res.statusCode = 400;
+                res.end(JSON.stringify({ success: false, exists: false, message: 'Invalid file path: directory traversal not allowed' }));
+                return;
+              }
+              
+              // Check if file exists
+              // Use imported fs and path modules (already imported at top)
+              if (!existsSync(filePath)) {
+                // Check if it's a directory and suggest the full file path
+                const parentDir = path.dirname(filePath);
+                if (existsSync(parentDir)) {
+                  const expectedFile = path.join(parentDir, 'mongo_crypt_v1.dylib');
+                  if (existsSync(expectedFile)) {
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ 
+                      success: false, 
+                      exists: false, 
+                      message: `Path is a directory. Use the full file path: ${expectedFile}` 
+                    }));
+                    return;
+                  }
+                }
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ 
+                  success: false, 
+                  exists: false, 
+                  message: 'File not found. Make sure the path points to mongo_crypt_v1.dylib (not a directory)' 
+                }));
+                return;
+              }
+              
+              // Check if it's actually a file (not a directory)
+              const stats = statSync(filePath);
+              if (stats.isDirectory()) {
+                // If it's a directory, check for the expected file inside
+                const expectedFile = path.join(filePath, 'mongo_crypt_v1.dylib');
+                if (existsSync(expectedFile)) {
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ 
+                    success: false, 
+                    exists: false, 
+                    message: `Path is a directory. Use the full file path: ${expectedFile}` 
+                  }));
+                } else {
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ 
+                    success: false, 
+                    exists: false, 
+                    message: 'Path is a directory. Please provide the full path to mongo_crypt_v1.dylib' 
+                  }));
+                }
+              } else if (stats.isFile()) {
+                // Verify it's the correct file
+                const filename = path.basename(filePath);
+                if (filename === 'mongo_crypt_v1.dylib' || filename.endsWith('.dylib')) {
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: true, exists: true, message: 'File found and verified' }));
+                } else {
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ 
+                    success: false, 
+                    exists: false, 
+                    message: `File exists but doesn't appear to be mongo_crypt_v1.dylib. Found: ${filename}` 
+                  }));
+                }
+              } else {
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ 
+                  success: false, 
+                  exists: false, 
+                  message: 'Path exists but is not a regular file' 
+                }));
+              }
+            } catch (error: any) {
+              console.error('Error in /api/check-file:', error);
+              res.setHeader('Content-Type', 'application/json');
+              res.statusCode = 500;
+              res.end(JSON.stringify({ 
+                success: false, 
+                exists: false, 
+                message: `Error checking file: ${error.message || String(error)}` 
+              }));
+            }
+            return;
           }
 
           if (req.url && req.url.startsWith('/api/check-versions')) {

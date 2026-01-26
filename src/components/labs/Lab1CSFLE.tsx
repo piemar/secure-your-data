@@ -6,6 +6,7 @@ export function Lab1CSFLE() {
   const { mongoUri, awsAccessKeyId, awsSecretAccessKey, awsRegion, verifiedTools } = useLab();
   const suffix = verifiedTools['suffix']?.path || 'suffix';
   const aliasName = `alias/mongodb-lab-key-${suffix}`;
+  const cryptSharedLibPath = verifiedTools['mongoCryptShared']?.path || '';
 
   const lab1Steps = [
 
@@ -161,13 +162,30 @@ async function run() {
     kmsProviders,
   });
 
+  const keyAltName = "user-${suffix}-ssn-key";
+  
+  // Check if DEK already exists
+  const keyVaultDB = client.db("encryption");
+  const existingKey = await keyVaultDB.collection("__keyVault").findOne({ 
+    keyAltNames: keyAltName 
+  });
+
+  if (existingKey) {
+    console.log("✓ DEK already exists with keyAltName:", keyAltName);
+    console.log("  DEK UUID:", existingKey._id.toString());
+    console.log("  Reusing existing key. No new key created.");
+    await client.close();
+    return;
+  }
+
   // 2. Create the Data Key
   const dekId = await encryption.createDataKey("aws", {
     masterKey: { key: "${aliasName}", region: "${awsRegion}" },
-    keyAltNames: ["user-${suffix}-ssn-key"]
+    keyAltNames: [keyAltName]
   });
 
-  console.log("Created DEK UUID:", dekId.toString());
+  console.log("✓ Created new DEK UUID:", dekId.toString());
+  console.log("  keyAltName:", keyAltName);
   await client.close();
 }
 
@@ -325,14 +343,18 @@ async function run() {
 
   await clientStandard.close();
 
-  // 2. CSFLE-ENABLED CONNECTION
+  // 2. CSFLE-ENABLED CONNECTION${cryptSharedLibPath ? `
+  const extraOptions = {
+    cryptSharedLibPath: "${cryptSharedLibPath}",
+    cryptSharedLibRequired: false
+  };` : ''}
   console.log("\\n=== WITH CSFLE ===");
   const clientEncrypted = new MongoClient(uri, {
     autoEncryption: {
       keyVaultNamespace: "encryption.__keyVault",
       kmsProviders,
       schemaMap,
-      bypassQueryAnalysis: false // Allow query analysis for deterministic encryption
+      bypassQueryAnalysis: false${cryptSharedLibPath ? ',\n      ...extraOptions' : ''} // Allow query analysis for deterministic encryption
     }
   });
   await clientEncrypted.connect();
@@ -461,12 +483,17 @@ async function main() {
     }
   };
 
-  // 1. Initialize Client with AutoEncryption
+  // 1. Initialize Client with AutoEncryption${cryptSharedLibPath ? `
+  const extraOptions = {
+    cryptSharedLibPath: "${cryptSharedLibPath}",
+    cryptSharedLibRequired: false
+  };` : ''}
+
   const client = new MongoClient(uri, {
     autoEncryption: {
       keyVaultNamespace,
       kmsProviders,
-      schemaMap
+      schemaMap${cryptSharedLibPath ? ',\n      ...extraOptions' : ''}
     }
   });
 
