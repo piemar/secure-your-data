@@ -1572,7 +1572,7 @@ Prerequisites: Atlas M10+, AWS account, Azure subscription, Node.js 18+, mongosh
               {[
                 { num: '1', title: 'Complete both labs', desc: 'Hands-on experience is essential for demos' },
                 { num: '2', title: 'Review territory accounts', desc: 'Identify 2-3 customers who might benefit' },
-                { num: '3', title: 'Schedule practice demo', desc: 'Run through the flow with your SE manager' },
+                { num: '3', title: 'Schedule practice demo', desc: 'Implement crypto shredding to showcase GDPR right for erasure' },
               ].map((item, i) => (
                 <div key={i} className="p-4 rounded-lg bg-primary/10 border border-primary">
                   <div className="flex items-center gap-2 mb-1">
@@ -1587,7 +1587,6 @@ Prerequisites: Atlas M10+, AWS account, Azure subscription, Node.js 18+, mongosh
         </div>
         <div className="p-6 rounded-lg bg-card border border-border text-center">
           <h3 className="text-2xl font-bold mb-2">Questions?</h3>
-          <p className="text-muted-foreground">#sa-encryption-help on Slack</p>
         </div>
       </div>
     ),
@@ -1600,9 +1599,7 @@ Prerequisites: Atlas M10+, AWS account, Azure subscription, Node.js 18+, mongosh
 Action items:
 1. Complete both labs - hands-on experience is essential
 2. Review territory accounts - identify 2-3 opportunities
-3. Schedule practice demo with your SE manager
-
-Questions? #sa-encryption-help on Slack`,
+3. Schedule practice demo - implement crypto shredding to showcase GDPR right for erasure`,
     exportContent: {
       title: 'Resources & Next Steps',
       bullets: [
@@ -1611,8 +1608,7 @@ Questions? #sa-encryption-help on Slack`,
         'GitHub Samples: github.com/mongodb-university/csfle-guides',
         'Action 1: Complete both labs',
         'Action 2: Review territory accounts for 2-3 opportunities',
-        'Action 3: Schedule practice demo with SE manager',
-        'Questions? #sa-encryption-help on Slack',
+        'Action 3: Schedule practice demo - implement crypto shredding to showcase GDPR right for erasure',
       ],
       notes: 'Resources and action items for continued learning.',
     },

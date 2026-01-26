@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { LabStep } from './LabStep';
 import { useLab } from '@/context/LabContext';
+import { heartbeat } from '@/utils/leaderboardUtils';
 
 interface Step {
   id: string;
@@ -57,14 +58,7 @@ export function LabView({
     // Send heartbeat every 30 seconds to update time tracking
     const heartbeatInterval = setInterval(() => {
       if (userEmail) {
-        fetch('/api/leaderboard/heartbeat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: userEmail,
-            labNumber
-          })
-        }).catch(console.error);
+        heartbeat(userEmail, labNumber);
       }
     }, 30000);
     

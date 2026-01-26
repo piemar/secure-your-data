@@ -57,7 +57,7 @@ export const LabSetupWizard: React.FC = () => {
             const ln = lastName.toLowerCase();
             setVerifiedTool('suffix', true, `${fn}-${ln}`);
         }
-    }, [firstName, lastName, setVerifiedTool]);
+    }, [firstName, lastName]); // Removed setVerifiedTool from dependencies to prevent infinite loop
 
     // Sync local verify state from context on mount
     useEffect(() => {
@@ -257,7 +257,7 @@ export const LabSetupWizard: React.FC = () => {
 
                     <div className="text-sm text-muted-foreground bg-muted/30 p-3 rounded border border-dashed">
                         <p className="font-semibold flex items-center gap-1 mb-1"><HelpCircle className="w-3 h-3" /> Get Started:</p>
-                        <p>Open <strong>Lab 1: CSFLE Core</strong> from the sidebar. You will use your verified AWS CLI to create your first root Customer Master Key (CMK).</p>
+                        <p>Open <strong>Lab 1: CSFLE Fundamentals</strong> from the sidebar. You will use your verified AWS CLI to create your first root Customer Master Key (CMK).</p>
                     </div>
                 </CardContent>
                 <CardFooter className="flex gap-2">

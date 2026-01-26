@@ -2,39 +2,49 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Trophy, Clock, Award, Users, TrendingUp, Medal } from 'lucide-react';
 import { useLab } from '@/context/LabContext';
-
-interface LeaderboardEntry {
-  email: string;
-  score: number;
-  completedLabs: number[];
-  labTimes: Record<number, number>; // lab number -> time spent in ms
-  lastActive: number;
-}
+import { getSortedLeaderboard, heartbeat, type LeaderboardEntry } from '@/utils/leaderboardUtils';
 
 export function Leaderboard() {
   const { userEmail } = useLab();
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const fetchLeaderboard = async () => {
-      try {
-        const response = await fetch('/api/leaderboard');
-        if (response.ok) {
-          const data = await response.json();
-          setLeaderboard(data.entries || []);
-        }
-      } catch (error) {
-        console.error('Failed to fetch leaderboard:', error);
-      } finally {
-        setLoading(false);
-      }
+    const updateLeaderboard = () => {
+      const entries = getSortedLeaderboard();
+      setLeaderboard(entries);
+      setLoading(false);
     };
 
-    fetchLeaderboard();
-    const interval = setInterval(fetchLeaderboard, 5000); // Refresh every 5 seconds
-    return () => clearInterval(interval);
-  }, []);
+    // Initial load
+    updateLeaderboard();
+
+    // Send heartbeat for current user
+    if (userEmail) {
+      heartbeat(userEmail);
+    }
+
+    // Refresh every 2 seconds
+    const interval = setInterval(() => {
+      updateLeaderboard();
+      if (userEmail) {
+        heartbeat(userEmail);
+      }
+    }, 2000);
+
+    // Also listen for storage changes (in case another tab updates the leaderboard)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'workshop_leaderboard') {
+        updateLeaderboard();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [userEmail]);
 
   const formatTime = (ms: number) => {
     const hours = Math.floor(ms / 3600000);
