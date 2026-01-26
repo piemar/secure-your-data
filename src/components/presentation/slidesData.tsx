@@ -155,7 +155,7 @@ By the end of this session, you'll be able to:
 - Handle GDPR/HIPAA compliance questions with confidence
 - Differentiate our solution from competitors like Oracle TDE and Cosmos DB
 
-We have 45 minutes of presentation followed by three hands-on labs (Lab 1: 45 min, Lab 2: 45 min, Lab 3: 30 min - total 120 min).`,
+We have 45 minutes of presentation followed by three hands-on labs (Lab 1: 15 min, Lab 2: 15 min, Lab 3: 15 min - total 45 min).`,
   },
   {
     id: 2,
@@ -1354,7 +1354,7 @@ This question separates "encryption at rest" conversations from true data protec
             },
             {
               objection: '"It\'s too complex to implement"',
-              response: 'Automatic encryption uses a schema definition - your app code doesn\'t change. We have working labs that take 45 minutes (Lab 1 & 2) and 30 minutes (Lab 3).',
+              response: 'Automatic encryption uses a schema definition - your app code doesn\'t change. We have working labs that take 15 minutes each (Lab 1, Lab 2, and Lab 3).',
             },
             {
               objection: '"Our compliance team is fine with TDE"',
@@ -1513,19 +1513,19 @@ The key: Qualify early. A failed POC is worse than a declined engagement.`,
     ),
     speakerNotes: `Here are the three hands-on labs you'll complete after this presentation.
 
-Lab 1: CSFLE Fundamentals (45 min)
+Lab 1: CSFLE Fundamentals (15 min)
 - Set up AWS KMS integration
 - Implement automatic encryption
 - Intentionally break crypt_shared to learn debugging
 - Verify encrypted data in Atlas
 
-Lab 2: Queryable Encryption (45 min)
-- Implement range queries on salary field
+Lab 2: Queryable Encryption (15 min)
+- Implement equality queries on encrypted fields
 - Actually explore the .esc and .ecoc collections
 - Understand how QE stores metadata
 - Verify DEK-per-field requirement
 
-Lab 3: Migration & Multi-Tenant Patterns (30 min)
+Lab 3: Migration & Multi-Tenant Patterns (15 min)
 - Migrate plaintext data to encrypted format
 - Implement per-tenant key isolation using KeyAltNames
 - Perform key rotation procedures

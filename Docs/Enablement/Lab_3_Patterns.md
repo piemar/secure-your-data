@@ -110,7 +110,7 @@ await encryption.rewrapManyDataKey(
   { keyAltNames: "tenant-123" },
   { 
     provider: "aws", 
-    masterKey: { key: "new-cmk-arn", region: "eu-north-1" } 
+    masterKey: { key: "new-cmk-arn", region: "eu-central-1" } 
   }
 );
 ```

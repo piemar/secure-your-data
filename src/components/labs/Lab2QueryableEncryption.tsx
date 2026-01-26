@@ -6,6 +6,7 @@ export function Lab2QueryableEncryption() {
   const { mongoUri, awsRegion, verifiedTools } = useLab();
   const suffix = verifiedTools['suffix']?.path || 'suffix';
   const aliasName = `alias/mongodb-lab-key-${suffix}`;
+  const cryptSharedLibPath = verifiedTools['mongoCryptShared']?.path || '';
 
   const lab2Steps = [
     {
@@ -305,14 +306,19 @@ async function run() {
     ]
   };
 
-  // QE-enabled client
+  // QE-enabled client${cryptSharedLibPath ? `
+  const extraOptions = {
+    cryptSharedLibPath: "${cryptSharedLibPath}",
+    cryptSharedLibRequired: false
+  };` : ''}
+
   const client = new MongoClient(uri, {
     autoEncryption: {
       keyVaultNamespace: "encryption.__keyVault",
       kmsProviders,
       encryptedFieldsMap: {
         "hr.employees": encryptedFields
-      }
+      }${cryptSharedLibPath ? ',\n      ...extraOptions' : ''}
     }
   });
 
@@ -459,13 +465,18 @@ async function run() {
     ]
   };
 
-  const clientQE = new MongoClient(uri, {
+  ${cryptSharedLibPath ? `const extraOptions = {
+    cryptSharedLibPath: "${cryptSharedLibPath}",
+    cryptSharedLibRequired: false
+  };
+
+  ` : ''}const clientQE = new MongoClient(uri, {
     autoEncryption: {
       keyVaultNamespace: "encryption.__keyVault",
       kmsProviders,
       encryptedFieldsMap: {
         "hr.employees": encryptedFields
-      }
+      }${cryptSharedLibPath ? ',\n      ...extraOptions' : ''}
     }
   });
 
