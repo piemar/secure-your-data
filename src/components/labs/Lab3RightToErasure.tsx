@@ -9,7 +9,32 @@ export function Lab3RightToErasure() {
   const aliasName = `alias/mongodb-lab-key-${suffix}`;
   const cryptSharedLibPath = verifiedTools['mongoCryptShared']?.path || '';
 
-  const lab3Steps = [
+  const lab3Steps: Array<{
+    id: string;
+    title: string;
+    estimatedTime: string;
+    description: string;
+    difficulty?: DifficultyLevel;
+    understandSection?: string;
+    doThisSection?: string[];
+    hints?: string[];
+    tips?: string[];
+    codeBlocks?: Array<{ filename: string; language: string; code: string; skeleton?: string }>;
+    troubleshooting?: string[];
+    onVerify?: () => Promise<{ success: boolean; message: string }>;
+    exercises?: Array<{
+      id: string;
+      type: 'quiz' | 'fill_blank' | 'challenge';
+      title: string;
+      description?: string;
+      points?: number;
+      question?: string;
+      options?: Array<{ id: string; label: string; isCorrect: boolean }>;
+      codeTemplate?: string;
+      blanks?: Array<{ id: string; placeholder: string; correctAnswer: string; hint?: string }>;
+      challengeSteps?: Array<{ instruction: string; hint?: string }>;
+    }>;
+  }> = [
     {
       id: 'l3s1',
       title: 'Step 1: Explicit Encryption for Migration',
