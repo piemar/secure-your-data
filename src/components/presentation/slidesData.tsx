@@ -696,9 +696,9 @@ This is what makes key rotation efficient - you only need to re-encrypt the DEKs
 Common misconception: People think the CMK encrypts data directly. It doesn't - it's "key to the keys."`,
   },
 
-  // SECTION 3: GDPR & Multi-Cloud Patterns (Slides 12-14)
+  // SECTION 3: GDPR & Multi-Cloud Patterns (Slides 13-15)
   {
-    id: 12,
+    id: 13,
     title: 'Right to Erasure Pattern',
     section: 'GDPR Patterns',
     content: (
@@ -736,7 +736,7 @@ This is Lab 3 - you'll implement this pattern hands-on.
 Limitation to discuss: Cross-user queries become complex. If you need to query across users (analytics), you may need a separate aggregation approach.`,
   },
   {
-    id: 13,
+    id: 14,
     title: 'Multi-Cloud KMS Architecture',
     section: 'GDPR Patterns',
     content: (
@@ -801,8 +801,46 @@ Architecture tip: You can use DIFFERENT KMS providers for different DEKs.
 - DR data with Azure Key Vault
 - Provides true multi-cloud resilience`,
   },
+  // Knowledge Check - GDPR Patterns
   {
-    id: 14,
+    id: 15,
+    title: 'Knowledge Check: GDPR Compliance',
+    section: 'GDPR Patterns',
+    content: (
+      <div className="max-w-3xl mx-auto">
+        <SlideTitle>Knowledge Check</SlideTitle>
+        <KnowledgeCheck
+          question="A customer asks: 'How can I implement GDPR Right to Erasure if user data is in backups I can't delete?' What's the best MongoDB pattern?"
+          options={[
+            { id: 'delete', label: 'Run db.collection.deleteMany() across all collections', isCorrect: false },
+            { id: 'ttl', label: 'Use TTL indexes to auto-expire user data', isCorrect: false },
+            { id: 'crypto', label: 'Assign one DEK per user - delete their DEK to crypto-shred all their data', isCorrect: true },
+            { id: 'backup', label: 'Maintain separate backups per user for selective deletion', isCorrect: false },
+          ]}
+          explanation="Crypto-shredding is the pattern: each user gets their own DEK. When they request erasure, you delete their DEK from the Key Vault. All their data (including in backups) becomes cryptographically unreadable. No need to find and delete individual records."
+          points={15}
+        />
+      </div>
+    ),
+    speakerNotes: `This is a scenario-based question to test practical application.
+
+Correct answer: One DEK per user pattern (crypto-shredding)
+
+Why the other answers don't work:
+- deleteMany(): Doesn't affect backups, and you have to find ALL user data
+- TTL indexes: Can't control exact deletion time, doesn't handle Article 17 requests
+- Separate backups: Operationally complex and expensive
+
+The crypto-shredding pattern is elegant:
+1. User signs up → generate unique DEK for them
+2. All their sensitive data encrypted with THEIR DEK
+3. User requests erasure → delete their DEK
+4. All their data (live + backups) becomes unreadable garbage
+
+This is Lab 3 - they'll implement this hands-on.`,
+  },
+  {
+    id: 16,
     title: 'Automatic vs Explicit Encryption',
     section: 'Architecture',
     content: (
@@ -888,9 +926,9 @@ In practice, many customers use both:
 Both use the same underlying crypto - it's just about developer experience.`,
   },
 
-  // SECTION 4: CSFLE vs QE Deep Comparison (Slides 15-18)
+  // SECTION 4: CSFLE vs QE Deep Comparison (Slides 17-20)
   {
-    id: 15,
+    id: 17,
     title: 'Supported Query Types',
     section: 'CSFLE vs QE',
     content: (
@@ -944,7 +982,7 @@ Example: salary field
   - Maintain a separate, anonymized analytics collection`,
   },
   {
-    id: 16,
+    id: 18,
     title: 'What You Can\'t Do',
     section: 'CSFLE vs QE',
     content: (
@@ -1024,7 +1062,7 @@ Schema design is key:
 This is where "Day 2" architecture discussions happen.`,
   },
   {
-    id: 17,
+    id: 19,
     title: 'Performance Considerations',
     section: 'CSFLE vs QE',
     content: (
@@ -1088,8 +1126,45 @@ Sizing guidance:
 - Monitor and adjust based on actual usage
 - Consider separate storage tier for encrypted collections`,
   },
+  // Knowledge Check - CSFLE vs QE
   {
-    id: 18,
+    id: 20,
+    title: 'Knowledge Check: CSFLE vs QE',
+    section: 'CSFLE vs QE',
+    content: (
+      <div className="max-w-3xl mx-auto">
+        <SlideTitle>Knowledge Check</SlideTitle>
+        <KnowledgeCheck
+          question="A healthcare customer needs to query patient records by date of birth ranges (e.g., 'patients born between 1980-1990'). Which encryption approach should you recommend?"
+          options={[
+            { id: 'csfle-det', label: 'CSFLE with Deterministic encryption', isCorrect: false },
+            { id: 'csfle-rand', label: 'CSFLE with Random encryption', isCorrect: false },
+            { id: 'qe-range', label: 'Queryable Encryption with Range index', isCorrect: true },
+            { id: 'no-encrypt', label: 'Leave DOB unencrypted - it\'s not sensitive enough', isCorrect: false },
+          ]}
+          explanation="CSFLE only supports equality queries (with Deterministic encryption). For range queries on encrypted data, Queryable Encryption with Range index is required. DOB is considered ePHI under HIPAA and should be encrypted for healthcare customers."
+          points={15}
+        />
+      </div>
+    ),
+    speakerNotes: `Scenario-based question to test practical decision-making.
+
+Correct answer: Queryable Encryption with Range index
+
+Why the other answers don't work:
+- CSFLE Deterministic: Only supports equality ($eq), not range queries ($gt, $lt)
+- CSFLE Random: No queries at all - maximum security but no searchability
+- Unencrypted: DOB is PHI under HIPAA - must be encrypted for healthcare
+
+Key decision tree for customers:
+1. Do you need range queries? → QE only option
+2. Do you only need equality? → CSFLE Deterministic OR QE Equality
+3. No queries needed on encrypted field? → CSFLE Random (most secure)
+
+Trade-off reminder: QE Range has 2-3x storage overhead, so recommend only for fields that truly need range queries.`,
+  },
+  {
+    id: 21,
     title: 'KMS Providers & Key Rotation',
     section: 'Operations',
     content: (
@@ -1169,9 +1244,9 @@ Best practices:
 - Automate rotation in your CI/CD pipeline`,
   },
 
-  // SECTION 5: Competitive & Sales (Slides 19-23)
+  // SECTION 5: Competitive & Sales (Slides 22-27)
   {
-    id: 19,
+    id: 22,
     title: 'Regulatory Alignment',
     section: 'Compliance',
     content: (
@@ -1224,7 +1299,7 @@ Auditor conversations:
 - "Show me access controls" → RBAC + field-level separation`,
   },
   {
-    id: 20,
+    id: 23,
     title: 'Competitive Landscape',
     section: 'Competition',
     content: (
@@ -1301,8 +1376,50 @@ vs PostgreSQL (column encryption):
 
 Key message: MongoDB is the only document database with client-side searchable encryption that supports range queries while maintaining true zero-trust (server never sees plaintext).`,
   },
+  // Knowledge Check - Competitive Positioning
   {
-    id: 21,
+    id: 24,
+    title: 'Knowledge Check: Competitive',
+    section: 'Competition',
+    content: (
+      <div className="max-w-3xl mx-auto">
+        <SlideTitle>Knowledge Check</SlideTitle>
+        <KnowledgeCheck
+          question="A customer says: 'We already use Oracle TDE for encryption. Why would we need MongoDB's client-side encryption?' What's the key differentiator?"
+          options={[
+            { id: 'faster', label: 'MongoDB encryption is faster than Oracle TDE', isCorrect: false },
+            { id: 'cheaper', label: 'MongoDB encryption is cheaper to operate', isCorrect: false },
+            { id: 'zero-trust', label: 'With TDE, DBAs can still see plaintext data. With CSFLE/QE, the server NEVER sees plaintext.', isCorrect: true },
+            { id: 'compliance', label: 'TDE doesn\'t meet compliance requirements', isCorrect: false },
+          ]}
+          explanation="The fundamental difference: TDE (Transparent Data Encryption) encrypts data at rest on disk, but decrypts it in memory during query processing. Database administrators can still access plaintext data. MongoDB's client-side encryption ensures the server NEVER sees plaintext - true zero-trust architecture for insider threat protection."
+          points={20}
+        />
+      </div>
+    ),
+    speakerNotes: `This is the killer competitive question.
+
+Correct answer: Server never sees plaintext
+
+The TDE vs CSFLE distinction:
+- TDE: Encrypts on disk, decrypts in RAM for queries
+- CSFLE/QE: Client encrypts BEFORE sending to server
+- Server never has access to plaintext
+
+Why the other answers are wrong:
+- Performance: TDE may actually be faster (no client overhead)
+- Cost: Both have operational costs
+- Compliance: TDE meets many compliance checkboxes
+
+The real differentiator is INSIDER THREAT protection:
+- Oracle DBAs can see plaintext with TDE
+- MongoDB DBAs see only ciphertext with CSFLE
+- This is the "Should your DBA see SSNs?" question
+
+This is often the winning argument in competitive deals.`,
+  },
+  {
+    id: 25,
     title: 'Discovery Questions',
     section: 'Sales',
     content: (
@@ -1366,7 +1483,7 @@ The answer is almost always "No" - and that's where client-side encryption becom
 This question separates "encryption at rest" conversations from true data protection.`,
   },
   {
-    id: 22,
+    id: 26,
     title: 'Objection Handling',
     section: 'Sales',
     content: (
@@ -1434,7 +1551,7 @@ This question separates "encryption at rest" conversations from true data protec
 The key: Don't argue features. Understand their specific concerns and address those.`,
   },
   {
-    id: 23,
+    id: 27,
     title: 'When NOT to Use',
     section: 'Sales',
     content: (
@@ -1501,7 +1618,7 @@ Workarounds to discuss:
 The key: Qualify early. A failed POC is worse than a declined engagement.`,
   },
   {
-    id: 24,
+    id: 28,
     title: 'Labs Overview',
     section: 'Labs',
     content: (
@@ -1569,7 +1686,7 @@ Total hands-on time: 120 minutes (2 hours)
 Each lab is self-paced with step-by-step instructions and checkpoints.`,
   },
   {
-    id: 25,
+    id: 29,
     title: 'Wrap-Up & Resources',
     section: 'Conclusion',
     content: (
