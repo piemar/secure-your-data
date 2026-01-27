@@ -148,13 +148,63 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          skeleton: `// 1. Connect to MongoDB and get SSO credentials
-// 2. Look up the DEK by keyAltName from Lab 1
-// 3. Initialize ClientEncryption for explicit encryption
-// 4. Read documents from legacy collection (plaintext)
-// 5. For each document, encrypt the SSN field using encryption.encrypt()
-// 6. Insert encrypted documents into secure collection
-// 7. Verify encryption by querying without CSFLE (should see Binary)`
+          skeleton: `// ══════════════════════════════════════════════════════════════
+// Migrate Plaintext Data to CSFLE Using Explicit Encryption
+// ══════════════════════════════════════════════════════════════
+// When migrating existing data, you cannot use automatic encryption
+// because the driver expects ciphertext. Use explicit encryption instead.
+
+const { MongoClient, ClientEncryption } = require("mongodb");
+const { fromSSO } = require("@aws-sdk/credential-providers");
+
+const uri = "${mongoUri}";
+const keyVaultNamespace = "encryption.__keyVault";
+
+async function run() {
+  const credentials = await fromSSO()();
+  const kmsProviders = { aws: { /* credentials */ } };
+
+  const client = await MongoClient.connect(uri);
+  
+  // TASK: Look up the DEK from Lab 1 by its keyAltName
+  const keyVaultDB = client.db("encryption");
+  const keyDoc = await keyVaultDB.collection("__keyVault").______({ 
+    keyAltNames: "user-${suffix}-ssn-key" 
+  });
+  const dekId = keyDoc._id;
+
+  // TASK: Initialize ClientEncryption for explicit encryption
+  const encryption = new ________________(client, {
+    keyVaultNamespace,
+    kmsProviders,
+  });
+
+  // Read from legacy collection (plaintext)
+  const legacyDB = client.db("medical");
+  const legacyCollection = legacyDB.collection("patients_legacy");
+  const secureCollection = legacyDB.collection("patients_secure");
+
+  const legacyDocs = await legacyCollection.find({}).toArray();
+  
+  for (const doc of legacyDocs) {
+    // TASK: Encrypt the SSN field explicitly
+    const encryptedSSN = await encryption._________(doc.ssn, {
+      algorithm: "AEAD_AES_256_CBC_HMAC_SHA_512-____________",  // Deterministic or Random?
+      keyId: dekId
+    });
+
+    // Insert with encrypted SSN
+    await secureCollection.insertOne({
+      ...doc,
+      ssn: encryptedSSN
+    });
+  }
+
+  console.log("Migration complete!");
+  await client.close();
+}
+
+run().catch(console.error);`
         },
         {
           filename: 'Terminal - Run the script',
@@ -177,6 +227,12 @@ node migrateToCSFLE.cjs
 # SSN (encrypted): Binary - Binary ciphertext
 # ✓ Data is encrypted in the database!`
         }
+      ],
+      hints: [
+        'Blank 1: The method to find one document is "findOne".',
+        'Blank 2: The class for encryption operations is "ClientEncryption".',
+        'Blank 3: The method to encrypt a value explicitly is "encrypt".',
+        'Blank 4: Use "Deterministic" for fields you need to query on.'
       ],
       onVerify: async () => validatorUtils.checkMigration(mongoUri)
     },
@@ -249,87 +305,6 @@ async function run() {
     }
   }
 
-  // Demonstrate multi-tenant data insertion
-  console.log("\\n=== Multi-Tenant Data Insertion ===");
-  const saasDB = client.db("saas");
-  
-  for (const tenantId of tenants) {
-    const keyAltName = \`tenant-\${tenantId}\`;
-    
-    // Look up the tenant's DEK
-    const keyVaultDB = client.db("encryption");
-    const keyDoc = await keyVaultDB.collection("__keyVault").findOne({ 
-      keyAltNames: keyAltName 
-    });
-
-    if (!keyDoc) {
-      throw new Error(\`DEK not found for tenant: \${tenantId}\`);
-    }
-
-    const dekId = keyDoc._id;
-
-    // Create schema map for this tenant
-const schemaMap = {
-  "saas.app": {
-        bsonType: "object",
-        encryptMetadata: {
-          keyId: [dekId],
-          algorithm: "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
-        },
-        properties: {
-          customerData: {
-            encrypt: {
-              bsonType: "string",
-              algorithm: "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic",
-              keyId: [dekId]
-            }
-          }
-        }
-      }
-    };
-
-    // Insert data for this tenant using CSFLE${cryptSharedLibPath ? `
-    const extraOptions = {
-      cryptSharedLibPath: "${cryptSharedLibPath}",
-      cryptSharedLibRequired: false
-    };` : ''}
-
-    const tenantClient = new MongoClient(uri, {
-      autoEncryption: {
-        keyVaultNamespace,
-        kmsProviders,
-        schemaMap${cryptSharedLibPath ? ',\n        ...extraOptions' : ''}
-      }
-    });
-
-    await tenantClient.connect();
-    const tenantCollection = tenantClient.db("saas").collection("app");
-    
-    await tenantCollection.insertOne({
-      tenantId: tenantId,
-      customerData: \`Sensitive data for \${tenantId}\`,
-      timestamp: new Date()
-    });
-
-    console.log(\`✓ Inserted encrypted data for tenant: \${tenantId}\`);
-    await tenantClient.close();
-  }
-
-  // Verify tenant isolation: Query each tenant's data
-  console.log("\\n=== Verifying Tenant Isolation ===");
-  const keyVaultDB = client.db("encryption");
-  
-  for (const tenantId of tenants) {
-    const keyAltName = \`tenant-\${tenantId}\`;
-    const keyDoc = await keyVaultDB.collection("__keyVault").findOne({ 
-      keyAltNames: keyAltName 
-    });
-    
-    if (keyDoc) {
-      console.log(\`✓ Tenant \${tenantId}: DEK exists (\${keyDoc._id.toString()})\`);
-    }
-  }
-
   console.log("\\n✓ Multi-tenant isolation setup complete!");
   console.log("✓ Each tenant has its own DEK, ensuring data isolation");
 
@@ -337,13 +312,59 @@ const schemaMap = {
 }
 
 run().catch(console.error);`,
-          skeleton: `// 1. Connect to MongoDB and get SSO credentials
-// 2. Create DEKs for multiple tenants (acme, contoso, fabrikam)
-// 3. For each tenant:
-//    - Look up their DEK by keyAltName
-//    - Create a schemaMap with that tenant's DEK
-//    - Insert encrypted data using CSFLE client
-// 4. Verify that each tenant has their own DEK in the key vault`
+          skeleton: `// ══════════════════════════════════════════════════════════════
+// Multi-Tenant Isolation with Per-Tenant DEKs
+// ══════════════════════════════════════════════════════════════
+// Each tenant gets their own DEK. A key compromise for one tenant
+// does NOT affect others. This is SaaS-safe architecture.
+
+const { MongoClient, ClientEncryption } = require("mongodb");
+const { fromSSO } = require("@aws-sdk/credential-providers");
+
+const uri = "${mongoUri}";
+const keyVaultNamespace = "encryption.__keyVault";
+
+async function run() {
+  const credentials = await fromSSO()();
+  const kmsProviders = { aws: { /* credentials */ } };
+
+  const client = await MongoClient.connect(uri);
+  const encryption = new ClientEncryption(client, {
+    keyVaultNamespace,
+    kmsProviders,
+  });
+
+  // TASK: Create DEKs for multiple tenants
+  const tenants = ["acme", "contoso", "fabrikam"];
+  
+  for (const tenantId of tenants) {
+    // TASK: Construct a unique keyAltName for each tenant
+    const keyAltName = \`_______-\${tenantId}\`;  // Prefix pattern
+    
+    // Check if DEK already exists
+    const keyVaultDB = client.db("encryption");
+    const existingKey = await keyVaultDB.collection("__keyVault").findOne({ 
+      ___________: keyAltName   // Which field to query?
+    });
+
+    if (!existingKey) {
+      // TASK: Create a new DEK for this tenant
+      const dekId = await encryption.____________("aws", {
+        masterKey: { 
+          key: "${aliasName}", 
+          region: "${awsRegion || 'eu-central-1'}" 
+        },
+        keyAltNames: [keyAltName]
+      });
+      console.log(\`Created DEK for tenant: \${tenantId}\`);
+    }
+  }
+
+  console.log("Multi-tenant isolation setup complete!");
+  await client.close();
+}
+
+run().catch(console.error);`
         },
         {
           filename: 'Terminal - Run the script',
@@ -366,6 +387,11 @@ node multiTenantIsolation.cjs
 # ✓ Tenant fabrikam: DEK exists (...)
 # ✓ Multi-tenant isolation setup complete!`
         }
+      ],
+      hints: [
+        'Blank 1: The keyAltName prefix should be "tenant" (e.g., tenant-acme).',
+        'Blank 2: Query by "keyAltNames" field to find existing DEKs.',
+        'Blank 3: The method to create a DEK is "createDataKey".'
       ],
       onVerify: async () => validatorUtils.checkTenantDEKs(mongoUri)
     },
