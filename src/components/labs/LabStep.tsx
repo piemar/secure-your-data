@@ -7,6 +7,7 @@ import { useLab } from '@/context/LabContext';
 import { toast } from 'sonner';
 import { ValidationResult } from '@/utils/validatorUtils';
 import { DifficultyBadge, DifficultyLevel } from './DifficultyBadge';
+import { HintSystem } from './HintSystem';
 
 interface LabStepProps {
   stepId: string;
@@ -17,6 +18,7 @@ interface LabStepProps {
   difficulty?: DifficultyLevel;
   understandSection?: string;
   doThisSection?: string[];
+  hints?: string[];
   codeBlocks?: Array<{
     filename: string;
     language: string;
@@ -43,6 +45,7 @@ export function LabStep({
   difficulty,
   understandSection,
   doThisSection,
+  hints,
   codeBlocks,
   expectedOutput,
   troubleshooting,
@@ -224,24 +227,34 @@ export function LabStep({
                 // Always show skeleton first if available, even if solution is hidden
                 if (!shouldShowFull && hasSkeleton) {
                   return (
-                    <div key={i} className="space-y-2">
+                    <div key={i} className="space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-mono text-muted-foreground">
-                          {block.filename} <span className="text-primary-500 font-bold ml-2">(Template - Fill in the blanks)</span>
+                          {block.filename} <span className="text-primary font-bold ml-2">(Template - Fill in the blanks)</span>
                         </span>
-                        <Button variant="ghost" size="sm" onClick={handleShowSolution} className="h-6 text-[10px] gap-1 text-muted-foreground hover:text-primary">
-                          <Eye className="w-3 h-3" /> Reveal Full Solution (-5 pts)
-                        </Button>
                       </div>
                       <CodeBlock
                         code={block.skeleton}
                         language={block.language}
                       />
-                      <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
-                        <p className="text-xs text-blue-800 dark:text-blue-300">
-                          <strong>💡 Hint:</strong> Use the description above and tips to fill in the missing parts. Try implementing it yourself before revealing the solution!
-                        </p>
-                      </div>
+                      
+                      {/* Progressive Hint System */}
+                      {hints && hints.length > 0 ? (
+                        <HintSystem
+                          hints={hints}
+                          onRevealSolution={handleShowSolution}
+                          solutionRevealed={showSolutions}
+                        />
+                      ) : (
+                        <div className="p-3 rounded-lg bg-accent/50 border border-accent">
+                          <p className="text-xs text-accent-foreground">
+                            <strong>💡 Tip:</strong> Use the description above and tips to fill in the missing parts. Try implementing it yourself before revealing the solution!
+                          </p>
+                          <Button variant="ghost" size="sm" onClick={handleShowSolution} className="mt-2 h-6 text-[10px] gap-1 text-muted-foreground hover:text-primary">
+                            <Eye className="w-3 h-3" /> Reveal Full Solution (-5 pts)
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   );
                 }
@@ -249,24 +262,32 @@ export function LabStep({
                 // If no skeleton and solution is hidden, show placeholder with more guidance
                 if (!shouldShowFull && !hasSkeleton) {
                   return (
-                    <div key={i} className="p-8 border-2 border-dashed border-border rounded-lg text-center bg-muted/30 space-y-4">
-                      <div>
+                    <div key={i} className="space-y-4">
+                      <div className="p-6 border-2 border-dashed border-border rounded-lg text-center bg-muted/30">
                         <p className="text-sm text-muted-foreground mb-2">Code solution for <strong>{block.filename}</strong> is hidden.</p>
-                        <p className="text-xs text-muted-foreground mb-2">Use the description, tips, and your knowledge to implement it. Check the documentation links if needed.</p>
-                        <div className="mt-3 p-2 bg-primary/10 rounded text-xs text-left text-muted-foreground">
-                          <p className="font-semibold mb-1">💡 What to do:</p>
-                          <ul className="list-disc list-inside space-y-1">
+                        <p className="text-xs text-muted-foreground">Use the description, tips, and progressive hints to implement it yourself.</p>
+                      </div>
+                      
+                      {/* Progressive Hint System */}
+                      {hints && hints.length > 0 ? (
+                        <HintSystem
+                          hints={hints}
+                          onRevealSolution={handleShowSolution}
+                          solutionRevealed={showSolutions}
+                        />
+                      ) : (
+                        <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                          <p className="text-xs text-muted-foreground mb-2">💡 <strong>What to do:</strong></p>
+                          <ul className="list-disc list-inside space-y-1 text-xs text-muted-foreground">
                             <li>Read the step description carefully</li>
                             <li>Review the tips section above</li>
                             <li>Check documentation links if provided</li>
-                            <li>Try implementing based on patterns from previous steps</li>
-                            <li>Use "Check My Progress" to validate your solution</li>
                           </ul>
+                          <Button variant="outline" size="sm" onClick={handleShowSolution} className="mt-3 gap-2">
+                            <Eye className="w-4 h-4" /> Reveal Solution (-5 pts)
+                          </Button>
                         </div>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={handleShowSolution} className="gap-2">
-                        <Eye className="w-4 h-4" /> Reveal Solution (-5 pts)
-                      </Button>
+                      )}
                     </div>
                   );
                 }
@@ -279,7 +300,7 @@ export function LabStep({
                         {block.filename}
                       </span>
                       {showSolutions && !isCompleted && (
-                        <span className="text-xs text-yellow-600 dark:text-yellow-400 font-semibold">
+                        <span className="text-xs text-warning font-semibold">
                           ⚠️ Solution Revealed (-5 pts)
                         </span>
                       )}

@@ -17,6 +17,7 @@ export function Lab1CSFLE() {
     difficulty?: DifficultyLevel;
     understandSection?: string;
     doThisSection?: string[];
+    hints?: string[];
     tips?: string[];
     codeBlocks?: Array<{ filename: string; language: string; code: string; skeleton?: string }>;
     onVerify?: () => Promise<{ success: boolean; message: string }>;
@@ -37,6 +38,11 @@ export function Lab1CSFLE() {
       tips: [
         'ROOT OF TRUST: The CMK never leaves the KMS Hardware Security Module (HSM).',
         'SA TIP: Use aliases for your keys to make them application-agnostic. Referencing a key by alias allows for easier rotation.'
+      ],
+      hints: [
+        'The aws kms create-key command creates a symmetric key by default - no extra flags needed',
+        'Store the KeyId in a variable using --query "KeyMetadata.KeyId" --output text',
+        'Use aws kms create-alias with --alias-name and --target-key-id to link the alias to your key'
       ],
       codeBlocks: [
         {
@@ -105,10 +111,22 @@ aws kms put-key-policy --key-id $KMS_KEY_ID --policy-name default --policy file:
       id: 'l1s3',
       title: 'Initialize Key Vault with Unique Index',
       estimatedTime: '5 min',
+      difficulty: 'basic' as DifficultyLevel,
+      understandSection: 'The Key Vault is a special MongoDB collection that stores encrypted DEKs. A unique partial index on keyAltNames prevents duplicate key names.',
+      doThisSection: [
+        'Connect to Atlas using mongosh',
+        'Switch to the encryption database',
+        'Create a unique partial index on the __keyVault collection'
+      ],
       description: 'The Key Vault collection stores your encrypted DEKs. You MUST create a unique index manually. The driver does NOT do this for you.',
       tips: [
         'IMPORTANT: Run this command in your MONGODB SHELL (mongosh) connected to Atlas.',
         'Architecture: Usually stored in a database named "encryption" and collection "__keyVault".'
+      ],
+      hints: [
+        'Use mongosh to connect, then "use encryption" to switch databases',
+        'The index needs to be on { keyAltNames: 1 } with unique: true',
+        'Add partialFilterExpression: { keyAltNames: { $exists: true } } so docs without keyAltNames are allowed'
       ],
       codeBlocks: [
         {
@@ -138,12 +156,25 @@ db.getCollection("__keyVault").createIndex(
       id: 'l1s5',
       title: 'Generate Data Encryption Keys (DEKs)',
       estimatedTime: '8 min',
+      difficulty: 'intermediate' as DifficultyLevel,
+      understandSection: 'The DEK (Data Encryption Key) is what actually encrypts your data. The CMK "wraps" the DEK, meaning the DEK is stored encrypted in MongoDB using the CMK from AWS KMS.',
+      doThisSection: [
+        'Install required npm packages',
+        'Create a Node.js script (createKey.cjs)',
+        'Configure KMS providers with AWS credentials',
+        'Use ClientEncryption.createDataKey() to generate and store the DEK'
+      ],
       description: 'Generate the actual keys used to encrypt data using a Node.js script with the mongodb-client-encryption library.',
       tips: [
         'RUN WITH NODE.JS: This is a Node.js script. Run with: node createKey.cjs',
         'NOT MONGOSH: This is NOT a mongosh command - it must run in your terminal with Node.js.',
         'DEPENDENCIES: Ensure you run npm install first (see step 1 below).',
         'MULTI-DEK: In production, create different keys for different sensitivity levels.'
+      ],
+      hints: [
+        'Use require("mongodb") and require("mongodb-client-encryption") for the MongoDB client encryption library',
+        'The createDataKey() method takes the provider name ("aws") and a masterKey object with your alias and region',
+        'Use keyAltNames to give your DEK a human-readable name for easier reference later'
       ],
       codeBlocks: [
         {
