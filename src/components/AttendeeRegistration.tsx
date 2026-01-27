@@ -11,7 +11,8 @@ interface AttendeeRegistrationProps {
 
 export function AttendeeRegistration({ onComplete }: AttendeeRegistrationProps) {
   const { setUserEmail, userEmail } = useLab();
-  const [displayName, setDisplayName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -25,12 +26,13 @@ export function AttendeeRegistration({ onComplete }: AttendeeRegistrationProps) 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!displayName.trim() || !email.trim() || !email.includes('@')) return;
+    if (!firstName.trim() || !lastName.trim() || !email.trim() || !email.includes('@')) return;
 
     setIsSubmitting(true);
     
-    // Store attendee info
-    localStorage.setItem('workshop_attendee_name', displayName.trim());
+    // Store attendee info - combine first and last name for display
+    const fullName = `${firstName.trim()} ${lastName.trim()}`;
+    localStorage.setItem('workshop_attendee_name', fullName);
     setUserEmail(email.trim());
     
     // Small delay for UX
@@ -61,21 +63,36 @@ export function AttendeeRegistration({ onComplete }: AttendeeRegistrationProps) 
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Display Name */}
-            <div className="space-y-2">
-              <Label htmlFor="displayName" className="text-sm flex items-center gap-2">
-                <User className="w-4 h-4 text-muted-foreground" />
-                Display Name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="displayName"
-                type="text"
-                placeholder="Your name"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                className="h-12 bg-background border-primary/50 focus:border-primary"
-                autoFocus
-              />
+            {/* Name Fields */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="firstName" className="text-sm flex items-center gap-2">
+                  <User className="w-4 h-4 text-muted-foreground" />
+                  First Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="firstName"
+                  type="text"
+                  placeholder="Pierre"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="h-12 bg-background border-primary/50 focus:border-primary"
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName" className="text-sm">
+                  Last Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="lastName"
+                  type="text"
+                  placeholder="Petersson"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="h-12 bg-background border-primary/50 focus:border-primary"
+                />
+              </div>
             </div>
 
             {/* Email (Required) */}
@@ -98,7 +115,7 @@ export function AttendeeRegistration({ onComplete }: AttendeeRegistrationProps) 
             {/* Submit Button */}
             <Button
               type="submit"
-              disabled={!displayName.trim() || !email.trim() || !email.includes('@') || isSubmitting}
+              disabled={!firstName.trim() || !lastName.trim() || !email.trim() || !email.includes('@') || isSubmitting}
               className="w-full h-12 text-base font-semibold gap-2 bg-primary hover:bg-primary/90"
               size="lg"
             >
