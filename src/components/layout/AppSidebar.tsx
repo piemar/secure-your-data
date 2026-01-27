@@ -77,6 +77,15 @@ export function AppSidebar() {
   const [userRank, setUserRank] = useState<number>(0);
   const [totalParticipants, setTotalParticipants] = useState<number>(0);
 
+  const handleLogout = () => {
+    logout();
+    localStorage.removeItem('workshop_attendee_name');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('completedLabs');
+    localStorage.removeItem('labStartTimes');
+    window.location.reload();
+  };
+
   // Calculate user rank and progress
   useEffect(() => {
     const updateRank = () => {
@@ -239,19 +248,19 @@ export function AppSidebar() {
         </div>
       )}
 
-      {/* Switch Role / Logout */}
+      {/* Logout */}
       <div className="p-2 border-t border-sidebar-border">
         <Button
           variant="ghost"
           size="sm"
-          onClick={logout}
+          onClick={handleLogout}
           className={cn(
-            'w-full justify-start gap-2 text-muted-foreground hover:text-foreground',
+            'w-full justify-start gap-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10',
             !sidebarOpen && 'justify-center px-0'
           )}
         >
           <LogOut className="w-4 h-4" />
-          {sidebarOpen && <span>{isModerator ? 'Exit Presenter' : 'Switch User'}</span>}
+          {sidebarOpen && <span>Log Out</span>}
         </Button>
       </div>
 
