@@ -2,6 +2,7 @@ import { LabViewWithTabs } from './LabViewWithTabs';
 import { validatorUtils } from '@/utils/validatorUtils';
 import { useLab } from '@/context/LabContext';
 import { DifficultyLevel } from './DifficultyBadge';
+import { QEArchitectureDiagram } from './LabArchitectureDiagrams';
 
 export function Lab2QueryableEncryption() {
   const { mongoUri, awsRegion, verifiedTools } = useLab();
@@ -628,41 +629,7 @@ node queryQERange.cjs
     keyInsight: 'QE lets you query encrypted data without decrypting first. The server processes queries on ciphertext using structured encryption techniques - a significant advancement over CSFLE.',
     showEncryptionFlow: true,
     encryptionFlowType: 'qe' as const,
-    architectureDiagram: (
-      <div className="text-xs font-mono text-muted-foreground">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="text-left py-2 px-3">Query Type</th>
-              <th className="text-center py-2 px-3">CSFLE</th>
-              <th className="text-center py-2 px-3">QE</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b border-border">
-              <td className="py-2 px-3">Equality</td>
-              <td className="text-center py-2 px-3">✅ (Deterministic only)</td>
-              <td className="text-center py-2 px-3">✅</td>
-            </tr>
-            <tr className="border-b border-border">
-              <td className="py-2 px-3">Range</td>
-              <td className="text-center py-2 px-3">❌</td>
-              <td className="text-center py-2 px-3">✅ (8.0+)</td>
-            </tr>
-            <tr className="border-b border-border">
-              <td className="py-2 px-3">Prefix</td>
-              <td className="text-center py-2 px-3">❌</td>
-              <td className="text-center py-2 px-3">✅ (8.0+)</td>
-            </tr>
-            <tr>
-              <td className="py-2 px-3">Regex</td>
-              <td className="text-center py-2 px-3">❌</td>
-              <td className="text-center py-2 px-3">❌</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    )
+    architectureDiagram: <QEArchitectureDiagram />
   };
 
   // Exercises for Lab 2
