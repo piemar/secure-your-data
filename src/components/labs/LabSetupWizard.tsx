@@ -9,6 +9,7 @@ import { validatorUtils } from '@/utils/validatorUtils';
 import { toast } from 'sonner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
+import { ArchitectureDiagram } from '@/components/workshop/ArchitectureDiagram';
 
 type SetupPhase = 'onboarding' | 'ready';
 
@@ -26,6 +27,7 @@ const PREREQUISITES: Prerequisite[] = [
     { id: 'mongosh', label: 'mongosh', description: 'MongoDB Shell for database operations', installCommand: 'brew install mongodb-community-shell', downloadUrl: 'https://www.mongodb.com/try/download/shell', required: true },
     { id: 'node', label: 'Node.js v18+', description: 'JavaScript runtime', installCommand: 'brew install node', downloadUrl: 'https://nodejs.org/', required: true },
     { id: 'npm', label: 'npm', description: 'Package manager (comes with Node.js)', installCommand: 'Included with Node.js', required: true },
+    { id: 'mongoCryptShared', label: 'mongo_crypt_shared', description: 'Required for Queryable Encryption (Lab 2)', installCommand: 'Download from MongoDB', downloadUrl: 'https://www.mongodb.com/docs/manual/core/queryable-encryption/reference/shared-library/', required: false },
 ];
 
 export const LabSetupWizard: React.FC = () => {
@@ -207,6 +209,9 @@ export const LabSetupWizard: React.FC = () => {
                         <p className="font-semibold flex items-center gap-1 mb-1"><HelpCircle className="w-3 h-3" /> Get Started:</p>
                         <p>Open <strong>Lab 1: CSFLE Fundamentals</strong> from the sidebar to create your first Customer Master Key (CMK).</p>
                     </div>
+
+                    {/* Architecture Diagram */}
+                    <ArchitectureDiagram variant="overview" />
                 </CardContent>
                 <CardFooter className="flex gap-2">
                     <Button variant="outline" className="flex-1" onClick={() => setPhase('onboarding')}>Update Environment</Button>
