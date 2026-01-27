@@ -10,13 +10,17 @@ import {
   Lock,
   LogOut,
   Crown,
+  TrendingUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { useRole } from '@/contexts/RoleContext';
 import { useLab } from '@/context/LabContext';
+import { getSortedLeaderboard } from '@/utils/leaderboardUtils';
 import type { Section } from '@/types';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { useState, useEffect } from 'react';
 
 interface NavItem {
   id: Section;
@@ -41,39 +45,60 @@ const navItems: NavItem[] = [
     subLabel: 'Environment Config',
   },
   {
-    id: 'leaderboard',
-    label: 'Leaderboard',
-    icon: Trophy,
-    subLabel: 'Rankings & Scores',
-    moderatorOnly: true,
-  },
-  {
     id: 'lab1',
-    label: 'Lab 1: CSFLE Fundamentals',
+    label: 'Lab 1: CSFLE',
     icon: Database,
-    subLabel: '45 min • AWS KMS',
+    subLabel: '35 min • AWS KMS',
   },
   {
     id: 'lab2',
     label: 'Lab 2: Queryable Encryption',
     icon: Shield,
-    subLabel: '45 min • Range Queries',
+    subLabel: '30 min • Range Queries',
   },
   {
     id: 'lab3',
-    label: 'Lab 3: Migration & Multi-Tenant',
+    label: 'Lab 3: Right to Erasure',
     icon: Key,
-    subLabel: '30 min • Advanced Patterns',
+    subLabel: '15 min • GDPR Pattern',
+  },
+  {
+    id: 'leaderboard',
+    label: 'Leaderboard',
+    icon: Trophy,
+    subLabel: 'Rankings & Scores',
   },
 ];
 
 export function AppSidebar() {
   const { currentSection, setSection, sidebarOpen, toggleSidebar } = useNavigation();
-  const { isLabAccessible } = useLab();
-  const { isModerator, logout, role } = useRole();
+  const { isLabAccessible, userEmail, currentScore, completedLabs } = useLab();
+  const { isModerator, logout } = useRole();
+  const [userRank, setUserRank] = useState<number>(0);
+  const [totalParticipants, setTotalParticipants] = useState<number>(0);
+
+  // Calculate user rank and progress
+  useEffect(() => {
+    const updateRank = () => {
+      const leaderboard = getSortedLeaderboard();
+      setTotalParticipants(leaderboard.length);
+      const rank = leaderboard.findIndex(e => e.email === userEmail) + 1;
+      setUserRank(rank);
+    };
+    
+    updateRank();
+    const interval = setInterval(updateRank, 5000);
+    return () => clearInterval(interval);
+  }, [userEmail]);
 
   // Filter nav items based on role
   const visibleNavItems = navItems.filter(item => !item.moderatorOnly || isModerator);
+
+  // Calculate overall progress
+  const totalLabs = 3;
+  const progressPercentage = (completedLabs.length / totalLabs) * 100;
+
+  const attendeeName = localStorage.getItem('workshop_attendee_name') || 'Attendee';
 
   return (
     <aside
@@ -90,32 +115,67 @@ export function AppSidebar() {
         {sidebarOpen && (
           <div className="flex flex-col">
             <span className="text-sm font-semibold text-sidebar-foreground">MongoDB</span>
-            <span className="text-xs text-muted-foreground">SA Enablement</span>
+            <span className="text-xs text-muted-foreground">Encryption Workshop</span>
           </div>
         )}
       </div>
 
-      {/* Moderator Badge */}
-      {isModerator && sidebarOpen && (
-        <div className="mx-2 mt-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
-          <div className="flex items-center gap-2 text-primary text-sm font-medium">
-            <Crown className="w-4 h-4" />
-            Moderator Mode
-          </div>
+      {/* User Info / Moderator Badge */}
+      {sidebarOpen ? (
+        <div className="mx-2 mt-2 p-3 rounded-lg bg-card/50 border border-border">
+          {isModerator ? (
+            <div className="flex items-center gap-2 text-primary text-sm font-medium">
+              <Crown className="w-4 h-4" />
+              Moderator Mode
+            </div>
+          ) : (
+            <div>
+              <p className="font-medium text-sm truncate">{attendeeName}</p>
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3" />
+                  {currentScore} pts
+                </span>
+                {userRank > 0 && (
+                  <span className="text-xs text-primary font-mono">
+                    #{userRank} of {totalParticipants}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="mx-2 mt-2 flex justify-center">
+          {isModerator ? (
+            <Crown className="w-5 h-5 text-primary" />
+          ) : (
+            <div className="text-xs font-mono text-primary">
+              {userRank > 0 && `#${userRank}`}
+            </div>
+          )}
         </div>
       )}
-      {isModerator && !sidebarOpen && (
-        <div className="mx-2 mt-2 flex justify-center">
-          <Crown className="w-5 h-5 text-primary" />
+
+      {/* Progress Bar */}
+      {sidebarOpen && !isModerator && (
+        <div className="mx-2 mt-2 px-3">
+          <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+            <span>Progress</span>
+            <span>{completedLabs.length}/{totalLabs} labs</span>
+          </div>
+          <Progress value={progressPercentage} className="h-1.5" />
         </div>
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+      <nav className="flex-1 p-2 space-y-1 overflow-y-auto mt-2">
         {visibleNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentSection === item.id;
-          const isLocked = (item.id === 'lab2' || item.id === 'lab3') && !isLabAccessible(parseInt(item.id.replace('lab', '')));
+          const labNumber = item.id.startsWith('lab') ? parseInt(item.id.replace('lab', '')) : null;
+          const isLocked = labNumber !== null && labNumber > 1 && !isLabAccessible(labNumber);
+          const isLabComplete = labNumber !== null && completedLabs.includes(labNumber);
 
           return (
             <button
@@ -133,6 +193,11 @@ export function AppSidebar() {
             >
               {isLocked && sidebarOpen && (
                 <Lock className="absolute right-2 w-4 h-4 text-muted-foreground" />
+              )}
+              {isLabComplete && sidebarOpen && !isLocked && (
+                <div className="absolute right-2 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs">
+                  ✓
+                </div>
               )}
               <Icon
                 className={cn(
@@ -170,15 +235,11 @@ export function AppSidebar() {
               <span>Notes</span>
               <kbd className="kbd">N</kbd>
             </div>
-            <div className="flex items-center justify-between">
-              <span>Fullscreen</span>
-              <kbd className="kbd">F</kbd>
-            </div>
           </div>
         </div>
       )}
 
-      {/* Role indicator and logout */}
+      {/* Switch Role / Logout */}
       <div className="p-2 border-t border-sidebar-border">
         <Button
           variant="ghost"
@@ -190,7 +251,7 @@ export function AppSidebar() {
           )}
         >
           <LogOut className="w-4 h-4" />
-          {sidebarOpen && <span>Switch Role</span>}
+          {sidebarOpen && <span>{isModerator ? 'Exit Presenter' : 'Switch User'}</span>}
         </Button>
       </div>
 
