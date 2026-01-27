@@ -206,6 +206,13 @@ async function run() {
 }
 
 run().catch(console.error);`,
+          // Inline hints for Lab 3 Step 1
+          inlineHints: [
+            { line: 21, blankText: '______', hint: 'Method to retrieve a single document', answer: 'findOne' },
+            { line: 27, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
+            { line: 41, blankText: '_________', hint: 'Method to encrypt a value manually', answer: 'encrypt' },
+            { line: 42, blankText: '____________', hint: 'Algorithm suffix for queryable encryption', answer: 'Deterministic' }
+          ],
           // Tier 2: Challenge
           challengeSkeleton: `// ══════════════════════════════════════════════════════════════
 // CHALLENGE MODE - Data Migration with Explicit Encryption
@@ -424,7 +431,13 @@ async function run() {
   await client.close();
 }
 
-run().catch(console.error);`
+run().catch(console.error);`,
+          // Inline hints for Lab 3 Step 2
+          inlineHints: [
+            { line: 28, blankText: '_______', hint: 'Prefix for tenant-specific key names', answer: 'tenant' },
+            { line: 33, blankText: '___________', hint: 'Field to query for existing DEK names', answer: 'keyAltNames' },
+            { line: 38, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' }
+          ]
         },
         {
           filename: 'Terminal - Run the script',

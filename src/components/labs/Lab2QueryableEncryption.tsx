@@ -145,6 +145,13 @@ async function run() {
 }
 
 run().catch(console.error);`,
+          // Inline hints for Guided mode
+          inlineHints: [
+            { line: 31, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
+            { line: 33, blankText: '___________', hint: 'Property for human-readable key identifiers', answer: 'keyAltNames' },
+            { line: 38, blankText: '____________', hint: 'Same method as above for creating DEKs', answer: 'createDataKey' },
+            { line: 40, blankText: '___________', hint: 'The keyAltName for the taxId field DEK', answer: 'qe-taxid-dek' }
+          ],
           // Tier 2: Challenge
           challengeSkeleton: `// ══════════════════════════════════════════════════════════════
 // CHALLENGE MODE - Create DEKs for Queryable Encryption
@@ -212,12 +219,6 @@ node createQEDeks.cjs
 # TaxId Altname: qe-taxid-dek,  DEK UUID: a1b2c3d4-5e6f-7890-abcd-ef1234567890
 # (Your UUIDs will be different)`
         },
-      ],
-      hints: [
-        'Blank 1: The method to create a DEK is "createDataKey".',
-        'Blank 2: The property for human-readable names is "keyAltNames".',
-        'Blank 3: Same method "createDataKey" for the second DEK.',
-        'Blank 4: The keyAltName for taxId field should be "qe-taxid-dek".'
       ],
       onVerify: async () => validatorUtils.checkQEDEKs(mongoUri)
     },
@@ -342,7 +343,15 @@ async function run() {
   await client.close();
 }
 
-run().catch(console.error);`
+run().catch(console.error);`,
+          // Inline hints for Step 2
+          inlineHints: [
+            { line: 14, blankText: '______', hint: 'Method to find a single document by query', answer: 'findOne' },
+            { line: 18, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
+            { line: 27, blankText: '_______', hint: 'The field name for salary data', answer: 'salary' },
+            { line: 30, blankText: '________', hint: 'Query type for searching encrypted fields', answer: 'equality' },
+            { line: 43, blankText: '________________', hint: 'Method to create a new collection', answer: 'createCollection' }
+          ]
         },
         {
           filename: 'Terminal - Run the Node.js script',
@@ -528,10 +537,72 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          skeleton: `// Create a QE-enabled MongoDB client
-// Connect to the "hr" database
-// Insert multiple test documents with salary and taxId fields
-// The fields will be automatically encrypted based on your encryptedFields configuration`
+          skeleton: `// ══════════════════════════════════════════════════════════════
+// Insert Test Data with QE-Enabled Client
+// ══════════════════════════════════════════════════════════════
+// Fields defined in encryptedFields are automatically encrypted.
+
+const { MongoClient } = require("mongodb");
+const { fromSSO } = require("@aws-sdk/credential-providers");
+
+const uri = "${mongoUri}";
+
+async function run() {
+  const credentials = await fromSSO()();
+  const kmsProviders = { aws: { /* credentials */ } };
+
+  // TASK: Look up DEKs by their keyAltNames
+  const tempClient = await MongoClient.connect(uri);
+  const keyVaultDB = tempClient.db("encryption");
+  const salaryKeyDoc = await keyVaultDB.collection("__keyVault").______({ 
+    keyAltNames: "qe-salary-dek" 
+  });
+  const taxKeyDoc = await keyVaultDB.collection("__keyVault").findOne({ 
+    keyAltNames: "____________" 
+  });
+  
+  const salaryDekId = salaryKeyDoc._id;
+  const taxDekId = taxKeyDoc._id;
+  await tempClient.close();
+
+  // TASK: Configure the encryptedFieldsMap
+  const encryptedFields = {
+    fields: [
+      { path: "salary", bsonType: "___", keyId: salaryDekId, queries: { queryType: "equality" } },
+      { path: "______", bsonType: "string", keyId: taxDekId, queries: { queryType: "equality" } }
+    ]
+  };
+
+  // TASK: Create QE-enabled client with autoEncryption
+  const client = new MongoClient(uri, {
+    _______________: {
+      keyVaultNamespace: "encryption.__keyVault",
+      kmsProviders,
+      encryptedFieldsMap: { "hr.employees": encryptedFields }
+    }
+  });
+
+  await client.connect();
+  const collection = client.db("hr").collection("employees");
+  
+  // Insert test documents
+  await collection.___________([
+    { name: "Alice Johnson", salary: 75000, taxId: "123-45-6789" }
+  ]);
+
+  console.log("Inserted documents with encrypted fields!");
+  await client.close();
+}
+
+run().catch(console.error);`,
+          inlineHints: [
+            { line: 18, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
+            { line: 22, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
+            { line: 32, blankText: '___', hint: 'BSON type for integer values', answer: 'int' },
+            { line: 33, blankText: '______', hint: 'Field name for tax identification', answer: 'taxId' },
+            { line: 38, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
+            { line: 49, blankText: '___________', hint: 'Method to insert multiple documents', answer: 'insertMany' }
+          ]
         },
         {
           filename: 'Terminal - Run the Node.js script',
