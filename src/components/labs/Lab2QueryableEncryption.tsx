@@ -737,7 +737,6 @@ node queryQERange.cjs
       ]}
       steps={lab2Steps}
       introContent={introContent}
-      exercises={exercises}
       businessValue="Query encrypted data without exposing plaintext to the database"
       atlasCapability="Queryable Encryption + Range Queries"
     />
