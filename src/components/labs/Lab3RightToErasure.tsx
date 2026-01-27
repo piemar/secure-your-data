@@ -1,6 +1,7 @@
-import { LabView } from './LabView';
+import { LabViewWithTabs } from './LabViewWithTabs';
 import { validatorUtils } from '@/utils/validatorUtils';
 import { useLab } from '@/context/LabContext';
+import { DifficultyLevel } from './DifficultyBadge';
 
 export function Lab3RightToErasure() {
   const { mongoUri, awsRegion, verifiedTools } = useLab();
@@ -551,8 +552,52 @@ For this lab demo, we use the same CMK to demonstrate the rewrap operation.`
     }
   ];
 
+  const introContent = {
+    whatYouWillBuild: [
+      'Implement explicit encryption for data migration',
+      'Design multi-tenant isolation with per-tenant DEKs',
+      'Execute CMK rotation without re-encrypting data',
+      'Understand the "Right to Erasure" pattern via crypto-shredding'
+    ],
+    keyConcepts: [
+      {
+        term: 'Explicit Encryption',
+        explanation: 'Manually encrypt/decrypt fields using the ClientEncryption API. Required for migrating existing plaintext data to encrypted format.'
+      },
+      {
+        term: 'Multi-Tenant Isolation',
+        explanation: 'Assign one DEK per tenant. If a tenant\'s key is compromised, only their data is at risk - other tenants remain secure.'
+      },
+      {
+        term: 'Crypto-Shredding (Right to Erasure)',
+        explanation: 'Delete the DEK to make all associated data cryptographically unreadable. Fulfills GDPR Article 17 without finding/deleting every record.'
+      }
+    ],
+    keyInsight: 'When a user requests deletion under GDPR, instead of finding and deleting all their data across collections, simply delete their DEK. All their data becomes cryptographically unreadable garbage.',
+    architectureDiagram: (
+      <pre className="text-xs font-mono text-muted-foreground whitespace-pre overflow-x-auto">
+{`┌─────────────────────────────────────────────────────────────┐
+│                    1 DEK per User Pattern                   │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  User A Data ──encrypted with──▶ DEK-A ──wrapped by──▶ CMK │
+│  User B Data ──encrypted with──▶ DEK-B ──wrapped by──▶ CMK │
+│  User C Data ──encrypted with──▶ DEK-C ──wrapped by──▶ CMK │
+│                                                             │
+│  ═══════════════════════════════════════════════════════   │
+│                                                             │
+│  DELETE DEK-A ═══▶ User A's data is now unreadable garbage │
+│                                                             │
+│  ✓ No need to find every User A record                     │
+│  ✓ Instant compliance with GDPR Article 17                 │
+│  ✓ Audit log shows key deletion timestamp                  │
+└─────────────────────────────────────────────────────────────┘`}
+      </pre>
+    )
+  };
+
   return (
-    <LabView
+    <LabViewWithTabs
       labNumber={3}
       title="Migration & Multi-Tenant Patterns"
       description="Elevate your SA skills by mastering complex production patterns. Learn to migrate legacy data explicitly, manage per-tenant key isolation, and perform lifecycle rotations for enterprise compliance."
@@ -569,6 +614,7 @@ For this lab demo, we use the same CMK to demonstrate the rewrap operation.`
         'Defend the "One DEK per compliance category" architecture'
       ]}
       steps={lab3Steps}
+      introContent={introContent}
     />
   );
 }
