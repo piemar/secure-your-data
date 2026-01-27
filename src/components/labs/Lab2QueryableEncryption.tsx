@@ -1,6 +1,7 @@
-import { LabView } from './LabView';
+import { LabViewWithTabs } from './LabViewWithTabs';
 import { validatorUtils } from '@/utils/validatorUtils';
 import { useLab } from '@/context/LabContext';
+import { DifficultyLevel } from './DifficultyBadge';
 
 export function Lab2QueryableEncryption() {
   const { mongoUri, awsRegion, verifiedTools } = useLab();
@@ -578,8 +579,67 @@ node queryQERange.cjs
     }
   ];
 
+  const introContent = {
+    whatYouWillBuild: [
+      'Create DEKs for Queryable Encryption fields',
+      'Configure collections with encrypted field definitions',
+      'Execute equality queries on encrypted data',
+      'Compare QE-enabled vs standard client behavior'
+    ],
+    keyConcepts: [
+      {
+        term: 'Queryable Encryption (QE)',
+        explanation: 'Query encrypted data without decrypting first. Supports equality queries with encrypted indexes stored in metadata collections.'
+      },
+      {
+        term: 'Metadata Collections (.esc, .ecoc)',
+        explanation: 'QE creates system collections to store encrypted search indexes. These enable querying without exposing plaintext.'
+      },
+      {
+        term: 'Storage Overhead',
+        explanation: 'QE requires 2-3x storage overhead for encrypted indexes and metadata. Plan capacity accordingly.'
+      }
+    ],
+    keyInsight: 'QE lets you query encrypted data without decrypting first. The server processes queries on ciphertext using structured encryption techniques - a significant advancement over CSFLE.',
+    architectureDiagram: (
+      <div className="text-xs font-mono text-muted-foreground">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="text-left py-2 px-3">Query Type</th>
+              <th className="text-center py-2 px-3">CSFLE</th>
+              <th className="text-center py-2 px-3">QE</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-b border-border">
+              <td className="py-2 px-3">Equality</td>
+              <td className="text-center py-2 px-3">✅ (Deterministic only)</td>
+              <td className="text-center py-2 px-3">✅</td>
+            </tr>
+            <tr className="border-b border-border">
+              <td className="py-2 px-3">Range</td>
+              <td className="text-center py-2 px-3">❌</td>
+              <td className="text-center py-2 px-3">✅ (8.0+)</td>
+            </tr>
+            <tr className="border-b border-border">
+              <td className="py-2 px-3">Prefix</td>
+              <td className="text-center py-2 px-3">❌</td>
+              <td className="text-center py-2 px-3">✅ (8.0+)</td>
+            </tr>
+            <tr>
+              <td className="py-2 px-3">Regex</td>
+              <td className="text-center py-2 px-3">❌</td>
+              <td className="text-center py-2 px-3">❌</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    )
+  };
+
   return (
-    <LabView
+    <LabViewWithTabs
       labNumber={2}
       title="Queryable Encryption & Range Deep-Dive"
       description="Master the breakthrough Queryable Encryption (QE) feature. Learn to query encrypted data using equality, range, prefix, and suffix queries. Compare QE-enabled vs standard clients to see the power of querying encrypted data without decrypting first."
@@ -599,6 +659,7 @@ node queryQERange.cjs
         'Understand how QE enables querying encrypted data transparently'
       ]}
       steps={lab2Steps}
+      introContent={introContent}
     />
   );
 }
