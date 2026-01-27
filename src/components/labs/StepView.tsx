@@ -1,5 +1,7 @@
-import { useState, useCallback, useMemo } from 'react';
-import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2, Info, BookOpen, Clock } from 'lucide-react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2, Info, BookOpen, Clock, Lock, Eye, Unlock } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -9,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Editor from '@monaco-editor/react';
 import { StepContextDrawer } from './StepContextDrawer';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
+import { trackHintUsage, trackSolutionReveal } from '@/utils/leaderboardUtils';
 
 interface CodeBlock {
   filename: string;
@@ -441,16 +444,79 @@ export function StepView({
   const [isRunning, setIsRunning] = useState(false);
   const [copied, setCopied] = useState(false);
   const [direction, setDirection] = useState(0);
+  
+  // Challenge Mode State
+  const [showSolution, setShowSolution] = useState<Record<string, boolean>>({});
+  const [revealedHints, setRevealedHints] = useState<Record<string, number[]>>({});
+  const [alwaysShowSolutions, setAlwaysShowSolutions] = useState<boolean>(() => {
+    const saved = localStorage.getItem('workshop_always_show_solutions');
+    return saved === 'true';
+  });
+  const [pointsDeducted, setPointsDeducted] = useState<Record<string, number>>({});
 
   const currentStep = steps[currentStepIndex];
   const isCompleted = completedSteps.includes(currentStepIndex);
 
-  const handleCopyCode = useCallback(async () => {
-    const code = currentStep.codeBlocks?.[0]?.code || '';
+  // Check if any code block has a skeleton
+  const hasSkeletons = useMemo(() => {
+    return currentStep.codeBlocks?.some(block => block.skeleton) ?? false;
+  }, [currentStep.codeBlocks]);
+
+  // Persist read-only mode preference
+  useEffect(() => {
+    localStorage.setItem('workshop_always_show_solutions', String(alwaysShowSolutions));
+  }, [alwaysShowSolutions]);
+
+  // Helper to reveal a hint
+  const revealHint = useCallback((blockKey: string, hintIdx: number) => {
+    setRevealedHints(prev => {
+      const existing = prev[blockKey] || [];
+      if (existing.includes(hintIdx)) return prev;
+      return { ...prev, [blockKey]: [...existing, hintIdx] };
+    });
+    // Deduct points for hint
+    const penalty = hintIdx === 0 ? 1 : 2;
+    setPointsDeducted(prev => ({
+      ...prev,
+      [blockKey]: (prev[blockKey] || 0) + penalty
+    }));
+    
+    // Track in leaderboard
+    const email = localStorage.getItem('userEmail') || '';
+    if (email) {
+      trackHintUsage(email, penalty);
+    }
+  }, []);
+
+  // Helper to reveal full solution
+  const revealSolution = useCallback((blockKey: string) => {
+    setShowSolution(prev => ({ ...prev, [blockKey]: true }));
+    // Deduct 5 points for revealing solution
+    setPointsDeducted(prev => ({
+      ...prev,
+      [blockKey]: (prev[blockKey] || 0) + 5
+    }));
+    
+    // Track in leaderboard
+    const email = localStorage.getItem('userEmail') || '';
+    if (email) {
+      trackSolutionReveal(email, 5);
+    }
+  }, []);
+
+  // Copy button should always copy full solution (even if skeleton shown)
+  const handleCopyCode = useCallback(async (blockIdx: number = 0) => {
+    const block = currentStep.codeBlocks?.[blockIdx];
+    const blockKey = `${currentStepIndex}-${blockIdx}`;
+    const hasSkeleton = !!block?.skeleton;
+    const isSolutionRevealed = alwaysShowSolutions || showSolution[blockKey] || !hasSkeleton;
+    
+    // Copy the solution if revealed, otherwise copy skeleton
+    const code = isSolutionRevealed ? (block?.code || '') : (block?.skeleton || block?.code || '');
     await navigator.clipboard.writeText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [currentStep.codeBlocks]);
+  }, [currentStep.codeBlocks, currentStepIndex, alwaysShowSolutions, showSolution]);
 
   const handleCheckProgress = async () => {
     setIsRunning(true);
@@ -611,59 +677,161 @@ export function StepView({
           </div>
         </div>
 
+        {/* Read-Only Mode Toggle */}
+        {hasSkeletons && (
+          <div className="flex-shrink-0 flex items-center gap-2 px-6 py-2 border-b border-border bg-muted/20">
+            <Switch 
+              id="read-only-mode"
+              checked={alwaysShowSolutions} 
+              onCheckedChange={setAlwaysShowSolutions}
+            />
+            <Label htmlFor="read-only-mode" className="text-sm text-muted-foreground cursor-pointer">
+              <Unlock className="w-3 h-3 inline mr-1" />
+              Read-only mode (show all solutions)
+            </Label>
+          </div>
+        )}
+
         {/* Code Editor & Output - Resizable Split */}
         <div className="flex-1 overflow-hidden min-h-0">
           {currentStep.codeBlocks && currentStep.codeBlocks.length > 0 ? (
             <ResizablePanelGroup direction="vertical" className="h-full">
               {/* Code Editor Panel */}
               <ResizablePanel defaultSize={outputOpen ? 50 : 85} minSize={30}>
-                <div className="h-full flex flex-col">
-                  {currentStep.codeBlocks.map((block, idx) => (
-                    <div key={idx} className="h-full flex flex-col">
-                      <div className="flex-shrink-0 px-4 py-2 bg-muted/50 border-b border-border flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono text-muted-foreground">{block.filename}</span>
-                          {currentStep.estimatedTime && (
-                            <span className="text-xs text-muted-foreground">
-                              ⏱️ {currentStep.estimatedTime}
-                            </span>
-                          )}
+                <div className="h-full flex flex-col overflow-auto">
+                  {currentStep.codeBlocks.map((block, idx) => {
+                    const blockKey = `${currentStepIndex}-${idx}`;
+                    const hasSkeleton = !!block.skeleton;
+                    const isSolutionRevealed = alwaysShowSolutions || showSolution[blockKey] || !hasSkeleton;
+                    const displayCode = isSolutionRevealed ? block.code : block.skeleton!;
+                    const blockHints = currentStep.hints || [];
+                    const revealedForBlock = revealedHints[blockKey] || [];
+                    
+                    return (
+                      <div key={idx} className="flex flex-col min-h-[250px]">
+                        {/* Editor Header */}
+                        <div className="flex-shrink-0 px-4 py-2 bg-muted/50 border-b border-border flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono text-muted-foreground">{block.filename}</span>
+                            {currentStep.estimatedTime && (
+                              <span className="text-xs text-muted-foreground">
+                                ⏱️ {currentStep.estimatedTime}
+                              </span>
+                            )}
+                            {hasSkeleton && !isSolutionRevealed && (
+                              <span className="flex items-center gap-1 text-xs bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded">
+                                <Lock className="w-3 h-3" />
+                                Challenge Mode
+                              </span>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCopyCode(idx)}
+                            className="gap-1.5 h-6 text-xs px-2"
+                          >
+                            {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                            {copied ? 'Copied!' : 'Copy Code'}
+                          </Button>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleCopyCode}
-                          className="gap-1.5 h-6 text-xs px-2"
-                        >
-                          {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                          {copied ? 'Copied!' : 'Copy Code'}
-                        </Button>
-                      </div>
-                      <div className="flex-1 min-h-0">
-                        {/* Wrap Monaco in stable container to fix ref warning */}
-                        <div className="h-full w-full">
-                          <Editor
-                            key={`editor-${currentStepIndex}-${idx}`}
-                            height="100%"
-                            language={block.language === 'bash' ? 'shell' : block.language}
-                            value={block.code}
-                            theme="vs-dark"
-                            options={{
-                              readOnly: true,
-                              minimap: { enabled: false },
-                              fontSize: 13,
-                              lineNumbers: 'on',
-                              scrollBeyondLastLine: false,
-                              wordWrap: 'on',
-                              automaticLayout: true,
-                              tabSize: 2,
-                              padding: { top: 12, bottom: 12 },
-                            }}
-                          />
+                        
+                        {/* Monaco Editor */}
+                        <div className="flex-1 min-h-[200px]">
+                          <div className="h-full w-full">
+                            <Editor
+                              key={`editor-${currentStepIndex}-${idx}-${isSolutionRevealed}`}
+                              height="100%"
+                              language={block.language === 'bash' ? 'shell' : block.language}
+                              value={displayCode}
+                              theme="vs-dark"
+                              options={{
+                                readOnly: true,
+                                minimap: { enabled: false },
+                                fontSize: 13,
+                                lineNumbers: 'on',
+                                scrollBeyondLastLine: false,
+                                wordWrap: 'on',
+                                automaticLayout: true,
+                                tabSize: 2,
+                                padding: { top: 12, bottom: 12 },
+                              }}
+                            />
+                          </div>
                         </div>
+
+                        {/* Challenge Mode Controls - Show only when skeleton is active */}
+                        {hasSkeleton && !isSolutionRevealed && (
+                          <div className="flex-shrink-0 px-4 py-3 bg-amber-500/10 border-t border-amber-500/30">
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <div className="flex items-center gap-2">
+                                <Lock className="w-4 h-4 text-amber-600" />
+                                <span className="text-sm font-medium text-amber-700 dark:text-amber-500">
+                                  Try to fill in the blanks before revealing the solution
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {blockHints.map((hint, hintIdx) => (
+                                  <Button
+                                    key={hintIdx}
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => revealHint(blockKey, hintIdx)}
+                                    disabled={revealedForBlock.includes(hintIdx) || (hintIdx > 0 && !revealedForBlock.includes(hintIdx - 1))}
+                                    className={cn(
+                                      "gap-1 h-7 text-xs",
+                                      revealedForBlock.includes(hintIdx) && "opacity-50"
+                                    )}
+                                  >
+                                    <Lightbulb className="w-3 h-3" />
+                                    Hint {hintIdx + 1} (-{hintIdx === 0 ? 1 : 2}pt)
+                                  </Button>
+                                ))}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => revealSolution(blockKey)}
+                                  className="gap-1 h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  Show Solution (-5pts)
+                                </Button>
+                              </div>
+                            </div>
+                            
+                            {/* Display revealed hints */}
+                            {revealedForBlock.length > 0 && (
+                              <div className="mt-3 space-y-2">
+                                {revealedForBlock.map(hintIdx => (
+                                  <motion.div 
+                                    key={hintIdx} 
+                                    initial={{ opacity: 0, y: -5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="text-sm bg-background/80 p-3 rounded border border-border"
+                                  >
+                                    <span className="text-primary mr-2">💡 Hint {hintIdx + 1}:</span>
+                                    {blockHints[hintIdx]}
+                                  </motion.div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Solution Revealed Banner */}
+                        {hasSkeleton && isSolutionRevealed && !alwaysShowSolutions && showSolution[blockKey] && (
+                          <div className="flex-shrink-0 px-4 py-2 bg-green-500/10 border-t border-green-500/30">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="w-4 h-4 text-green-600" />
+                              <span className="text-sm text-green-700 dark:text-green-500">
+                                Solution revealed • Copy the code and run it in your terminal
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </ResizablePanel>
 
