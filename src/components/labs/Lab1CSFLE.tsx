@@ -693,7 +693,7 @@ main().catch(console.error);`,
     <LabViewWithTabs
       labNumber={1}
       title="CSFLE Fundamentals with AWS KMS"
-      description="The journey starts with the Foundation. Master the rollout of KMS infrastructure, CLI automation, and the critical IAM requirements that power MongoDB's Client-Side Encryption."
+      description="Master the rollout of KMS infrastructure and Client-Side Field Level Encryption"
       duration="35 min"
       prerequisites={[
         'MongoDB Atlas M10+ running MongoDB 7.0+',
@@ -709,6 +709,8 @@ main().catch(console.error);`,
       steps={lab1Steps}
       introContent={introContent}
       exercises={exercises}
+      businessValue="Protect PII at the application layer before it reaches the database"
+      atlasCapability="Client-Side Field Level Encryption"
     />
   );
 }

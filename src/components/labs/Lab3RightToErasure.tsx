@@ -644,8 +644,8 @@ For this lab demo, we use the same CMK to demonstrate the rewrap operation.`
   return (
     <LabViewWithTabs
       labNumber={3}
-      title="Right to Erasure & Migration Patterns"
-      description="Elevate your SA skills by mastering complex production patterns. Learn to migrate legacy data explicitly, manage per-tenant key isolation, and perform lifecycle rotations for enterprise compliance."
+      title="Right to Erasure & Crypto-Shredding"
+      description="GDPR Article 17 compliance through cryptographic key deletion"
       duration="15 min"
       prerequisites={[
         'Successful completion of Lab 1 & 2',
@@ -655,12 +655,14 @@ For this lab demo, we use the same CMK to demonstrate the rewrap operation.`
       objectives={[
         'Implement Explicit Encryption API for bulk migration',
         'Design Multi-Tenant schemas using KeyAltNames',
-        'Execute high-compliance CMK rotations',
-        'Defend the "One DEK per compliance category" architecture'
+        'Execute crypto-shredding for compliance',
+        'Defend "One DEK per user" architecture'
       ]}
       steps={lab3Steps}
       introContent={introContent}
       exercises={exercises}
+      businessValue="Achieve GDPR compliance by deleting encryption keys instead of data"
+      atlasCapability="Crypto-Shredding Pattern"
     />
   );
 }
