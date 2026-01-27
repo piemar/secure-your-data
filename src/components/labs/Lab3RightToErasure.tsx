@@ -596,12 +596,57 @@ For this lab demo, we use the same CMK to demonstrate the rewrap operation.`
     )
   };
 
+  // Exercises for Lab 3
+  const exercises = [
+    {
+      id: 'lab3-quiz-1',
+      type: 'quiz' as const,
+      title: 'GDPR Right to Erasure',
+      description: 'Understanding crypto-shredding for compliance',
+      points: 10,
+      question: 'How does crypto-shredding help with GDPR Article 17 (Right to Erasure)?',
+      options: [
+        { id: 'a', label: 'It permanently deletes all user documents from the database', isCorrect: false },
+        { id: 'b', label: 'It deletes the user\'s DEK, making all their encrypted data unreadable', isCorrect: true },
+        { id: 'c', label: 'It encrypts the deletion request for audit purposes', isCorrect: false },
+        { id: 'd', label: 'It creates a backup before deleting user data', isCorrect: false },
+      ]
+    },
+    {
+      id: 'lab3-quiz-2',
+      type: 'quiz' as const,
+      title: 'Multi-Tenant Key Strategy',
+      description: 'Understanding tenant isolation patterns',
+      points: 10,
+      question: 'Why should each tenant have their own DEK in a multi-tenant application?',
+      options: [
+        { id: 'a', label: 'To reduce storage costs', isCorrect: false },
+        { id: 'b', label: 'To improve query performance', isCorrect: false },
+        { id: 'c', label: 'To isolate blast radius if a key is compromised', isCorrect: true },
+        { id: 'd', label: 'MongoDB requires separate DEKs per tenant', isCorrect: false },
+      ]
+    },
+    {
+      id: 'lab3-challenge',
+      type: 'challenge' as const,
+      title: 'Migration Verification',
+      description: 'Verify your migration was successful',
+      points: 20,
+      challengeSteps: [
+        { instruction: 'Query the legacy collection to see plaintext SSNs', hint: 'db.legacy.findOne()' },
+        { instruction: 'Query the secure collection WITHOUT CSFLE to see BinData ciphertext', hint: 'Connect without autoEncryption options' },
+        { instruction: 'Query the secure collection WITH CSFLE to see decrypted SSNs', hint: 'Use the encrypted client from your script' },
+        { instruction: 'Verify the record count matches between legacy and secure collections', hint: 'Use countDocuments() on both' },
+      ]
+    }
+  ];
+
   return (
     <LabViewWithTabs
       labNumber={3}
-      title="Migration & Multi-Tenant Patterns"
+      title="Right to Erasure & Migration Patterns"
       description="Elevate your SA skills by mastering complex production patterns. Learn to migrate legacy data explicitly, manage per-tenant key isolation, and perform lifecycle rotations for enterprise compliance."
-      duration="30 min"
+      duration="15 min"
       prerequisites={[
         'Successful completion of Lab 1 & 2',
         'Familiarity with JS Async/Await',
@@ -615,6 +660,7 @@ For this lab demo, we use the same CMK to demonstrate the rewrap operation.`
       ]}
       steps={lab3Steps}
       introContent={introContent}
+      exercises={exercises}
     />
   );
 }

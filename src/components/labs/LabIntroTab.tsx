@@ -1,6 +1,7 @@
 import { Clock, Target, Lightbulb, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { EncryptionFlowVisual } from '@/components/workshop/EncryptionFlowVisual';
 
 interface LabIntroTabProps {
   labNumber: number;
@@ -11,6 +12,8 @@ interface LabIntroTabProps {
   keyConcepts: Array<{ term: string; explanation: string }>;
   keyInsight: string;
   architectureDiagram?: React.ReactNode;
+  showEncryptionFlow?: boolean;
+  encryptionFlowType?: 'csfle' | 'qe';
   onStartLab: () => void;
 }
 
@@ -23,6 +26,8 @@ export function LabIntroTab({
   keyConcepts,
   keyInsight,
   architectureDiagram,
+  showEncryptionFlow = false,
+  encryptionFlowType = 'csfle',
   onStartLab
 }: LabIntroTabProps) {
   return (
@@ -62,6 +67,17 @@ export function LabIntroTab({
           ))}
         </ul>
       </div>
+
+      {/* Interactive Encryption Flow Visualization */}
+      {showEncryptionFlow && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-sm">🔄</span>
+            How It Works
+          </h2>
+          <EncryptionFlowVisual type={encryptionFlowType} autoPlay={false} />
+        </div>
+      )}
 
       {/* Architecture Diagram */}
       {architectureDiagram && (
