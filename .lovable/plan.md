@@ -1,16 +1,19 @@
 
 # Progressive Code Disclosure: Skeleton-First Learning
 
-## Current Problem
+## ✅ IMPLEMENTED
 
-The workshop currently shows **complete, copy-paste-ready code** for every step. This removes the learning challenge - Solution Architects just copy text without understanding what each command does or why.
+Challenge Mode is now live! The implementation includes:
 
-**Evidence from codebase:**
-- `Lab1CSFLE.tsx` line 73-74: Steps have `skeleton` property defined but never rendered
-- `StepView.tsx` line 649: Always renders `block.code` (full solution)
-- `HintSystem.tsx`: Exists but not integrated into code blocks
+1. **Skeleton-First Display**: Code blocks with a `skeleton` property show the skeleton by default
+2. **Progressive Hint Reveal**: Users can reveal hints one-by-one (-1pt for hint 1, -2pt for subsequent)
+3. **Solution Reveal**: Full solution can be revealed for -5 points
+4. **Read-Only Mode Toggle**: Users can toggle "Show all solutions" for read-only learning
+5. **Leaderboard Integration**: Hint/solution usage is tracked per user
 
 ---
+
+## Original Problem
 
 ## Proposed Solution: Challenge Mode
 
