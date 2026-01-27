@@ -1,16 +1,14 @@
 import { useState, useEffect } from 'react';
-import { ChevronRight, Trophy } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LabIntroTab } from './LabIntroTab';
 import { StepView } from './StepView';
-import { ExercisePanel, ExerciseType } from '@/components/workshop/ExercisePanel';
 import { useLab } from '@/context/LabContext';
 import { heartbeat } from '@/utils/leaderboardUtils';
 import { DifficultyLevel } from './DifficultyBadge';
 
 interface Exercise {
   id: string;
-  type: ExerciseType;
+  type: 'quiz' | 'fill_blank' | 'challenge';
   title: string;
   description?: string;
   points?: number;
@@ -62,7 +60,6 @@ interface LabViewWithTabsProps {
   objectives: string[];
   steps: Step[];
   introContent: LabIntroContent;
-  exercises?: Exercise[];
   businessValue?: string;
   atlasCapability?: string;
 }
@@ -72,11 +69,8 @@ export function LabViewWithTabs({
   title,
   description,
   duration,
-  prerequisites,
-  objectives,
   steps,
   introContent,
-  exercises = [],
   businessValue,
   atlasCapability,
 }: LabViewWithTabsProps) {
@@ -148,12 +142,6 @@ export function LabViewWithTabs({
                   </span>
                 )}
               </TabsTrigger>
-              {exercises.length > 0 && (
-                <TabsTrigger value="exercises" className="gap-2">
-                  <Trophy className="w-4 h-4" />
-                  Exercises
-                </TabsTrigger>
-              )}
             </TabsList>
           </div>
         </div>
@@ -191,42 +179,6 @@ export function LabViewWithTabs({
           />
         </TabsContent>
 
-        {/* Exercises Tab */}
-        {exercises.length > 0 && (
-          <TabsContent value="exercises" className="mt-0 flex-1 overflow-auto">
-            <div className="max-w-4xl mx-auto p-8">
-              <div className="mb-8">
-                <div className="flex items-center gap-2 text-primary text-sm font-mono mb-2">
-                  <span>LAB {labNumber}</span>
-                  <ChevronRight className="w-4 h-4" />
-                  <span>Exercises</span>
-                </div>
-                <h1 className="text-3xl font-bold text-gradient-green mb-2">Knowledge Check</h1>
-                <p className="text-muted-foreground">
-                  Test your understanding and earn points for the leaderboard
-                </p>
-              </div>
-
-              <div className="space-y-6">
-                {exercises.map((exercise) => (
-                  <ExercisePanel
-                    key={exercise.id}
-                    id={exercise.id}
-                    type={exercise.type}
-                    title={exercise.title}
-                    description={exercise.description}
-                    points={exercise.points}
-                    question={exercise.question}
-                    options={exercise.options}
-                    codeTemplate={exercise.codeTemplate}
-                    blanks={exercise.blanks}
-                    challengeSteps={exercise.challengeSteps}
-                  />
-                ))}
-              </div>
-            </div>
-          </TabsContent>
-        )}
       </Tabs>
     </div>
   );
