@@ -41,6 +41,7 @@ interface Step {
   tips?: string[];
   documentationUrl?: string;
   onVerify?: () => Promise<{ success: boolean; message: string }>;
+  exercises?: Exercise[];
 }
 
 interface LabIntroContent {
@@ -123,6 +124,13 @@ export function LabViewWithTabs({
     setActiveTab('steps');
   };
 
+  // Merge step-level exercises with lab-level exercises for the steps
+  const stepsWithExercises = steps.map((step, index) => {
+    // Assign exercises to specific steps based on index or include from step definition
+    const stepExercises = step.exercises || [];
+    return { ...step, exercises: stepExercises };
+  });
+
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
@@ -170,7 +178,7 @@ export function LabViewWithTabs({
         {/* Steps Tab - New Clean Layout */}
         <TabsContent value="steps" className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
           <StepView
-            steps={steps}
+            steps={stepsWithExercises}
             currentStepIndex={currentStepIndex}
             completedSteps={completedSteps}
             onStepChange={setCurrentStepIndex}
