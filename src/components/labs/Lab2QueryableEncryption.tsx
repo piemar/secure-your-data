@@ -20,7 +20,7 @@ export function Lab2QueryableEncryption() {
     doThisSection?: string[];
     hints?: string[];
     tips?: string[];
-    codeBlocks?: Array<{ filename: string; language: string; code: string; skeleton?: string }>;
+    codeBlocks?: Array<{ filename: string; language: string; code: string; skeleton?: string; challengeSkeleton?: string; expertSkeleton?: string }>;
     troubleshooting?: string[];
     onVerify?: () => Promise<{ success: boolean; message: string }>;
     exercises?: Array<{
@@ -96,6 +96,7 @@ async function run() {
 }
 
 run().catch(console.error);`,
+          // Tier 1: Guided
           skeleton: `// ══════════════════════════════════════════════════════════════
 // Create DEKs for Queryable Encryption (QE)
 // ══════════════════════════════════════════════════════════════
@@ -143,7 +144,62 @@ async function run() {
   await client.close();
 }
 
-run().catch(console.error);`
+run().catch(console.error);`,
+          // Tier 2: Challenge
+          challengeSkeleton: `// ══════════════════════════════════════════════════════════════
+// CHALLENGE MODE - Create DEKs for Queryable Encryption
+// ══════════════════════════════════════════════════════════════
+
+// TASK 1: Set up the connection and encryption client
+// ───────────────────────────────────────────────────
+// Requirements:
+//   • Import MongoClient and ClientEncryption from "mongodb"
+//   • Connect to: ${mongoUri}
+//   • Initialize ClientEncryption with AWS KMS providers
+
+// Write your setup code:
+
+
+// TASK 2: Create two Data Encryption Keys
+// ──────────────────────────────────────
+// Requirements:
+//   • Create DEK for "salary" field with keyAltName: "qe-salary-dek"
+//   • Create DEK for "taxId" field with keyAltName: "qe-taxid-dek"
+//   • Use CMK alias: ${aliasName}
+//   • Log the UUIDs for verification
+//
+// Docs: https://www.mongodb.com/docs/manual/core/queryable-encryption/
+
+// Write your DEK creation code:
+
+
+`,
+          // Tier 3: Expert
+          expertSkeleton: `// ══════════════════════════════════════════════════════════════
+// EXPERT MODE - Queryable Encryption Key Setup
+// ══════════════════════════════════════════════════════════════
+//
+// OBJECTIVE: Prepare Data Encryption Keys for Queryable Encryption
+//
+// Your solution must:
+//   1. Connect to MongoDB Atlas: ${mongoUri}
+//   2. Configure AWS KMS as the key provider (use SSO credentials)
+//   3. Create TWO separate DEKs - one for each encrypted field:
+//      - Salary DEK (keyAltName: "qe-salary-dek")
+//      - TaxId DEK (keyAltName: "qe-taxid-dek")
+//   4. Use CMK alias: ${aliasName}
+//
+// Key difference from CSFLE: QE requires 1 DEK per encrypted field
+//
+// Reference: MongoDB Queryable Encryption documentation
+// Points available: 25 (if no hints used)
+//
+// ══════════════════════════════════════════════════════════════
+
+// YOUR SOLUTION:
+
+
+`
         },
         {
           filename: 'Terminal - Run the script',
