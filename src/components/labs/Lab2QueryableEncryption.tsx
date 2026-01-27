@@ -601,6 +601,8 @@ node queryQERange.cjs
       }
     ],
     keyInsight: 'QE lets you query encrypted data without decrypting first. The server processes queries on ciphertext using structured encryption techniques - a significant advancement over CSFLE.',
+    showEncryptionFlow: true,
+    encryptionFlowType: 'qe' as const,
     architectureDiagram: (
       <div className="text-xs font-mono text-muted-foreground">
         <table className="w-full border-collapse">
@@ -638,12 +640,64 @@ node queryQERange.cjs
     )
   };
 
+  // Exercises for Lab 2
+  const exercises = [
+    {
+      id: 'lab2-quiz-1',
+      type: 'quiz' as const,
+      title: 'QE vs CSFLE',
+      description: 'Understanding the key differences',
+      points: 10,
+      question: 'What is the main advantage of Queryable Encryption over CSFLE?',
+      options: [
+        { id: 'a', label: 'QE uses less storage space', isCorrect: false },
+        { id: 'b', label: 'QE allows querying encrypted data without decrypting on the server', isCorrect: true },
+        { id: 'c', label: 'QE does not require a key vault', isCorrect: false },
+        { id: 'd', label: 'QE works with MongoDB 4.x', isCorrect: false },
+      ]
+    },
+    {
+      id: 'lab2-quiz-2',
+      type: 'quiz' as const,
+      title: 'Metadata Collections',
+      description: 'Understanding QE internals',
+      points: 10,
+      question: 'What are the .esc and .ecoc collections used for in Queryable Encryption?',
+      options: [
+        { id: 'a', label: 'Storing backup copies of encrypted data', isCorrect: false },
+        { id: 'b', label: 'Storing encrypted search indexes and metadata', isCorrect: true },
+        { id: 'c', label: 'Storing user session data', isCorrect: false },
+        { id: 'd', label: 'Storing application logs', isCorrect: false },
+      ]
+    },
+    {
+      id: 'lab2-fill-blank',
+      type: 'fill_blank' as const,
+      title: 'QE Field Configuration',
+      description: 'Complete the encrypted field definition',
+      points: 15,
+      codeTemplate: `encryptedFieldsMap: {
+  "hr.employees": {
+    fields: [{
+      path: "salary",
+      bsonType: "______",
+      queries: [{ queryType: "______" }]
+    }]
+  }
+}`,
+      blanks: [
+        { id: 'bsonType', placeholder: 'BSON Type', correctAnswer: 'int', hint: 'Salary is a number' },
+        { id: 'queryType', placeholder: 'Query Type', correctAnswer: 'range', hint: 'For salary comparisons like $gt, $lt' },
+      ]
+    }
+  ];
+
   return (
     <LabViewWithTabs
       labNumber={2}
       title="Queryable Encryption & Range Deep-Dive"
       description="Master the breakthrough Queryable Encryption (QE) feature. Learn to query encrypted data using equality, range, prefix, and suffix queries. Compare QE-enabled vs standard clients to see the power of querying encrypted data without decrypting first."
-      duration="45 min"
+      duration="30 min"
       prerequisites={[
         'MongoDB 8.0+ Atlas Cluster',
         'AWS KMS CMK from Lab 1',
@@ -660,6 +714,7 @@ node queryQERange.cjs
       ]}
       steps={lab2Steps}
       introContent={introContent}
+      exercises={exercises}
     />
   );
 }

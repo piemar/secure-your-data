@@ -597,6 +597,8 @@ main().catch(console.error);`,
       }
     ],
     keyInsight: 'The breakthrough: MongoDB never sees plaintext. Ever. The client library encrypts BEFORE the data leaves your application. This is fundamentally different from TDE.',
+    showEncryptionFlow: true,
+    encryptionFlowType: 'csfle' as const,
     architectureDiagram: (
       <pre className="text-xs font-mono text-muted-foreground whitespace-pre overflow-x-auto">
 {`┌──────────────┐     ┌─────────────┐     ┌─────────────┐
@@ -617,12 +619,82 @@ main().catch(console.error);`,
     )
   };
 
+  // Exercises for Lab 1
+  const exercises = [
+    {
+      id: 'lab1-quiz-1',
+      type: 'quiz' as const,
+      title: 'Encryption Algorithm Choice',
+      description: 'Understanding when to use which encryption algorithm',
+      points: 10,
+      question: 'You need to query patients by their SSN (Social Security Number). Which CSFLE algorithm should you use?',
+      options: [
+        { id: 'random', label: 'AEAD_AES_256_CBC_HMAC_SHA_512-Random', isCorrect: false },
+        { id: 'deterministic', label: 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic', isCorrect: true },
+        { id: 'both', label: 'Either algorithm works for equality queries', isCorrect: false },
+        { id: 'neither', label: 'CSFLE does not support queries on encrypted fields', isCorrect: false },
+      ]
+    },
+    {
+      id: 'lab1-quiz-2',
+      type: 'quiz' as const,
+      title: 'Key Hierarchy Understanding',
+      description: 'Understanding the envelope encryption key hierarchy',
+      points: 10,
+      question: 'In CSFLE, which key directly encrypts your application data?',
+      options: [
+        { id: 'cmk', label: 'Customer Master Key (CMK)', isCorrect: false },
+        { id: 'dek', label: 'Data Encryption Key (DEK)', isCorrect: true },
+        { id: 'tls', label: 'TLS Certificate Key', isCorrect: false },
+        { id: 'atlas', label: 'Atlas Cluster Key', isCorrect: false },
+      ]
+    },
+    {
+      id: 'lab1-fill-blank',
+      type: 'fill_blank' as const,
+      title: 'Complete the Schema Map',
+      description: 'Fill in the missing parts of a CSFLE schema map',
+      points: 15,
+      codeTemplate: `const schemaMap = {
+  "medical.patients": {
+    "bsonType": "object",
+    "properties": {
+      "ssn": {
+        "encrypt": {
+          "bsonType": "______",
+          "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-______",
+          "keyId": [dekId]
+        }
+      }
+    }
+  }
+};`,
+      blanks: [
+        { id: 'bsonType', placeholder: 'BSON Type', correctAnswer: 'string', hint: 'SSN is stored as text' },
+        { id: 'algorithm', placeholder: 'Algorithm suffix', correctAnswer: 'Deterministic', hint: 'Needed for equality queries' },
+      ]
+    },
+    {
+      id: 'lab1-challenge',
+      type: 'challenge' as const,
+      title: 'Security Audit Challenge',
+      description: 'Complete these security audit steps',
+      points: 20,
+      challengeSteps: [
+        { instruction: 'Verify your CMK has key rotation enabled in AWS Console', hint: 'KMS > Customer managed keys > Key rotation' },
+        { instruction: 'Confirm the Key Policy allows only your IAM user', hint: 'Check the Principal field in the policy' },
+        { instruction: 'Check that the DEK in __keyVault has masterKey.provider set to "aws"', hint: 'Use db.getCollection("__keyVault").findOne()' },
+        { instruction: 'Verify encrypted documents show BinData in Atlas Data Explorer', hint: 'Look for subtype 6 in the binary data' },
+      ]
+    }
+  ];
+
   return (
     <LabViewWithTabs
       labNumber={1}
       title="CSFLE Fundamentals with AWS KMS"
       description="The journey starts with the Foundation. Master the rollout of KMS infrastructure, CLI automation, and the critical IAM requirements that power MongoDB's Client-Side Encryption."
-      duration="45 min"
+      duration="35 min"
       prerequisites={[
         'MongoDB Atlas M10+ running MongoDB 7.0+',
         'AWS IAM User with KMS Management Permissions',
@@ -636,6 +708,7 @@ main().catch(console.error);`,
       ]}
       steps={lab1Steps}
       introContent={introContent}
+      exercises={exercises}
     />
   );
 }
