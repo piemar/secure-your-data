@@ -18,6 +18,7 @@ interface Step {
   difficulty?: DifficultyLevel;
   understandSection?: string;
   doThisSection?: string[];
+  hints?: string[];
   codeBlocks?: Array<{
     filename: string;
     language: string;
@@ -266,6 +267,7 @@ export function LabViewWithTabs({
                     difficulty={step.difficulty}
                     understandSection={step.understandSection}
                     doThisSection={step.doThisSection}
+                    hints={step.hints}
                     codeBlocks={step.codeBlocks}
                     expectedOutput={step.expectedOutput}
                     troubleshooting={step.troubleshooting}
