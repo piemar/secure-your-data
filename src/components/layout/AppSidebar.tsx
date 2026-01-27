@@ -11,6 +11,7 @@ import {
   LogOut,
   Crown,
   TrendingUp,
+  RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigation } from '@/contexts/NavigationContext';
@@ -72,7 +73,7 @@ const navItems: NavItem[] = [
 
 export function AppSidebar() {
   const { currentSection, setSection, sidebarOpen, toggleSidebar } = useNavigation();
-  const { isLabAccessible, userEmail, currentScore, completedLabs } = useLab();
+  const { isLabAccessible, userEmail, currentScore, completedLabs, resetProgress } = useLab();
   const { isModerator, logout } = useRole();
   const [userRank, setUserRank] = useState<number>(0);
   const [totalParticipants, setTotalParticipants] = useState<number>(0);
@@ -84,6 +85,22 @@ export function AppSidebar() {
     localStorage.removeItem('completedLabs');
     localStorage.removeItem('labStartTimes');
     window.location.reload();
+  };
+
+  const handleResetProgress = () => {
+    if (window.confirm('Are you sure you want to reset all lab progress? This will clear completed steps, scores, and start fresh.')) {
+      resetProgress();
+      // Clear all lab-specific localStorage
+      localStorage.removeItem('lab1-progress');
+      localStorage.removeItem('lab2-progress');
+      localStorage.removeItem('lab3-progress');
+      localStorage.removeItem('completedLabs');
+      localStorage.removeItem('labStartTimes');
+      localStorage.removeItem('lab_mongo_uri');
+      localStorage.removeItem('lab_aws_profile');
+      localStorage.removeItem('lab_kms_alias');
+      window.location.reload();
+    }
   };
 
   // Calculate user rank and progress
@@ -248,8 +265,20 @@ export function AppSidebar() {
         </div>
       )}
 
-      {/* Logout */}
-      <div className="p-2 border-t border-sidebar-border">
+      {/* Reset Progress & Logout */}
+      <div className="p-2 border-t border-sidebar-border space-y-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleResetProgress}
+          className={cn(
+            'w-full justify-start gap-2 text-muted-foreground hover:text-amber-600 hover:bg-amber-500/10',
+            !sidebarOpen && 'justify-center px-0'
+          )}
+        >
+          <RotateCcw className="w-4 h-4" />
+          {sidebarOpen && <span>Reset Progress</span>}
+        </Button>
         <Button
           variant="ghost"
           size="sm"
