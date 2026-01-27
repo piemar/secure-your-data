@@ -639,46 +639,46 @@ export function StepView({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header - Sticky */}
-      <div className="border-b border-border px-6 py-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-mono text-muted-foreground border border-border px-2 py-0.5 rounded">
+      {/* Header - Sticky - Mobile Optimized */}
+      <div className="border-b border-border px-3 sm:px-6 py-3 sm:py-4">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1">
+              <span className="text-xs font-mono text-muted-foreground border border-border px-1.5 sm:px-2 py-0.5 rounded">
                 Lab {String(labNumber).padStart(2, '0')}
               </span>
               {currentStep.difficulty && (
                 <DifficultyBadge level={currentStep.difficulty} />
               )}
               {isCompleted && (
-                <span className="flex items-center gap-1 text-xs text-green-600 bg-green-500/10 px-2 py-0.5 rounded">
+                <span className="flex items-center gap-1 text-xs text-green-600 bg-green-500/10 px-1.5 sm:px-2 py-0.5 rounded">
                   <CheckCircle2 className="w-3 h-3" />
-                  Completed
+                  <span className="hidden xs:inline">Completed</span>
                 </span>
               )}
             </div>
-            <h1 className="text-xl font-bold">{labTitle}</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">{labDescription}</p>
+            <h1 className="text-lg sm:text-xl font-bold truncate">{labTitle}</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 line-clamp-2 sm:line-clamp-1">{labDescription}</p>
           </div>
           {atlasCapability && (
-            <div className="text-right">
+            <div className="text-left sm:text-right flex-shrink-0">
               <span className="text-xs text-muted-foreground">Atlas Capability</span>
-              <div className="text-xs font-mono text-primary bg-primary/10 px-2 py-1 rounded mt-0.5">
+              <div className="text-xs font-mono text-primary bg-primary/10 px-2 py-1 rounded mt-0.5 inline-block sm:block">
                 {atlasCapability}
               </div>
             </div>
           )}
         </div>
 
-        {/* Business Value Banner */}
+        {/* Business Value Banner - Mobile Optimized */}
         {businessValue && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-3 flex items-center gap-2 text-sm bg-primary/10 text-primary px-3 py-2 rounded-md"
+            className="mt-2 sm:mt-3 flex items-start sm:items-center gap-2 text-xs sm:text-sm bg-primary/10 text-primary px-2 sm:px-3 py-1.5 sm:py-2 rounded-md"
           >
-            <Lightbulb className="w-4 h-4 flex-shrink-0" />
-            <span>
+            <Lightbulb className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 mt-0.5 sm:mt-0" />
+            <span className="line-clamp-2 sm:line-clamp-none">
               <strong>Business Value:</strong> {businessValue}
             </span>
           </motion.div>
@@ -687,8 +687,8 @@ export function StepView({
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-        {/* Step Header with Actions */}
-        <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-b border-border bg-muted/30">
+        {/* Step Header with Actions - Mobile Optimized */}
+        <div className="flex-shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 px-3 sm:px-6 py-2 sm:py-3 border-b border-border bg-muted/30">
           <div className="flex-1 min-w-0">
             <AnimatePresence mode="wait" custom={direction}>
               <motion.div
@@ -700,35 +700,36 @@ export function StepView({
                 exit="exit"
                 transition={{ duration: 0.2, ease: 'easeInOut' }}
               >
-                <h2 className="font-semibold truncate">{currentStep.title}</h2>
-                <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">{currentStep.description}</p>
+                <h2 className="font-semibold truncate text-sm sm:text-base">{currentStep.title}</h2>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 line-clamp-2 sm:line-clamp-1">{currentStep.description}</p>
               </motion.div>
             </AnimatePresence>
           </div>
 
-          <div className="flex items-center gap-3 ml-4 flex-shrink-0">
-            <span className="text-sm text-muted-foreground">
-              Step {currentStepIndex + 1} of {steps.length}
+          <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 flex-shrink-0">
+            <span className="text-xs sm:text-sm text-muted-foreground">
+              Step {currentStepIndex + 1}/{steps.length}
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <Button
                 size="sm"
                 onClick={handleCheckProgress}
                 disabled={isRunning || !currentStep.codeBlocks?.length}
-                className="gap-2 h-8"
+                className="gap-1 sm:gap-2 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3"
               >
                 {isRunning ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
                 ) : (
-                  <CheckCircle2 className="w-4 h-4" />
+                  <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4" />
                 )}
-                {isRunning ? 'Checking...' : 'Check My Progress'}
+                <span className="hidden xs:inline">{isRunning ? 'Checking...' : 'Check My Progress'}</span>
+                <span className="xs:hidden">{isRunning ? '...' : 'Check'}</span>
               </Button>
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="p-1.5 rounded-md bg-amber-500/10 text-amber-600 cursor-help">
-                      <Info className="w-4 h-4" />
+                    <div className="p-1 sm:p-1.5 rounded-md bg-amber-500/10 text-amber-600 cursor-help">
+                      <Info className="w-3 h-3 sm:w-4 sm:h-4" />
                     </div>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="max-w-xs">
@@ -749,17 +750,18 @@ export function StepView({
           </div>
         </div>
 
-        {/* Read-Only Mode Toggle */}
+        {/* Read-Only Mode Toggle - Mobile Optimized */}
         {hasSkeletons && (
-          <div className="flex-shrink-0 flex items-center gap-2 px-6 py-2 border-b border-border bg-muted/20">
+          <div className="flex-shrink-0 flex items-center gap-2 px-3 sm:px-6 py-1.5 sm:py-2 border-b border-border bg-muted/20">
             <Switch 
               id="read-only-mode"
               checked={alwaysShowSolutions} 
               onCheckedChange={setAlwaysShowSolutions}
             />
-            <Label htmlFor="read-only-mode" className="text-sm text-muted-foreground cursor-pointer">
+            <Label htmlFor="read-only-mode" className="text-xs sm:text-sm text-muted-foreground cursor-pointer">
               <Unlock className="w-3 h-3 inline mr-1" />
-              Read-only mode (show all solutions)
+              <span className="hidden sm:inline">Read-only mode (show all solutions)</span>
+              <span className="sm:hidden">Show solutions</span>
             </Label>
           </div>
         )}
@@ -781,21 +783,23 @@ export function StepView({
                     const solutionPenalty = getSolutionPenalty(tier);
                     
                     return (
-                      <div key={idx} className="flex flex-col min-h-[250px]">
-                        {/* Editor Header */}
-                        <div className="flex-shrink-0 px-4 py-2 bg-muted/50 border-b border-border flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono text-muted-foreground">{block.filename}</span>
+                      <div key={idx} className="flex flex-col min-h-[200px] sm:min-h-[250px]">
+                        {/* Editor Header - Mobile Optimized */}
+                        <div className="flex-shrink-0 px-2 sm:px-4 py-1.5 sm:py-2 bg-muted/50 border-b border-border flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 overflow-hidden">
+                            <span className="text-[10px] sm:text-xs font-mono text-muted-foreground truncate max-w-[100px] sm:max-w-none">{block.filename}</span>
                             {currentStep.estimatedTime && (
-                              <span className="text-xs text-muted-foreground">
+                              <span className="hidden sm:inline text-xs text-muted-foreground">
                                 ⏱️ {currentStep.estimatedTime}
                               </span>
                             )}
                             {hasSkeleton && !isSolutionRevealed && (
-                              <span className="flex items-center gap-1 text-xs bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded">
-                                <Lock className="w-3 h-3" />
-                                {tier === 'expert' ? 'Expert' : tier === 'challenge' ? 'Challenge' : 'Guided'} Mode
-                                <span className="text-amber-500/70 ml-1">({maxPoints}pts max)</span>
+                              <span className="flex items-center gap-1 text-[10px] sm:text-xs bg-amber-500/10 text-amber-600 px-1.5 sm:px-2 py-0.5 rounded flex-shrink-0">
+                                <Lock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                                <span className="hidden xs:inline">
+                                  {tier === 'expert' ? 'Expert' : tier === 'challenge' ? 'Challenge' : 'Guided'}
+                                </span>
+                                <span className="text-amber-500/70">({maxPoints}pts)</span>
                               </span>
                             )}
                           </div>
@@ -803,15 +807,15 @@ export function StepView({
                             variant="ghost"
                             size="sm"
                             onClick={() => handleCopyCode(idx)}
-                            className="gap-1.5 h-6 text-xs px-2"
+                            className="gap-1 h-6 text-[10px] sm:text-xs px-1.5 sm:px-2 flex-shrink-0"
                           >
                             {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                            {copied ? 'Copied!' : 'Copy Code'}
+                            <span className="hidden xs:inline">{copied ? 'Copied!' : 'Copy'}</span>
                           </Button>
                         </div>
                         
                         {/* Monaco Editor with Inline Hint Overlay */}
-                        <div className="flex-1 min-h-[200px] relative">
+                        <div className="flex-1 min-h-[150px] sm:min-h-[200px] relative">
                           <div className="h-full w-full" ref={editorContainerRef}>
                             <Editor
                               key={`editor-${currentStepIndex}-${idx}-${isSolutionRevealed}`}
@@ -822,14 +826,17 @@ export function StepView({
                               options={{
                                 readOnly: true,
                                 minimap: { enabled: false },
-                                fontSize: 13,
+                                fontSize: 11,
                                 lineNumbers: 'on',
                                 scrollBeyondLastLine: false,
                                 wordWrap: 'on',
                                 automaticLayout: true,
                                 tabSize: 2,
-                                padding: { top: 12, bottom: 12 },
+                                padding: { top: 8, bottom: 8 },
                                 lineHeight: lineHeight,
+                                folding: false,
+                                lineDecorationsWidth: 0,
+                                lineNumbersMinChars: 3,
                               }}
                               onMount={(editor) => {
                                 // Get actual line height from Monaco
@@ -841,15 +848,18 @@ export function StepView({
                           
                           {/* Inline Hint Markers Overlay - Right side of editor */}
                           {hasSkeleton && !isSolutionRevealed && block.inlineHints && block.inlineHints.length > 0 && tier === 'guided' && (
-                            <div className="absolute top-0 right-3 pointer-events-none" style={{ paddingTop: 12 }}>
+                            <div className="absolute top-0 right-1 sm:right-3 pointer-events-none" style={{ paddingTop: 8 }}>
                               {block.inlineHints.map((hint, hintIdx) => {
                                 const hintRevealed = (revealedHints[blockKey] || []).includes(hintIdx);
                                 const answerRevealed = (revealedAnswers[blockKey] || []).includes(hintIdx);
                                 
                                 return (
-                                  <div 
+                                  <motion.div 
                                     key={hintIdx}
                                     className="absolute pointer-events-auto"
+                                    initial={{ opacity: 0, scale: 0.5 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: hintIdx * 0.05 }}
                                     style={{ 
                                       top: `${(hint.line - 1) * lineHeight}px`,
                                       right: 0,
@@ -863,25 +873,25 @@ export function StepView({
                                       onRevealAnswer={() => revealInlineAnswer(blockKey, hintIdx, tier)}
                                       tier={tier}
                                     />
-                                  </div>
+                                  </motion.div>
                                 );
                               })}
                             </div>
                           )}
                         </div>
 
-                        {/* Simplified Challenge Mode Footer */}
+                        {/* Simplified Challenge Mode Footer - Mobile Optimized */}
                         {hasSkeleton && !isSolutionRevealed && (
-                          <div className="flex-shrink-0 px-4 py-2 bg-muted/50 border-t border-border">
-                            <div className="flex items-center justify-between gap-4">
+                          <div className="flex-shrink-0 px-2 sm:px-4 py-1.5 sm:py-2 bg-muted/50 border-t border-border">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                               {/* Left: Difficulty selector & Score */}
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                                 {/* Compact difficulty selector */}
                                 <div className="flex gap-0.5 bg-background rounded p-0.5 border border-border">
                                   <button
                                     onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'guided' }))}
                                     className={cn(
-                                      "px-2 py-0.5 text-xs rounded transition-colors",
+                                      "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors",
                                       tier === 'guided' 
                                         ? "bg-primary text-primary-foreground" 
                                         : "hover:bg-muted"
@@ -893,7 +903,7 @@ export function StepView({
                                     onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'challenge' }))}
                                     disabled={!block.challengeSkeleton && !block.expertSkeleton}
                                     className={cn(
-                                      "px-2 py-0.5 text-xs rounded transition-colors",
+                                      "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors",
                                       tier === 'challenge' 
                                         ? "bg-primary text-primary-foreground" 
                                         : "hover:bg-muted",
@@ -906,7 +916,7 @@ export function StepView({
                                     onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'expert' }))}
                                     disabled={!block.expertSkeleton}
                                     className={cn(
-                                      "px-2 py-0.5 text-xs rounded transition-colors",
+                                      "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors",
                                       tier === 'expert' 
                                         ? "bg-primary text-primary-foreground" 
                                         : "hover:bg-muted",
@@ -918,7 +928,7 @@ export function StepView({
                                 </div>
                                 
                                 {/* Score display */}
-                                <div className="flex items-center gap-1.5 text-sm">
+                                <div className="flex items-center gap-1 text-xs sm:text-sm">
                                   <span className="text-muted-foreground">Score:</span>
                                   <span className={cn(
                                     "font-mono font-medium",
@@ -929,9 +939,9 @@ export function StepView({
                                   <span className="text-muted-foreground">/ {maxPoints}</span>
                                 </div>
                                 
-                                {/* Hints used indicator (for inline hints) */}
+                                {/* Hints used indicator (for inline hints) - Hidden on mobile */}
                                 {tier === 'guided' && block.inlineHints && (
-                                  <span className="text-xs text-muted-foreground">
+                                  <span className="hidden sm:inline text-xs text-muted-foreground">
                                     {block.inlineHints.length > 0 && (
                                       <>Click <span className="bg-muted px-1 rounded">?</span> markers for hints</>
                                     )}
@@ -944,10 +954,12 @@ export function StepView({
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => revealSolution(blockKey, tier)}
-                                className="gap-1.5 h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                                className="gap-1 h-6 sm:h-7 text-[10px] sm:text-xs text-destructive hover:text-destructive hover:bg-destructive/10 w-full sm:w-auto"
                               >
                                 <Eye className="w-3 h-3" />
-                                Show Full Solution (-{solutionPenalty}pts)
+                                <span className="hidden xs:inline">Show Full Solution</span>
+                                <span className="xs:hidden">Solution</span>
+                                <span>(-{solutionPenalty}pts)</span>
                               </Button>
                             </div>
                           </div>
