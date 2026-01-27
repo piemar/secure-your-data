@@ -20,7 +20,7 @@ export function Lab3RightToErasure() {
     doThisSection?: string[];
     hints?: string[];
     tips?: string[];
-    codeBlocks?: Array<{ filename: string; language: string; code: string; skeleton?: string }>;
+    codeBlocks?: Array<{ filename: string; language: string; code: string; skeleton?: string; challengeSkeleton?: string; expertSkeleton?: string }>;
     troubleshooting?: string[];
     onVerify?: () => Promise<{ success: boolean; message: string }>;
     exercises?: Array<{
@@ -148,6 +148,7 @@ async function run() {
 }
 
 run().catch(console.error);`,
+          // Tier 1: Guided
           skeleton: `// ══════════════════════════════════════════════════════════════
 // Migrate Plaintext Data to CSFLE Using Explicit Encryption
 // ══════════════════════════════════════════════════════════════
@@ -204,7 +205,66 @@ async function run() {
   await client.close();
 }
 
-run().catch(console.error);`
+run().catch(console.error);`,
+          // Tier 2: Challenge
+          challengeSkeleton: `// ══════════════════════════════════════════════════════════════
+// CHALLENGE MODE - Data Migration with Explicit Encryption
+// ══════════════════════════════════════════════════════════════
+
+// TASK 1: Set up the encryption client
+// ────────────────────────────────────
+// Requirements:
+//   • Connect to MongoDB: ${mongoUri}
+//   • Look up your DEK by keyAltName: "user-${suffix}-ssn-key"
+//   • Initialize ClientEncryption with AWS KMS
+
+// Write your setup code:
+
+
+// TASK 2: Read legacy data and encrypt
+// ───────────────────────────────────
+// Requirements:
+//   • Read documents from "medical.patients_legacy"
+//   • For each document, encrypt the "ssn" field explicitly
+//   • Use Deterministic encryption (for queryability)
+//   • Insert into "medical.patients_secure"
+//
+// Docs: https://www.mongodb.com/docs/manual/core/csfle/fundamentals/manual-encryption/
+
+// Write your migration loop:
+
+
+`,
+          // Tier 3: Expert
+          expertSkeleton: `// ══════════════════════════════════════════════════════════════
+// EXPERT MODE - Legacy Data Migration to CSFLE
+// ══════════════════════════════════════════════════════════════
+//
+// OBJECTIVE: Migrate plaintext PII data to encrypted storage
+//
+// Scenario:
+//   You have a legacy collection "medical.patients_legacy" with 
+//   plaintext SSN values. You need to migrate this to a new
+//   collection "medical.patients_secure" with encrypted SSNs.
+//
+// Your solution must:
+//   1. Connect to ${mongoUri}
+//   2. Use your DEK from Lab 1 (keyAltName: "user-${suffix}-ssn-key")
+//   3. Use EXPLICIT encryption (not automatic)
+//   4. Encrypt the "ssn" field with Deterministic algorithm
+//   5. Preserve all other fields unchanged
+//
+// Why Explicit? Automatic encryption expects ciphertext in the DB.
+// For migration, you need to manually encrypt each field.
+//
+// Points available: 25 (if no hints used)
+//
+// ══════════════════════════════════════════════════════════════
+
+// YOUR SOLUTION:
+
+
+`
         },
         {
           filename: 'Terminal - Run the script',

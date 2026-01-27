@@ -13,11 +13,16 @@ import { StepContextDrawer } from './StepContextDrawer';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { trackHintUsage, trackSolutionReveal } from '@/utils/leaderboardUtils';
 
+// Difficulty tier type
+type SkeletonTier = 'guided' | 'challenge' | 'expert';
+
 interface CodeBlock {
   filename: string;
   language: string;
   code: string;
-  skeleton?: string;
+  skeleton?: string;           // Tier 1: Guided (blanks with structure)
+  challengeSkeleton?: string;  // Tier 2: Challenge (tasks only)
+  expertSkeleton?: string;     // Tier 3: Expert (objective only)
 }
 
 interface Exercise {
@@ -453,13 +458,56 @@ export function StepView({
     return saved === 'true';
   });
   const [pointsDeducted, setPointsDeducted] = useState<Record<string, number>>({});
+  const [skeletonTier, setSkeletonTier] = useState<Record<string, SkeletonTier>>({});
+
+  // Helper functions for tiered scoring
+  const getMaxPoints = (tier: SkeletonTier): number => {
+    switch (tier) {
+      case 'expert': return 25;
+      case 'challenge': return 15;
+      case 'guided': default: return 10;
+    }
+  };
+
+  const getHintPenalty = (tier: SkeletonTier, hintIndex: number): number => {
+    const base = tier === 'expert' ? 3 : tier === 'challenge' ? 2 : 1;
+    return hintIndex === 0 ? base : base + 1;
+  };
+
+  const getSolutionPenalty = (tier: SkeletonTier): number => {
+    switch (tier) {
+      case 'expert': return 15;
+      case 'challenge': return 8;
+      case 'guided': default: return 5;
+    }
+  };
+
+  // Get display code based on tier
+  const getDisplayCode = (block: CodeBlock, tier: SkeletonTier, solutionRevealed: boolean): string => {
+    if (solutionRevealed) return block.code;
+    
+    switch (tier) {
+      case 'expert':
+        return block.expertSkeleton || block.challengeSkeleton || block.skeleton || block.code;
+      case 'challenge':
+        return block.challengeSkeleton || block.skeleton || block.code;
+      case 'guided':
+      default:
+        return block.skeleton || block.code;
+    }
+  };
+
+  // Check if block has any skeleton tier
+  const hasAnySkeleton = (block: CodeBlock): boolean => {
+    return !!(block.skeleton || block.challengeSkeleton || block.expertSkeleton);
+  };
 
   const currentStep = steps[currentStepIndex];
   const isCompleted = completedSteps.includes(currentStepIndex);
 
   // Check if any code block has a skeleton
   const hasSkeletons = useMemo(() => {
-    return currentStep.codeBlocks?.some(block => block.skeleton) ?? false;
+    return currentStep.codeBlocks?.some(block => hasAnySkeleton(block)) ?? false;
   }, [currentStep.codeBlocks]);
 
   // Persist read-only mode preference
@@ -468,14 +516,14 @@ export function StepView({
   }, [alwaysShowSolutions]);
 
   // Helper to reveal a hint
-  const revealHint = useCallback((blockKey: string, hintIdx: number) => {
+  const revealHint = useCallback((blockKey: string, hintIdx: number, tier: SkeletonTier) => {
     setRevealedHints(prev => {
       const existing = prev[blockKey] || [];
       if (existing.includes(hintIdx)) return prev;
       return { ...prev, [blockKey]: [...existing, hintIdx] };
     });
-    // Deduct points for hint
-    const penalty = hintIdx === 0 ? 1 : 2;
+    // Deduct points for hint based on tier
+    const penalty = getHintPenalty(tier, hintIdx);
     setPointsDeducted(prev => ({
       ...prev,
       [blockKey]: (prev[blockKey] || 0) + penalty
@@ -489,18 +537,19 @@ export function StepView({
   }, []);
 
   // Helper to reveal full solution
-  const revealSolution = useCallback((blockKey: string) => {
+  const revealSolution = useCallback((blockKey: string, tier: SkeletonTier) => {
     setShowSolution(prev => ({ ...prev, [blockKey]: true }));
-    // Deduct 5 points for revealing solution
+    // Deduct points for revealing solution based on tier
+    const penalty = getSolutionPenalty(tier);
     setPointsDeducted(prev => ({
       ...prev,
-      [blockKey]: (prev[blockKey] || 0) + 5
+      [blockKey]: (prev[blockKey] || 0) + penalty
     }));
     
     // Track in leaderboard
     const email = localStorage.getItem('userEmail') || '';
     if (email) {
-      trackSolutionReveal(email, 5);
+      trackSolutionReveal(email, penalty);
     }
   }, []);
 
@@ -508,15 +557,16 @@ export function StepView({
   const handleCopyCode = useCallback(async (blockIdx: number = 0) => {
     const block = currentStep.codeBlocks?.[blockIdx];
     const blockKey = `${currentStepIndex}-${blockIdx}`;
-    const hasSkeleton = !!block?.skeleton;
+    const hasSkeleton = block ? hasAnySkeleton(block) : false;
     const isSolutionRevealed = alwaysShowSolutions || showSolution[blockKey] || !hasSkeleton;
+    const tier = skeletonTier[blockKey] || 'guided';
     
-    // Copy the solution if revealed, otherwise copy skeleton
-    const code = isSolutionRevealed ? (block?.code || '') : (block?.skeleton || block?.code || '');
+    // Copy the solution if revealed, otherwise copy current tier skeleton
+    const code = isSolutionRevealed ? (block?.code || '') : getDisplayCode(block!, tier, false);
     await navigator.clipboard.writeText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [currentStep.codeBlocks, currentStepIndex, alwaysShowSolutions, showSolution]);
+  }, [currentStep.codeBlocks, currentStepIndex, alwaysShowSolutions, showSolution, skeletonTier]);
 
   const handleCheckProgress = async () => {
     setIsRunning(true);
@@ -701,11 +751,14 @@ export function StepView({
                 <div className="h-full flex flex-col overflow-auto">
                   {currentStep.codeBlocks.map((block, idx) => {
                     const blockKey = `${currentStepIndex}-${idx}`;
-                    const hasSkeleton = !!block.skeleton;
+                    const hasSkeleton = hasAnySkeleton(block);
+                    const tier = skeletonTier[blockKey] || 'guided';
                     const isSolutionRevealed = alwaysShowSolutions || showSolution[blockKey] || !hasSkeleton;
-                    const displayCode = isSolutionRevealed ? block.code : block.skeleton!;
+                    const displayCode = getDisplayCode(block, tier, isSolutionRevealed);
                     const blockHints = currentStep.hints || [];
                     const revealedForBlock = revealedHints[blockKey] || [];
+                    const maxPoints = getMaxPoints(tier);
+                    const solutionPenalty = getSolutionPenalty(tier);
                     
                     return (
                       <div key={idx} className="flex flex-col min-h-[250px]">
@@ -721,7 +774,8 @@ export function StepView({
                             {hasSkeleton && !isSolutionRevealed && (
                               <span className="flex items-center gap-1 text-xs bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded">
                                 <Lock className="w-3 h-3" />
-                                Challenge Mode
+                                {tier === 'expert' ? 'Expert' : tier === 'challenge' ? 'Challenge' : 'Guided'} Mode
+                                <span className="text-amber-500/70 ml-1">({maxPoints}pts max)</span>
                               </span>
                             )}
                           </div>
@@ -763,12 +817,49 @@ export function StepView({
                         {/* Challenge Mode Controls - Show only when skeleton is active */}
                         {hasSkeleton && !isSolutionRevealed && (
                           <div className="flex-shrink-0 px-4 py-3 bg-amber-500/10 border-t border-amber-500/30">
-                            <div className="flex items-center justify-between flex-wrap gap-2">
+                            {/* Difficulty Selector */}
+                            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
                               <div className="flex items-center gap-2">
-                                <Lock className="w-4 h-4 text-amber-600" />
-                                <span className="text-sm font-medium text-amber-700 dark:text-amber-500">
-                                  Fill in the blanks (marked with _________) 
-                                </span>
+                                <span className="text-xs text-muted-foreground">Difficulty:</span>
+                                <div className="flex gap-0.5 bg-muted rounded-md p-0.5">
+                                  <button
+                                    onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'guided' }))}
+                                    className={cn(
+                                      "px-2 py-1 text-xs rounded transition-colors",
+                                      tier === 'guided' 
+                                        ? "bg-primary text-primary-foreground" 
+                                        : "hover:bg-muted-foreground/10"
+                                    )}
+                                  >
+                                    Guided (10pts)
+                                  </button>
+                                  <button
+                                    onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'challenge' }))}
+                                    disabled={!block.challengeSkeleton && !block.expertSkeleton}
+                                    className={cn(
+                                      "px-2 py-1 text-xs rounded transition-colors",
+                                      tier === 'challenge' 
+                                        ? "bg-amber-500 text-white" 
+                                        : "hover:bg-muted-foreground/10",
+                                      !block.challengeSkeleton && !block.expertSkeleton && "opacity-40 cursor-not-allowed"
+                                    )}
+                                  >
+                                    Challenge (15pts)
+                                  </button>
+                                  <button
+                                    onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'expert' }))}
+                                    disabled={!block.expertSkeleton}
+                                    className={cn(
+                                      "px-2 py-1 text-xs rounded transition-colors",
+                                      tier === 'expert' 
+                                        ? "bg-red-500 text-white" 
+                                        : "hover:bg-muted-foreground/10",
+                                      !block.expertSkeleton && "opacity-40 cursor-not-allowed"
+                                    )}
+                                  >
+                                    Expert (25pts)
+                                  </button>
+                                </div>
                                 {/* Point Tracker */}
                                 {(pointsDeducted[blockKey] || 0) > 0 && (
                                   <span className="flex items-center gap-1 text-xs bg-red-500/10 text-red-600 px-2 py-0.5 rounded">
@@ -776,11 +867,25 @@ export function StepView({
                                   </span>
                                 )}
                               </div>
+                            </div>
+                            
+                            {/* Instructions based on tier */}
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <div className="flex items-center gap-2">
+                                <Lock className="w-4 h-4 text-amber-600" />
+                                <span className="text-sm font-medium text-amber-700 dark:text-amber-500">
+                                  {tier === 'expert' 
+                                    ? 'Complete the objective from scratch' 
+                                    : tier === 'challenge' 
+                                    ? 'Follow the tasks and write your code' 
+                                    : 'Fill in the blanks (marked with _________)'}
+                                </span>
+                              </div>
                               <div className="flex items-center gap-2 flex-wrap">
                                 {blockHints.map((hint, hintIdx) => {
                                   const isRevealed = revealedForBlock.includes(hintIdx);
                                   const isLocked = hintIdx > 0 && !revealedForBlock.includes(hintIdx - 1);
-                                  const penalty = hintIdx === 0 ? 1 : 2;
+                                  const penalty = getHintPenalty(tier, hintIdx);
                                   
                                   // Extract blank number from hint if it starts with "Blank N:"
                                   const blankMatch = hint.match(/^Blank (\d+):/);
@@ -791,7 +896,7 @@ export function StepView({
                                       key={hintIdx}
                                       variant="outline"
                                       size="sm"
-                                      onClick={() => revealHint(blockKey, hintIdx)}
+                                      onClick={() => revealHint(blockKey, hintIdx, tier)}
                                       disabled={isRevealed || isLocked}
                                       className={cn(
                                         "gap-1 h-7 text-xs",
@@ -800,18 +905,18 @@ export function StepView({
                                       )}
                                     >
                                       <Lightbulb className="w-3 h-3" />
-                                      Blank {blankNum} {!isRevealed && `(-${penalty}pt)`}
+                                      {tier === 'guided' ? `Blank ${blankNum}` : `Hint ${hintIdx + 1}`} {!isRevealed && `(-${penalty}pt)`}
                                     </Button>
                                   );
                                 })}
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => revealSolution(blockKey)}
+                                  onClick={() => revealSolution(blockKey, tier)}
                                   className="gap-1 h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
                                 >
                                   <Eye className="w-3 h-3" />
-                                  Show Solution (-5pts)
+                                  Show Solution (-{solutionPenalty}pts)
                                 </Button>
                               </div>
                             </div>
@@ -834,13 +939,21 @@ export function StepView({
                             )}
                             
                             {/* Step Score Preview */}
-                            {(pointsDeducted[blockKey] || 0) > 0 && (
-                              <div className="mt-2 pt-2 border-t border-amber-500/20 flex items-center gap-2 text-xs text-muted-foreground">
-                                <span>Step score: </span>
-                                <span className="font-mono text-foreground">{Math.max(0, 10 - (pointsDeducted[blockKey] || 0))}</span>
-                                <span>/10 points</span>
-                              </div>
-                            )}
+                            <div className="mt-2 pt-2 border-t border-amber-500/20 flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>Step score: </span>
+                              <span className={cn(
+                                "font-mono",
+                                (pointsDeducted[blockKey] || 0) > 0 ? "text-amber-600" : "text-foreground"
+                              )}>
+                                {Math.max(0, maxPoints - (pointsDeducted[blockKey] || 0))}
+                              </span>
+                              <span>/{maxPoints} points</span>
+                              {tier !== 'guided' && (
+                                <span className="text-primary ml-2">
+                                  (+{maxPoints - 10} bonus for {tier} mode)
+                                </span>
+                              )}
+                            </div>
                           </div>
                         )}
 
