@@ -4,6 +4,8 @@ export interface LeaderboardEntry {
   completedLabs: number[];
   labTimes: Record<number, number>; // lab number -> time spent in ms
   lastActive: number;
+  hintsUsed: number; // Total hints revealed
+  solutionsRevealed: number; // Total solutions revealed early
 }
 
 const LEADERBOARD_STORAGE_KEY = 'workshop_leaderboard';
@@ -46,7 +48,9 @@ function getOrCreateEntry(email: string): LeaderboardEntry {
       score: 0,
       completedLabs: [],
       labTimes: {},
-      lastActive: Date.now()
+      lastActive: Date.now(),
+      hintsUsed: 0,
+      solutionsRevealed: 0
     };
     entries.push(entry);
     saveLeaderboardEntries(entries);
@@ -70,6 +74,8 @@ function updateEntry(email: string, updates: Partial<LeaderboardEntry>): void {
       completedLabs: [],
       labTimes: {},
       lastActive: Date.now(),
+      hintsUsed: 0,
+      solutionsRevealed: 0,
       ...updates
     };
     entries.push(newEntry);
@@ -182,6 +188,32 @@ export function heartbeat(email: string, labNumber?: number): void {
   }
   
   updateEntry(email, updates);
+}
+
+/**
+ * Track when a user reveals a hint
+ */
+export function trackHintUsage(email: string, hintPenalty: number): void {
+  if (!email) return;
+  
+  const entry = getOrCreateEntry(email);
+  updateEntry(email, {
+    hintsUsed: (entry.hintsUsed || 0) + 1,
+    score: Math.max(0, entry.score - hintPenalty)
+  });
+}
+
+/**
+ * Track when a user reveals a solution early
+ */
+export function trackSolutionReveal(email: string, solutionPenalty: number = 5): void {
+  if (!email) return;
+  
+  const entry = getOrCreateEntry(email);
+  updateEntry(email, {
+    solutionsRevealed: (entry.solutionsRevealed || 0) + 1,
+    score: Math.max(0, entry.score - solutionPenalty)
+  });
 }
 
 /**
