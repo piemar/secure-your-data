@@ -20,12 +20,25 @@ export function Lab1CSFLE() {
     hints?: string[];
     tips?: string[];
     codeBlocks?: Array<{ filename: string; language: string; code: string; skeleton?: string }>;
+    troubleshooting?: string[];
     onVerify?: () => Promise<{ success: boolean; message: string }>;
+    exercises?: Array<{
+      id: string;
+      type: 'quiz' | 'fill_blank' | 'challenge';
+      title: string;
+      description?: string;
+      points?: number;
+      question?: string;
+      options?: Array<{ id: string; label: string; isCorrect: boolean }>;
+      codeTemplate?: string;
+      blanks?: Array<{ id: string; placeholder: string; correctAnswer: string; hint?: string }>;
+      challengeSteps?: Array<{ instruction: string; hint?: string }>;
+    }>;
   }> = [
 
     {
       id: 'l1s1',
-      title: 'Infrastructure: Create Customer Master Key (CMK)',
+      title: 'Create Customer Master Key (CMK)',
       estimatedTime: '10 min',
       difficulty: 'basic' as DifficultyLevel,
       understandSection: 'The CMK is the root of trust in Envelope Encryption. It never leaves the KMS Hardware Security Module (HSM). This key will "wrap" (encrypt) the Data Encryption Keys (DEKs) that MongoDB stores.',
@@ -34,19 +47,19 @@ export function Lab1CSFLE() {
         'Create an alias for easier reference',
         'Save the Key ID for the next step'
       ],
-      description: 'The CMK is the root of trust in Envelope Encryption. In this step, you will create a CMK and an alias using the AWS CLI. This key will "wrap" the Data Encryption Keys (DEKs) that MongoDB stores.',
+      description: 'Create your Customer Master Key (CMK) in AWS KMS. This key is the root of trust that wraps all Data Encryption Keys.',
       tips: [
         'ROOT OF TRUST: The CMK never leaves the KMS Hardware Security Module (HSM).',
-        'SA TIP: Use aliases for your keys to make them application-agnostic. Referencing a key by alias allows for easier rotation.'
+        'SA TIP: Use aliases for keys to allow easier rotation without code changes.'
       ],
       hints: [
-        'The aws kms create-key command creates a symmetric key by default - no extra flags needed',
-        'Store the KeyId in a variable using --query "KeyMetadata.KeyId" --output text',
-        'Use aws kms create-alias with --alias-name and --target-key-id to link the alias to your key'
+        'The aws kms create-key command creates a symmetric key by default',
+        'Store the KeyId using --query "KeyMetadata.KeyId" --output text',
+        'Use aws kms create-alias to link the alias to your key'
       ],
       codeBlocks: [
         {
-          filename: 'AWS CLI - Create Key & Alias',
+          filename: 'Terminal - AWS CLI',
           language: 'bash',
           code: `# 1. Create the CMK
 KMS_KEY_ID=$(aws kms create-key --description "Lab 1 MongoDB Encryption Key" --query 'KeyMetadata.KeyId' --output text)
@@ -57,7 +70,22 @@ aws kms create-alias --alias-name "${aliasName}" --target-key-id $KMS_KEY_ID
 echo "CMK Created: $KMS_KEY_ID"
 echo "Alias Created: ${aliasName}"`,
           skeleton: `# Use 'aws kms create-key' to create a new Symmetric key
-# Use 'aws kms create-alias' to assign it a friendly name like '${aliasName}'`
+# Use 'aws kms create-alias' to assign it a friendly name`
+        }
+      ],
+      exercises: [
+        {
+          id: 'l1s1-quiz',
+          type: 'quiz' as const,
+          title: 'CMK Purpose',
+          points: 5,
+          question: 'What is the primary purpose of the Customer Master Key (CMK)?',
+          options: [
+            { id: 'a', label: 'Directly encrypt application data', isCorrect: false },
+            { id: 'b', label: 'Wrap (encrypt) Data Encryption Keys', isCorrect: true },
+            { id: 'c', label: 'Authenticate users to MongoDB', isCorrect: false },
+            { id: 'd', label: 'Generate TLS certificates', isCorrect: false },
+          ]
         }
       ],
       onVerify: async () => validatorUtils.checkKmsAlias(aliasName)
