@@ -2,6 +2,7 @@ import { LabViewWithTabs } from './LabViewWithTabs';
 import { validatorUtils } from '@/utils/validatorUtils';
 import { useLab } from '@/context/LabContext';
 import { DifficultyLevel } from './DifficultyBadge';
+import { CryptoShreddingDiagram } from './LabArchitectureDiagrams';
 
 export function Lab3RightToErasure() {
   const { mongoUri, awsRegion, verifiedTools } = useLab();
@@ -599,26 +600,7 @@ For this lab demo, we use the same CMK to demonstrate the rewrap operation.`
       }
     ],
     keyInsight: 'When a user requests deletion under GDPR, instead of finding and deleting all their data across collections, simply delete their DEK. All their data becomes cryptographically unreadable garbage.',
-    architectureDiagram: (
-      <pre className="text-xs font-mono text-muted-foreground whitespace-pre overflow-x-auto">
-{`┌─────────────────────────────────────────────────────────────┐
-│                    1 DEK per User Pattern                   │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  User A Data ──encrypted with──▶ DEK-A ──wrapped by──▶ CMK │
-│  User B Data ──encrypted with──▶ DEK-B ──wrapped by──▶ CMK │
-│  User C Data ──encrypted with──▶ DEK-C ──wrapped by──▶ CMK │
-│                                                             │
-│  ═══════════════════════════════════════════════════════   │
-│                                                             │
-│  DELETE DEK-A ═══▶ User A's data is now unreadable garbage │
-│                                                             │
-│  ✓ No need to find every User A record                     │
-│  ✓ Instant compliance with GDPR Article 17                 │
-│  ✓ Audit log shows key deletion timestamp                  │
-└─────────────────────────────────────────────────────────────┘`}
-      </pre>
-    )
+    architectureDiagram: <CryptoShreddingDiagram />
   };
 
   // Exercises for Lab 3

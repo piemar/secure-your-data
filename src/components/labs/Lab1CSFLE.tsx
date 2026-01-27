@@ -2,6 +2,7 @@ import { LabViewWithTabs } from './LabViewWithTabs';
 import { validatorUtils } from '@/utils/validatorUtils';
 import { useLab } from '@/context/LabContext';
 import { DifficultyLevel } from './DifficultyBadge';
+import { CSFLEArchitectureDiagram } from './LabArchitectureDiagrams';
 
 export function Lab1CSFLE() {
   const { mongoUri, awsAccessKeyId, awsSecretAccessKey, awsRegion, verifiedTools } = useLab();
@@ -627,24 +628,7 @@ main().catch(console.error);`,
     keyInsight: 'The breakthrough: MongoDB never sees plaintext. Ever. The client library encrypts BEFORE the data leaves your application. This is fundamentally different from TDE.',
     showEncryptionFlow: true,
     encryptionFlowType: 'csfle' as const,
-    architectureDiagram: (
-      <pre className="text-xs font-mono text-muted-foreground whitespace-pre overflow-x-auto">
-{`┌──────────────┐     ┌─────────────┐     ┌─────────────┐
-│  Your App    │────▶│   MongoDB   │     │   AWS KMS   │
-│  (Node.js)   │     │   Atlas     │     │   (CMK)     │
-│              │     │             │     │             │
-│ ┌──────────┐ │     │ ┌─────────┐ │     │ ┌─────────┐ │
-│ │libmongoc │◀┼─────┼─│ DEK     │◀┼─────┼─│ CMK     │ │
-│ │rypt      │ │     │ │(wrapped)│ │     │ │         │ │
-│ └──────────┘ │     │ └─────────┘ │     │ └─────────┘ │
-└──────────────┘     └─────────────┘     └─────────────┘
-        │                   │
-        ▼                   ▼
-   Data encrypted      Only ciphertext
-   BEFORE leaving      stored in DB
-   your app`}
-      </pre>
-    )
+    architectureDiagram: <CSFLEArchitectureDiagram />
   };
 
   // Exercises for Lab 1
