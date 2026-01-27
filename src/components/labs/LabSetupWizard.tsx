@@ -28,7 +28,7 @@ const PREREQUISITES: Prerequisite[] = [
     { id: 'mongosh', label: 'mongosh', description: 'MongoDB Shell for database operations', installCommand: 'brew install mongodb-community-shell', downloadUrl: 'https://www.mongodb.com/try/download/shell', required: true },
     { id: 'node', label: 'Node.js v18+', description: 'JavaScript runtime', installCommand: 'brew install node', downloadUrl: 'https://nodejs.org/', required: true },
     { id: 'npm', label: 'npm', description: 'Package manager (comes with Node.js)', installCommand: 'Included with Node.js', required: true },
-    { id: 'mongoCryptShared', label: 'mongo_crypt_shared', description: 'Required for Queryable Encryption (Lab 2)', installCommand: 'Download from MongoDB', downloadUrl: 'https://www.mongodb.com/docs/manual/core/queryable-encryption/reference/shared-library/', required: false },
+    { id: 'mongoCryptShared', label: 'mongo_crypt_shared', description: 'Required for Lab 2 (Queryable Encryption)', installCommand: 'Download from MongoDB', downloadUrl: 'https://www.mongodb.com/docs/manual/core/queryable-encryption/reference/shared-library/', required: false },
 ];
 
 export const LabSetupWizard: React.FC = () => {
@@ -46,45 +46,33 @@ export const LabSetupWizard: React.FC = () => {
 
     const [phase, setPhase] = useState<SetupPhase>(mongoUri ? 'ready' : 'onboarding');
     const [localUri, setLocalUri] = useState(mongoUri);
-    const [localEmail, setLocalEmail] = useState(userEmail);
-    const [firstName, setFirstName] = useState('');
-    const [lastName, setLastName] = useState('');
     const [isCheckingPrereqs, setIsCheckingPrereqs] = useState(false);
     const [prereqResults, setPrereqResults] = useState<Record<string, { verified: boolean; message: string; path?: string }>>({});
     const [showPrereqDetails, setShowPrereqDetails] = useState(false);
-    const [cryptSharedLibPath, setCryptSharedLibPath] = useState(verifiedTools.mongoCryptShared?.path || '');
     const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
+    const [bypassPrereqs, setBypassPrereqs] = useState(false);
 
-    // Auto-fill name from email when email changes
+    // Get attendee name from localStorage (set during registration)
+    const attendeeName = localStorage.getItem('workshop_attendee_name') || '';
+
+    // Update suffix from attendee name on mount
     useEffect(() => {
-        if (localEmail && localEmail.includes('@')) {
-            const emailPrefix = localEmail.split('@')[0];
-            const parts = emailPrefix.split(/[.\-_]/);
-            if (parts.length >= 2 && !firstName && !lastName) {
-                setFirstName(parts[0].charAt(0).toUpperCase() + parts[0].slice(1));
-                setLastName(parts[1].charAt(0).toUpperCase() + parts[1].slice(1));
-            } else if (parts.length === 1 && !firstName) {
-                setFirstName(parts[0].charAt(0).toUpperCase() + parts[0].slice(1));
+        if (attendeeName) {
+            const parts = attendeeName.trim().split(/\s+/);
+            if (parts.length >= 2) {
+                const fn = parts[0].toLowerCase();
+                const ln = parts[parts.length - 1].toLowerCase();
+                setVerifiedTool('suffix', true, `${fn}-${ln}`);
+            } else if (parts.length === 1) {
+                setVerifiedTool('suffix', true, parts[0].toLowerCase());
             }
         }
-    }, [localEmail]);
-
-    // Update suffix when names change
-    useEffect(() => {
-        if (firstName && lastName) {
-            const fn = firstName.toLowerCase();
-            const ln = lastName.toLowerCase();
-            setVerifiedTool('suffix', true, `${fn}-${ln}`);
-        }
-    }, [firstName, lastName]);
+    }, [attendeeName, setVerifiedTool]);
 
     // Sync local verify state from context on mount
     useEffect(() => {
         if (mongoUri) setPhase('ready');
-        if (verifiedTools.mongoCryptShared?.path) {
-            setCryptSharedLibPath(verifiedTools.mongoCryptShared.path);
-        }
-    }, [mongoUri, verifiedTools.mongoCryptShared]);
+    }, [mongoUri]);
 
     const copyToClipboard = async (text: string, id: string) => {
         await navigator.clipboard.writeText(text);
@@ -136,11 +124,11 @@ export const LabSetupWizard: React.FC = () => {
         setPrereqResults(results);
         setIsCheckingPrereqs(false);
 
-        const allPassed = PREREQUISITES.every(p => results[p.id]?.verified);
-        if (allPassed) {
-            toast.success('All prerequisites verified!');
+        const requiredPassed = PREREQUISITES.filter(p => p.required).every(p => results[p.id]?.verified);
+        if (requiredPassed) {
+            toast.success('All required prerequisites verified!');
         } else {
-            toast.error('Some prerequisites are missing. See details below.');
+            toast.warning('Some prerequisites are missing. You can install them or continue anyway.');
         }
     };
 
@@ -165,12 +153,12 @@ export const LabSetupWizard: React.FC = () => {
     };
 
     const handleFinalize = () => {
-        if (!localEmail || !localEmail.includes('@')) {
-            toast.error('Please provide a valid email address');
+        const savedEmail = userEmail || localStorage.getItem('userEmail') || '';
+        if (!savedEmail || !savedEmail.includes('@')) {
+            toast.error('Please provide a valid email address during registration');
             return;
         }
         setMongoUri(localUri);
-        setUserEmail(localEmail);
         setAwsCredentials({
             accessKeyId: '',
             secretAccessKey: '',
@@ -181,8 +169,10 @@ export const LabSetupWizard: React.FC = () => {
         toast.success("Environment Activated! Ready for Lab 1.");
     };
 
-    const allVerified = verifiedTools.awsCli.verified && verifiedTools.mongosh.verified && verifiedTools.node.verified && verifiedTools.npm.verified;
+    const requiredVerified = verifiedTools.awsCli.verified && verifiedTools.mongosh.verified && verifiedTools.node.verified && verifiedTools.npm.verified;
+    const allVerified = requiredVerified || bypassPrereqs;
     const hasAtlasConnection = verifiedTools.atlas.verified || prereqResults['atlas']?.verified;
+    const hasCheckedPrereqs = Object.keys(prereqResults).length > 0;
 
     if (phase === 'ready') {
         return (
@@ -294,20 +284,35 @@ export const LabSetupWizard: React.FC = () => {
                     </div>
 
                     {/* Expandable details for missing prerequisites */}
-                    {showPrereqDetails && Object.keys(prereqResults).length > 0 && (
-                        <Collapsible open={!allVerified}>
+                    {showPrereqDetails && hasCheckedPrereqs && (
+                        <Collapsible open={!requiredVerified}>
                             <CollapsibleTrigger asChild>
                                 <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                                    {allVerified ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                                    {allVerified ? 'Show details' : 'Installation instructions'}
+                                    {requiredVerified ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                    {requiredVerified ? 'Show details' : 'Installation instructions'}
                                 </button>
                             </CollapsibleTrigger>
                             <CollapsibleContent>
                                 <div className="mt-3 space-y-2">
                                     {PREREQUISITES.filter(p => !prereqResults[p.id]?.verified).map((prereq) => (
-                                        <div key={prereq.id} className="p-3 rounded-lg bg-red-500/5 border border-red-500/20">
+                                        <div key={prereq.id} className={cn(
+                                            "p-3 rounded-lg border",
+                                            prereq.required 
+                                                ? "bg-red-500/5 border-red-500/20" 
+                                                : "bg-amber-500/5 border-amber-500/20"
+                                        )}>
                                             <div className="flex items-center justify-between mb-2">
-                                                <span className="text-sm font-medium text-red-600">{prereq.label}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={cn(
+                                                        "text-sm font-medium",
+                                                        prereq.required ? "text-red-600" : "text-amber-600"
+                                                    )}>
+                                                        {prereq.label}
+                                                    </span>
+                                                    {!prereq.required && (
+                                                        <span className="text-xs px-1.5 py-0.5 bg-amber-500/10 text-amber-600 rounded">Optional</span>
+                                                    )}
+                                                </div>
                                                 {prereq.downloadUrl && (
                                                     <a
                                                         href={prereq.downloadUrl}
@@ -319,7 +324,8 @@ export const LabSetupWizard: React.FC = () => {
                                                     </a>
                                                 )}
                                             </div>
-                                            {prereq.installCommand && prereq.installCommand !== 'Included with Node.js' && (
+                                            <p className="text-xs text-muted-foreground mb-2">{prereq.description}</p>
+                                            {prereq.installCommand && prereq.installCommand !== 'Included with Node.js' && prereq.installCommand !== 'Download from MongoDB' && (
                                                 <div className="flex items-center gap-2">
                                                     <code className="flex-1 text-xs p-2 bg-background rounded border border-border font-mono">
                                                         {prereq.installCommand}
@@ -340,55 +346,48 @@ export const LabSetupWizard: React.FC = () => {
                                             )}
                                         </div>
                                     ))}
+                                    
+                                    {/* Continue anyway option */}
+                                    {!requiredVerified && (
+                                        <div className="mt-4 p-3 rounded-lg bg-muted/50 border border-dashed border-border">
+                                            <div className="flex items-start gap-3">
+                                                <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                                                <div className="flex-1">
+                                                    <p className="text-sm font-medium">Continue without all prerequisites?</p>
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        Some labs may not work correctly. You can always return here to check prerequisites later.
+                                                    </p>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="mt-2"
+                                                        onClick={() => setBypassPrereqs(true)}
+                                                    >
+                                                        Continue Anyway
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </CollapsibleContent>
                         </Collapsible>
                     )}
                 </div>
 
-                {/* Personalization */}
-                <div className="space-y-3">
-                    <h3 className="text-sm font-semibold flex items-center gap-2">
-                        <Fingerprint className="w-4 h-4 text-primary" />
-                        Personalization
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="email" className="text-xs">Email <span className="text-red-500">*</span></Label>
-                            <Input
-                                id="email"
-                                type="email"
-                                placeholder="you@mongodb.com"
-                                value={localEmail}
-                                onChange={(e) => setLocalEmail(e.target.value)}
-                                className="h-9"
-                            />
+                {/* Attendee Info (from registration) */}
+                {(attendeeName || userEmail) && (
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
+                        <Fingerprint className="w-4 h-4 text-primary flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{attendeeName || 'Attendee'}</p>
+                            <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
                         </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="fname" className="text-xs">First Name <span className="text-red-500">*</span></Label>
-                            <Input
-                                id="fname"
-                                placeholder="Pierre"
-                                value={firstName}
-                                onChange={(e) => setFirstName(e.target.value)}
-                                className="h-9"
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="lname" className="text-xs">Last Name <span className="text-red-500">*</span></Label>
-                            <Input
-                                id="lname"
-                                placeholder="Petersson"
-                                value={lastName}
-                                onChange={(e) => setLastName(e.target.value)}
-                                className="h-9"
-                            />
+                        <div className="text-xs text-muted-foreground">
+                            AWS suffix: <span className="font-mono text-primary">{verifiedTools['suffix']?.path || '...'}</span>
                         </div>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                        Your suffix for AWS resources: <span className="font-mono text-primary">{verifiedTools['suffix']?.path || '...'}</span>
-                    </p>
-                </div>
+                )}
 
                 {/* Atlas Connection */}
                 <div className="space-y-3">
@@ -431,55 +430,20 @@ export const LabSetupWizard: React.FC = () => {
                     </Collapsible>
                 </div>
 
-                {/* Optional: mongo_crypt_shared for Lab 2 */}
-                <Collapsible>
-                    <CollapsibleTrigger className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
-                        <ChevronRight className="w-3 h-3" />
-                        Advanced: Queryable Encryption library (for Lab 2)
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                        <div className="mt-2 p-3 rounded-lg bg-muted/30 border border-border space-y-3">
-                            <div className="space-y-2">
-                                <Label htmlFor="cryptSharedLibPath" className="text-xs">mongo_crypt_shared library path</Label>
-                                <Input
-                                    id="cryptSharedLibPath"
-                                    type="text"
-                                    placeholder="/Users/yourname/mongo_crypt_shared/lib/mongo_crypt_v1.dylib"
-                                    value={cryptSharedLibPath}
-                                    onChange={(e) => setCryptSharedLibPath(e.target.value)}
-                                    className="text-xs h-9"
-                                    disabled={verifiedTools.mongoCryptShared.verified}
-                                />
-                                {verifiedTools.mongoCryptShared.verified && (
-                                    <div className="flex items-center gap-2 text-xs text-green-600">
-                                        <CheckCircle2 className="w-3 h-3" />
-                                        <span>Verified: {verifiedTools.mongoCryptShared.path}</span>
-                                    </div>
-                                )}
-                            </div>
-                            <details className="text-xs">
-                                <summary className="cursor-pointer text-primary hover:underline">Download instructions</summary>
-                                <div className="mt-2 space-y-1 text-muted-foreground">
-                                    <p>1. Check architecture: <code className="bg-background px-1 rounded">uname -m</code></p>
-                                    <p>2. Download from <a href="https://www.mongodb.com/docs/manual/core/csfle/reference/shared-library/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">MongoDB docs</a></p>
-                                    <p>3. Extract and provide the full path to mongo_crypt_v1.dylib</p>
-                                </div>
-                            </details>
-                        </div>
-                    </CollapsibleContent>
-                </Collapsible>
             </CardContent>
 
             <CardFooter className="bg-primary/5 p-6 border-t">
                 <Button
                     className="w-full h-12 text-base font-semibold rounded-lg"
-                    disabled={!allVerified || !localUri || !localEmail || !localEmail.includes('@') || !firstName || !lastName}
+                    disabled={!allVerified || !localUri}
                     onClick={handleFinalize}
                 >
-                    {!allVerified ? (
+                    {!hasCheckedPrereqs ? (
                         <>Check prerequisites first</>
-                    ) : !localUri || !localEmail || !firstName || !lastName ? (
-                        <>Complete all fields</>
+                    ) : !allVerified ? (
+                        <>Missing prerequisites (or continue anyway)</>
+                    ) : !localUri ? (
+                        <>Enter Atlas connection string</>
                     ) : (
                         <>Activate Lab Environment</>
                     )}
