@@ -884,6 +884,72 @@ export default defineConfig(({ mode }) => ({
             return;
           }
 
+          if (req.url && req.url.startsWith('/api/verify-datakey')) {
+            const url = new URL(req.url, `http://${req.headers.host}`);
+            const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            const keyAltName = url.searchParams.get('keyAltName') || '';
+            
+            if (!uri) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' }));
+              return;
+            }
+            
+            if (!keyAltName) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ success: false, message: 'Key Alt Name is required.' }));
+              return;
+            }
+
+            const dbName = 'encryption';
+            const collName = '__keyVault';
+
+            // Check if DEK exists by keyAltName
+            const script = `
+              var key = db.getSiblingDB('${dbName}').getCollection('${collName}').findOne({ keyAltNames: '${keyAltName}' });
+              var result = { exists: !!key };
+              if (key) {
+                result.keyId = key._id.toString();
+                result.masterKey = key.masterKey ? key.masterKey.provider : null;
+              }
+              print(JSON.stringify(result));
+            `;
+
+            const cmd = `mongosh "${uri}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
+
+            exec(cmd, (error: any, stdout: any, stderr: any) => {
+              if (error) {
+                res.statusCode = 500;
+                res.end(JSON.stringify({
+                  success: false,
+                  message: `Connection Failed: ${stderr || error.message}. Ensure IP is whitelisted.`
+                }));
+                return;
+              }
+
+              try {
+                const result = JSON.parse(stdout.trim());
+                if (result.exists) {
+                  res.end(JSON.stringify({
+                    success: true,
+                    message: `Verified: DEK "${keyAltName}" exists in ${dbName}.${collName} (Provider: ${result.masterKey || 'N/A'})`
+                  }));
+                } else {
+                  res.end(JSON.stringify({
+                    success: false,
+                    message: `DEK with keyAltName "${keyAltName}" not found. Run the createKey.cjs script to create it.`
+                  }));
+                }
+              } catch (e: any) {
+                res.end(JSON.stringify({
+                  success: false,
+                  message: `Failed to parse database response: ${e.message}`
+                }));
+              }
+            });
+            return;
+          }
+
           if (req.url && req.url.startsWith('/api/leaderboard')) {
             if (req.method === 'GET') {
               // Get all leaderboard entries from MongoDB
