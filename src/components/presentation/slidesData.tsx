@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { InteractivePoll } from './InteractivePoll';
 import { StorageChallenge } from './StorageChallenge';
+import { KnowledgeCheck } from './KnowledgeCheck';
 import {
   EnvelopeEncryptionDiagram,
   EscEcocDiagram,
@@ -660,6 +661,39 @@ Key rotation workflow (using rewrapManyDataKey):
 2. Use rewrapManyDataKey() to re-encrypt all DEKs
 3. Retire old CMK
 4. No data re-encryption needed!`,
+  },
+  // Knowledge Check - Cryptographic Fundamentals
+  {
+    id: 12,
+    title: 'Knowledge Check: Encryption Fundamentals',
+    section: 'Cryptographic Fundamentals',
+    content: (
+      <div className="max-w-3xl mx-auto">
+        <SlideTitle>Knowledge Check</SlideTitle>
+        <KnowledgeCheck
+          question="In MongoDB's envelope encryption model, which key directly encrypts your application data?"
+          options={[
+            { id: 'cmk', label: 'Customer Master Key (CMK)', isCorrect: false },
+            { id: 'dek', label: 'Data Encryption Key (DEK)', isCorrect: true },
+            { id: 'kms', label: 'KMS Provider Key', isCorrect: false },
+            { id: 'tls', label: 'TLS Certificate Key', isCorrect: false },
+          ]}
+          explanation="The DEK directly encrypts your data. The CMK never touches your data - it only encrypts/decrypts the DEKs. This separation enables efficient key rotation (only re-encrypt DEKs, not all data)."
+          points={10}
+        />
+      </div>
+    ),
+    speakerNotes: `Knowledge Check time! Ask the audience before revealing the answer.
+
+Correct answer: DEK (Data Encryption Key)
+
+The key insight here is the separation of concerns:
+- CMK: Protects DEKs, lives in KMS
+- DEK: Protects data, stored encrypted in Key Vault
+
+This is what makes key rotation efficient - you only need to re-encrypt the DEKs, not all the data.
+
+Common misconception: People think the CMK encrypts data directly. It doesn't - it's "key to the keys."`,
   },
 
   // SECTION 3: GDPR & Multi-Cloud Patterns (Slides 12-14)

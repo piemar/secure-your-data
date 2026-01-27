@@ -1,11 +1,9 @@
 import { useState, useCallback } from 'react';
-import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Trophy, Terminal, Copy, Check, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DifficultyBadge, DifficultyLevel } from './DifficultyBadge';
-import { ExercisePanel, ExerciseType } from '@/components/workshop/ExercisePanel';
 import { motion, AnimatePresence } from 'framer-motion';
 import Editor from '@monaco-editor/react';
 
@@ -18,7 +16,7 @@ interface CodeBlock {
 
 interface Exercise {
   id: string;
-  type: ExerciseType;
+  type: 'quiz' | 'fill_blank' | 'challenge';
   title: string;
   description?: string;
   points?: number;
@@ -257,8 +255,8 @@ export function StepView({
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Header - Sticky */}
       <div className="border-b border-border px-6 py-4">
         <div className="flex items-start justify-between">
           <div>
@@ -305,253 +303,104 @@ export function StepView({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-          <div className="flex items-center justify-between px-6 py-2 border-b border-border bg-muted/30">
-            <TabsList className="bg-transparent h-auto p-0 gap-1">
-              <TabsTrigger
-                value="code"
-                className="data-[state=active]:bg-card data-[state=active]:border-border border border-transparent px-4 py-2 rounded-md text-sm gap-2"
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+        {/* Step Header with Actions */}
+        <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-b border-border bg-muted/30">
+          <div className="flex-1 min-w-0">
+            <AnimatePresence mode="wait" custom={direction}>
+              <motion.div
+                key={currentStepIndex}
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.2, ease: 'easeInOut' }}
               >
-                <Terminal className="w-4 h-4" /> Code
-              </TabsTrigger>
-              <TabsTrigger
-                value="explanation"
-                className="data-[state=active]:bg-card data-[state=active]:border-border border border-transparent px-4 py-2 rounded-md text-sm gap-2"
-              >
-                <Lightbulb className="w-4 h-4" /> Explanation
-              </TabsTrigger>
-              {currentStep.exercises && currentStep.exercises.length > 0 && (
-                <TabsTrigger
-                  value="exercises"
-                  className="data-[state=active]:bg-card data-[state=active]:border-border border border-transparent px-4 py-2 rounded-md text-sm gap-2"
-                >
-                  <Trophy className="w-4 h-4" /> Exercises
-                </TabsTrigger>
-              )}
-            </TabsList>
-
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground">
-                Step {currentStepIndex + 1} of {steps.length}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCopyCode}
-                className="gap-1.5 h-8"
-                disabled={!currentStep.codeBlocks?.length}
-              >
-                {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                {copied ? 'Copied!' : 'Copy'}
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleCheckProgress}
-                disabled={isRunning || !currentStep.codeBlocks?.length}
-                className="gap-2 h-8"
-              >
-                {isRunning ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="w-4 h-4" />
-                )}
-                {isRunning ? 'Checking...' : 'Check My Progress'}
-              </Button>
-            </div>
+                <h2 className="font-semibold truncate">{currentStep.title}</h2>
+                <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">{currentStep.description}</p>
+              </motion.div>
+            </AnimatePresence>
           </div>
 
-          {/* Step Title with Animation */}
-          <AnimatePresence mode="wait" custom={direction}>
-            <motion.div
-              key={currentStepIndex}
-              custom={direction}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.2, ease: 'easeInOut' }}
-              className="px-6 py-4 border-b border-border"
+          <div className="flex items-center gap-3 ml-4 flex-shrink-0">
+            <span className="text-sm text-muted-foreground">
+              Step {currentStepIndex + 1} of {steps.length}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCopyCode}
+              className="gap-1.5 h-8"
+              disabled={!currentStep.codeBlocks?.length}
             >
-              <h2 className="font-semibold">{currentStep.title}</h2>
-              <p className="text-sm text-muted-foreground mt-1">{currentStep.description}</p>
-              {currentStep.estimatedTime && (
-                <span className="text-xs text-muted-foreground mt-2 inline-block">
-                  ⏱️ Estimated: {currentStep.estimatedTime}
-                </span>
+              {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+              {copied ? 'Copied!' : 'Copy'}
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleCheckProgress}
+              disabled={isRunning || !currentStep.codeBlocks?.length}
+              className="gap-2 h-8"
+            >
+              {isRunning ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
               )}
-            </motion.div>
-          </AnimatePresence>
+              {isRunning ? 'Checking...' : 'Check My Progress'}
+            </Button>
+          </div>
+        </div>
 
-          {/* Tab Content */}
-          <div className="flex-1 overflow-hidden">
-            <TabsContent value="code" className="h-full m-0 data-[state=inactive]:hidden">
-              <div className="h-full flex flex-col">
-                {currentStep.codeBlocks && currentStep.codeBlocks.length > 0 ? (
-                  <div className="flex-1 overflow-hidden">
-                    {currentStep.codeBlocks.map((block, idx) => (
-                      <div key={idx} className="h-full flex flex-col">
-                        <div className="px-4 py-2 bg-muted/50 border-b border-border flex items-center justify-between">
-                          <span className="text-xs font-mono text-muted-foreground">{block.filename}</span>
-                        </div>
-                        <div className="flex-1">
-                          <Editor
-                            height="100%"
-                            language={block.language === 'bash' ? 'shell' : block.language}
-                            value={block.code}
-                            theme="vs-dark"
-                            options={{
-                              readOnly: true,
-                              minimap: { enabled: false },
-                              fontSize: 13,
-                              lineNumbers: 'on',
-                              scrollBeyondLastLine: false,
-                              wordWrap: 'on',
-                              automaticLayout: true,
-                              tabSize: 2,
-                              padding: { top: 12, bottom: 12 },
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ))}
+        {/* Code Editor - Full Height */}
+        <div className="flex-1 overflow-hidden min-h-0">
+          {currentStep.codeBlocks && currentStep.codeBlocks.length > 0 ? (
+            <div className="h-full flex flex-col">
+              {currentStep.codeBlocks.map((block, idx) => (
+                <div key={idx} className="h-full flex flex-col">
+                  <div className="flex-shrink-0 px-4 py-2 bg-muted/50 border-b border-border flex items-center justify-between">
+                    <span className="text-xs font-mono text-muted-foreground">{block.filename}</span>
+                    {currentStep.estimatedTime && (
+                      <span className="text-xs text-muted-foreground">
+                        ⏱️ {currentStep.estimatedTime}
+                      </span>
+                    )}
                   </div>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center text-muted-foreground">
-                    <p>No code for this step</p>
+                  <div className="flex-1 min-h-0">
+                    <Editor
+                      height="100%"
+                      language={block.language === 'bash' ? 'shell' : block.language}
+                      value={block.code}
+                      theme="vs-dark"
+                      options={{
+                        readOnly: true,
+                        minimap: { enabled: false },
+                        fontSize: 13,
+                        lineNumbers: 'on',
+                        scrollBeyondLastLine: false,
+                        wordWrap: 'on',
+                        automaticLayout: true,
+                        tabSize: 2,
+                        padding: { top: 12, bottom: 12 },
+                      }}
+                    />
                   </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-full flex items-center justify-center text-muted-foreground">
+              <div className="text-center">
+                <Terminal className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>No code for this step</p>
+                {currentStep.understandSection && (
+                  <p className="text-sm mt-2 max-w-md px-4">{currentStep.understandSection}</p>
                 )}
               </div>
-            </TabsContent>
-
-            <TabsContent value="explanation" className="h-full m-0 p-6 overflow-auto data-[state=inactive]:hidden">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.1 }}
-                className="max-w-2xl space-y-6"
-              >
-                {/* Understanding */}
-                {currentStep.understandSection && (
-                  <div className="p-4 rounded-lg bg-accent/50 border border-accent">
-                    <h3 className="font-semibold mb-2 flex items-center gap-2">
-                      📖 Understand
-                    </h3>
-                    <p className="text-sm text-muted-foreground">{currentStep.understandSection}</p>
-                  </div>
-                )}
-
-                {/* Do This */}
-                {currentStep.doThisSection && currentStep.doThisSection.length > 0 && (
-                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-                    <h3 className="font-semibold mb-2 flex items-center gap-2 text-primary">
-                      ✅ Do This
-                    </h3>
-                    <ol className="text-sm space-y-2 list-decimal list-inside">
-                      {currentStep.doThisSection.map((item, i) => (
-                        <li key={i}>{item}</li>
-                      ))}
-                    </ol>
-                  </div>
-                )}
-
-                {/* Tips */}
-                {currentStep.tips && currentStep.tips.length > 0 && (
-                  <div className="p-4 rounded-lg bg-muted border border-border">
-                    <h3 className="font-semibold mb-2 flex items-center gap-2">
-                      💡 Tips
-                    </h3>
-                    <ul className="text-sm space-y-1">
-                      {currentStep.tips.map((tip, i) => (
-                        <li key={i} className="flex items-start gap-2">
-                          <span className="text-primary">•</span>
-                          {tip}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Hints */}
-                {currentStep.hints && currentStep.hints.length > 0 && (
-                  <Collapsible>
-                    <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-                      <ChevronRight className="w-4 h-4" />
-                      Need a hint?
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <div className="mt-2 p-4 rounded-lg bg-warning/10 border border-warning/20">
-                        <ul className="text-sm space-y-1">
-                          {currentStep.hints.map((hint, i) => (
-                            <li key={i} className="flex items-start gap-2">
-                              <span className="text-warning">💡</span>
-                              {hint}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                )}
-
-                {/* Troubleshooting */}
-                {currentStep.troubleshooting && currentStep.troubleshooting.length > 0 && (
-                  <div className="p-4 rounded-lg bg-warning/10 border border-warning/20">
-                    <h3 className="font-semibold mb-2 flex items-center gap-2 text-warning">
-                      ⚠️ Troubleshooting
-                    </h3>
-                    <ul className="text-sm space-y-1">
-                      {currentStep.troubleshooting.map((item, i) => (
-                        <li key={i} className="flex items-start gap-2">
-                          <span className="text-warning">•</span>
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </motion.div>
-            </TabsContent>
-
-            {/* Exercises Tab */}
-            {currentStep.exercises && currentStep.exercises.length > 0 && (
-              <TabsContent value="exercises" className="h-full m-0 p-6 overflow-auto data-[state=inactive]:hidden">
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.1 }}
-                  className="max-w-2xl space-y-6"
-                >
-                  <div className="mb-4">
-                    <h3 className="font-semibold flex items-center gap-2">
-                      <Trophy className="w-5 h-5 text-yellow-500" />
-                      Knowledge Check
-                    </h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Test your understanding and earn points
-                    </p>
-                  </div>
-                  {currentStep.exercises.map((exercise) => (
-                    <ExercisePanel
-                      key={exercise.id}
-                      id={exercise.id}
-                      type={exercise.type}
-                      title={exercise.title}
-                      description={exercise.description}
-                      points={exercise.points}
-                      question={exercise.question}
-                      options={exercise.options}
-                      codeTemplate={exercise.codeTemplate}
-                      blanks={exercise.blanks}
-                      challengeSteps={exercise.challengeSteps}
-                    />
-                  ))}
-                </motion.div>
-              </TabsContent>
-            )}
-          </div>
-        </Tabs>
+            </div>
+          )}
+        </div>
 
         {/* Output Panel */}
         <Collapsible open={outputOpen} onOpenChange={setOutputOpen}>
@@ -582,9 +431,9 @@ export function StepView({
         </Collapsible>
       </div>
 
-      {/* Footer Navigation */}
-      <div className="flex items-center justify-between px-6 py-4 border-t border-border bg-card">
-        <div className="flex items-center gap-2">
+      {/* Footer Navigation - Always Visible */}
+      <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-t border-border bg-card">
+        <div className="flex items-center gap-1.5">
           {steps.map((_, index) => (
             <motion.button
               key={index}
@@ -597,7 +446,7 @@ export function StepView({
               className={cn(
                 'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all',
                 index === currentStepIndex
-                  ? 'bg-primary text-primary-foreground'
+                  ? 'bg-primary text-primary-foreground ring-2 ring-primary/30'
                   : completedSteps.includes(index)
                   ? 'bg-primary/20 text-primary'
                   : 'bg-muted text-muted-foreground hover:bg-muted/80'
