@@ -20,7 +20,7 @@ export function Lab1CSFLE() {
     doThisSection?: string[];
     hints?: string[];
     tips?: string[];
-    codeBlocks?: Array<{ filename: string; language: string; code: string; skeleton?: string }>;
+    codeBlocks?: Array<{ filename: string; language: string; code: string; skeleton?: string; challengeSkeleton?: string; expertSkeleton?: string }>;
     troubleshooting?: string[];
     onVerify?: () => Promise<{ success: boolean; message: string }>;
     exercises?: Array<{
@@ -65,6 +65,7 @@ aws kms create-alias --alias-name "${aliasName}" --target-key-id $KMS_KEY_ID
 
 echo "CMK Created: $KMS_KEY_ID"
 echo "Alias Created: ${aliasName}"`,
+          // Tier 1: Guided - Shows structure with blanks
           skeleton: `# ══════════════════════════════════════════════════════════════
 # STEP 1: Create a Customer Master Key (CMK)
 # ══════════════════════════════════════════════════════════════
@@ -91,7 +92,60 @@ aws kms _____________ \\
     --target-key-id $KMS_KEY_ID
 
 echo "CMK Created: $KMS_KEY_ID"
-echo "Alias Created: ${aliasName}"`
+echo "Alias Created: ${aliasName}"`,
+          // Tier 2: Challenge - Task-based, minimal scaffolding
+          challengeSkeleton: `# ══════════════════════════════════════════════════════════════
+# CHALLENGE MODE - AWS KMS Setup for MongoDB Encryption
+# ══════════════════════════════════════════════════════════════
+
+# TASK 1: Create a Customer Master Key (CMK)
+# ──────────────────────────────────────────
+# Requirements:
+#   • Use the AWS KMS CLI (aws kms <command>)
+#   • Store the KeyId in a variable called KMS_KEY_ID
+#   • Add description: "Lab 1 MongoDB Encryption Key"
+#   • Use --query to extract only the KeyId
+#
+# Docs: https://awscli.amazonaws.com/v2/documentation/api/latest/reference/kms/create-key.html
+
+# Write your command:
+
+
+# TASK 2: Create an Alias for Easy Reference
+# ──────────────────────────────────────────
+# Requirements:
+#   • Create alias named: ${aliasName}
+#   • Link it to your CMK using its KeyId
+#
+# Docs: https://awscli.amazonaws.com/v2/documentation/api/latest/reference/kms/create-alias.html
+
+# Write your command:
+
+
+# Verification (run after completing above):
+echo "CMK Created: $KMS_KEY_ID"
+echo "Alias Created: ${aliasName}"`,
+          // Tier 3: Expert - Objective only
+          expertSkeleton: `# ══════════════════════════════════════════════════════════════
+# EXPERT MODE - AWS KMS Infrastructure
+# ══════════════════════════════════════════════════════════════
+#
+# OBJECTIVE: Prepare AWS KMS for MongoDB Client-Side Field Level Encryption
+#
+# Your solution must:
+#   1. Create a symmetric Customer Master Key (CMK) in AWS KMS
+#   2. Store its KeyId in variable: KMS_KEY_ID  
+#   3. Create an alias pointing to this key: ${aliasName}
+#
+# Reference: AWS KMS CLI documentation
+# Points available: 25 (if no hints used)
+#
+# ══════════════════════════════════════════════════════════════
+
+# YOUR SOLUTION:
+
+
+`
         }
       ],
       hints: [
@@ -155,6 +209,7 @@ cat <<EOF > policy.json
 EOF
 
 aws kms put-key-policy --key-id $KMS_KEY_ID --policy-name default --policy file://policy.json`,
+          // Tier 1: Guided
           skeleton: `# ══════════════════════════════════════════════════════════════
 # Apply a Key Policy to Allow Your IAM User
 # ══════════════════════════════════════════════════════════════
@@ -190,7 +245,63 @@ cat <<EOF > policy.json
 EOF
 
 # Apply the policy to your CMK
-aws kms ______________ --key-id $KMS_KEY_ID --policy-name default --policy file://policy.json`
+aws kms ______________ --key-id $KMS_KEY_ID --policy-name default --policy file://policy.json`,
+          // Tier 2: Challenge
+          challengeSkeleton: `# ══════════════════════════════════════════════════════════════
+# CHALLENGE MODE - Apply KMS Key Policy
+# ══════════════════════════════════════════════════════════════
+
+# TASK 1: Get your Key ID and IAM identity
+# ─────────────────────────────────────────
+# Requirements:
+#   • Look up the KeyId using your alias: ${aliasName}
+#   • Get your IAM ARN and Account ID
+#   • Store them in variables: KMS_KEY_ID, IAM_ARN, ACCOUNT_ID
+
+# Write your commands:
+
+
+# TASK 2: Create a Key Policy JSON file
+# ─────────────────────────────────────
+# Requirements:
+#   • Allow the account root full access
+#   • Allow YOUR IAM user full access
+#   • Save to a file called "policy.json"
+
+# Write your heredoc or echo command:
+
+
+# TASK 3: Apply the policy to your CMK
+# ────────────────────────────────────
+# Docs: https://awscli.amazonaws.com/v2/documentation/api/latest/reference/kms/put-key-policy.html
+
+# Write your command:
+
+`,
+          // Tier 3: Expert
+          expertSkeleton: `# ══════════════════════════════════════════════════════════════
+# EXPERT MODE - Secure Your KMS Key
+# ══════════════════════════════════════════════════════════════
+#
+# OBJECTIVE: Apply a resource-based policy to your KMS CMK
+#
+# Your solution must:
+#   1. Look up the KeyId using your alias: ${aliasName}
+#   2. Create a policy that allows your IAM identity to use the key
+#   3. Apply the policy to the CMK
+#
+# Important: The key policy must grant at least these permissions:
+#   - kms:Encrypt, kms:Decrypt, kms:GenerateDataKey
+#
+# Reference: AWS KMS Key Policies documentation
+# Points available: 25 (if no hints used)
+#
+# ══════════════════════════════════════════════════════════════
+
+# YOUR SOLUTION:
+
+
+`
         }
       ],
       hints: [
@@ -231,6 +342,7 @@ db.getCollection("__keyVault").createIndex(
   { keyAltNames: 1 },
   { unique: true, partialFilterExpression: { keyAltNames: { $exists: true } } }
 );`,
+          // Tier 1: Guided
           skeleton: `// ══════════════════════════════════════════════════════════════
 // Initialize Key Vault with Unique Index
 // ══════════════════════════════════════════════════════════════
@@ -253,7 +365,53 @@ db.getCollection("__keyVault").____________(
     unique: true, 
     partialFilterExpression: { keyAltNames: { $_______: true } } 
   }
-);`
+);`,
+          // Tier 2: Challenge
+          challengeSkeleton: `// ══════════════════════════════════════════════════════════════
+// CHALLENGE MODE - Initialize Key Vault Collection
+// ══════════════════════════════════════════════════════════════
+
+// TASK 1: Connect to MongoDB Atlas
+// ────────────────────────────────
+// Use mongosh to connect to your cluster
+mongosh "${mongoUri}"
+
+// TASK 2: Create the Key Vault Index
+// ──────────────────────────────────
+// Requirements:
+//   • Switch to the "encryption" database
+//   • Create a unique partial index on "__keyVault" collection
+//   • Index field: keyAltNames
+//   • Make it unique only when keyAltNames exists
+//
+// Docs: https://www.mongodb.com/docs/manual/core/index-partial/
+
+// Write your commands:
+
+
+`,
+          // Tier 3: Expert  
+          expertSkeleton: `// ══════════════════════════════════════════════════════════════
+// EXPERT MODE - Configure Key Vault Storage
+// ══════════════════════════════════════════════════════════════
+//
+// OBJECTIVE: Prepare MongoDB to store encrypted Data Encryption Keys
+//
+// Your solution must:
+//   1. Connect to the cluster using mongosh
+//   2. Create a key vault collection in the "encryption" database
+//   3. Add a unique partial index that prevents duplicate key names
+//
+// Hint: The collection name should be "__keyVault"
+// Reference: MongoDB Key Vault documentation
+// Points available: 25 (if no hints used)
+//
+// ══════════════════════════════════════════════════════════════
+
+// YOUR SOLUTION:
+
+
+`
         }
       ],
       hints: [
