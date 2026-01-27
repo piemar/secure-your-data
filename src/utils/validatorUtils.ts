@@ -1,7 +1,7 @@
 /**
  * Utility functions for validating MongoDB CSFLE and QE states.
- * Note: Actual TCP/TLS driver logic is complex in browser; we perform 
- * structural validation of URIs and simulate DB checks for this demo/enablement.
+ * These functions call real API endpoints in the Vite dev server 
+ * that execute mongosh and AWS CLI commands to validate user's environment.
  */
 
 export interface ValidationResult {
@@ -25,27 +25,28 @@ export const validatorUtils = {
     },
 
     /**
-     * Mimics a check for the existence of the Key Vault collection.
+     * Checks for the existence and configuration of the Key Vault collection.
+     * Uses the real /api/verify-index endpoint to check via mongosh.
      */
     checkKeyVault: async (uri: string, ns: string): Promise<ValidationResult> => {
-        // In a real production app, this would call an API backend.
-        // For this SA enablement, we simulate the network delay and return success.
-        await new Promise(r => setTimeout(r, 800));
-
-        if (uri.includes('invalid')) {
-            return { success: false, message: 'Could not connect to cluster. Check your IP whitelisting.' };
+        if (!uri || uri.trim() === '') {
+            return { success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' };
         }
 
-        return { success: true, message: `Successfully connected. Verified namespace: ${ns}` };
+        try {
+            const response = await fetch(`/api/verify-index?uri=${encodeURIComponent(uri)}`);
+            const data = await response.json();
+            return { success: data.success, message: data.message };
+        } catch (error) {
+            return { success: false, message: 'Connection to validation bridge failed. Ensure npm run dev is active.' };
+        }
     },
 
     /**
-     * Verifies a KMS Alias exists in the user's account via CLI bridge.
-     * Since we can't access AWS from the browser, this validates configuration.
+     * Verifies a KMS Alias exists in the user's AWS account.
+     * Uses the real /api/verify-kms endpoint to check via AWS CLI.
      */
-    checkKmsAlias: async (alias: string): Promise<ValidationResult> => {
-        await new Promise(r => setTimeout(r, 800));
-        
+    checkKmsAlias: async (alias: string, profile: string = 'default'): Promise<ValidationResult> => {
         if (!alias || alias.trim() === '') {
             return { success: false, message: 'KMS alias is required.' };
         }
@@ -53,38 +54,41 @@ export const validatorUtils = {
         if (!alias.startsWith('alias/')) {
             return { success: false, message: 'KMS alias must start with "alias/".' };
         }
-        
-        // Provide helpful guidance
-        return { 
-            success: true, 
-            message: `KMS alias format validated: ${alias}\n\nTo verify in AWS CLI:\naws kms describe-key --key-id ${alias}\n\nIf the command succeeds, your alias exists!` 
-        };
+
+        try {
+            const response = await fetch(`/api/verify-kms?alias=${encodeURIComponent(alias)}&profile=${encodeURIComponent(profile)}`);
+            const data = await response.json();
+            return { success: data.success, message: data.message };
+        } catch (error) {
+            return { success: false, message: 'Connection to validation bridge failed. Ensure npm run dev is active and AWS CLI is configured.' };
+        }
     },
 
     /**
      * Verifies that the KMS Key Policy allows the current user.
-     * Since we can't access AWS from the browser, this validates configuration.
+     * Uses the real /api/verify-policy endpoint to check via AWS CLI.
      */
-    checkKeyPolicy: async (alias: string): Promise<ValidationResult> => {
-        await new Promise(r => setTimeout(r, 800));
-        
+    checkKeyPolicy: async (alias: string, profile: string = 'default'): Promise<ValidationResult> => {
         if (!alias || alias.trim() === '') {
             return { success: false, message: 'KMS alias is required.' };
         }
-        
-        // Provide helpful guidance
-        return { 
-            success: true, 
-            message: `Key policy step validated.\n\nTo verify your policy:\naws kms get-key-policy --key-id ${alias} --policy-name default\n\nIf you see your IAM ARN in the policy, you're all set!` 
-        };
+
+        try {
+            const response = await fetch(`/api/verify-policy?alias=${encodeURIComponent(alias)}&profile=${encodeURIComponent(profile)}`);
+            const data = await response.json();
+            return { success: data.success, message: data.message };
+        } catch (error) {
+            return { success: false, message: 'Connection to validation bridge failed. Ensure npm run dev is active.' };
+        }
     },
 
     /**
      * Triggers the cleanup of AWS resources (Delete Alias + Schedule Key Deletion).
+     * Uses the real /api/cleanup-resources endpoint.
      */
-    cleanupAwsResources: async (alias: string): Promise<ValidationResult> => {
+    cleanupAwsResources: async (alias: string, profile: string = 'default'): Promise<ValidationResult> => {
         try {
-            const response = await fetch(`/api/cleanup-resources?alias=${alias}`);
+            const response = await fetch(`/api/cleanup-resources?alias=${encodeURIComponent(alias)}&profile=${encodeURIComponent(profile)}`);
             const data = await response.json();
             return { success: data.success, message: data.message };
         } catch (error) {
@@ -94,42 +98,45 @@ export const validatorUtils = {
 
     /**
      * Verifies that migration was successful - checks for encrypted data in secure collection.
+     * Uses the real /api/verify-migration endpoint to check via mongosh.
      */
     checkMigration: async (uri: string): Promise<ValidationResult> => {
-        await new Promise(r => setTimeout(r, 800));
-        
         if (!uri || uri.trim() === '') {
             return { success: false, message: 'MongoDB URI is required.' };
         }
-        
-        return { 
-            success: true, 
-            message: 'Migration verification passed. To verify manually, query your collection and check for Binary fields.' 
-        };
+
+        try {
+            const response = await fetch(`/api/verify-migration?uri=${encodeURIComponent(uri)}`);
+            const data = await response.json();
+            return { success: data.success, message: data.message };
+        } catch (error) {
+            return { success: false, message: 'Connection to validation bridge failed. Ensure npm run dev is active.' };
+        }
     },
 
     /**
      * Verifies that tenant DEKs exist for multi-tenant isolation.
+     * Uses the real /api/verify-tenant-deks endpoint to check via mongosh.
      */
     checkTenantDEKs: async (uri: string): Promise<ValidationResult> => {
-        await new Promise(r => setTimeout(r, 800));
-        
         if (!uri || uri.trim() === '') {
             return { success: false, message: 'MongoDB URI is required.' };
         }
-        
-        return { 
-            success: true, 
-            message: 'Tenant DEKs verification passed. To verify manually, check the key vault for tenant-specific keys.' 
-        };
+
+        try {
+            const response = await fetch(`/api/verify-tenant-deks?uri=${encodeURIComponent(uri)}`);
+            const data = await response.json();
+            return { success: data.success, message: data.message };
+        } catch (error) {
+            return { success: false, message: 'Connection to validation bridge failed. Ensure npm run dev is active.' };
+        }
     },
 
     /**
      * Verifies that a DEK exists and can be rotated (checks master key configuration).
+     * Uses the real /api/verify-key-rotation endpoint to check via mongosh.
      */
     checkKeyRotation: async (uri: string, keyAltName: string): Promise<ValidationResult> => {
-        await new Promise(r => setTimeout(r, 800));
-        
         if (!uri || uri.trim() === '') {
             return { success: false, message: 'MongoDB URI is required.' };
         }
@@ -137,100 +144,138 @@ export const validatorUtils = {
         if (!keyAltName || keyAltName.trim() === '') {
             return { success: false, message: 'Key Alt Name is required.' };
         }
-        
-        return { 
-            success: true, 
-            message: `Key rotation verification passed. Key: ${keyAltName}. To verify manually, check that the new CMK exists in AWS.` 
-        };
+
+        try {
+            const response = await fetch(`/api/verify-key-rotation?uri=${encodeURIComponent(uri)}&keyAltName=${encodeURIComponent(keyAltName)}`);
+            const data = await response.json();
+            return { success: data.success, message: data.message };
+        } catch (error) {
+            return { success: false, message: 'Connection to validation bridge failed. Ensure npm run dev is active.' };
+        }
     },
 
     /**
-     * Verifies that exactly one DEK exists in the key vault.
-     * Since we can't connect to MongoDB from the browser, this validates configuration.
+     * Verifies the expected DEK count in the key vault.
+     * Uses the real /api/verify-keyvault-count endpoint to check via mongosh.
      */
-    checkKeyVaultCount: async (expectedCount: number = 1): Promise<ValidationResult> => {
-        await new Promise(r => setTimeout(r, 800));
+    checkKeyVaultCount: async (expectedCount: number = 1, uri?: string): Promise<ValidationResult> => {
+        // Get URI from parameter or try localStorage
+        const mongoUri = uri || localStorage.getItem('lab_mongo_uri') || '';
         
-        // Provide helpful guidance
-        return { 
-            success: true, 
-            message: `Verification step validated. Expected ${expectedCount} DEK(s) in key vault.\n\nTo verify manually in mongosh:\ndb.getCollection("__keyVault").countDocuments()\n\nIf the count matches ${expectedCount}, you're good to go!` 
-        };
+        if (!mongoUri) {
+            return { success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' };
+        }
+
+        try {
+            const response = await fetch(`/api/verify-keyvault-count?uri=${encodeURIComponent(mongoUri)}&expectedCount=${expectedCount}`);
+            const data = await response.json();
+            return { success: data.success, message: data.message };
+        } catch (error) {
+            return { success: false, message: 'Connection to validation bridge failed. Ensure npm run dev is active.' };
+        }
     },
 
     /**
      * Verifies that both QE-specific DEKs exist in the key vault (qe-salary-dek and qe-taxid-dek).
+     * Uses the real /api/verify-qe-deks endpoint to check via mongosh.
      */
     checkQEDEKs: async (uri?: string): Promise<ValidationResult> => {
-        await new Promise(r => setTimeout(r, 800));
+        // Get URI from parameter or try localStorage
+        const mongoUri = uri || localStorage.getItem('lab_mongo_uri') || '';
         
-        return { 
-            success: true, 
-            message: 'QE DEKs verification passed. To verify manually, check the key vault for qe-salary-dek and qe-taxid-dek.' 
-        };
+        if (!mongoUri) {
+            return { success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' };
+        }
+
+        try {
+            const response = await fetch(`/api/verify-qe-deks?uri=${encodeURIComponent(mongoUri)}`);
+            const data = await response.json();
+            return { success: data.success, message: data.message };
+        } catch (error) {
+            return { success: false, message: 'Connection to validation bridge failed. Ensure npm run dev is active.' };
+        }
     },
 
     /**
      * Verifies that Queryable Encryption metadata collections (.esc and .ecoc) exist.
+     * Uses the real /api/verify-qe-metadata endpoint to check via mongosh.
      */
     checkQEMetadata: async (db: string, coll: string, uri?: string): Promise<ValidationResult> => {
-        await new Promise(r => setTimeout(r, 800));
-        
         if (!db || !coll) {
             return { success: false, message: 'Database and collection names are required.' };
         }
+
+        // Get URI from parameter or try localStorage
+        const mongoUri = uri || localStorage.getItem('lab_mongo_uri') || '';
         
-        return { 
-            success: true, 
-            message: `QE metadata verification passed. To verify manually, check for collections: enxcol_.${coll}.esc and enxcol_.${coll}.ecoc in database ${db}.` 
-        };
+        if (!mongoUri) {
+            return { success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' };
+        }
+
+        try {
+            const response = await fetch(`/api/verify-qe-metadata?uri=${encodeURIComponent(mongoUri)}&db=${encodeURIComponent(db)}&coll=${encodeURIComponent(coll)}`);
+            const data = await response.json();
+            return { success: data.success, message: data.message };
+        } catch (error) {
+            return { success: false, message: 'Connection to validation bridge failed. Ensure npm run dev is active.' };
+        }
     },
 
     /**
      * Verifies that a collection exists and has encryptedFields configuration.
+     * Uses the real /api/verify-qe-collection endpoint to check via mongosh.
      */
     checkQECollection: async (db: string, coll: string, uri?: string): Promise<ValidationResult> => {
-        await new Promise(r => setTimeout(r, 800));
-        
         if (!db || !coll) {
             return { success: false, message: 'Database and collection names are required.' };
         }
+
+        // Get URI from parameter or try localStorage
+        const mongoUri = uri || localStorage.getItem('lab_mongo_uri') || '';
         
-        return { 
-            success: true, 
-            message: `QE collection verification passed. To verify manually: db.${coll}.getCollectionInfos()` 
-        };
+        if (!mongoUri) {
+            return { success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' };
+        }
+
+        try {
+            const response = await fetch(`/api/verify-qe-collection?uri=${encodeURIComponent(mongoUri)}&db=${encodeURIComponent(db)}&coll=${encodeURIComponent(coll)}`);
+            const data = await response.json();
+            return { success: data.success, message: data.message };
+        } catch (error) {
+            return { success: false, message: 'Connection to validation bridge failed. Ensure npm run dev is active.' };
+        }
     },
 
     /**
      * Verifies that the collection has documents with encrypted fields for range query testing.
+     * Uses the real /api/verify-qe-range-query endpoint to check via mongosh.
      */
     checkQERangeQuery: async (db: string, coll: string, uri?: string): Promise<ValidationResult> => {
-        await new Promise(r => setTimeout(r, 800));
-        
         if (!db || !coll) {
             return { success: false, message: 'Database and collection names are required.' };
         }
+
+        // Get URI from parameter or try localStorage
+        const mongoUri = uri || localStorage.getItem('lab_mongo_uri') || '';
         
-        return { 
-            success: true, 
-            message: `QE range query verification passed. To verify manually, run range queries on encrypted fields.` 
-        };
+        if (!mongoUri) {
+            return { success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' };
+        }
+
+        try {
+            const response = await fetch(`/api/verify-qe-range-query?uri=${encodeURIComponent(mongoUri)}&db=${encodeURIComponent(db)}&coll=${encodeURIComponent(coll)}`);
+            const data = await response.json();
+            return { success: data.success, message: data.message };
+        } catch (error) {
+            return { success: false, message: 'Connection to validation bridge failed. Ensure npm run dev is active.' };
+        }
     },
 
     /**
-     * System check for installed CLI tools via Vite bridge.
-     */
-    /**
      * Verifies that a specific DEK exists in the key vault by keyAltName.
-     * Since we can't connect to MongoDB from the browser, this validates
-     * that the user has the necessary configuration and provides guidance.
+     * Uses the real /api/verify-datakey endpoint to check via mongosh.
      */
     checkDataKey: async (uri: string, keyAltName: string): Promise<ValidationResult> => {
-        // Simulate network delay
-        await new Promise(r => setTimeout(r, 800));
-        
-        // Validate inputs
         if (!uri || uri.trim() === '') {
             return { 
                 success: false, 
@@ -251,16 +296,19 @@ export const validatorUtils = {
                 message: 'Key Alt Name is required. Check your createKey.cjs script.' 
             };
         }
-        
-        // Provide helpful guidance - allow user to verify manually
-        return { 
-            success: true, 
-            message: `DEK verification passed. Key Alt Name: ${keyAltName}\n\nTo verify manually in mongosh:\ndb.getCollection("__keyVault").find({keyAltNames: "${keyAltName}"})\n\nIf you see a document with your key, the DEK was created successfully!` 
-        };
+
+        try {
+            const response = await fetch(`/api/verify-datakey?uri=${encodeURIComponent(uri)}&keyAltName=${encodeURIComponent(keyAltName)}`);
+            const data = await response.json();
+            return { success: data.success, message: data.message };
+        } catch (error) {
+            return { success: false, message: 'Connection to validation bridge failed. Ensure npm run dev is active.' };
+        }
     },
 
     /**
      * System check for installed CLI tools via Vite bridge.
+     * Uses the real /api/check-tool endpoint.
      */
     checkToolInstalled: async (toolName: string): Promise<ValidationResult> => {
         const toolLower = toolName.toLowerCase();
