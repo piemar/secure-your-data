@@ -736,7 +736,6 @@ main().catch(console.error);`,
       ]}
       steps={lab1Steps}
       introContent={introContent}
-      exercises={exercises}
       businessValue="Protect PII at the application layer before it reaches the database"
       atlasCapability="Client-Side Field Level Encryption"
     />

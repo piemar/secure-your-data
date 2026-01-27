@@ -685,7 +685,6 @@ For this lab demo, we use the same CMK to demonstrate the rewrap operation.`
       ]}
       steps={lab3Steps}
       introContent={introContent}
-      exercises={exercises}
       businessValue="Achieve GDPR compliance by deleting encryption keys instead of data"
       atlasCapability="Crypto-Shredding Pattern"
     />
