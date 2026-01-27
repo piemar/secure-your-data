@@ -53,11 +53,6 @@ export function Lab1CSFLE() {
         'ROOT OF TRUST: The CMK never leaves the KMS Hardware Security Module (HSM).',
         'SA TIP: Use aliases for keys to allow easier rotation without code changes.'
       ],
-      hints: [
-        'The aws kms create-key command creates a symmetric key by default',
-        'Store the KeyId using --query "KeyMetadata.KeyId" --output text',
-        'Use aws kms create-alias to link the alias to your key'
-      ],
       codeBlocks: [
         {
           filename: 'Terminal - AWS CLI',
@@ -70,9 +65,39 @@ aws kms create-alias --alias-name "${aliasName}" --target-key-id $KMS_KEY_ID
 
 echo "CMK Created: $KMS_KEY_ID"
 echo "Alias Created: ${aliasName}"`,
-          skeleton: `# Use 'aws kms create-key' to create a new Symmetric key
-# Use 'aws kms create-alias' to assign it a friendly name`
+          skeleton: `# ══════════════════════════════════════════════════════════════
+# STEP 1: Create a Customer Master Key (CMK)
+# ══════════════════════════════════════════════════════════════
+# The CMK is your "root of trust" - it wraps all your Data Encryption Keys.
+# It NEVER leaves AWS KMS (protected by hardware security modules).
+#
+# TASK: Complete the AWS KMS command below to create a new symmetric key.
+
+KMS_KEY_ID=$(aws kms _________ \\
+    --description "Lab 1 MongoDB Encryption Key" \\
+    --query 'KeyMetadata._______' \\
+    --output text)
+
+# ══════════════════════════════════════════════════════════════
+# STEP 2: Create a Human-Readable Alias
+# ══════════════════════════════════════════════════════════════
+# Aliases make keys easier to reference and enable key rotation without
+# changing your application code.
+#
+# TASK: Complete the AWS KMS command to link an alias to your key.
+
+aws kms _____________ \\
+    --alias-name "${aliasName}" \\
+    --target-key-id $KMS_KEY_ID
+
+echo "CMK Created: $KMS_KEY_ID"
+echo "Alias Created: ${aliasName}"`
         }
+      ],
+      hints: [
+        'Blank 1: The AWS KMS command to create a new key is "create-key" (no space). It creates a symmetric key by default.',
+        'Blank 2: The JMESPath query to extract just the KeyId is "KeyId" - this returns only the UUID.',
+        'Blank 3: The command to create an alias is "create-alias" (no space). It links a friendly name to your target key.'
       ],
       exercises: [
         {
@@ -130,9 +155,49 @@ cat <<EOF > policy.json
 EOF
 
 aws kms put-key-policy --key-id $KMS_KEY_ID --policy-name default --policy file://policy.json`,
-          skeleton: `# Define a JSON policy enabling your IAM Principal
-# Run 'aws kms put-key-policy'`
+          skeleton: `# ══════════════════════════════════════════════════════════════
+# Apply a Key Policy to Allow Your IAM User
+# ══════════════════════════════════════════════════════════════
+# Even if your IAM User has permissions, the Key itself must *trust* you.
+#
+# TASK: Fill in the AWS CLI commands to get your identity and apply the policy.
+
+# Get the Key ID from your alias
+KMS_KEY_ID=$(aws kms ____________ --key-id ${aliasName} --query 'KeyMetadata.KeyId' --output text)
+
+# Get your IAM ARN and Account ID
+IAM_ARN=$(aws sts ___________________ --query 'Arn' --output text)
+ACCOUNT_ID=$(aws sts get-caller-identity --query '________' --output text)
+
+# Create a policy allowing YOU full access
+cat <<EOF > policy.json
+{
+    "Version": "2012-10-17",
+    "Statement": [{
+        "Sid": "Enable IAM User Permissions",
+        "Effect": "Allow",
+        "Principal": {"AWS": "arn:aws:iam::\${ACCOUNT_ID}:root"},
+        "Action": "kms:*",
+        "Resource": "*"
+    }, {
+        "Sid": "Allow My User",
+        "Effect": "Allow",
+        "Principal": {"AWS": "$IAM_ARN"},
+        "Action": "kms:*",
+        "Resource": "*"
+    }]
+}
+EOF
+
+# Apply the policy to your CMK
+aws kms ______________ --key-id $KMS_KEY_ID --policy-name default --policy file://policy.json`
         }
+      ],
+      hints: [
+        'Blank 1: The command to get details about an existing key is "describe-key".',
+        'Blank 2: The STS command to get your identity is "get-caller-identity".',
+        'Blank 3: The query to extract your AWS Account ID is "Account".',
+        'Blank 4: The command to attach a policy to a KMS key is "put-key-policy".'
       ],
       onVerify: async () => validatorUtils.checkKeyPolicy(aliasName)
     },
@@ -152,11 +217,6 @@ aws kms put-key-policy --key-id $KMS_KEY_ID --policy-name default --policy file:
         'IMPORTANT: Run this command in your MONGODB SHELL (mongosh) connected to Atlas.',
         'Architecture: Usually stored in a database named "encryption" and collection "__keyVault".'
       ],
-      hints: [
-        'Use mongosh to connect, then "use encryption" to switch databases',
-        'The index needs to be on { keyAltNames: 1 } with unique: true',
-        'Add partialFilterExpression: { keyAltNames: { $exists: true } } so docs without keyAltNames are allowed'
-      ],
       codeBlocks: [
         {
           filename: 'mongosh (MongoDB Shell - NOT Node.js)',
@@ -171,13 +231,36 @@ db.getCollection("__keyVault").createIndex(
   { keyAltNames: 1 },
   { unique: true, partialFilterExpression: { keyAltNames: { $exists: true } } }
 );`,
-          skeleton: `// Run in mongosh (MongoDB Shell)
-use encryption
-db.getCollection("__keyVault").createIndex(
-  { keyAltNames: 1 },
-  { unique: true, /* partialFilterExpression */ }
+          skeleton: `// ══════════════════════════════════════════════════════════════
+// Initialize Key Vault with Unique Index
+// ══════════════════════════════════════════════════════════════
+// The Key Vault stores your encrypted DEKs. A unique partial index on
+// keyAltNames prevents duplicate key names.
+//
+// TASK: Connect to Atlas and create the required unique index.
+
+// 1. Connect to your Atlas Cluster:
+mongosh "${mongoUri}"
+
+// 2. Switch to the encryption database
+use _________
+
+// 3. Create the unique index on the __keyVault collection
+// TASK: Fill in the index key and the partialFilterExpression
+db.getCollection("__keyVault").____________(
+  { ___________: 1 },
+  { 
+    unique: true, 
+    partialFilterExpression: { keyAltNames: { $_______: true } } 
+  }
 );`
         }
+      ],
+      hints: [
+        'Blank 1: The database name for encryption operations is "encryption".',
+        'Blank 2: The method to create an index in MongoDB is "createIndex".',
+        'Blank 3: The field to index is "keyAltNames" - this stores the human-readable key names.',
+        'Blank 4: The operator to check if a field exists is "$exists".'
       ],
       onVerify: async () => validatorUtils.checkKeyVault(mongoUri, 'encryption.__keyVault')
     },
@@ -199,11 +282,6 @@ db.getCollection("__keyVault").createIndex(
         'NOT MONGOSH: This is NOT a mongosh command - it must run in your terminal with Node.js.',
         'DEPENDENCIES: Ensure you run npm install first (see step 1 below).',
         'MULTI-DEK: In production, create different keys for different sensitivity levels.'
-      ],
-      hints: [
-        'Use require("mongodb") and require("mongodb-client-encryption") for the MongoDB client encryption library',
-        'The createDataKey() method takes the provider name ("aws") and a masterKey object with your alias and region',
-        'Use keyAltNames to give your DEK a human-readable name for easier reference later'
       ],
       codeBlocks: [
         {
@@ -269,7 +347,51 @@ async function run() {
 }
 
 run().catch(console.dir);`,
-          skeleton: `// This is a Node.js script - create createKey.cjs in your project root`
+          skeleton: `// ══════════════════════════════════════════════════════════════
+// Generate Data Encryption Key (DEK) using Node.js
+// ══════════════════════════════════════════════════════════════
+// The DEK is what actually encrypts your data. The CMK "wraps" the DEK.
+//
+// Create a file called "createKey.cjs" and run with: node createKey.cjs
+
+const { MongoClient, ________________ } = require("mongodb");
+const { fromSSO } = require("@aws-sdk/credential-providers");
+
+const uri = "${mongoUri}";
+const keyVaultNamespace = "encryption.__keyVault";
+
+async function run() {
+  const credentials = await fromSSO()();
+
+  const kmsProviders = {
+    aws: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
+  };
+
+  const client = await MongoClient.connect(uri);
+  
+  // TASK: Initialize ClientEncryption with the correct options
+  const encryption = new ________________(client, {
+    keyVaultNamespace,
+    kmsProviders,
+  });
+
+  const keyAltName = "user-${suffix}-ssn-key";
+
+  // TASK: Create the Data Encryption Key using the correct method
+  const dekId = await encryption.________________("aws", {
+    masterKey: { key: "${aliasName}", region: "${awsRegion}" },
+    ___________: [keyAltName]  // Human-readable key name
+  });
+
+  console.log("✓ Created new DEK UUID:", dekId.toString());
+  await client.close();
+}
+
+run().catch(console.dir);`
         },
         {
           filename: '3. Terminal (NOT mongosh) - Run with Node.js',
@@ -281,6 +403,12 @@ node createKey.cjs
 # Created DEK UUID: 7274650f-1ea0-48e1-b47e-33d3bba95a21
 # (Your UUID will be different - save it for the next step!)`
         }
+      ],
+      hints: [
+        'Blank 1: Import "ClientEncryption" from the mongodb package.',
+        'Blank 2: The class to initialize for encryption operations is "ClientEncryption".',
+        'Blank 3: The method to create a new Data Encryption Key is "createDataKey".',
+        'Blank 4: The option to give your DEK a human-readable name is "keyAltNames".'
       ],
       onVerify: async () => validatorUtils.checkDataKey(mongoUri, `user-${suffix}-ssn-key`)
     },

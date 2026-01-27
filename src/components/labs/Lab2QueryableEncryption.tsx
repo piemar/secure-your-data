@@ -96,11 +96,54 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          skeleton: `// Create createQEDeks.cjs file
-// Use ClientEncryption to create two DEKs:
-// 1. One for salary field (keyAltName: "qe-salary-dek")
-// 2. One for taxId field (keyAltName: "qe-taxid-dek")
-// Save the UUIDs - you'll need them next!`
+          skeleton: `// ══════════════════════════════════════════════════════════════
+// Create DEKs for Queryable Encryption (QE)
+// ══════════════════════════════════════════════════════════════
+// QE requires a SEPARATE DEK for each encrypted field (unlike CSFLE).
+// You need one DEK for 'salary' and one for 'taxId'.
+
+const { MongoClient, ClientEncryption } = require("mongodb");
+const { fromSSO } = require("@aws-sdk/credential-providers");
+
+const uri = "${mongoUri}";
+const keyVaultNamespace = "encryption.__keyVault";
+
+async function run() {
+  const credentials = await fromSSO()();
+
+  const kmsProviders = {
+    aws: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
+  };
+
+  const client = await MongoClient.connect(uri);
+  const encryption = new ClientEncryption(client, {
+    keyVaultNamespace,
+    kmsProviders,
+  });
+
+  // TASK: Create DEK for salary field
+  // Fill in the method name and the keyAltNames array
+  const salaryDekId = await encryption.____________("aws", {
+    masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" },
+    ___________: ["qe-salary-dek"]
+  });
+  console.log("Salary DEK created:", salaryDekId.toString());
+
+  // TASK: Create DEK for taxId field (same pattern)
+  const taxDekId = await encryption.____________("aws", {
+    masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" },
+    keyAltNames: ["___________"]
+  });
+  console.log("TaxId DEK created:", taxDekId.toString());
+
+  await client.close();
+}
+
+run().catch(console.error);`
         },
         {
           filename: 'Terminal - Run the script',
@@ -113,6 +156,12 @@ node createQEDeks.cjs
 # TaxId Altname: qe-taxid-dek,  DEK UUID: a1b2c3d4-5e6f-7890-abcd-ef1234567890
 # (Your UUIDs will be different)`
         },
+      ],
+      hints: [
+        'Blank 1: The method to create a DEK is "createDataKey".',
+        'Blank 2: The property for human-readable names is "keyAltNames".',
+        'Blank 3: Same method "createDataKey" for the second DEK.',
+        'Blank 4: The keyAltName for taxId field should be "qe-taxid-dek".'
       ],
       onVerify: async () => validatorUtils.checkQEDEKs(mongoUri)
     },
@@ -187,10 +236,57 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          skeleton: `// Connect to MongoDB
-// Look up DEKs from key vault using keyAltNames
-// Define encryptedFields with the DEK UUIDs
-// Create collection with encryptedFields option`
+          skeleton: `// ══════════════════════════════════════════════════════════════
+// Create QE Collection with Encrypted Fields Configuration
+// ══════════════════════════════════════════════════════════════
+// This defines which fields to encrypt AND creates the collection.
+// MongoDB automatically creates .esc and .ecoc metadata collections.
+
+const { MongoClient } = require("mongodb");
+const uri = "${mongoUri}";
+
+async function run() {
+  const client = await MongoClient.connect(uri);
+  
+  // TASK: Look up DEKs by their keyAltNames from the key vault
+  const keyVaultDB = client.db("encryption");
+  const salaryKeyDoc = await keyVaultDB.collection("__keyVault").______({ 
+    keyAltNames: "qe-salary-dek" 
+  });
+  const taxKeyDoc = await keyVaultDB.collection("__keyVault").findOne({ 
+    keyAltNames: "____________" 
+  });
+
+  const salaryDekId = salaryKeyDoc._id;
+  const taxDekId = taxKeyDoc._id;
+
+  // TASK: Define the encryptedFields configuration
+  const encryptedFields = {
+    fields: [
+      {
+        path: "_______",        // Field name to encrypt
+        bsonType: "int",
+        keyId: salaryDekId,
+        queries: { queryType: "________" }  // Query type
+      },
+      {
+        path: "taxId",
+        bsonType: "string",
+        keyId: taxDekId,
+        queries: { queryType: "equality" }
+      }
+    ]
+  };
+
+  // TASK: Create the collection with encryptedFields option
+  const db = client.db("hr");
+  await db.________________("employees", { encryptedFields });
+  
+  console.log("Collection created with Queryable Encryption!");
+  await client.close();
+}
+
+run().catch(console.error);`
         },
         {
           filename: 'Terminal - Run the Node.js script',
@@ -256,6 +352,13 @@ db.getCollectionNames().filter(c => c.includes("enxcol"))
 # Expected Output:
 # [ 'enxcol_.employees.esc', 'enxcol_.employees.ecoc' ]`
         }
+      ],
+      hints: [
+        'Blank 1: The method to find one document is "findOne".',
+        'Blank 2: The keyAltName for taxId DEK is "qe-taxid-dek".',
+        'Blank 3: The field to encrypt for salary data is "salary".',
+        'Blank 4: For this lab we use "equality" query type.',
+        'Blank 5: The method to create a collection is "createCollection".'
       ],
       onVerify: async () => validatorUtils.checkQECollection('hr', 'employees', mongoUri)
     },

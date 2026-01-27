@@ -767,26 +767,43 @@ export function StepView({
                               <div className="flex items-center gap-2">
                                 <Lock className="w-4 h-4 text-amber-600" />
                                 <span className="text-sm font-medium text-amber-700 dark:text-amber-500">
-                                  Try to fill in the blanks before revealing the solution
+                                  Fill in the blanks (marked with _________) 
                                 </span>
+                                {/* Point Tracker */}
+                                {(pointsDeducted[blockKey] || 0) > 0 && (
+                                  <span className="flex items-center gap-1 text-xs bg-red-500/10 text-red-600 px-2 py-0.5 rounded">
+                                    -{pointsDeducted[blockKey]}pts used
+                                  </span>
+                                )}
                               </div>
                               <div className="flex items-center gap-2 flex-wrap">
-                                {blockHints.map((hint, hintIdx) => (
-                                  <Button
-                                    key={hintIdx}
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => revealHint(blockKey, hintIdx)}
-                                    disabled={revealedForBlock.includes(hintIdx) || (hintIdx > 0 && !revealedForBlock.includes(hintIdx - 1))}
-                                    className={cn(
-                                      "gap-1 h-7 text-xs",
-                                      revealedForBlock.includes(hintIdx) && "opacity-50"
-                                    )}
-                                  >
-                                    <Lightbulb className="w-3 h-3" />
-                                    Hint {hintIdx + 1} (-{hintIdx === 0 ? 1 : 2}pt)
-                                  </Button>
-                                ))}
+                                {blockHints.map((hint, hintIdx) => {
+                                  const isRevealed = revealedForBlock.includes(hintIdx);
+                                  const isLocked = hintIdx > 0 && !revealedForBlock.includes(hintIdx - 1);
+                                  const penalty = hintIdx === 0 ? 1 : 2;
+                                  
+                                  // Extract blank number from hint if it starts with "Blank N:"
+                                  const blankMatch = hint.match(/^Blank (\d+):/);
+                                  const blankNum = blankMatch ? blankMatch[1] : (hintIdx + 1).toString();
+                                  
+                                  return (
+                                    <Button
+                                      key={hintIdx}
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => revealHint(blockKey, hintIdx)}
+                                      disabled={isRevealed || isLocked}
+                                      className={cn(
+                                        "gap-1 h-7 text-xs",
+                                        isRevealed && "opacity-50 bg-primary/5 border-primary/30",
+                                        isLocked && "opacity-40 cursor-not-allowed"
+                                      )}
+                                    >
+                                      <Lightbulb className="w-3 h-3" />
+                                      Blank {blankNum} {!isRevealed && `(-${penalty}pt)`}
+                                    </Button>
+                                  );
+                                })}
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -809,10 +826,19 @@ export function StepView({
                                     animate={{ opacity: 1, y: 0 }}
                                     className="text-sm bg-background/80 p-3 rounded border border-border"
                                   >
-                                    <span className="text-primary mr-2">💡 Hint {hintIdx + 1}:</span>
+                                    <span className="text-primary mr-2">💡</span>
                                     {blockHints[hintIdx]}
                                   </motion.div>
                                 ))}
+                              </div>
+                            )}
+                            
+                            {/* Step Score Preview */}
+                            {(pointsDeducted[blockKey] || 0) > 0 && (
+                              <div className="mt-2 pt-2 border-t border-amber-500/20 flex items-center gap-2 text-xs text-muted-foreground">
+                                <span>Step score: </span>
+                                <span className="font-mono text-foreground">{Math.max(0, 10 - (pointsDeducted[blockKey] || 0))}</span>
+                                <span>/10 points</span>
                               </div>
                             )}
                           </div>
