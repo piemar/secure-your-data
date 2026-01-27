@@ -1,14 +1,28 @@
 import { useState, useEffect, useRef } from 'react';
-import { CheckCircle, Clock, RotateCcw, ChevronRight, Eye, EyeOff } from 'lucide-react';
+import { CheckCircle, Clock, RotateCcw, ChevronRight, Eye, EyeOff, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LabStep } from './LabStep';
 import { LabIntroTab } from './LabIntroTab';
+import { ExercisePanel, ExerciseType } from '@/components/workshop/ExercisePanel';
 import { useLab } from '@/context/LabContext';
 import { useRole } from '@/contexts/RoleContext';
 import { heartbeat } from '@/utils/leaderboardUtils';
 import { DifficultyLevel } from './DifficultyBadge';
+
+interface Exercise {
+  id: string;
+  type: ExerciseType;
+  title: string;
+  description?: string;
+  points?: number;
+  question?: string;
+  options?: Array<{ id: string; label: string; isCorrect: boolean }>;
+  codeTemplate?: string;
+  blanks?: Array<{ id: string; placeholder: string; correctAnswer: string; hint?: string }>;
+  challengeSteps?: Array<{ instruction: string; hint?: string }>;
+}
 
 interface Step {
   id: string;
@@ -37,6 +51,8 @@ interface LabIntroContent {
   keyConcepts: Array<{ term: string; explanation: string }>;
   keyInsight: string;
   architectureDiagram?: React.ReactNode;
+  showEncryptionFlow?: boolean;
+  encryptionFlowType?: 'csfle' | 'qe';
 }
 
 interface LabViewWithTabsProps {
@@ -48,6 +64,7 @@ interface LabViewWithTabsProps {
   objectives: string[];
   steps: Step[];
   introContent: LabIntroContent;
+  exercises?: Exercise[];
 }
 
 export function LabViewWithTabs({
@@ -59,6 +76,7 @@ export function LabViewWithTabs({
   objectives,
   steps,
   introContent,
+  exercises = [],
 }: LabViewWithTabsProps) {
   const { startLab, completeLab, userEmail } = useLab();
   const { isModerator } = useRole();
@@ -152,6 +170,12 @@ export function LabViewWithTabs({
                   </span>
                 )}
               </TabsTrigger>
+              {exercises.length > 0 && (
+                <TabsTrigger value="exercises" className="gap-2">
+                  <Trophy className="w-4 h-4" />
+                  Exercises
+                </TabsTrigger>
+              )}
             </TabsList>
             
             {activeTab === 'steps' && (
@@ -183,6 +207,8 @@ export function LabViewWithTabs({
             keyConcepts={introContent.keyConcepts}
             keyInsight={introContent.keyInsight}
             architectureDiagram={introContent.architectureDiagram}
+            showEncryptionFlow={introContent.showEncryptionFlow}
+            encryptionFlowType={introContent.encryptionFlowType}
             onStartLab={handleStartLab}
           />
         </TabsContent>
@@ -295,6 +321,43 @@ export function LabViewWithTabs({
             )}
           </div>
         </TabsContent>
+
+        {/* Exercises Tab */}
+        {exercises.length > 0 && (
+          <TabsContent value="exercises" className="mt-0">
+            <div className="max-w-4xl mx-auto p-8">
+              <div className="mb-8">
+                <div className="flex items-center gap-2 text-primary text-sm font-mono mb-2">
+                  <span>LAB {labNumber}</span>
+                  <ChevronRight className="w-4 h-4" />
+                  <span>Exercises</span>
+                </div>
+                <h1 className="text-3xl font-bold text-gradient-green mb-2">Knowledge Check</h1>
+                <p className="text-muted-foreground">
+                  Test your understanding and earn points for the leaderboard
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                {exercises.map((exercise) => (
+                  <ExercisePanel
+                    key={exercise.id}
+                    id={exercise.id}
+                    type={exercise.type}
+                    title={exercise.title}
+                    description={exercise.description}
+                    points={exercise.points}
+                    question={exercise.question}
+                    options={exercise.options}
+                    codeTemplate={exercise.codeTemplate}
+                    blanks={exercise.blanks}
+                    challengeSteps={exercise.challengeSteps}
+                  />
+                ))}
+              </div>
+            </div>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { NewPresentationView } from '@/components/presentation/NewPresentationView';
 import { Lab1CSFLE } from '@/components/labs/Lab1CSFLE';
@@ -5,14 +6,14 @@ import { Lab2QueryableEncryption } from '@/components/labs/Lab2QueryableEncrypti
 import { Lab3RightToErasure } from '@/components/labs/Lab3RightToErasure';
 import { LabSetupWizard } from '@/components/labs/LabSetupWizard';
 import { Leaderboard } from '@/components/labs/Leaderboard';
-import { RoleSelection } from '@/components/RoleSelection';
+import { AttendeeRegistration } from '@/components/AttendeeRegistration';
+import { PresenterLogin } from '@/components/PresenterLogin';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { useRole } from '@/contexts/RoleContext';
 import { useLab } from '@/context/LabContext';
 import { Lock } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 function ContentRouter() {
@@ -38,78 +39,117 @@ function ContentRouter() {
     case 'setup':
       return <LabSetupWizard />;
     case 'leaderboard':
-      // Only moderators see leaderboard
-      if (!isModerator) {
-        return <LabSetupWizard />;
-      }
+      // Leaderboard is now open to everyone
       return <Leaderboard />;
     case 'lab1':
       return <Lab1CSFLE />;
     case 'lab2':
       if (!isLabAccessible(2)) {
         return (
-          <MainLayout>
-            <div className="flex items-center justify-center h-full p-8">
-              <Alert className="max-w-2xl">
-                <Lock className="h-4 w-4" />
-                <AlertTitle>Lab 2 Locked</AlertTitle>
-                <AlertDescription className="mt-2">
-                  You must complete Lab 1 before accessing Lab 2. Please finish all steps in Lab 1: CSFLE Fundamentals first.
-                  {isLabCompleted(1) ? (
-                    <p className="mt-2 text-sm text-muted-foreground">Note: Make sure you've verified all steps in Lab 1.</p>
-                  ) : (
-                    <Button className="mt-4" onClick={() => window.location.hash = '#lab1'}>
-                      Go to Lab 1
-                    </Button>
-                  )}
-                </AlertDescription>
-              </Alert>
-            </div>
-          </MainLayout>
+          <div className="flex items-center justify-center h-full p-8">
+            <Alert className="max-w-2xl">
+              <Lock className="h-4 w-4" />
+              <AlertTitle>Lab 2 Locked</AlertTitle>
+              <AlertDescription className="mt-2">
+                You must complete Lab 1 before accessing Lab 2. Please finish all steps in Lab 1: CSFLE Fundamentals first.
+                {isLabCompleted(1) ? (
+                  <p className="mt-2 text-sm text-muted-foreground">Note: Make sure you've verified all steps in Lab 1.</p>
+                ) : (
+                  <Button className="mt-4" onClick={() => setSection('lab1')}>
+                    Go to Lab 1
+                  </Button>
+                )}
+              </AlertDescription>
+            </Alert>
+          </div>
         );
       }
       return <Lab2QueryableEncryption />;
     case 'lab3':
       if (!isLabAccessible(3)) {
         return (
-          <MainLayout>
-            <div className="flex items-center justify-center h-full p-8">
-              <Alert className="max-w-2xl">
-                <Lock className="h-4 w-4" />
-                <AlertTitle>Lab 3 Locked</AlertTitle>
-                <AlertDescription className="mt-2">
-                  You must complete Lab 1 before accessing Lab 3. Please finish all steps in Lab 1: CSFLE Fundamentals first.
-                  {isLabCompleted(1) ? (
-                    <p className="mt-2 text-sm text-muted-foreground">Note: Make sure you've verified all steps in Lab 1.</p>
-                  ) : (
-                    <Button className="mt-4" onClick={() => window.location.hash = '#lab1'}>
-                      Go to Lab 1
-                    </Button>
-                  )}
-                </AlertDescription>
-              </Alert>
-            </div>
-          </MainLayout>
+          <div className="flex items-center justify-center h-full p-8">
+            <Alert className="max-w-2xl">
+              <Lock className="h-4 w-4" />
+              <AlertTitle>Lab 3 Locked</AlertTitle>
+              <AlertDescription className="mt-2">
+                You must complete Lab 1 before accessing Lab 3. Please finish all steps in Lab 1: CSFLE Fundamentals first.
+                {isLabCompleted(1) ? (
+                  <p className="mt-2 text-sm text-muted-foreground">Note: Make sure you've verified all steps in Lab 1.</p>
+                ) : (
+                  <Button className="mt-4" onClick={() => setSection('lab1')}>
+                    Go to Lab 1
+                  </Button>
+                )}
+              </AlertDescription>
+            </Alert>
+          </div>
         );
       }
       return <Lab3RightToErasure />;
     default:
-      // Default to setup for attendees, presentation for moderators
-      if (!isModerator) {
-        return <LabSetupWizard />;
-      }
-      return <NewPresentationView />;
+      // Default to setup for everyone
+      return <LabSetupWizard />;
   }
 }
 
 const Index = () => {
-  const { role } = useRole();
+  const { role, setRole } = useRole();
+  const { userEmail } = useLab();
+  const [showPresenterLogin, setShowPresenterLogin] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(false);
 
-  // Show role selection if no role is selected
-  if (!role) {
-    return <RoleSelection />;
+  // Check if user is already registered
+  useEffect(() => {
+    const savedName = localStorage.getItem('workshop_attendee_name');
+    const showPresenter = localStorage.getItem('show_presenter_login');
+    
+    if (showPresenter) {
+      setShowPresenterLogin(true);
+    } else if (savedName && userEmail) {
+      setIsRegistered(true);
+      // Auto-set attendee role if not already set
+      if (!role) {
+        setRole('attendee');
+      }
+    }
+  }, [userEmail, role, setRole]);
+
+  // Show presenter login if requested
+  if (showPresenterLogin && !role) {
+    return (
+      <PresenterLogin
+        onBack={() => {
+          setShowPresenterLogin(false);
+          localStorage.removeItem('show_presenter_login');
+        }}
+        onSuccess={() => setShowPresenterLogin(false)}
+      />
+    );
   }
 
+  // If moderator is logged in, show full app
+  if (role === 'moderator') {
+    return (
+      <MainLayout>
+        <ContentRouter />
+      </MainLayout>
+    );
+  }
+
+  // Show registration if not registered
+  if (!isRegistered && !role) {
+    return (
+      <AttendeeRegistration 
+        onComplete={() => {
+          setIsRegistered(true);
+          setRole('attendee');
+        }} 
+      />
+    );
+  }
+
+  // Normal attendee flow
   return (
     <MainLayout>
       <ContentRouter />
