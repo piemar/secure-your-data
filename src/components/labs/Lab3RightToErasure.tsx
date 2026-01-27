@@ -20,7 +20,7 @@ export function Lab3RightToErasure() {
     doThisSection?: string[];
     hints?: string[];
     tips?: string[];
-    codeBlocks?: Array<{ filename: string; language: string; code: string; skeleton?: string; challengeSkeleton?: string; expertSkeleton?: string }>;
+    codeBlocks?: Array<{ filename: string; language: string; code: string; skeleton?: string; challengeSkeleton?: string; expertSkeleton?: string; inlineHints?: Array<{ line: number; blankText: string; hint: string; answer: string }> }>;
     troubleshooting?: string[];
     onVerify?: () => Promise<{ success: boolean; message: string }>;
     exercises?: Array<{
