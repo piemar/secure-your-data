@@ -1,241 +1,279 @@
 
 
-# Graduated Difficulty Challenge Mode
+# Inline Hint System with Cleaner UI
 
-## Problem Restatement
+## Problem Analysis
 
-The current skeleton approach shows ~90% of the code structure with only small blanks to fill in. While better than full copy-paste, users are essentially doing pattern matching rather than understanding:
-- They see `aws kms _________` and just need to guess `create-key`
-- The entire command structure is visible, reducing cognitive load too much
+The current hint system has these issues:
 
-## Proposed Solution: Three-Tier Skeleton System
+1. **Disconnected hints**: Hint buttons are at the bottom of the code block, separated from the blanks they explain
+2. **Crowded UI**: Difficulty selector, hint buttons, point tracker, and instructions all compete for space
+3. **No line-level context**: Users can't see which hint corresponds to which line/blank in the code
+4. **Overwhelming for beginners**: Too many options visible at once
 
-Instead of one skeleton per code block, implement **three difficulty levels** that users can choose:
+## Proposed Solution: Line-Level Inline Hints
 
-### Tier 1: Guided Mode (Current - For Beginners)
-Shows structure with blanks:
-```bash
-KMS_KEY_ID=$(aws kms _________ \
-    --description "Lab 1 MongoDB Encryption Key" \
-    --query 'KeyMetadata._______' \
-    --output text)
+Transform hints from bottom-of-block buttons to inline indicators next to specific lines in the code editor.
+
+### Visual Design
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│ Terminal - AWS CLI                  ⏱️ 10 min  │ 8/10 pts │ Copy │
+├─────────────────────────────────────────────────────────────────┤
+│ 1  # STEP 1: Create a Customer Master Key                      │
+│ 2  KMS_KEY_ID=$(aws kms _________ \                       [?]  │
+│ 3      --description "Lab 1 MongoDB Encryption Key" \          │
+│ 4      --query 'KeyMetadata._______' \                    [?]  │
+│ 5      --output text)                                          │
+│ 6                                                               │
+│ 7  # STEP 2: Create a Human-Readable Alias                     │
+│ 8  aws kms _____________ \                                [?]  │
+│ 9      --alias-name "alias/mongodb-lab-key-xyz" \              │
+│10      --target-key-id $KMS_KEY_ID                             │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓ Click [?] ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ 💡 Line 2: aws kms _________                           [-1pt]  │
+├─────────────────────────────────────────────────────────────────┤
+│ [Show Hint]     [Show Answer: create-key]                       │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Tier 2: Challenge Mode (New - For Intermediate)
-Shows only high-level tasks with minimal code:
-```bash
-# TASK 1: Create a Customer Master Key (CMK)
-# Requirements:
-#   - Use AWS KMS CLI
-#   - Capture the KeyId in a variable called KMS_KEY_ID
-#   - Add a description "Lab 1 MongoDB Encryption Key"
+### How It Works
 
-# YOUR CODE HERE:
-
-
-# TASK 2: Create an alias for your key
-# Requirements:
-#   - Alias name should be: ${aliasName}
-#   - Link it to the CMK you just created
-
-# YOUR CODE HERE:
-
-```
-
-### Tier 3: Expert Mode (New - For Advanced)
-Shows only the objective:
-```bash
-# OBJECTIVE: Set up AWS KMS infrastructure for MongoDB encryption
-#
-# You need to:
-# 1. Create a Customer Master Key in AWS KMS
-# 2. Create a human-readable alias for the key
-#
-# Expected variables after completion:
-#   - KMS_KEY_ID should contain your key UUID
-#
-# Hints available if needed (costs points)
-
-# YOUR SOLUTION:
-
-```
+1. **Blank Detection**: Parse the skeleton code to find lines containing `_________`
+2. **Hint Markers**: Display a subtle `[?]` icon in the right margin next to each blank line
+3. **Click to Reveal**: Clicking `[?]` opens a popover with two options:
+   - **Show Hint** (-1pt): Explains what goes in the blank conceptually
+   - **Show Answer** (-2pt): Reveals the exact text to fill in
+4. **Visual Feedback**: Revealed answers highlight the line in green
 
 ---
 
 ## Implementation Plan
 
-### Phase 1: Add Difficulty Selector to Code Blocks
+### Phase 1: Create Inline Hint Data Structure
 
-**File**: `src/components/labs/StepView.tsx`
+Update the skeleton/hint system to use line-based hints:
 
-Add a difficulty toggle above each code block:
-
-```tsx
-type SkeletonTier = 'guided' | 'challenge' | 'expert';
-
-const [skeletonTier, setSkeletonTier] = useState<Record<string, SkeletonTier>>({});
-
-// In the editor header, add:
-<div className="flex gap-1 bg-muted rounded p-0.5">
-  <button 
-    onClick={() => setTier(blockKey, 'guided')}
-    className={tier === 'guided' ? 'bg-primary' : ''}
-  >
-    Guided
-  </button>
-  <button 
-    onClick={() => setTier(blockKey, 'challenge')}
-    className={tier === 'challenge' ? 'bg-primary' : ''}
-  >
-    Challenge
-  </button>
-  <button 
-    onClick={() => setTier(blockKey, 'expert')}
-    className={tier === 'expert' ? 'bg-primary' : ''}
-  >
-    Expert
-  </button>
-</div>
-```
-
-### Phase 2: Update Code Block Interface
-
-**Files**: `StepView.tsx`, `Lab1CSFLE.tsx`, `Lab2QueryableEncryption.tsx`, `Lab3RightToErasure.tsx`
-
-Extend the CodeBlock interface:
 ```typescript
+interface InlineHint {
+  line: number;           // Line number in the skeleton (1-indexed)
+  blankText: string;      // The blank pattern (e.g., "_________")
+  hint: string;           // Conceptual explanation
+  answer: string;         // Exact text to fill in
+}
+
 interface CodeBlock {
   filename: string;
   language: string;
-  code: string;                    // Full solution
-  skeleton?: string;               // Tier 1: Guided (blanks)
-  challengeSkeleton?: string;      // Tier 2: Challenge (tasks only)
-  expertSkeleton?: string;         // Tier 3: Expert (objective only)
+  code: string;
+  skeleton?: string;
+  inlineHints?: InlineHint[];  // NEW: Line-specific hints
 }
 ```
 
-### Phase 3: Tiered Points System
+Example for Lab 1 Step 1:
+```typescript
+inlineHints: [
+  {
+    line: 2,
+    blankText: '_________',
+    hint: 'The AWS KMS command to create a new symmetric key',
+    answer: 'create-key'
+  },
+  {
+    line: 4,
+    blankText: '_______',
+    hint: 'JMESPath query to extract the key identifier',
+    answer: 'KeyId'
+  },
+  {
+    line: 8,
+    blankText: '_____________',
+    hint: 'The AWS KMS command to assign a friendly name',
+    answer: 'create-alias'
+  }
+]
+```
 
-| Difficulty | Completing without hints | Per hint penalty | Solution penalty |
-|------------|-------------------------|------------------|------------------|
-| Guided     | 10 points               | -1 to -2 pts     | -5 pts           |
-| Challenge  | 15 points               | -2 to -3 pts     | -8 pts           |
-| Expert     | 25 points               | -3 to -5 pts     | -15 pts          |
+### Phase 2: Create InlineHintMarker Component
 
-### Phase 4: Define Three Skeletons Per Step
+New component that renders hint indicators in the editor margin:
 
-**Example for Lab 1 Step 1:**
+```tsx
+// src/components/labs/InlineHintMarker.tsx
 
-```javascript
+interface InlineHintMarkerProps {
+  hint: InlineHint;
+  isRevealed: boolean;
+  answerRevealed: boolean;
+  onRevealHint: () => void;
+  onRevealAnswer: () => void;
+  tier: SkeletonTier;
+}
+
+function InlineHintMarker({ 
+  hint, 
+  isRevealed, 
+  answerRevealed,
+  onRevealHint,
+  onRevealAnswer,
+  tier 
+}: InlineHintMarkerProps) {
+  const hintPenalty = tier === 'expert' ? 3 : tier === 'challenge' ? 2 : 1;
+  const answerPenalty = tier === 'expert' ? 5 : tier === 'challenge' ? 3 : 2;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className={cn(
+          "w-5 h-5 rounded-full flex items-center justify-center text-xs",
+          answerRevealed 
+            ? "bg-green-500/20 text-green-500" 
+            : isRevealed 
+            ? "bg-amber-500/20 text-amber-500"
+            : "bg-muted hover:bg-primary/20 text-muted-foreground"
+        )}>
+          {answerRevealed ? '✓' : isRevealed ? '!' : '?'}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Lightbulb className="w-4 h-4 text-amber-500" />
+            Line {hint.line}: <code className="bg-muted px-1">{hint.blankText}</code>
+          </div>
+          
+          {isRevealed && (
+            <div className="p-2 bg-amber-500/10 rounded text-sm">
+              💡 {hint.hint}
+            </div>
+          )}
+          
+          {answerRevealed && (
+            <div className="p-2 bg-green-500/10 rounded text-sm font-mono">
+              ✓ Answer: <strong>{hint.answer}</strong>
+            </div>
+          )}
+          
+          <div className="flex gap-2">
+            {!isRevealed && !answerRevealed && (
+              <Button size="sm" variant="outline" onClick={onRevealHint}>
+                <Lightbulb className="w-3 h-3 mr-1" />
+                Show Hint (-{hintPenalty}pt)
+              </Button>
+            )}
+            {!answerRevealed && (
+              <Button size="sm" variant="secondary" onClick={onRevealAnswer}>
+                <Eye className="w-3 h-3 mr-1" />
+                Show Answer (-{answerPenalty}pt)
+              </Button>
+            )}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+```
+
+### Phase 3: Custom Monaco Editor Overlay
+
+Add a right-margin overlay to Monaco Editor that displays hint markers:
+
+```tsx
+// In StepView.tsx, alongside the Monaco Editor
+
+<div className="relative">
+  <Editor
+    height="100%"
+    value={displayCode}
+    // ... options
+  />
+  
+  {/* Hint Markers Overlay - Right Margin */}
+  {hasSkeleton && !isSolutionRevealed && block.inlineHints && (
+    <div className="absolute top-0 right-8 pt-3 space-y-0">
+      {block.inlineHints.map((hint, idx) => (
+        <div 
+          key={idx}
+          style={{ 
+            position: 'absolute',
+            top: `${(hint.line - 1) * 20 + 12}px` // Line height ~20px
+          }}
+        >
+          <InlineHintMarker
+            hint={hint}
+            isRevealed={revealedHints[blockKey]?.includes(idx)}
+            answerRevealed={revealedAnswers[blockKey]?.includes(idx)}
+            onRevealHint={() => revealHint(blockKey, idx, tier)}
+            onRevealAnswer={() => revealAnswer(blockKey, idx, tier)}
+            tier={tier}
+          />
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+```
+
+### Phase 4: Simplify the Bottom Controls
+
+Remove cluttered buttons from bottom panel, keep only essentials:
+
+**Current (crowded):**
+```text
+┌──────────────────────────────────────────────────────────────────┐
+│ Difficulty: [Guided] [Challenge] [Expert]   -2pts used           │
+├──────────────────────────────────────────────────────────────────┤
+│ 🔒 Fill in the blanks                                            │
+│ [Blank 1 (-1pt)] [Blank 2 (-2pt)] [Blank 3 (-2pt)] [Solution -5] │
+│ 💡 Hint text displayed here...                                   │
+│ Step score: 8/10 points                                          │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**New (clean):**
+```text
+┌──────────────────────────────────────────────────────────────────┐
+│ 📊 Score: 8/10 pts  │  Guided Mode  │  [Show Full Solution (-5)] │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+- Move difficulty selector to header (next to filename)
+- Hint buttons removed (now inline with code)
+- Only show full solution button and score in footer
+
+### Phase 5: Update Lab Data with InlineHints
+
+Add `inlineHints` to all lab steps. Example for Lab 1 Step 1:
+
+```typescript
 {
-  code: `# Full solution
-KMS_KEY_ID=$(aws kms create-key --description "Lab 1 MongoDB Encryption Key" --query 'KeyMetadata.KeyId' --output text)
+  filename: 'Terminal - AWS CLI',
+  language: 'bash',
+  code: `KMS_KEY_ID=$(aws kms create-key --description "Lab 1 MongoDB Encryption Key" --query 'KeyMetadata.KeyId' --output text)
 aws kms create-alias --alias-name "${aliasName}" --target-key-id $KMS_KEY_ID`,
-
-  // Tier 1: Guided - Shows structure, hide commands
-  skeleton: `# ══════════════════════════════════════════════════════════════
-# STEP 1: Create a Customer Master Key (CMK)
-# ══════════════════════════════════════════════════════════════
+  
+  skeleton: `# STEP 1: Create a Customer Master Key (CMK)
 KMS_KEY_ID=$(aws kms _________ \\
     --description "Lab 1 MongoDB Encryption Key" \\
     --query 'KeyMetadata._______' \\
     --output text)
 
-# ══════════════════════════════════════════════════════════════
-# STEP 2: Create a Human-Readable Alias
-# ══════════════════════════════════════════════════════════════
+# STEP 2: Create a Human-Readable Alias  
 aws kms _____________ \\
     --alias-name "${aliasName}" \\
     --target-key-id $KMS_KEY_ID`,
-
-  // Tier 2: Challenge - Task-based, minimal scaffolding
-  challengeSkeleton: `# ══════════════════════════════════════════════════════════════
-# CHALLENGE MODE - MongoDB Encryption Setup
-# ══════════════════════════════════════════════════════════════
-
-# TASK 1: Create a Customer Master Key (CMK)
-# ──────────────────────────────────────────
-# Requirements:
-#   • Use the AWS KMS CLI (aws kms <command>)
-#   • Store the KeyId in a variable called KMS_KEY_ID
-#   • Add description: "Lab 1 MongoDB Encryption Key"
-#   • Use --query to extract only the KeyId
-#
-# Documentation: https://awscli.amazonaws.com/v2/documentation/api/latest/reference/kms/create-key.html
-
-# Write your command:
-
-
-# TASK 2: Create an Alias for Easy Reference
-# ──────────────────────────────────────────
-# Requirements:
-#   • Create alias named: ${aliasName}
-#   • Link it to your CMK using its KeyId
-#
-# Documentation: https://awscli.amazonaws.com/v2/documentation/api/latest/reference/kms/create-alias.html
-
-# Write your command:
-
-
-# Verification (run after completing above):
-echo "CMK Created: $KMS_KEY_ID"
-echo "Alias: ${aliasName}"`,
-
-  // Tier 3: Expert - Objective only
-  expertSkeleton: `# ══════════════════════════════════════════════════════════════
-# EXPERT MODE - AWS KMS Infrastructure
-# ══════════════════════════════════════════════════════════════
-#
-# OBJECTIVE: Prepare AWS KMS for MongoDB Client-Side Field Level Encryption
-#
-# Your solution must:
-#   1. Create a symmetric Customer Master Key (CMK) in AWS KMS
-#   2. Store its KeyId in variable: KMS_KEY_ID
-#   3. Create an alias pointing to this key: ${aliasName}
-#
-# Reference: AWS KMS CLI documentation
-# Points available: 25 (if no hints used)
-#
-# ══════════════════════════════════════════════════════════════
-
-# YOUR SOLUTION:
-
-
-`
+  
+  inlineHints: [
+    { line: 2, blankText: '_________', hint: 'AWS KMS command to create a new symmetric key', answer: 'create-key' },
+    { line: 4, blankText: '_______', hint: 'JMESPath path to extract the key identifier', answer: 'KeyId' },
+    { line: 8, blankText: '_____________', hint: 'AWS KMS command to assign a friendly name to a key', answer: 'create-alias' }
+  ]
 }
-```
-
----
-
-## Visual Mockup
-
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│ Terminal - AWS CLI                                       │ Copy │
-├─────────────────────────────────────────────────────────────────┤
-│ Difficulty: [Guided] [Challenge ✓] [Expert]     Max: 15pts     │
-├─────────────────────────────────────────────────────────────────┤
-│ # ══════════════════════════════════════════════════════        │
-│ # CHALLENGE MODE - MongoDB Encryption Setup                     │
-│ # ══════════════════════════════════════════════════════        │
-│                                                                 │
-│ # TASK 1: Create a Customer Master Key (CMK)                   │
-│ # ──────────────────────────────────────────                   │
-│ # Requirements:                                                 │
-│ #   • Use the AWS KMS CLI (aws kms <command>)                  │
-│ #   • Store the KeyId in a variable called KMS_KEY_ID          │
-│ #   • Add description: "Lab 1 MongoDB Encryption Key"          │
-│ #                                                               │
-│ # Write your command:                                           │
-│                                                                 │
-│ █                                                               │
-│                                                                 │
-├─────────────────────────────────────────────────────────────────┤
-│ 🔒 Challenge Mode                        Current: 0pts / 15pts  │
-│                                                                 │
-│ [Hint: KMS commands (-2pt)]  [Hint: Query syntax (-3pt)]       │
-│ [Show Full Solution (-8pts)]                                   │
-└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -244,86 +282,53 @@ echo "Alias: ${aliasName}"`,
 
 | File | Changes |
 |------|---------|
-| `src/components/labs/StepView.tsx` | Add difficulty selector, tier-based code display, update point calculations |
-| `src/components/labs/Lab1CSFLE.tsx` | Add `challengeSkeleton` and `expertSkeleton` to all steps |
-| `src/components/labs/Lab2QueryableEncryption.tsx` | Add `challengeSkeleton` and `expertSkeleton` to all steps |
-| `src/components/labs/Lab3RightToErasure.tsx` | Add `challengeSkeleton` and `expertSkeleton` to all steps |
-| `src/utils/leaderboardUtils.ts` | Track difficulty tier chosen per step |
+| `src/components/labs/StepView.tsx` | Add InlineHintMarker, simplify bottom controls, add right-margin overlay |
+| `src/components/labs/Lab1CSFLE.tsx` | Add `inlineHints` to all code blocks |
+| `src/components/labs/Lab2QueryableEncryption.tsx` | Add `inlineHints` to all code blocks |
+| `src/components/labs/Lab3RightToErasure.tsx` | Add `inlineHints` to all code blocks |
 
 ---
 
-## User Experience Flow
+## UX Benefits
 
-1. User enters a step and sees **difficulty selector** (defaults to "Guided")
-2. Advanced users can switch to "Challenge" or "Expert" for more points
-3. In Challenge/Expert mode:
-   - Less scaffolding means more thinking required
-   - Documentation links provided for self-research
-   - Higher point rewards for completion without hints
-4. Hints are tiered: more expensive in harder modes
-5. "Show Solution" penalty scales with difficulty
-6. Leaderboard shows both **total points** and **difficulty breakdown**
+| Before | After |
+|--------|-------|
+| Hints at bottom, disconnected from code | Hints inline next to each blank |
+| 5-6 buttons in control bar | 1 button (full solution) |
+| Generic "Hint 1, Hint 2" labels | Visual marker on exact line |
+| Answer reveals all at once | Per-blank reveal with granular penalties |
+| Crowded interface | Clean, focused code editor |
 
 ---
 
-## Why This Works Better
+## Scoring Adjustments
 
-| Current Approach | New Tiered Approach |
-|-----------------|---------------------|
-| One skeleton fits all | Users choose their challenge level |
-| Shows 90% of structure | Expert mode shows 0% of structure |
-| 10 points max per step | Up to 25 points for expert mode |
-| Pattern matching | Actual problem-solving |
-| Same hints for everyone | Difficulty-appropriate hints |
+Granular per-blank scoring:
 
-This creates genuine **learning differentiation** - beginners get scaffolding, experts get real challenges, and the leaderboard reflects actual skill level.
+| Action | Guided | Challenge | Expert |
+|--------|--------|-----------|--------|
+| Reveal hint for 1 blank | -1pt | -2pt | -3pt |
+| Reveal answer for 1 blank | -2pt | -3pt | -5pt |
+| Reveal full solution | -5pt | -8pt | -15pt |
+| Complete without help | 10pts | 15pts | 25pts |
 
 ---
 
-## Technical Details
+## Technical Considerations
 
-### Difficulty State Management
+### Monaco Editor Line Height
+The overlay positioning uses Monaco's default line height (~20px). We'll need to calculate this dynamically:
 ```typescript
-// State for tracking chosen difficulty per block
-const [skeletonTier, setSkeletonTier] = useState<Record<string, 'guided' | 'challenge' | 'expert'>>({});
-
-// Get display code based on tier
-const getDisplayCode = (block: CodeBlock, tier: SkeletonTier, solutionRevealed: boolean): string => {
-  if (solutionRevealed || alwaysShowSolutions) return block.code;
-  
-  switch (tier) {
-    case 'expert':
-      return block.expertSkeleton || block.challengeSkeleton || block.skeleton || block.code;
-    case 'challenge':
-      return block.challengeSkeleton || block.skeleton || block.code;
-    case 'guided':
-    default:
-      return block.skeleton || block.code;
-  }
-};
+const lineHeight = 20; // Can be read from Monaco's options
+const topOffset = (hint.line - 1) * lineHeight + padding;
 ```
 
-### Point Calculation
+### State Management
+New state for tracking revealed answers separately from hints:
 ```typescript
-const getMaxPoints = (tier: SkeletonTier): number => {
-  switch (tier) {
-    case 'expert': return 25;
-    case 'challenge': return 15;
-    case 'guided': default: return 10;
-  }
-};
-
-const getHintPenalty = (tier: SkeletonTier, hintIndex: number): number => {
-  const base = tier === 'expert' ? 3 : tier === 'challenge' ? 2 : 1;
-  return hintIndex === 0 ? base : base + 1;
-};
-
-const getSolutionPenalty = (tier: SkeletonTier): number => {
-  switch (tier) {
-    case 'expert': return 15;
-    case 'challenge': return 8;
-    case 'guided': default: return 5;
-  }
-};
+const [revealedAnswers, setRevealedAnswers] = useState<Record<string, number[]>>({});
 ```
+
+### Responsive Design
+On narrow screens, the hint markers will stack or show as a floating panel rather than fixed margin.
 
