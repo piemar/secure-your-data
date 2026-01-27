@@ -695,26 +695,26 @@ node queryQERange.cjs
   return (
     <LabViewWithTabs
       labNumber={2}
-      title="Queryable Encryption & Range Deep-Dive"
-      description="Master the breakthrough Queryable Encryption (QE) feature. Learn to query encrypted data using equality, range, prefix, and suffix queries. Compare QE-enabled vs standard clients to see the power of querying encrypted data without decrypting first."
+      title="Queryable Encryption & Range Queries"
+      description="Query encrypted data without decrypting on the server"
       duration="30 min"
       prerequisites={[
         'MongoDB 8.0+ Atlas Cluster',
         'AWS KMS CMK from Lab 1',
-        'Node.js 20+ with MongoDB driver >= 6.1.0 (6.x series) or >= 7.x',
-        'mongodb-client-encryption >= 6.1.0+ (for 6.x driver) or >= 7.x (for 7.x driver)',
-        'Required for range queries: mongodb@6.1.0+ or mongodb@7.x with compatible mongodb-client-encryption',
-        'Lab uses: mongodb@6.19.0 and mongodb-client-encryption@6.5.0 (installed via npm install)'
+        'Node.js 20+ with MongoDB driver >= 6.1.0',
+        'mongodb-client-encryption >= 6.1.0+'
       ]}
       objectives={[
         'Configure QE with field-level DEK binding',
         'Compare QE-enabled vs standard client behavior',
-        'Execute Equality, Range, Prefix, and Suffix queries on encrypted data',
-        'Understand how QE enables querying encrypted data transparently'
+        'Execute Range queries on encrypted data',
+        'Understand QE metadata collections'
       ]}
       steps={lab2Steps}
       introContent={introContent}
       exercises={exercises}
+      businessValue="Query encrypted data without exposing plaintext to the database"
+      atlasCapability="Queryable Encryption + Range Queries"
     />
   );
 }
