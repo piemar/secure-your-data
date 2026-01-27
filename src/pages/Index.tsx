@@ -94,8 +94,8 @@ function ContentRouter() {
 }
 
 const Index = () => {
-  const { role, setRole } = useRole();
-  const { userEmail } = useLab();
+  const { role, setRole, logout } = useRole();
+  const { userEmail, resetProgress } = useLab();
   const [showPresenterLogin, setShowPresenterLogin] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
 
@@ -114,6 +114,16 @@ const Index = () => {
       }
     }
   }, [userEmail, role, setRole]);
+
+  // Handle logout - clear session and show registration
+  const handleLogout = () => {
+    logout();
+    localStorage.removeItem('workshop_attendee_name');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('completedLabs');
+    localStorage.removeItem('labStartTimes');
+    setIsRegistered(false);
+  };
 
   // Show presenter login if requested
   if (showPresenterLogin && !role) {
