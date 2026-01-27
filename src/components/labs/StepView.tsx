@@ -1,20 +1,17 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2, Info, BookOpen, Clock, Lock, Eye, Unlock } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DifficultyBadge, DifficultyLevel } from './DifficultyBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 import Editor from '@monaco-editor/react';
 import { StepContextDrawer } from './StepContextDrawer';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { trackHintUsage, trackSolutionReveal } from '@/utils/leaderboardUtils';
-
-// Difficulty tier type
-type SkeletonTier = 'guided' | 'challenge' | 'expert';
+import { InlineHintMarker, type InlineHint, type SkeletonTier } from './InlineHintMarker';
 
 interface CodeBlock {
   filename: string;
@@ -23,6 +20,7 @@ interface CodeBlock {
   skeleton?: string;           // Tier 1: Guided (blanks with structure)
   challengeSkeleton?: string;  // Tier 2: Challenge (tasks only)
   expertSkeleton?: string;     // Tier 3: Expert (objective only)
+  inlineHints?: InlineHint[];  // Line-specific hints for skeleton blanks
 }
 
 interface Exercise {
@@ -453,12 +451,15 @@ export function StepView({
   // Challenge Mode State
   const [showSolution, setShowSolution] = useState<Record<string, boolean>>({});
   const [revealedHints, setRevealedHints] = useState<Record<string, number[]>>({});
+  const [revealedAnswers, setRevealedAnswers] = useState<Record<string, number[]>>({});
   const [alwaysShowSolutions, setAlwaysShowSolutions] = useState<boolean>(() => {
     const saved = localStorage.getItem('workshop_always_show_solutions');
     return saved === 'true';
   });
   const [pointsDeducted, setPointsDeducted] = useState<Record<string, number>>({});
   const [skeletonTier, setSkeletonTier] = useState<Record<string, SkeletonTier>>({});
+  const editorContainerRef = useRef<HTMLDivElement>(null);
+  const [lineHeight, setLineHeight] = useState(19); // Monaco default line height
 
   // Helper functions for tiered scoring
   const getMaxPoints = (tier: SkeletonTier): number => {
@@ -515,24 +516,45 @@ export function StepView({
     localStorage.setItem('workshop_always_show_solutions', String(alwaysShowSolutions));
   }, [alwaysShowSolutions]);
 
-  // Helper to reveal a hint
-  const revealHint = useCallback((blockKey: string, hintIdx: number, tier: SkeletonTier) => {
+  // Helper to reveal an inline hint (conceptual)
+  const revealInlineHint = useCallback((blockKey: string, hintIdx: number, tier: SkeletonTier) => {
     setRevealedHints(prev => {
       const existing = prev[blockKey] || [];
       if (existing.includes(hintIdx)) return prev;
       return { ...prev, [blockKey]: [...existing, hintIdx] };
     });
     // Deduct points for hint based on tier
-    const penalty = getHintPenalty(tier, hintIdx);
+    const hintPenalty = tier === 'expert' ? 3 : tier === 'challenge' ? 2 : 1;
     setPointsDeducted(prev => ({
       ...prev,
-      [blockKey]: (prev[blockKey] || 0) + penalty
+      [blockKey]: (prev[blockKey] || 0) + hintPenalty
     }));
     
     // Track in leaderboard
     const email = localStorage.getItem('userEmail') || '';
     if (email) {
-      trackHintUsage(email, penalty);
+      trackHintUsage(email, hintPenalty);
+    }
+  }, []);
+
+  // Helper to reveal an inline answer (direct answer)
+  const revealInlineAnswer = useCallback((blockKey: string, hintIdx: number, tier: SkeletonTier) => {
+    setRevealedAnswers(prev => {
+      const existing = prev[blockKey] || [];
+      if (existing.includes(hintIdx)) return prev;
+      return { ...prev, [blockKey]: [...existing, hintIdx] };
+    });
+    // Deduct points for answer based on tier
+    const answerPenalty = tier === 'expert' ? 5 : tier === 'challenge' ? 3 : 2;
+    setPointsDeducted(prev => ({
+      ...prev,
+      [blockKey]: (prev[blockKey] || 0) + answerPenalty
+    }));
+    
+    // Track in leaderboard
+    const email = localStorage.getItem('userEmail') || '';
+    if (email) {
+      trackHintUsage(email, answerPenalty);
     }
   }, []);
 
@@ -755,8 +777,6 @@ export function StepView({
                     const tier = skeletonTier[blockKey] || 'guided';
                     const isSolutionRevealed = alwaysShowSolutions || showSolution[blockKey] || !hasSkeleton;
                     const displayCode = getDisplayCode(block, tier, isSolutionRevealed);
-                    const blockHints = currentStep.hints || [];
-                    const revealedForBlock = revealedHints[blockKey] || [];
                     const maxPoints = getMaxPoints(tier);
                     const solutionPenalty = getSolutionPenalty(tier);
                     
@@ -790,9 +810,9 @@ export function StepView({
                           </Button>
                         </div>
                         
-                        {/* Monaco Editor */}
-                        <div className="flex-1 min-h-[200px]">
-                          <div className="h-full w-full">
+                        {/* Monaco Editor with Inline Hint Overlay */}
+                        <div className="flex-1 min-h-[200px] relative">
+                          <div className="h-full w-full" ref={editorContainerRef}>
                             <Editor
                               key={`editor-${currentStepIndex}-${idx}-${isSolutionRevealed}`}
                               height="100%"
@@ -809,150 +829,126 @@ export function StepView({
                                 automaticLayout: true,
                                 tabSize: 2,
                                 padding: { top: 12, bottom: 12 },
+                                lineHeight: lineHeight,
+                              }}
+                              onMount={(editor) => {
+                                // Get actual line height from Monaco
+                                const options = editor.getOptions();
+                                setLineHeight(options.get(66) || 19); // 66 = EditorOption.lineHeight
                               }}
                             />
                           </div>
+                          
+                          {/* Inline Hint Markers Overlay - Right side of editor */}
+                          {hasSkeleton && !isSolutionRevealed && block.inlineHints && block.inlineHints.length > 0 && tier === 'guided' && (
+                            <div className="absolute top-0 right-3 pointer-events-none" style={{ paddingTop: 12 }}>
+                              {block.inlineHints.map((hint, hintIdx) => {
+                                const hintRevealed = (revealedHints[blockKey] || []).includes(hintIdx);
+                                const answerRevealed = (revealedAnswers[blockKey] || []).includes(hintIdx);
+                                
+                                return (
+                                  <div 
+                                    key={hintIdx}
+                                    className="absolute pointer-events-auto"
+                                    style={{ 
+                                      top: `${(hint.line - 1) * lineHeight}px`,
+                                      right: 0,
+                                    }}
+                                  >
+                                    <InlineHintMarker
+                                      hint={hint}
+                                      hintRevealed={hintRevealed}
+                                      answerRevealed={answerRevealed}
+                                      onRevealHint={() => revealInlineHint(blockKey, hintIdx, tier)}
+                                      onRevealAnswer={() => revealInlineAnswer(blockKey, hintIdx, tier)}
+                                      tier={tier}
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
 
-                        {/* Challenge Mode Controls - Show only when skeleton is active */}
+                        {/* Simplified Challenge Mode Footer */}
                         {hasSkeleton && !isSolutionRevealed && (
-                          <div className="flex-shrink-0 px-4 py-3 bg-amber-500/10 border-t border-amber-500/30">
-                            {/* Difficulty Selector */}
-                            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground">Difficulty:</span>
-                                <div className="flex gap-0.5 bg-muted rounded-md p-0.5">
+                          <div className="flex-shrink-0 px-4 py-2 bg-muted/50 border-t border-border">
+                            <div className="flex items-center justify-between gap-4">
+                              {/* Left: Difficulty selector & Score */}
+                              <div className="flex items-center gap-3">
+                                {/* Compact difficulty selector */}
+                                <div className="flex gap-0.5 bg-background rounded p-0.5 border border-border">
                                   <button
                                     onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'guided' }))}
                                     className={cn(
-                                      "px-2 py-1 text-xs rounded transition-colors",
+                                      "px-2 py-0.5 text-xs rounded transition-colors",
                                       tier === 'guided' 
                                         ? "bg-primary text-primary-foreground" 
-                                        : "hover:bg-muted-foreground/10"
+                                        : "hover:bg-muted"
                                     )}
                                   >
-                                    Guided (10pts)
+                                    Guided
                                   </button>
                                   <button
                                     onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'challenge' }))}
                                     disabled={!block.challengeSkeleton && !block.expertSkeleton}
                                     className={cn(
-                                      "px-2 py-1 text-xs rounded transition-colors",
+                                      "px-2 py-0.5 text-xs rounded transition-colors",
                                       tier === 'challenge' 
-                                        ? "bg-amber-500 text-white" 
-                                        : "hover:bg-muted-foreground/10",
+                                        ? "bg-primary text-primary-foreground" 
+                                        : "hover:bg-muted",
                                       !block.challengeSkeleton && !block.expertSkeleton && "opacity-40 cursor-not-allowed"
                                     )}
                                   >
-                                    Challenge (15pts)
+                                    Challenge
                                   </button>
                                   <button
                                     onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'expert' }))}
                                     disabled={!block.expertSkeleton}
                                     className={cn(
-                                      "px-2 py-1 text-xs rounded transition-colors",
+                                      "px-2 py-0.5 text-xs rounded transition-colors",
                                       tier === 'expert' 
-                                        ? "bg-red-500 text-white" 
-                                        : "hover:bg-muted-foreground/10",
+                                        ? "bg-primary text-primary-foreground" 
+                                        : "hover:bg-muted",
                                       !block.expertSkeleton && "opacity-40 cursor-not-allowed"
                                     )}
                                   >
-                                    Expert (25pts)
+                                    Expert
                                   </button>
                                 </div>
-                                {/* Point Tracker */}
-                                {(pointsDeducted[blockKey] || 0) > 0 && (
-                                  <span className="flex items-center gap-1 text-xs bg-red-500/10 text-red-600 px-2 py-0.5 rounded">
-                                    -{pointsDeducted[blockKey]}pts used
+                                
+                                {/* Score display */}
+                                <div className="flex items-center gap-1.5 text-sm">
+                                  <span className="text-muted-foreground">Score:</span>
+                                  <span className={cn(
+                                    "font-mono font-medium",
+                                    (pointsDeducted[blockKey] || 0) > 0 ? "text-amber-600" : "text-foreground"
+                                  )}>
+                                    {Math.max(0, maxPoints - (pointsDeducted[blockKey] || 0))}
+                                  </span>
+                                  <span className="text-muted-foreground">/ {maxPoints}</span>
+                                </div>
+                                
+                                {/* Hints used indicator (for inline hints) */}
+                                {tier === 'guided' && block.inlineHints && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {block.inlineHints.length > 0 && (
+                                      <>Click <span className="bg-muted px-1 rounded">?</span> markers for hints</>
+                                    )}
                                   </span>
                                 )}
                               </div>
-                            </div>
-                            
-                            {/* Instructions based on tier */}
-                            <div className="flex items-center justify-between flex-wrap gap-2">
-                              <div className="flex items-center gap-2">
-                                <Lock className="w-4 h-4 text-amber-600" />
-                                <span className="text-sm font-medium text-amber-700 dark:text-amber-500">
-                                  {tier === 'expert' 
-                                    ? 'Complete the objective from scratch' 
-                                    : tier === 'challenge' 
-                                    ? 'Follow the tasks and write your code' 
-                                    : 'Fill in the blanks (marked with _________)'}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {blockHints.map((hint, hintIdx) => {
-                                  const isRevealed = revealedForBlock.includes(hintIdx);
-                                  const isLocked = hintIdx > 0 && !revealedForBlock.includes(hintIdx - 1);
-                                  const penalty = getHintPenalty(tier, hintIdx);
-                                  
-                                  // Extract blank number from hint if it starts with "Blank N:"
-                                  const blankMatch = hint.match(/^Blank (\d+):/);
-                                  const blankNum = blankMatch ? blankMatch[1] : (hintIdx + 1).toString();
-                                  
-                                  return (
-                                    <Button
-                                      key={hintIdx}
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => revealHint(blockKey, hintIdx, tier)}
-                                      disabled={isRevealed || isLocked}
-                                      className={cn(
-                                        "gap-1 h-7 text-xs",
-                                        isRevealed && "opacity-50 bg-primary/5 border-primary/30",
-                                        isLocked && "opacity-40 cursor-not-allowed"
-                                      )}
-                                    >
-                                      <Lightbulb className="w-3 h-3" />
-                                      {tier === 'guided' ? `Blank ${blankNum}` : `Hint ${hintIdx + 1}`} {!isRevealed && `(-${penalty}pt)`}
-                                    </Button>
-                                  );
-                                })}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => revealSolution(blockKey, tier)}
-                                  className="gap-1 h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-                                >
-                                  <Eye className="w-3 h-3" />
-                                  Show Solution (-{solutionPenalty}pts)
-                                </Button>
-                              </div>
-                            </div>
-                            
-                            {/* Display revealed hints */}
-                            {revealedForBlock.length > 0 && (
-                              <div className="mt-3 space-y-2">
-                                {revealedForBlock.map(hintIdx => (
-                                  <motion.div 
-                                    key={hintIdx} 
-                                    initial={{ opacity: 0, y: -5 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="text-sm bg-background/80 p-3 rounded border border-border"
-                                  >
-                                    <span className="text-primary mr-2">💡</span>
-                                    {blockHints[hintIdx]}
-                                  </motion.div>
-                                ))}
-                              </div>
-                            )}
-                            
-                            {/* Step Score Preview */}
-                            <div className="mt-2 pt-2 border-t border-amber-500/20 flex items-center gap-2 text-xs text-muted-foreground">
-                              <span>Step score: </span>
-                              <span className={cn(
-                                "font-mono",
-                                (pointsDeducted[blockKey] || 0) > 0 ? "text-amber-600" : "text-foreground"
-                              )}>
-                                {Math.max(0, maxPoints - (pointsDeducted[blockKey] || 0))}
-                              </span>
-                              <span>/{maxPoints} points</span>
-                              {tier !== 'guided' && (
-                                <span className="text-primary ml-2">
-                                  (+{maxPoints - 10} bonus for {tier} mode)
-                                </span>
-                              )}
+                              
+                              {/* Right: Show full solution button */}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => revealSolution(blockKey, tier)}
+                                className="gap-1.5 h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                              >
+                                <Eye className="w-3 h-3" />
+                                Show Full Solution (-{solutionPenalty}pts)
+                              </Button>
                             </div>
                           </div>
                         )}
