@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { ArchitectureDiagram } from '@/components/workshop/ArchitectureDiagram';
+import { LabEnvironmentDiagram } from './LabEnvironmentDiagram';
 
 type SetupPhase = 'onboarding' | 'ready';
 
@@ -236,7 +237,10 @@ export const LabSetupWizard: React.FC = () => {
                 </div>
             </CardHeader>
 
-            <CardContent className="space-y-6 px-6">
+            <CardContent className="space-y-4 px-6">
+                {/* Architecture Overview */}
+                <LabEnvironmentDiagram />
+
                 {/* Prerequisites Check */}
                 <div className="space-y-3">
                     <div className="flex items-center justify-between">
