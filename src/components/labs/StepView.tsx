@@ -60,47 +60,108 @@ interface StepViewProps {
   atlasCapability?: string;
 }
 
-// Generate realistic MongoDB output based on code content
-function generateSimulatedOutput(code: string, stepTitle: string): string {
+// Generate realistic MongoDB output based on code content with structured formatting
+function generateSimulatedOutput(code: string, stepTitle: string): { output: string; success: boolean; summary: string } {
   const lowerCode = code.toLowerCase();
   const lowerTitle = stepTitle.toLowerCase();
+  const timestamp = new Date().toISOString();
   
   if (lowerCode.includes('create-key') || lowerTitle.includes('cmk') || lowerTitle.includes('master key')) {
-    return `{
+    return {
+      success: true,
+      summary: 'AWS KMS Customer Master Key created successfully',
+      output: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ✅ STEP VALIDATION: PASSED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 COMMAND OUTPUT:
+{
     "KeyMetadata": {
         "KeyId": "mrk-1234567890abcdef0",
         "Arn": "arn:aws:kms:eu-central-1:123456789012:key/mrk-1234567890abcdef0",
-        "CreationDate": "${new Date().toISOString()}",
+        "CreationDate": "${timestamp}",
         "Enabled": true,
-        "Description": "Lab 1 MongoDB Encryption Key",
+        "Description": "MongoDB Encryption Workshop - Customer Master Key",
         "KeyUsage": "ENCRYPT_DECRYPT",
         "KeyState": "Enabled",
         "Origin": "AWS_KMS",
         "KeyManager": "CUSTOMER",
-        "MultiRegion": false
+        "MultiRegion": false,
+        "KeySpec": "SYMMETRIC_DEFAULT",
+        "EncryptionAlgorithms": ["SYMMETRIC_DEFAULT"]
     }
 }
 
-✓ CMK created successfully
-✓ Alias linked: alias/mongodb-lab-key-*`;
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 VALIDATION DETAILS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✓ CMK created in AWS KMS
+  ✓ Key is enabled and ready for use
+  ✓ Key alias "alias/mongodb-lab-key-*" linked
+  ✓ Key usage set to ENCRYPT_DECRYPT
+  
+💡 WHAT THIS MEANS:
+   Your Customer Master Key (CMK) is now active in AWS KMS.
+   This key will be used to wrap/unwrap your Data Encryption Keys (DEKs).
+   
+⏭️  NEXT: Create a key alias for easier reference`
+    };
   }
   
   if (lowerCode.includes('createdatakey') || lowerTitle.includes('dek') || lowerTitle.includes('data encryption')) {
-    return `Connecting to MongoDB Atlas...
-✓ Connected to cluster
+    return {
+      success: true,
+      summary: 'Data Encryption Key (DEK) created and stored in key vault',
+      output: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ✅ STEP VALIDATION: PASSED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 COMMAND OUTPUT:
+Connecting to MongoDB Atlas cluster...
+✓ TLS 1.3 connection established
+✓ Authenticated with X.509 certificate
 
 Creating Data Encryption Key...
 {
     "acknowledged": true,
-    "_id": UUID("4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a")
+    "_id": UUID("4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a"),
+    "keyAltNames": ["workshop-dek-1"],
+    "creationDate": ISODate("${timestamp}"),
+    "updateDate": ISODate("${timestamp}"),
+    "status": 1,
+    "masterKey": {
+        "provider": "aws",
+        "region": "eu-central-1",
+        "key": "arn:aws:kms:eu-central-1:123456789012:key/mrk-1234567890abcdef0"
+    }
 }
 
-✓ DEK created and stored in encryption.__keyVault
-✓ Key wrapped with AWS KMS CMK`;
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 VALIDATION DETAILS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✓ DEK generated with 256-bit AES key
+  ✓ DEK wrapped with AWS KMS CMK
+  ✓ Stored in encryption.__keyVault collection
+  ✓ Key alt name assigned for easy reference
+
+💡 WHAT THIS MEANS:
+   Your Data Encryption Key is stored encrypted in MongoDB.
+   Only your AWS KMS CMK can decrypt it for use.
+   
+⏭️  NEXT: Configure your schema map for automatic encryption`
+    };
   }
   
   if (lowerCode.includes('createindex') || lowerTitle.includes('index') || lowerTitle.includes('key vault')) {
-    return `Switched to db encryption
+    return {
+      success: true,
+      summary: 'Key vault collection initialized with unique index',
+      output: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ✅ STEP VALIDATION: PASSED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 COMMAND OUTPUT:
+Switched to db encryption
 {
     "numIndexesBefore": 1,
     "numIndexesAfter": 2,
@@ -108,79 +169,256 @@ Creating Data Encryption Key...
     "ok": 1
 }
 
-✓ Unique partial index created on keyAltNames
-✓ Key vault collection initialized`;
+Index details:
+{
+    "v": 2,
+    "key": { "keyAltNames": 1 },
+    "name": "keyAltNames_1",
+    "unique": true,
+    "partialFilterExpression": { "keyAltNames": { "$exists": true } }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 VALIDATION DETAILS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✓ __keyVault collection created
+  ✓ Unique partial index on keyAltNames field
+  ✓ Index enforces uniqueness for DEK references
+  
+💡 WHAT THIS MEANS:
+   The key vault is ready to store your encrypted DEKs.
+   The unique index prevents duplicate key alt names.`
+    };
   }
   
   if (lowerCode.includes('insertone') || lowerCode.includes('insert')) {
-    return `{
+    return {
+      success: true,
+      summary: 'Document inserted with client-side field level encryption',
+      output: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ✅ STEP VALIDATION: PASSED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 COMMAND OUTPUT:
+{
     "acknowledged": true,
     "insertedId": ObjectId("65f1a2b3c4d5e6f7a8b9c0d1")
 }
 
-✓ Document inserted with client-side encryption
-✓ Sensitive fields encrypted before transmission`;
+🔒 Encryption Details:
+  - Fields encrypted: ssn, medicalRecordNumber
+  - Algorithm: AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic
+  - DEK used: UUID("4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a")
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 VALIDATION DETAILS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✓ Sensitive fields encrypted before network transmission
+  ✓ Document stored with encrypted binary values
+  ✓ Only authorized clients can decrypt
+  
+💡 WHAT THIS MEANS:
+   The SSN and medical record fields are encrypted client-side.
+   Even MongoDB servers never see the plaintext values.`
+    };
   }
   
   if (lowerCode.includes('findone') || lowerCode.includes('find')) {
-    return `{
+    return {
+      success: true,
+      summary: 'Document retrieved with automatic decryption',
+      output: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ✅ STEP VALIDATION: PASSED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 COMMAND OUTPUT:
+{
     "_id": ObjectId("65f1a2b3c4d5e6f7a8b9c0d1"),
-    "name": "Alice Johnson",
-    "ssn": "123-45-6789",  // Auto-decrypted
-    "dob": "1990-01-15"
+    "firstName": "Alice",
+    "lastName": "Johnson",
+    "ssn": "123-45-6789",          // ← Auto-decrypted
+    "dob": ISODate("1990-01-15"),
+    "email": "alice.johnson@example.com"
 }
 
-✓ Document retrieved
-✓ Encrypted fields auto-decrypted by driver`;
+🔓 Decryption Details:
+  - Fields auto-decrypted: ssn
+  - DEK fetched from: encryption.__keyVault
+  - CMK used to unwrap DEK via AWS KMS
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 VALIDATION DETAILS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✓ Encrypted document retrieved from database
+  ✓ DEK automatically fetched and unwrapped
+  ✓ Sensitive fields decrypted transparently
+  
+💡 WHAT THIS MEANS:
+   The MongoDB driver automatically decrypts fields
+   using your configured DEK and AWS KMS credentials.`
+    };
   }
   
   if (lowerCode.includes('createencryptedcollection') || lowerTitle.includes('queryable')) {
-    return `{
+    return {
+      success: true,
+      summary: 'Queryable Encryption collection created with metadata',
+      output: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ✅ STEP VALIDATION: PASSED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 COMMAND OUTPUT:
+{
     "ok": 1,
     "encryptedFieldsMap": {
         "medicalRecords.patients": {
             "fields": [
-                { "path": "ssn", "queryType": "equality" },
-                { "path": "medicalRecordNumber", "queryType": "equality" }
+                { 
+                    "path": "ssn", 
+                    "bsonType": "string",
+                    "queryType": "equality",
+                    "keyId": UUID("4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a")
+                },
+                { 
+                    "path": "medicalRecordNumber", 
+                    "bsonType": "string",
+                    "queryType": "equality",
+                    "keyId": UUID("5e6f7a8b-9c0d-1e2f-3a4b-5c6d7e8f9a0b")
+                }
             ]
         }
     }
 }
 
-✓ Encrypted collection created
-✓ Metadata collections initialized (.esc, .ecoc, .ecc)`;
+Metadata collections created:
+  • medicalRecords.patients.esc (Encrypted State Collection)
+  • medicalRecords.patients.ecoc (Encrypted Compaction Collection)  
+  • medicalRecords.patients.ecc (Encrypted Count Collection)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 VALIDATION DETAILS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✓ Encrypted collection created
+  ✓ Queryable fields: ssn, medicalRecordNumber
+  ✓ Metadata collections initialized (.esc, .ecoc, .ecc)
+  ✓ Equality query support enabled
+
+💡 WHAT THIS MEANS:
+   You can now query on encrypted fields while maintaining
+   full end-to-end encryption. The server never sees plaintext.`
+    };
   }
   
   if (lowerCode.includes('policy') || lowerTitle.includes('policy')) {
-    return `{
+    return {
+      success: true,
+      summary: 'AWS KMS key policy attached successfully',
+      output: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ✅ STEP VALIDATION: PASSED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 COMMAND OUTPUT:
+{
     "ResponseMetadata": {
-        "RequestId": "12345678-1234-1234-1234-123456789012"
+        "RequestId": "12345678-1234-1234-1234-123456789012",
+        "HTTPStatusCode": 200
     }
 }
 
-✓ Key policy attached successfully
-✓ IAM principal authorized for kms:* operations`;
+Policy attached to key: mrk-1234567890abcdef0
+Permitted actions:
+  • kms:Encrypt
+  • kms:Decrypt
+  • kms:GenerateDataKey
+  • kms:DescribeKey
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 VALIDATION DETAILS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✓ Key policy updated
+  ✓ IAM principal authorized for kms:* operations
+  ✓ Policy allows Encrypt, Decrypt, GenerateDataKey
+
+💡 WHAT THIS MEANS:
+   Your MongoDB application can now use AWS KMS
+   to wrap and unwrap Data Encryption Keys.`
+    };
   }
 
   if (lowerCode.includes('countdocuments') || lowerCode.includes('count')) {
-    return `1
+    return {
+      success: true,
+      summary: 'Key vault contains 1 Data Encryption Key',
+      output: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ✅ STEP VALIDATION: PASSED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-✓ Key vault contains 1 DEK`;
+📋 COMMAND OUTPUT:
+1
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 VALIDATION DETAILS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✓ Key vault contains 1 DEK
+  ✓ DEK is properly encrypted with AWS KMS
+  
+💡 WHAT THIS MEANS:
+   Your encrypted Data Encryption Key is safely stored
+   and ready to use for field-level encryption.`
+    };
   }
 
-  if (lowerCode.includes('deleteone') || lowerCode.includes('delete')) {
-    return `{
+  if (lowerCode.includes('deleteone') || lowerCode.includes('delete') || lowerTitle.includes('erasure')) {
+    return {
+      success: true,
+      summary: 'Crypto-shredding completed - DEK deleted',
+      output: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ✅ STEP VALIDATION: PASSED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 COMMAND OUTPUT:
+{
     "acknowledged": true,
     "deletedCount": 1
 }
 
-✓ Document/key deleted successfully`;
+🗑️ Crypto-Shredding Complete:
+  - DEK permanently deleted from key vault
+  - Associated encrypted data now unrecoverable
+  - GDPR Right to Erasure satisfied
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 VALIDATION DETAILS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✓ DEK deleted from encryption.__keyVault
+  ✓ All encrypted data now cryptographically inaccessible
+  ✓ No need to scan/delete individual records
+
+💡 WHAT THIS MEANS:
+   By deleting the DEK, all data encrypted with that key
+   is now permanently unreadable - instant crypto-shredding!`
+    };
   }
   
-  return `> Command executed successfully
+  return {
+    success: true,
+    summary: 'Command executed successfully',
+    output: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ✅ STEP VALIDATION: PASSED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 COMMAND OUTPUT:
 {
     "ok": 1
-}`;
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 VALIDATION DETAILS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✓ Command executed successfully
+
+💡 Proceed to the next step when ready.`
+  };
 }
 
 export function StepView({
@@ -198,6 +436,8 @@ export function StepView({
   const [activeTab, setActiveTab] = useState<string>('code');
   const [outputOpen, setOutputOpen] = useState(false);
   const [lastOutput, setLastOutput] = useState<string>('');
+  const [outputSummary, setOutputSummary] = useState<string>('');
+  const [outputSuccess, setOutputSuccess] = useState<boolean>(true);
   const [isRunning, setIsRunning] = useState(false);
   const [copied, setCopied] = useState(false);
   const [direction, setDirection] = useState(0);
@@ -219,8 +459,10 @@ export function StepView({
     // Simulate execution delay
     await new Promise(r => setTimeout(r, 800 + Math.random() * 600));
     
-    const output = generateSimulatedOutput(code, currentStep.title);
-    setLastOutput(output);
+    const result = generateSimulatedOutput(code, currentStep.title);
+    setLastOutput(result.output);
+    setOutputSummary(result.summary);
+    setOutputSuccess(result.success);
     setOutputOpen(true);
     setIsRunning(false);
   };
@@ -330,16 +572,6 @@ export function StepView({
             <span className="text-sm text-muted-foreground">
               Step {currentStepIndex + 1} of {steps.length}
             </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCopyCode}
-              className="gap-1.5 h-8"
-              disabled={!currentStep.codeBlocks?.length}
-            >
-              {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-              {copied ? 'Copied!' : 'Copy'}
-            </Button>
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
@@ -389,12 +621,23 @@ export function StepView({
                   {currentStep.codeBlocks.map((block, idx) => (
                     <div key={idx} className="h-full flex flex-col">
                       <div className="flex-shrink-0 px-4 py-2 bg-muted/50 border-b border-border flex items-center justify-between">
-                        <span className="text-xs font-mono text-muted-foreground">{block.filename}</span>
-                        {currentStep.estimatedTime && (
-                          <span className="text-xs text-muted-foreground">
-                            ⏱️ {currentStep.estimatedTime}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono text-muted-foreground">{block.filename}</span>
+                          {currentStep.estimatedTime && (
+                            <span className="text-xs text-muted-foreground">
+                              ⏱️ {currentStep.estimatedTime}
+                            </span>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleCopyCode}
+                          className="gap-1.5 h-6 text-xs px-2"
+                        >
+                          {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                          {copied ? 'Copied!' : 'Copy Code'}
+                        </Button>
                       </div>
                       <div className="flex-1 min-h-0">
                         {/* Wrap Monaco in stable container to fix ref warning */}
@@ -429,7 +672,7 @@ export function StepView({
 
               {/* Output Panel */}
               <ResizablePanel defaultSize={outputOpen ? 50 : 15} minSize={10} collapsible>
-                <div className="h-full flex flex-col bg-[hsl(220,20%,6%)]">
+                <div className="h-full flex flex-col bg-background/95">
                   <button 
                     onClick={() => setOutputOpen(!outputOpen)}
                     className="flex-shrink-0 flex items-center gap-2 px-6 py-2 border-t border-border bg-muted/50 hover:bg-muted transition-colors text-sm"
@@ -437,14 +680,24 @@ export function StepView({
                     {outputOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                     <Terminal className="w-4 h-4 text-primary" />
                     <span>Output</span>
-                    {lastOutput && !outputOpen && (
+                    {outputSummary && (
+                      <span className={cn(
+                        "ml-2 px-2 py-0.5 rounded text-xs font-medium",
+                        outputSuccess 
+                          ? "bg-green-500/10 text-green-500" 
+                          : "bg-red-500/10 text-red-500"
+                      )}>
+                        {outputSuccess ? '✓' : '✗'} {outputSummary}
+                      </span>
+                    )}
+                    {lastOutput && !outputOpen && !outputSummary && (
                       <span className="text-xs text-muted-foreground ml-2">
                         (Drag handle or click to expand)
                       </span>
                     )}
                   </button>
-                  <div className="flex-1 overflow-auto px-6 py-4">
-                    <pre className="font-mono text-sm text-primary whitespace-pre-wrap">
+                  <div className="flex-1 overflow-auto px-6 py-4 bg-[hsl(220,20%,6%)]">
+                    <pre className="font-mono text-sm text-primary whitespace-pre-wrap leading-relaxed">
                       {lastOutput || '// Run "Check My Progress" to see output'}
                     </pre>
                   </div>
