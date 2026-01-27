@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useRole } from '@/contexts/RoleContext';
+import { useLab } from '@/context/LabContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ interface PresenterLoginProps {
 
 export function PresenterLogin({ onBack, onSuccess }: PresenterLoginProps) {
   const { setRole, verifyModeratorPin } = useRole();
+  const { setUserEmail } = useLab();
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -25,6 +27,9 @@ export function PresenterLogin({ onBack, onSuccess }: PresenterLoginProps) {
     
     if (verifyModeratorPin(pin)) {
       setRole('moderator');
+      // Set hardcoded presenter credentials
+      localStorage.setItem('workshop_attendee_name', 'Pierre Petersson');
+      setUserEmail('pierre.petersson@mongodb.com');
       localStorage.removeItem('show_presenter_login');
       onSuccess();
     } else {
