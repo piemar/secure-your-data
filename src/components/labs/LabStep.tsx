@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { CheckCircle, Circle, Clock, ChevronDown, ChevronUp, Copy, Check, AlertTriangle, Lightbulb, ShieldCheck, Eye } from 'lucide-react';
+import { CheckCircle, Circle, Clock, ChevronDown, ChevronUp, Copy, Check, AlertTriangle, Lightbulb, ShieldCheck, Eye, Lock, BookOpen, ListChecks } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { CodeBlock } from '@/components/ui/code-block';
 import { useLab } from '@/context/LabContext';
 import { toast } from 'sonner';
 import { ValidationResult } from '@/utils/validatorUtils';
+import { DifficultyBadge, DifficultyLevel } from './DifficultyBadge';
 
 interface LabStepProps {
   stepId: string;
@@ -13,6 +14,9 @@ interface LabStepProps {
   title: string;
   estimatedTime: string;
   description: string;
+  difficulty?: DifficultyLevel;
+  understandSection?: string;
+  doThisSection?: string[];
   codeBlocks?: Array<{
     filename: string;
     language: string;
@@ -24,6 +28,7 @@ interface LabStepProps {
   tips?: string[];
   documentationUrl?: string;
   isCompleted: boolean;
+  isLocked?: boolean;
   onComplete: () => void;
   onVerify?: () => Promise<ValidationResult>;
   onSuccess?: () => void;
@@ -35,17 +40,21 @@ export function LabStep({
   title,
   estimatedTime,
   description,
+  difficulty,
+  understandSection,
+  doThisSection,
   codeBlocks,
   expectedOutput,
   troubleshooting,
   tips,
   documentationUrl,
   isCompleted,
+  isLocked = false,
   onComplete,
   onVerify,
   onSuccess,
 }: LabStepProps) {
-  const [isExpanded, setIsExpanded] = useState(!isCompleted);
+  const [isExpanded, setIsExpanded] = useState(!isCompleted && !isLocked);
   const [showExpectedOutput, setShowExpectedOutput] = useState(false);
   const [showSolutions, setShowSolutions] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
@@ -80,6 +89,31 @@ export function LabStep({
     toast.info("Solution revealed. Potential score for this step reduced by 50%.");
   };
 
+  // If locked, show a collapsed locked state
+  if (isLocked) {
+    return (
+      <div className="rounded-lg border border-border bg-muted/30 opacity-60">
+        <div className="flex items-center gap-4 p-4">
+          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+            <Lock className="w-4 h-4 text-muted-foreground" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground font-mono">Step {stepNumber}</span>
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Clock className="w-3 h-3" />
+                {estimatedTime}
+              </span>
+              {difficulty && <DifficultyBadge level={difficulty} />}
+            </div>
+            <h3 className="font-semibold text-muted-foreground">{title}</h3>
+          </div>
+          <span className="text-xs text-muted-foreground">Complete previous step to unlock</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cn(
       'rounded-lg border transition-all',
@@ -106,12 +140,13 @@ export function LabStep({
         </div>
 
         <div className="flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-muted-foreground font-mono">Step {stepNumber}</span>
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
               <Clock className="w-3 h-3" />
               {estimatedTime}
             </span>
+            {difficulty && <DifficultyBadge level={difficulty} />}
           </div>
           <h3 className={cn(
             'font-semibold',
@@ -131,7 +166,36 @@ export function LabStep({
       {/* Step Content */}
       {isExpanded && (
         <div className="px-4 pb-4 pt-0 space-y-4">
-          <p className="text-muted-foreground pl-12">{description}</p>
+          {/* UNDERSTAND Section */}
+          {understandSection && (
+            <div className="ml-12 p-4 rounded-lg bg-accent/50 border border-accent">
+              <div className="flex items-center gap-2 mb-2">
+                <BookOpen className="w-4 h-4 text-accent-foreground" />
+                <span className="text-sm font-semibold">📖 UNDERSTAND</span>
+              </div>
+              <p className="text-sm text-muted-foreground">{understandSection}</p>
+            </div>
+          )}
+
+          {/* DO THIS Section */}
+          {doThisSection && doThisSection.length > 0 && (
+            <div className="ml-12 p-4 rounded-lg bg-primary/5 border border-primary/20">
+              <div className="flex items-center gap-2 mb-2">
+                <ListChecks className="w-4 h-4 text-primary" />
+                <span className="text-sm font-semibold text-primary">✅ DO THIS</span>
+              </div>
+              <ol className="text-sm space-y-2 list-decimal list-inside">
+                {doThisSection.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {/* Description (shown if no UNDERSTAND/DO sections) */}
+          {!understandSection && !doThisSection && (
+            <p className="text-muted-foreground pl-12">{description}</p>
+          )}
 
           {/* Tips */}
           {tips && tips.length > 0 && (

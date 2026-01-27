@@ -13,18 +13,11 @@ interface RoleContextType {
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
-// Simple obfuscation - PIN stored as reversed base64  
-// btoa("163500") = "MTYzNTAw", reversed = "wATNzYTM"
-const OBFUSCATED_PIN = 'wATNzYTM'; // 163500 reversed base64
+// Simple PIN check for workshop setting
+const CORRECT_PIN = '163500';
 
-function deobfuscatePin(): string {
-  try {
-    // Reverse the string and decode
-    const reversed = OBFUSCATED_PIN.split('').reverse().join('');
-    return atob(reversed);
-  } catch {
-    return '';
-  }
+function verifyPin(pin: string): boolean {
+  return pin === CORRECT_PIN;
 }
 
 export function RoleProvider({ children }: { children: ReactNode }) {
@@ -46,8 +39,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const verifyModeratorPin = useCallback((pin: string): boolean => {
-    const correctPin = deobfuscatePin();
-    return pin === correctPin;
+    return verifyPin(pin);
   }, []);
 
   const logout = useCallback(() => {

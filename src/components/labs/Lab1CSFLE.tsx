@@ -1,6 +1,7 @@
-import { LabView } from './LabView';
+import { LabViewWithTabs } from './LabViewWithTabs';
 import { validatorUtils } from '@/utils/validatorUtils';
 import { useLab } from '@/context/LabContext';
+import { DifficultyLevel } from './DifficultyBadge';
 
 export function Lab1CSFLE() {
   const { mongoUri, awsAccessKeyId, awsSecretAccessKey, awsRegion, verifiedTools } = useLab();
@@ -8,12 +9,30 @@ export function Lab1CSFLE() {
   const aliasName = `alias/mongodb-lab-key-${suffix}`;
   const cryptSharedLibPath = verifiedTools['mongoCryptShared']?.path || '';
 
-  const lab1Steps = [
+  const lab1Steps: Array<{
+    id: string;
+    title: string;
+    estimatedTime: string;
+    description: string;
+    difficulty?: DifficultyLevel;
+    understandSection?: string;
+    doThisSection?: string[];
+    tips?: string[];
+    codeBlocks?: Array<{ filename: string; language: string; code: string; skeleton?: string }>;
+    onVerify?: () => Promise<{ success: boolean; message: string }>;
+  }> = [
 
     {
       id: 'l1s1',
       title: 'Infrastructure: Create Customer Master Key (CMK)',
       estimatedTime: '10 min',
+      difficulty: 'basic' as DifficultyLevel,
+      understandSection: 'The CMK is the root of trust in Envelope Encryption. It never leaves the KMS Hardware Security Module (HSM). This key will "wrap" (encrypt) the Data Encryption Keys (DEKs) that MongoDB stores.',
+      doThisSection: [
+        'Run the AWS CLI command to create a new symmetric key',
+        'Create an alias for easier reference',
+        'Save the Key ID for the next step'
+      ],
       description: 'The CMK is the root of trust in Envelope Encryption. In this step, you will create a CMK and an alias using the AWS CLI. This key will "wrap" the Data Encryption Keys (DEKs) that MongoDB stores.',
       tips: [
         'ROOT OF TRUST: The CMK never leaves the KMS Hardware Security Module (HSM).',
@@ -525,8 +544,50 @@ main().catch(console.error);`,
     }
   ];
 
+  const introContent = {
+    whatYouWillBuild: [
+      'Create a Customer Master Key (CMK) in AWS KMS',
+      'Generate Data Encryption Keys (DEKs) stored in MongoDB',
+      'Implement automatic field-level encryption',
+      'Demonstrate the "proof": DBAs only see ciphertext'
+    ],
+    keyConcepts: [
+      {
+        term: 'Envelope Encryption',
+        explanation: 'A two-tier key system where the CMK (Customer Master Key) wraps/encrypts the DEK (Data Encryption Key). The DEK encrypts your actual data.'
+      },
+      {
+        term: 'Client-Side Encryption',
+        explanation: 'Data is encrypted BEFORE it leaves your application. MongoDB never sees plaintext - this is fundamentally different from TDE (Transparent Data Encryption).'
+      },
+      {
+        term: 'Deterministic vs Random Algorithms',
+        explanation: 'Deterministic encryption allows equality queries on encrypted data. Random encryption is more secure but doesn\'t support queries.'
+      }
+    ],
+    keyInsight: 'The breakthrough: MongoDB never sees plaintext. Ever. The client library encrypts BEFORE the data leaves your application. This is fundamentally different from TDE.',
+    architectureDiagram: (
+      <pre className="text-xs font-mono text-muted-foreground whitespace-pre overflow-x-auto">
+{`┌──────────────┐     ┌─────────────┐     ┌─────────────┐
+│  Your App    │────▶│   MongoDB   │     │   AWS KMS   │
+│  (Node.js)   │     │   Atlas     │     │   (CMK)     │
+│              │     │             │     │             │
+│ ┌──────────┐ │     │ ┌─────────┐ │     │ ┌─────────┐ │
+│ │libmongoc │◀┼─────┼─│ DEK     │◀┼─────┼─│ CMK     │ │
+│ │rypt      │ │     │ │(wrapped)│ │     │ │         │ │
+│ └──────────┘ │     │ └─────────┘ │     │ └─────────┘ │
+└──────────────┘     └─────────────┘     └─────────────┘
+        │                   │
+        ▼                   ▼
+   Data encrypted      Only ciphertext
+   BEFORE leaving      stored in DB
+   your app`}
+      </pre>
+    )
+  };
+
   return (
-    <LabView
+    <LabViewWithTabs
       labNumber={1}
       title="CSFLE Fundamentals with AWS KMS"
       description="The journey starts with the Foundation. Master the rollout of KMS infrastructure, CLI automation, and the critical IAM requirements that power MongoDB's Client-Side Encryption."
@@ -543,6 +604,7 @@ main().catch(console.error);`,
         'Map PII fields to unique compliance-bound DEKs'
       ]}
       steps={lab1Steps}
+      introContent={introContent}
     />
   );
 }
