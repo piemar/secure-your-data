@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2, Info } from 'lucide-react';
+import { useState, useCallback, useMemo } from 'react';
+import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2, Info, BookOpen, Clock } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { DifficultyBadge, DifficultyLevel } from './DifficultyBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 import Editor from '@monaco-editor/react';
+import { StepContextDrawer } from './StepContextDrawer';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 
 interface CodeBlock {
   filename: string;
@@ -366,46 +368,89 @@ export function StepView({
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
+              <StepContextDrawer
+                understandSection={currentStep.understandSection}
+                doThisSection={currentStep.doThisSection}
+                hints={currentStep.hints}
+                tips={currentStep.tips}
+                troubleshooting={currentStep.troubleshooting}
+              />
             </div>
           </div>
         </div>
 
-        {/* Code Editor - Full Height */}
+        {/* Code Editor & Output - Resizable Split */}
         <div className="flex-1 overflow-hidden min-h-0">
           {currentStep.codeBlocks && currentStep.codeBlocks.length > 0 ? (
-            <div className="h-full flex flex-col">
-              {currentStep.codeBlocks.map((block, idx) => (
-                <div key={idx} className="h-full flex flex-col">
-                  <div className="flex-shrink-0 px-4 py-2 bg-muted/50 border-b border-border flex items-center justify-between">
-                    <span className="text-xs font-mono text-muted-foreground">{block.filename}</span>
-                    {currentStep.estimatedTime && (
-                      <span className="text-xs text-muted-foreground">
-                        ⏱️ {currentStep.estimatedTime}
+            <ResizablePanelGroup direction="vertical" className="h-full">
+              {/* Code Editor Panel */}
+              <ResizablePanel defaultSize={outputOpen ? 50 : 85} minSize={30}>
+                <div className="h-full flex flex-col">
+                  {currentStep.codeBlocks.map((block, idx) => (
+                    <div key={idx} className="h-full flex flex-col">
+                      <div className="flex-shrink-0 px-4 py-2 bg-muted/50 border-b border-border flex items-center justify-between">
+                        <span className="text-xs font-mono text-muted-foreground">{block.filename}</span>
+                        {currentStep.estimatedTime && (
+                          <span className="text-xs text-muted-foreground">
+                            ⏱️ {currentStep.estimatedTime}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-h-0">
+                        {/* Wrap Monaco in stable container to fix ref warning */}
+                        <div className="h-full w-full">
+                          <Editor
+                            key={`editor-${currentStepIndex}-${idx}`}
+                            height="100%"
+                            language={block.language === 'bash' ? 'shell' : block.language}
+                            value={block.code}
+                            theme="vs-dark"
+                            options={{
+                              readOnly: true,
+                              minimap: { enabled: false },
+                              fontSize: 13,
+                              lineNumbers: 'on',
+                              scrollBeyondLastLine: false,
+                              wordWrap: 'on',
+                              automaticLayout: true,
+                              tabSize: 2,
+                              padding: { top: 12, bottom: 12 },
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ResizablePanel>
+
+              {/* Resizable Handle */}
+              <ResizableHandle withHandle className="bg-border hover:bg-primary/50 transition-colors" />
+
+              {/* Output Panel */}
+              <ResizablePanel defaultSize={outputOpen ? 50 : 15} minSize={10} collapsible>
+                <div className="h-full flex flex-col bg-[hsl(220,20%,6%)]">
+                  <button 
+                    onClick={() => setOutputOpen(!outputOpen)}
+                    className="flex-shrink-0 flex items-center gap-2 px-6 py-2 border-t border-border bg-muted/50 hover:bg-muted transition-colors text-sm"
+                  >
+                    {outputOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                    <Terminal className="w-4 h-4 text-primary" />
+                    <span>Output</span>
+                    {lastOutput && !outputOpen && (
+                      <span className="text-xs text-muted-foreground ml-2">
+                        (Drag handle or click to expand)
                       </span>
                     )}
-                  </div>
-                  <div className="flex-1 min-h-0">
-                    <Editor
-                      height="100%"
-                      language={block.language === 'bash' ? 'shell' : block.language}
-                      value={block.code}
-                      theme="vs-dark"
-                      options={{
-                        readOnly: true,
-                        minimap: { enabled: false },
-                        fontSize: 13,
-                        lineNumbers: 'on',
-                        scrollBeyondLastLine: false,
-                        wordWrap: 'on',
-                        automaticLayout: true,
-                        tabSize: 2,
-                        padding: { top: 12, bottom: 12 },
-                      }}
-                    />
+                  </button>
+                  <div className="flex-1 overflow-auto px-6 py-4">
+                    <pre className="font-mono text-sm text-primary whitespace-pre-wrap">
+                      {lastOutput || '// Run "Check My Progress" to see output'}
+                    </pre>
                   </div>
                 </div>
-              ))}
-            </div>
+              </ResizablePanel>
+            </ResizablePanelGroup>
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground">
               <div className="text-center">
@@ -418,65 +463,57 @@ export function StepView({
             </div>
           )}
         </div>
-
-        {/* Output Panel */}
-        <Collapsible open={outputOpen} onOpenChange={setOutputOpen}>
-          <CollapsibleTrigger asChild>
-            <button className="w-full flex items-center gap-2 px-6 py-2 border-t border-border bg-muted/50 hover:bg-muted transition-colors text-sm">
-              {outputOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-              <Terminal className="w-4 h-4 text-primary" />
-              <span>Output</span>
-              {lastOutput && !outputOpen && (
-                <span className="text-xs text-muted-foreground ml-2">
-                  (Click to expand)
-                </span>
-              )}
-            </button>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <motion.div
-              initial={{ height: 0 }}
-              animate={{ height: 'auto' }}
-              exit={{ height: 0 }}
-              className="px-6 py-4 bg-[hsl(220,20%,6%)] border-t border-border max-h-64 overflow-auto"
-            >
-              <pre className="font-mono text-sm text-primary whitespace-pre-wrap">
-                {lastOutput || '// Run "Check My Progress" to see output'}
-              </pre>
-            </motion.div>
-          </CollapsibleContent>
-        </Collapsible>
       </div>
 
       {/* Footer Navigation - Always Visible */}
       <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-t border-border bg-card">
-        <div className="flex items-center gap-1.5">
-          {steps.map((_, index) => (
-            <motion.button
-              key={index}
-              onClick={() => {
-                setDirection(index > currentStepIndex ? 1 : -1);
-                onStepChange(index);
-              }}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              className={cn(
-                'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all',
-                index === currentStepIndex
-                  ? 'bg-primary text-primary-foreground ring-2 ring-primary/30'
-                  : completedSteps.includes(index)
-                  ? 'bg-primary/20 text-primary'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              )}
-            >
-              {completedSteps.includes(index) ? (
-                <CheckCircle2 className="w-4 h-4" />
-              ) : (
-                index + 1
-              )}
-            </motion.button>
-          ))}
-        </div>
+        <TooltipProvider delayDuration={200}>
+          <div className="flex items-center gap-1.5">
+            {steps.map((step, index) => (
+              <Tooltip key={index}>
+                <TooltipTrigger asChild>
+                  <motion.button
+                    onClick={() => {
+                      setDirection(index > currentStepIndex ? 1 : -1);
+                      onStepChange(index);
+                    }}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={cn(
+                      'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all',
+                      index === currentStepIndex
+                        ? 'bg-primary text-primary-foreground ring-2 ring-primary/30'
+                        : completedSteps.includes(index)
+                        ? 'bg-primary/20 text-primary'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    )}
+                  >
+                    {completedSteps.includes(index) ? (
+                      <CheckCircle2 className="w-4 h-4" />
+                    ) : (
+                      index + 1
+                    )}
+                  </motion.button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[200px]">
+                  <div className="space-y-1">
+                    <p className="font-medium text-sm">{step.title}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Clock className="w-3 h-3" />
+                      <span>{step.estimatedTime}</span>
+                      {completedSteps.includes(index) && (
+                        <span className="text-green-500 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          Done
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
+        </TooltipProvider>
 
         <div className="flex items-center gap-2">
           <Button
