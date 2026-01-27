@@ -25,14 +25,13 @@ export function AttendeeRegistration({ onComplete }: AttendeeRegistrationProps) 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!displayName.trim()) return;
+    if (!displayName.trim() || !email.trim() || !email.includes('@')) return;
 
     setIsSubmitting(true);
     
-    // Store attendee info - use provided email or generate from name
-    const userEmailValue = email.trim() || displayName.trim().toLowerCase().replace(/\s+/g, '.') + '@workshop.local';
+    // Store attendee info
     localStorage.setItem('workshop_attendee_name', displayName.trim());
-    setUserEmail(userEmailValue);
+    setUserEmail(email.trim());
     
     // Small delay for UX
     await new Promise(r => setTimeout(r, 300));
@@ -79,11 +78,11 @@ export function AttendeeRegistration({ onComplete }: AttendeeRegistrationProps) 
               />
             </div>
 
-            {/* Email (Optional) */}
+            {/* Email (Required) */}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm flex items-center gap-2">
                 <Mail className="w-4 h-4 text-muted-foreground" />
-                Email <span className="text-muted-foreground">(optional)</span>
+                Email <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="email"
@@ -91,14 +90,15 @@ export function AttendeeRegistration({ onComplete }: AttendeeRegistrationProps) 
                 placeholder="your.email@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="h-12 bg-background border-border"
+                className="h-12 bg-background border-primary/50 focus:border-primary"
+                required
               />
             </div>
             
             {/* Submit Button */}
             <Button
               type="submit"
-              disabled={!displayName.trim() || isSubmitting}
+              disabled={!displayName.trim() || !email.trim() || !email.includes('@') || isSubmitting}
               className="w-full h-12 text-base font-semibold gap-2 bg-primary hover:bg-primary/90"
               size="lg"
             >
