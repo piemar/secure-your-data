@@ -61,7 +61,9 @@ export function InlineHintEditor({
           positions.push({
             hintIdx,
             line: hint.line,
-            column: blankMatch.index + blankMatch[0].length + 1, // Position at end of blank
+            // Monaco uses 1-indexed columns, regex index is 0-indexed
+            // Position right after the last underscore character
+            column: blankMatch.index + Math.floor(blankMatch[0].length / 2) + 1,
             hint,
           });
         }
@@ -174,8 +176,8 @@ export function InlineHintEditor({
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: hintIdx * 0.05, type: "spring", stiffness: 400, damping: 20 }}
                 style={{ 
-                  top: pos.top,
-                  left: pos.left + 4, // Small offset from the blank
+                  top: pos.top - 2, // Slight vertical adjustment to center on text
+                  left: pos.left,
                 }}
               >
                 <InlineHintMarker
