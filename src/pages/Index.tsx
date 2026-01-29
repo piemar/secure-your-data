@@ -44,7 +44,8 @@ function ContentRouter() {
     case 'lab1':
       return <Lab1CSFLE />;
     case 'lab2':
-      if (!isLabAccessible(2)) {
+      // Moderators have access to all labs, attendees need to complete Lab 1 first
+      if (!isModerator && !isLabAccessible(2)) {
         return (
           <div className="flex items-center justify-center h-full p-8">
             <Alert className="max-w-2xl">
@@ -66,7 +67,8 @@ function ContentRouter() {
       }
       return <Lab2QueryableEncryption />;
     case 'lab3':
-      if (!isLabAccessible(3)) {
+      // Moderators have access to all labs, attendees need to complete Lab 1 first
+      if (!isModerator && !isLabAccessible(3)) {
         return (
           <div className="flex items-center justify-center h-full p-8">
             <Alert className="max-w-2xl">

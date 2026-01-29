@@ -200,7 +200,8 @@ export function AppSidebar() {
           const Icon = item.icon;
           const isActive = currentSection === item.id;
           const labNumber = item.id.startsWith('lab') ? parseInt(item.id.replace('lab', '')) : null;
-          const isLocked = labNumber !== null && labNumber > 1 && !isLabAccessible(labNumber);
+          // Moderators have access to all labs - never show as locked
+          const isLocked = !isModerator && labNumber !== null && labNumber > 1 && !isLabAccessible(labNumber);
           const isLabComplete = labNumber !== null && completedLabs.includes(labNumber);
 
           return (
