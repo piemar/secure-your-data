@@ -434,9 +434,9 @@ async function run() {
 run().catch(console.error);`,
           // Inline hints for Lab 3 Step 2 - line numbers match skeleton
           inlineHints: [
-            { line: 16, blankText: '_______', hint: 'Prefix for tenant-specific key names', answer: 'tenant' },
-            { line: 21, blankText: '___________', hint: 'Field to query for existing DEK names', answer: 'keyAltNames' },
-            { line: 26, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' }
+            { line: 28, blankText: '_______', hint: 'Prefix for tenant-specific key names', answer: 'tenant' },
+            { line: 33, blankText: '___________', hint: 'Field to query for existing DEK names', answer: 'keyAltNames' },
+            { line: 38, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' }
           ]
         },
         {

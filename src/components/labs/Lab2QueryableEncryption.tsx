@@ -597,12 +597,12 @@ async function run() {
 run().catch(console.error);`,
           // Inline hints for Step 3 - line numbers match skeleton
           inlineHints: [
-            { line: 14, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
-            { line: 18, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
-            { line: 28, blankText: '___', hint: 'BSON type for integer values', answer: 'int' },
-            { line: 29, blankText: '______', hint: 'Field name for tax identification', answer: 'taxId' },
-            { line: 34, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
-            { line: 46, blankText: '___________', hint: 'Method to insert multiple documents', answer: 'insertMany' }
+            { line: 18, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
+            { line: 22, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
+            { line: 32, blankText: '___', hint: 'BSON type for integer values', answer: 'int' },
+            { line: 33, blankText: '______', hint: 'Field name for tax identification', answer: 'taxId' },
+            { line: 38, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
+            { line: 50, blankText: '___________', hint: 'Method to insert multiple documents', answer: 'insertMany' }
           ]
         },
         {
