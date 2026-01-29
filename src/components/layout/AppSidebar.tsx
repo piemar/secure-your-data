@@ -31,6 +31,11 @@ interface NavItem {
   moderatorOnly?: boolean;
 }
 
+interface AppSidebarProps {
+  isMobileOverlay?: boolean;
+  onMobileNavigate?: (section: string) => void;
+}
+
 const navItems: NavItem[] = [
   {
     id: 'presentation',
@@ -71,7 +76,7 @@ const navItems: NavItem[] = [
   },
 ];
 
-export function AppSidebar() {
+export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSidebarProps) {
   const { currentSection, setSection, sidebarOpen, toggleSidebar } = useNavigation();
   const { isLabAccessible, userEmail, currentScore, completedLabs, resetProgress } = useLab();
   const { isModerator, logout } = useRole();
@@ -126,11 +131,19 @@ export function AppSidebar() {
 
   const attendeeName = localStorage.getItem('workshop_attendee_name') || 'Attendee';
 
+  // For mobile overlay, always show expanded
+  const isExpanded = isMobileOverlay || sidebarOpen;
+
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 flex flex-col h-screen border-r border-sidebar-border bg-sidebar transition-all duration-300 z-40',
-        sidebarOpen ? 'w-64' : 'w-16'
+        'flex flex-col h-screen bg-sidebar transition-all duration-300',
+        // Desktop: fixed sidebar with border
+        !isMobileOverlay && 'fixed left-0 top-0 border-r border-sidebar-border z-40',
+        // Desktop width based on collapsed state
+        !isMobileOverlay && (sidebarOpen ? 'w-64' : 'w-16'),
+        // Mobile overlay: full width within sheet
+        isMobileOverlay && 'w-full'
       )}
     >
       {/* Logo */}
@@ -138,7 +151,7 @@ export function AppSidebar() {
         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-primary-foreground font-bold">
           M
         </div>
-        {sidebarOpen && (
+        {isExpanded && (
           <div className="flex flex-col">
             <span className="text-sm font-semibold text-sidebar-foreground">MongoDB</span>
             <span className="text-xs text-muted-foreground">Encryption Workshop</span>
@@ -147,7 +160,7 @@ export function AppSidebar() {
       </div>
 
       {/* User Info / Moderator Badge */}
-      {sidebarOpen ? (
+      {isExpanded ? (
         <div className="mx-2 mt-2 p-3 rounded-lg bg-card/50 border border-border">
           {isModerator ? (
             <div className="flex items-center gap-2 text-primary text-sm font-medium">
@@ -184,7 +197,7 @@ export function AppSidebar() {
       )}
 
       {/* Progress Bar */}
-      {sidebarOpen && !isModerator && (
+      {isExpanded && !isModerator && (
         <div className="mx-2 mt-2 px-3">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
             <span>Progress</span>
@@ -204,10 +217,19 @@ export function AppSidebar() {
           const isLocked = !isModerator && labNumber !== null && labNumber > 1 && !isLabAccessible(labNumber);
           const isLabComplete = labNumber !== null && completedLabs.includes(labNumber);
 
+          const handleClick = () => {
+            if (isLocked) return;
+            if (isMobileOverlay && onMobileNavigate) {
+              onMobileNavigate(item.id);
+            } else {
+              setSection(item.id);
+            }
+          };
+
           return (
             <button
               key={item.id}
-              onClick={() => !isLocked && setSection(item.id)}
+              onClick={handleClick}
               disabled={isLocked}
               className={cn(
                 'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-left group relative',
@@ -218,10 +240,10 @@ export function AppSidebar() {
                   : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
               )}
             >
-              {isLocked && sidebarOpen && (
+              {isLocked && isExpanded && (
                 <Lock className="absolute right-2 w-4 h-4 text-muted-foreground" />
               )}
-              {isLabComplete && sidebarOpen && !isLocked && (
+              {isLabComplete && isExpanded && !isLocked && (
                 <div className="absolute right-2 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs">
                   ✓
                 </div>
@@ -232,7 +254,7 @@ export function AppSidebar() {
                   isActive ? 'text-primary' : isLocked ? 'text-muted-foreground' : 'text-muted-foreground group-hover:text-sidebar-foreground'
                 )}
               />
-              {sidebarOpen && (
+              {isExpanded && (
                 <div className="flex flex-col min-w-0 flex-1">
                   <span className="text-sm font-medium truncate">{item.label}</span>
                   {item.subLabel && (
@@ -247,8 +269,8 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {/* Keyboard shortcuts hint - only for moderators */}
-      {isModerator && sidebarOpen && (
+      {/* Keyboard shortcuts hint - only for moderators on desktop */}
+      {isModerator && isExpanded && !isMobileOverlay && (
         <div className="p-4 border-t border-sidebar-border">
           <div className="text-xs text-muted-foreground space-y-1">
             <div className="flex items-center justify-between">
@@ -273,12 +295,12 @@ export function AppSidebar() {
           size="sm"
           onClick={handleResetProgress}
           className={cn(
-            'w-full justify-start gap-2 text-muted-foreground hover:text-amber-600 hover:bg-amber-500/10',
-            !sidebarOpen && 'justify-center px-0'
+            'w-full justify-start gap-2 text-muted-foreground hover:text-warning hover:bg-warning/10',
+            !isExpanded && 'justify-center px-0'
           )}
         >
           <RotateCcw className="w-4 h-4" />
-          {sidebarOpen && <span>Reset Progress</span>}
+          {isExpanded && <span>Reset Progress</span>}
         </Button>
         <Button
           variant="ghost"
@@ -286,25 +308,27 @@ export function AppSidebar() {
           onClick={handleLogout}
           className={cn(
             'w-full justify-start gap-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10',
-            !sidebarOpen && 'justify-center px-0'
+            !isExpanded && 'justify-center px-0'
           )}
         >
           <LogOut className="w-4 h-4" />
-          {sidebarOpen && <span>Log Out</span>}
+          {isExpanded && <span>Log Out</span>}
         </Button>
       </div>
 
-      {/* Collapse toggle */}
-      <button
-        onClick={toggleSidebar}
-        className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-sidebar-accent border border-sidebar-border flex items-center justify-center hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
-      >
-        {sidebarOpen ? (
-          <ChevronLeft className="w-4 h-4" />
-        ) : (
-          <ChevronRight className="w-4 h-4" />
-        )}
-      </button>
+      {/* Collapse toggle - only show on desktop */}
+      {!isMobileOverlay && (
+        <button
+          onClick={toggleSidebar}
+          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-sidebar-accent border border-sidebar-border flex items-center justify-center hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
+        >
+          {sidebarOpen ? (
+            <ChevronLeft className="w-4 h-4" />
+          ) : (
+            <ChevronRight className="w-4 h-4" />
+          )}
+        </button>
+      )}
     </aside>
   );
 }
