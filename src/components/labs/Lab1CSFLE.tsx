@@ -626,7 +626,34 @@ async function run() {
   await client.close();
 }
 
-run().catch(console.dir);`
+run().catch(console.dir);`,
+          // Inline hints for Guided mode - line numbers match skeleton
+          inlineHints: [
+            { 
+              line: 8, 
+              blankText: '________________', 
+              hint: 'The class from mongodb package that handles encryption operations', 
+              answer: 'ClientEncryption' 
+            },
+            { 
+              line: 18, 
+              blankText: '________________', 
+              hint: 'Constructor for the encryption helper class', 
+              answer: 'ClientEncryption' 
+            },
+            { 
+              line: 26, 
+              blankText: '________________', 
+              hint: 'Method to generate a new Data Encryption Key', 
+              answer: 'createDataKey' 
+            },
+            { 
+              line: 28, 
+              blankText: '___________', 
+              hint: 'Option to assign a human-readable name to the DEK', 
+              answer: 'keyAltNames' 
+            }
+          ]
         },
         {
           filename: '3. Terminal (NOT mongosh) - Run with Node.js',
