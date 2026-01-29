@@ -206,12 +206,12 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints for Lab 3 Step 1
+          // Inline hints for Lab 3 Step 1 - line numbers match skeleton
           inlineHints: [
-            { line: 21, blankText: '______', hint: 'Method to retrieve a single document', answer: 'findOne' },
-            { line: 27, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
-            { line: 41, blankText: '_________', hint: 'Method to encrypt a value manually', answer: 'encrypt' },
-            { line: 42, blankText: '____________', hint: 'Algorithm suffix for queryable encryption', answer: 'Deterministic' }
+            { line: 22, blankText: '______', hint: 'Method to retrieve a single document', answer: 'findOne' },
+            { line: 28, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
+            { line: 42, blankText: '_________', hint: 'Method to encrypt a value manually', answer: 'encrypt' },
+            { line: 43, blankText: '____________', hint: 'Algorithm suffix for queryable encryption', answer: 'Deterministic' }
           ],
           // Tier 2: Challenge
           challengeSkeleton: `// ══════════════════════════════════════════════════════════════
@@ -432,11 +432,11 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints for Lab 3 Step 2
+          // Inline hints for Lab 3 Step 2 - line numbers match skeleton
           inlineHints: [
-            { line: 28, blankText: '_______', hint: 'Prefix for tenant-specific key names', answer: 'tenant' },
-            { line: 33, blankText: '___________', hint: 'Field to query for existing DEK names', answer: 'keyAltNames' },
-            { line: 38, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' }
+            { line: 16, blankText: '_______', hint: 'Prefix for tenant-specific key names', answer: 'tenant' },
+            { line: 21, blankText: '___________', hint: 'Field to query for existing DEK names', answer: 'keyAltNames' },
+            { line: 26, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' }
           ]
         },
         {

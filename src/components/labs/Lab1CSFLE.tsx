@@ -149,19 +149,19 @@ echo "Alias Created: ${aliasName}"`,
           // Inline hints for Guided mode - line numbers match skeleton
           inlineHints: [
             { 
-              line: 7, 
+              line: 8, 
               blankText: '_________', 
               hint: 'The AWS KMS command to create a new symmetric key', 
               answer: 'create-key' 
             },
             { 
-              line: 9, 
+              line: 10, 
               blankText: '_______', 
               hint: 'JMESPath query to extract the key identifier', 
               answer: 'KeyId' 
             },
             { 
-              line: 16, 
+              line: 22, 
               blankText: '_____________', 
               hint: 'AWS KMS command to assign a friendly name to a key', 
               answer: 'create-alias' 
@@ -327,25 +327,25 @@ aws kms ______________ --key-id $KMS_KEY_ID --policy-name default --policy file:
           // Inline hints for Guided mode - line numbers match skeleton
           inlineHints: [
             { 
-              line: 8, 
+              line: 9, 
               blankText: '____________', 
               hint: 'AWS KMS command to get details about an existing key', 
               answer: 'describe-key' 
             },
             { 
-              line: 11, 
+              line: 12, 
               blankText: '___________________', 
               hint: 'AWS STS command to get information about your identity', 
               answer: 'get-caller-identity' 
             },
             { 
-              line: 12, 
+              line: 13, 
               blankText: '________', 
               hint: 'JMESPath query to extract your AWS Account ID', 
               answer: 'Account' 
             },
             { 
-              line: 35, 
+              line: 36, 
               blankText: '______________', 
               hint: 'AWS KMS command to attach a policy to a key', 
               answer: 'put-key-policy' 
@@ -465,25 +465,25 @@ mongosh "${mongoUri}"
           // Inline hints for Guided mode - line numbers match skeleton
           inlineHints: [
             { 
-              line: 12, 
+              line: 8, 
               blankText: '_________', 
               hint: 'The database name used by MongoDB encryption operations', 
               answer: 'encryption' 
             },
             { 
-              line: 16, 
+              line: 12, 
               blankText: '____________', 
               hint: 'MongoDB method to create an index on a collection', 
               answer: 'createIndex' 
             },
             { 
-              line: 17, 
+              line: 13, 
               blankText: '___________', 
               hint: 'The field that stores alternate names for DEKs', 
               answer: 'keyAltNames' 
             },
             { 
-              line: 20, 
+              line: 16, 
               blankText: '$_______', 
               hint: 'MongoDB operator to check if a field exists', 
               answer: 'exists' 
