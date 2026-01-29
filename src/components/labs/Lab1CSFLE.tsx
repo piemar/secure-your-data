@@ -149,13 +149,13 @@ echo "Alias Created: ${aliasName}"`,
           // Inline hints for Guided mode - line numbers match skeleton
           inlineHints: [
             { 
-              line: 8, 
+              line: 9, 
               blankText: '_________', 
               hint: 'The AWS KMS command to create a new symmetric key', 
               answer: 'create-key' 
             },
             { 
-              line: 10, 
+              line: 11, 
               blankText: '_______', 
               hint: 'JMESPath query to extract the key identifier', 
               answer: 'KeyId' 
