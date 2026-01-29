@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import Editor from '@monaco-editor/react';
+import Editor, { Monaco } from '@monaco-editor/react';
 import { InlineHintMarker, type InlineHint, type SkeletonTier } from './InlineHintMarker';
 import { motion } from 'framer-motion';
 
@@ -22,6 +22,8 @@ interface BlankPosition {
   hintIdx: number;
   line: number;
   column: number;
+  blankStart: number;
+  blankLength: number;
   hint: InlineHint;
 }
 
@@ -41,6 +43,7 @@ export function InlineHintEditor({
 }: InlineHintEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [editorInstance, setEditorInstance] = useState<any>(null);
+  const [monacoInstance, setMonacoInstance] = useState<Monaco | null>(null);
   const [blankPositions, setBlankPositions] = useState<BlankPosition[]>([]);
   const [scrollTop, setScrollTop] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
@@ -55,15 +58,17 @@ export function InlineHintEditor({
       const lineIndex = hint.line - 1;
       if (lineIndex >= 0 && lineIndex < lines.length) {
         const lineText = lines[lineIndex];
-        // Find blank pattern (underscores) in this line
-        const blankMatch = lineText.match(/_+/);
+        // Find blank pattern: 5+ consecutive underscores (to avoid matching variable names like KMS_KEY_ID)
+        const blankMatch = lineText.match(/_{5,}/);
         if (blankMatch && blankMatch.index !== undefined) {
           positions.push({
             hintIdx,
             line: hint.line,
             // Monaco uses 1-indexed columns, regex index is 0-indexed
-            // Position right after the last underscore character
+            // Position at the middle of the blank
             column: blankMatch.index + Math.floor(blankMatch[0].length / 2) + 1,
+            blankStart: blankMatch.index,
+            blankLength: blankMatch[0].length,
             hint,
           });
         }
@@ -72,6 +77,27 @@ export function InlineHintEditor({
     
     return positions;
   }, []);
+
+  // Generate code with revealed answers filled in
+  const displayCode = useMemo(() => {
+    if (!inlineHints || revealedAnswers.length === 0) return code;
+    
+    const lines = code.split('\n');
+    
+    // For each revealed answer, replace the blank with the answer
+    inlineHints.forEach((hint, hintIdx) => {
+      if (revealedAnswers.includes(hintIdx)) {
+        const lineIndex = hint.line - 1;
+        if (lineIndex >= 0 && lineIndex < lines.length) {
+          const lineText = lines[lineIndex];
+          // Replace the blank pattern with the answer
+          lines[lineIndex] = lineText.replace(/_{5,}/, hint.answer);
+        }
+      }
+    });
+    
+    return lines.join('\n');
+  }, [code, inlineHints, revealedAnswers]);
 
   // Update blank positions when code or hints change
   useEffect(() => {
@@ -84,8 +110,9 @@ export function InlineHintEditor({
   }, [code, inlineHints, hasSkeleton, isSolutionRevealed, findBlankPositions]);
 
   // Handle editor mount
-  const handleEditorMount = useCallback((editor: any) => {
+  const handleEditorMount = useCallback((editor: any, monaco: Monaco) => {
     setEditorInstance(editor);
+    setMonacoInstance(monaco);
     
     // Get actual line height from Monaco
     const options = editor.getOptions();
@@ -99,6 +126,48 @@ export function InlineHintEditor({
     });
   }, [setLineHeight]);
 
+  // Apply decorations for revealed answers (green highlight)
+  useEffect(() => {
+    if (!editorInstance || !monacoInstance || !inlineHints) return;
+    
+    const decorations: any[] = [];
+    
+    // Find positions of revealed answers in the displayCode
+    const lines = displayCode.split('\n');
+    inlineHints.forEach((hint, hintIdx) => {
+      if (revealedAnswers.includes(hintIdx)) {
+        const lineIndex = hint.line - 1;
+        if (lineIndex >= 0 && lineIndex < lines.length) {
+          const lineText = lines[lineIndex];
+          // Find the answer in the line
+          const answerIndex = lineText.indexOf(hint.answer);
+          if (answerIndex !== -1) {
+            decorations.push({
+              range: new monacoInstance.Range(
+                hint.line,
+                answerIndex + 1,
+                hint.line,
+                answerIndex + hint.answer.length + 1
+              ),
+              options: {
+                inlineClassName: 'revealed-answer-green',
+              }
+            });
+          }
+        }
+      }
+    });
+    
+    // Apply decorations
+    const decorationIds = editorInstance.deltaDecorations([], decorations);
+    
+    return () => {
+      if (editorInstance) {
+        editorInstance.deltaDecorations(decorationIds, []);
+      }
+    };
+  }, [editorInstance, monacoInstance, inlineHints, revealedAnswers, displayCode]);
+
   // Calculate pixel position for a line/column in the editor
   const getPositionPixels = useCallback((lineNumber: number, column: number) => {
     if (!editorInstance) return { top: 0, left: 0 };
@@ -109,9 +178,10 @@ export function InlineHintEditor({
       const coords = editorInstance.getScrolledVisiblePosition(position);
       
       if (coords) {
+        // Adjust for marker width (w-5 = 20px, so center it)
         return {
           top: coords.top,
-          left: coords.left,
+          left: coords.left - 10, // Center the 20px marker
         };
       }
     } catch {
@@ -125,19 +195,39 @@ export function InlineHintEditor({
     
     return {
       top: (lineNumber - 1) * lineHeight + 8 - scrollTop, // 8 = padding top
-      left: lineNumWidth + (column - 1) * charWidth - scrollLeft,
+      left: lineNumWidth + (column - 1) * charWidth - scrollLeft - 10, // Center the marker
     };
   }, [editorInstance, lineHeight, scrollTop, scrollLeft]);
 
   // Show hint markers only in guided mode with unrevealed solution
+  // Only show markers for blanks that haven't been answered yet
   const showMarkers = hasSkeleton && !isSolutionRevealed && tier === 'guided' && blankPositions.length > 0;
+
+  // Filter out positions where answer is already revealed
+  const visiblePositions = blankPositions.filter(pos => !revealedAnswers.includes(pos.hintIdx));
+
+  // Configure Monaco before mount to add CSS rule for green answers
+  const handleBeforeMount = useCallback((monaco: Monaco) => {
+    // Define custom CSS for the revealed answer decoration
+    const styleElement = document.getElementById('monaco-answer-styles') || document.createElement('style');
+    styleElement.id = 'monaco-answer-styles';
+    styleElement.textContent = `
+      .revealed-answer-green {
+        color: #22c55e !important;
+        font-weight: 600;
+      }
+    `;
+    if (!document.getElementById('monaco-answer-styles')) {
+      document.head.appendChild(styleElement);
+    }
+  }, []);
 
   return (
     <div className="flex-1 min-h-[150px] sm:min-h-[200px] relative" ref={containerRef}>
       <Editor
         height="100%"
         language={language === 'bash' ? 'shell' : language}
-        value={code}
+        value={displayCode}
         theme="vs-dark"
         options={{
           readOnly: true,
@@ -154,13 +244,14 @@ export function InlineHintEditor({
           lineDecorationsWidth: 0,
           lineNumbersMinChars: 3,
         }}
+        beforeMount={handleBeforeMount}
         onMount={handleEditorMount}
       />
       
       {/* Inline Hint Markers - Positioned at each blank */}
-      {showMarkers && (
+      {showMarkers && visiblePositions.length > 0 && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {blankPositions.map(({ hintIdx, line, column, hint }) => {
+          {visiblePositions.map(({ hintIdx, line, column, hint }) => {
             const hintRevealed = revealedHints.includes(hintIdx);
             const answerRevealed = revealedAnswers.includes(hintIdx);
             const pos = getPositionPixels(line, column);
