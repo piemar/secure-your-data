@@ -11,7 +11,8 @@ import Editor from '@monaco-editor/react';
 import { StepContextDrawer } from './StepContextDrawer';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { trackHintUsage, trackSolutionReveal } from '@/utils/leaderboardUtils';
-import { InlineHintMarker, type InlineHint, type SkeletonTier } from './InlineHintMarker';
+import { type InlineHint, type SkeletonTier } from './InlineHintMarker';
+import { InlineHintEditor } from './InlineHintEditor';
 
 interface CodeBlock {
   filename: string;
@@ -458,7 +459,6 @@ export function StepView({
   });
   const [pointsDeducted, setPointsDeducted] = useState<Record<string, number>>({});
   const [skeletonTier, setSkeletonTier] = useState<Record<string, SkeletonTier>>({});
-  const editorContainerRef = useRef<HTMLDivElement>(null);
   const [lineHeight, setLineHeight] = useState(19); // Monaco default line height
 
   // Helper functions for tiered scoring
@@ -814,71 +814,22 @@ export function StepView({
                           </Button>
                         </div>
                         
-                        {/* Monaco Editor with Inline Hint Overlay */}
-                        <div className="flex-1 min-h-[150px] sm:min-h-[200px] relative">
-                          <div className="h-full w-full" ref={editorContainerRef}>
-                            <Editor
-                              key={`editor-${currentStepIndex}-${idx}-${isSolutionRevealed}`}
-                              height="100%"
-                              language={block.language === 'bash' ? 'shell' : block.language}
-                              value={displayCode}
-                              theme="vs-dark"
-                              options={{
-                                readOnly: true,
-                                minimap: { enabled: false },
-                                fontSize: 11,
-                                lineNumbers: 'on',
-                                scrollBeyondLastLine: false,
-                                wordWrap: 'on',
-                                automaticLayout: true,
-                                tabSize: 2,
-                                padding: { top: 8, bottom: 8 },
-                                lineHeight: lineHeight,
-                                folding: false,
-                                lineDecorationsWidth: 0,
-                                lineNumbersMinChars: 3,
-                              }}
-                              onMount={(editor) => {
-                                // Get actual line height from Monaco
-                                const options = editor.getOptions();
-                                setLineHeight(options.get(66) || 19); // 66 = EditorOption.lineHeight
-                              }}
-                            />
-                          </div>
-                          
-                          {/* Inline Hint Markers Overlay - Right side of editor */}
-                          {hasSkeleton && !isSolutionRevealed && block.inlineHints && block.inlineHints.length > 0 && tier === 'guided' && (
-                            <div className="absolute top-0 right-1 sm:right-3 pointer-events-none" style={{ paddingTop: 8 }}>
-                              {block.inlineHints.map((hint, hintIdx) => {
-                                const hintRevealed = (revealedHints[blockKey] || []).includes(hintIdx);
-                                const answerRevealed = (revealedAnswers[blockKey] || []).includes(hintIdx);
-                                
-                                return (
-                                  <motion.div 
-                                    key={hintIdx}
-                                    className="absolute pointer-events-auto"
-                                    initial={{ opacity: 0, scale: 0.5 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ delay: hintIdx * 0.05 }}
-                                    style={{ 
-                                      top: `${(hint.line - 1) * lineHeight}px`,
-                                      right: 0,
-                                    }}
-                                  >
-                                    <InlineHintMarker
-                                      hint={hint}
-                                      hintRevealed={hintRevealed}
-                                      answerRevealed={answerRevealed}
-                                      onRevealHint={() => revealInlineHint(blockKey, hintIdx, tier)}
-                                      onRevealAnswer={() => revealInlineAnswer(blockKey, hintIdx, tier)}
-                                      tier={tier}
-                                    />
-                                  </motion.div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
+                        {/* Monaco Editor with Inline Hint Widgets */}
+                        <InlineHintEditor
+                          key={`editor-${currentStepIndex}-${idx}-${isSolutionRevealed}`}
+                          code={displayCode}
+                          language={block.language}
+                          lineHeight={lineHeight}
+                          setLineHeight={setLineHeight}
+                          hasSkeleton={hasSkeleton}
+                          isSolutionRevealed={isSolutionRevealed}
+                          inlineHints={block.inlineHints}
+                          tier={tier}
+                          revealedHints={revealedHints[blockKey] || []}
+                          revealedAnswers={revealedAnswers[blockKey] || []}
+                          onRevealHint={(hintIdx) => revealInlineHint(blockKey, hintIdx, tier)}
+                          onRevealAnswer={(hintIdx) => revealInlineAnswer(blockKey, hintIdx, tier)}
+                        />
 
                         {/* Simplified Challenge Mode Footer - Mobile Optimized */}
                         {hasSkeleton && !isSolutionRevealed && (
