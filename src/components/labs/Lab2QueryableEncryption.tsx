@@ -145,12 +145,12 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints for Guided mode
+          // Inline hints for Guided mode - line numbers match skeleton
           inlineHints: [
-            { line: 31, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
-            { line: 33, blankText: '___________', hint: 'Property for human-readable key identifiers', answer: 'keyAltNames' },
-            { line: 38, blankText: '____________', hint: 'Same method as above for creating DEKs', answer: 'createDataKey' },
-            { line: 40, blankText: '___________', hint: 'The keyAltName for the taxId field DEK', answer: 'qe-taxid-dek' }
+            { line: 32, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
+            { line: 34, blankText: '___________', hint: 'Property for human-readable key identifiers', answer: 'keyAltNames' },
+            { line: 39, blankText: '____________', hint: 'Same method as above for creating DEKs', answer: 'createDataKey' },
+            { line: 41, blankText: '___________', hint: 'The keyAltName for the taxId field DEK', answer: 'qe-taxid-dek' }
           ],
           // Tier 2: Challenge
           challengeSkeleton: `// ══════════════════════════════════════════════════════════════
@@ -344,13 +344,13 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints for Step 2
+          // Inline hints for Step 2 - line numbers match skeleton
           inlineHints: [
-            { line: 14, blankText: '______', hint: 'Method to find a single document by query', answer: 'findOne' },
-            { line: 18, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
-            { line: 27, blankText: '_______', hint: 'The field name for salary data', answer: 'salary' },
-            { line: 30, blankText: '________', hint: 'Query type for searching encrypted fields', answer: 'equality' },
-            { line: 43, blankText: '________________', hint: 'Method to create a new collection', answer: 'createCollection' }
+            { line: 11, blankText: '______', hint: 'Method to find a single document by query', answer: 'findOne' },
+            { line: 15, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
+            { line: 25, blankText: '_______', hint: 'The field name for salary data', answer: 'salary' },
+            { line: 28, blankText: '________', hint: 'Query type for searching encrypted fields', answer: 'equality' },
+            { line: 41, blankText: '________________', hint: 'Method to create a new collection', answer: 'createCollection' }
           ]
         },
         {
@@ -595,13 +595,14 @@ async function run() {
 }
 
 run().catch(console.error);`,
+          // Inline hints for Step 3 - line numbers match skeleton
           inlineHints: [
-            { line: 18, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
-            { line: 22, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
-            { line: 32, blankText: '___', hint: 'BSON type for integer values', answer: 'int' },
-            { line: 33, blankText: '______', hint: 'Field name for tax identification', answer: 'taxId' },
-            { line: 38, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
-            { line: 49, blankText: '___________', hint: 'Method to insert multiple documents', answer: 'insertMany' }
+            { line: 14, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
+            { line: 18, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
+            { line: 28, blankText: '___', hint: 'BSON type for integer values', answer: 'int' },
+            { line: 29, blankText: '______', hint: 'Field name for tax identification', answer: 'taxId' },
+            { line: 34, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
+            { line: 46, blankText: '___________', hint: 'Method to insert multiple documents', answer: 'insertMany' }
           ]
         },
         {
