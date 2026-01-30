@@ -5,6 +5,8 @@ import { StepView } from './StepView';
 import { useLab } from '@/context/LabContext';
 import { heartbeat } from '@/utils/leaderboardUtils';
 import { DifficultyLevel } from './DifficultyBadge';
+import { Database, Lightbulb } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Exercise {
   id: string;
@@ -128,13 +130,14 @@ export function LabViewWithTabs({
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-        <div className="sticky top-0 z-10 bg-background border-b border-border px-6 py-3">
-          <div className="flex items-center justify-between">
+        <div className="sticky top-0 z-10 bg-background border-b border-border px-4 sm:px-6 py-2 sm:py-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            {/* Left: Tabs */}
             <TabsList className="bg-transparent">
-              <TabsTrigger value="overview" className="gap-2">
+              <TabsTrigger value="overview" className="gap-2 text-xs sm:text-sm">
                 📖 Overview
               </TabsTrigger>
-              <TabsTrigger value="steps" className="gap-2">
+              <TabsTrigger value="steps" className="gap-2 text-xs sm:text-sm">
                 🔧 Steps
                 {completedSteps.length > 0 && (
                   <span className="ml-1 px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs">
@@ -143,6 +146,45 @@ export function LabViewWithTabs({
                 )}
               </TabsTrigger>
             </TabsList>
+            
+            {/* Right: Atlas Capability & Business Value - Compact Inline */}
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              {atlasCapability && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10 text-primary text-xs cursor-help">
+                        <Database className="w-3 h-3" />
+                        <span className="hidden sm:inline">Atlas:</span>
+                        <span className="font-medium truncate max-w-[120px] sm:max-w-[180px]">{atlasCapability}</span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs">
+                      <p className="text-sm font-medium">Atlas Capability</p>
+                      <p className="text-sm text-muted-foreground">{atlasCapability}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              
+              {businessValue && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 text-amber-600 text-xs cursor-help">
+                        <Lightbulb className="w-3 h-3" />
+                        <span className="hidden sm:inline truncate max-w-[150px]">Business Value</span>
+                        <span className="sm:hidden">Value</span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs">
+                      <p className="text-sm font-medium">💡 Business Value</p>
+                      <p className="text-sm text-muted-foreground">{businessValue}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
           </div>
         </div>
 
