@@ -639,129 +639,114 @@ export function StepView({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header - Sticky - Mobile Optimized */}
-      <div className="border-b border-border px-3 sm:px-6 py-3 sm:py-4">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1">
-              <span className="text-xs font-mono text-muted-foreground border border-border px-1.5 sm:px-2 py-0.5 rounded">
-                Lab {String(labNumber).padStart(2, '0')}
-              </span>
-              {currentStep.difficulty && (
-                <DifficultyBadge level={currentStep.difficulty} />
-              )}
-              {isCompleted && (
-                <span className="flex items-center gap-1 text-xs text-green-600 bg-green-500/10 px-1.5 sm:px-2 py-0.5 rounded">
-                  <CheckCircle2 className="w-3 h-3" />
-                  <span className="hidden xs:inline">Completed</span>
-                </span>
-              )}
-            </div>
-            <h1 className="text-lg sm:text-xl font-bold truncate">{labTitle}</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 line-clamp-2 sm:line-clamp-1">{labDescription}</p>
-          </div>
-          {atlasCapability && (
-            <div className="text-left sm:text-right flex-shrink-0">
-              <span className="text-xs text-muted-foreground">Atlas Capability</span>
-              <div className="text-xs font-mono text-primary bg-primary/10 px-2 py-1 rounded mt-0.5 inline-block sm:block">
-                {atlasCapability}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Business Value Banner - Mobile Optimized */}
-        {businessValue && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-2 sm:mt-3 flex items-start sm:items-center gap-2 text-xs sm:text-sm bg-primary/10 text-primary px-2 sm:px-3 py-1.5 sm:py-2 rounded-md"
-          >
-            <Lightbulb className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 mt-0.5 sm:mt-0" />
-            <span className="line-clamp-2 sm:line-clamp-none">
-              <strong>Business Value:</strong> {businessValue}
+      {/* Compact Header - Single Row */}
+      <div className="flex-shrink-0 border-b border-border px-3 sm:px-4 py-2 bg-muted/30">
+        <div className="flex items-center justify-between gap-2">
+          {/* Left: Lab info + Step info */}
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <span className="flex-shrink-0 text-[10px] sm:text-xs font-mono text-muted-foreground border border-border px-1.5 py-0.5 rounded">
+              Lab {String(labNumber).padStart(2, '0')}
             </span>
-          </motion.div>
-        )}
+            {currentStep.difficulty && (
+              <DifficultyBadge level={currentStep.difficulty} size="sm" className="hidden xs:flex" />
+            )}
+            <div className="min-w-0 flex-1">
+              <AnimatePresence mode="wait" custom={direction}>
+                <motion.div
+                  key={currentStepIndex}
+                  custom={direction}
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.15, ease: 'easeOut' }}
+                  className="flex items-center gap-1.5 sm:gap-2"
+                >
+                  <span className="text-xs text-muted-foreground flex-shrink-0">
+                    Step {currentStepIndex + 1}/{steps.length}:
+                  </span>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-xs sm:text-sm font-medium truncate cursor-help">
+                          {currentStep.title}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-xs">
+                        <p className="text-sm">{currentStep.description}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  {currentStep.estimatedTime && (
+                    <span className="hidden sm:inline text-[10px] sm:text-xs text-muted-foreground flex-shrink-0">
+                      ⏱️ {currentStep.estimatedTime}
+                    </span>
+                  )}
+                  {isCompleted && (
+                    <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4 text-green-500 flex-shrink-0" />
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* Right: Actions */}
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            <Button
+              size="sm"
+              onClick={handleCheckProgress}
+              disabled={isRunning || !currentStep.codeBlocks?.length}
+              className="gap-1 h-7 sm:h-8 text-xs px-2 sm:px-3"
+            >
+              {isRunning ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-3 h-3" />
+              )}
+              <span className="hidden xs:inline">{isRunning ? 'Checking...' : 'Check'}</span>
+            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="p-1 rounded-md bg-amber-500/10 text-amber-600 cursor-help">
+                    <Info className="w-3 h-3" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs">
+                  <p className="text-sm">
+                    <strong>Local execution required:</strong> Run <code className="bg-muted px-1 rounded">npm run dev</code> locally with AWS CLI and mongosh.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <StepContextDrawer
+              understandSection={currentStep.understandSection}
+              doThisSection={currentStep.doThisSection}
+              hints={currentStep.hints}
+              tips={currentStep.tips}
+              troubleshooting={currentStep.troubleshooting}
+              businessValue={businessValue}
+              atlasCapability={atlasCapability}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-        {/* Step Header with Actions - Mobile Optimized */}
-        <div className="flex-shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 px-3 sm:px-6 py-2 sm:py-3 border-b border-border bg-muted/30">
-          <div className="flex-1 min-w-0">
-            <AnimatePresence mode="wait" custom={direction}>
-              <motion.div
-                key={currentStepIndex}
-                custom={direction}
-                variants={slideVariants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{ duration: 0.2, ease: 'easeInOut' }}
-              >
-                <h2 className="font-semibold truncate text-sm sm:text-base">{currentStep.title}</h2>
-                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 line-clamp-2 sm:line-clamp-1">{currentStep.description}</p>
-              </motion.div>
-            </AnimatePresence>
-          </div>
-
-          <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 flex-shrink-0">
-            <span className="text-xs sm:text-sm text-muted-foreground">
-              Step {currentStepIndex + 1}/{steps.length}
-            </span>
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <Button
-                size="sm"
-                onClick={handleCheckProgress}
-                disabled={isRunning || !currentStep.codeBlocks?.length}
-                className="gap-1 sm:gap-2 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3"
-              >
-                {isRunning ? (
-                  <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                )}
-                <span className="hidden xs:inline">{isRunning ? 'Checking...' : 'Check My Progress'}</span>
-                <span className="xs:hidden">{isRunning ? '...' : 'Check'}</span>
-              </Button>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="p-1 sm:p-1.5 rounded-md bg-amber-500/10 text-amber-600 cursor-help">
-                      <Info className="w-3 h-3 sm:w-4 sm:h-4" />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-xs">
-                    <p className="text-sm">
-                      <strong>Local execution required:</strong> Real environment validation only works when running <code className="bg-muted px-1 rounded">npm run dev</code> locally on your machine with AWS CLI and mongosh installed.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <StepContextDrawer
-                understandSection={currentStep.understandSection}
-                doThisSection={currentStep.doThisSection}
-                hints={currentStep.hints}
-                tips={currentStep.tips}
-                troubleshooting={currentStep.troubleshooting}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Read-Only Mode Toggle - Mobile Optimized */}
+        {/* Read-Only Mode Toggle - Compact */}
         {hasSkeletons && (
-          <div className="flex-shrink-0 flex items-center gap-2 px-3 sm:px-6 py-1.5 sm:py-2 border-b border-border bg-muted/20">
+          <div className="flex-shrink-0 flex items-center gap-2 px-3 sm:px-4 py-1 border-b border-border bg-muted/20">
             <Switch 
               id="read-only-mode"
               checked={alwaysShowSolutions} 
               onCheckedChange={setAlwaysShowSolutions}
+              className="scale-90"
             />
-            <Label htmlFor="read-only-mode" className="text-xs sm:text-sm text-muted-foreground cursor-pointer">
+            <Label htmlFor="read-only-mode" className="text-[10px] sm:text-xs text-muted-foreground cursor-pointer">
               <Unlock className="w-3 h-3 inline mr-1" />
-              <span className="hidden sm:inline">Read-only mode (show all solutions)</span>
-              <span className="sm:hidden">Show solutions</span>
+              <span className="hidden sm:inline">Read-only mode (show solutions)</span>
+              <span className="sm:hidden">Solutions</span>
             </Label>
           </div>
         )}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BookOpen, CheckSquare, Lightbulb, AlertTriangle, Sparkles, ChevronDown } from 'lucide-react';
+import { BookOpen, CheckSquare, Lightbulb, AlertTriangle, Sparkles, Database, Target } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -11,6 +11,8 @@ interface StepContextDrawerProps {
   hints?: string[];
   tips?: string[];
   troubleshooting?: string[];
+  businessValue?: string;
+  atlasCapability?: string;
   trigger?: React.ReactNode;
 }
 
@@ -20,11 +22,13 @@ export function StepContextDrawer({
   hints,
   tips,
   troubleshooting,
+  businessValue,
+  atlasCapability,
   trigger,
 }: StepContextDrawerProps) {
   const [revealedHints, setRevealedHints] = useState<number[]>([]);
 
-  const hasContent = understandSection || doThisSection?.length || hints?.length || tips?.length || troubleshooting?.length;
+  const hasContent = understandSection || doThisSection?.length || hints?.length || tips?.length || troubleshooting?.length || businessValue || atlasCapability;
 
   if (!hasContent) return null;
 
@@ -38,9 +42,10 @@ export function StepContextDrawer({
     <Sheet>
       <SheetTrigger asChild>
         {trigger || (
-          <Button variant="outline" size="sm" className="gap-2">
-            <BookOpen className="w-4 h-4" />
-            Help & Tips
+          <Button variant="outline" size="sm" className="gap-1.5 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3">
+            <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden xs:inline">Help & Tips</span>
+            <span className="xs:hidden">Help</span>
           </Button>
         )}
       </SheetTrigger>
@@ -53,6 +58,34 @@ export function StepContextDrawer({
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
+          {/* Context Section - Business Value & Atlas Capability */}
+          {(businessValue || atlasCapability) && (
+            <section className="space-y-3">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Target className="w-4 h-4 text-primary" />
+                Lab Context
+              </h3>
+              {atlasCapability && (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
+                  <Database className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-xs text-muted-foreground">Atlas Capability</span>
+                    <p className="text-sm font-mono text-primary">{atlasCapability}</p>
+                  </div>
+                </div>
+              )}
+              {businessValue && (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <Lightbulb className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-xs text-muted-foreground">Business Value</span>
+                    <p className="text-sm text-foreground">{businessValue}</p>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
           {/* Understand Section */}
           {understandSection && (
             <section>
