@@ -4,6 +4,7 @@ export type DifficultyLevel = 'basic' | 'intermediate' | 'advanced';
 
 interface DifficultyBadgeProps {
   level: DifficultyLevel;
+  size?: 'sm' | 'default';
   className?: string;
 }
 
@@ -25,16 +26,17 @@ const difficultyConfig: Record<DifficultyLevel, { label: string; emoji: string; 
   }
 };
 
-export function DifficultyBadge({ level, className }: DifficultyBadgeProps) {
+export function DifficultyBadge({ level, size = 'default', className }: DifficultyBadgeProps) {
   const config = difficultyConfig[level];
   
   return (
     <span className={cn(
-      'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border',
+      'inline-flex items-center gap-1 rounded-full font-medium border',
+      size === 'sm' ? 'px-1.5 py-0 text-[10px]' : 'px-2 py-0.5 text-xs',
       config.colors,
       className
     )}>
-      <span>{config.emoji}</span>
+      <span className={size === 'sm' ? 'text-[10px]' : ''}>{config.emoji}</span>
       <span>{config.label}</span>
     </span>
   );
