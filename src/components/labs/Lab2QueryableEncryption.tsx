@@ -176,16 +176,16 @@ run().catch(console.error);`,
           // Row 55: createDataKey blank
           // Row 57: keyAltNames blank
           inlineHints: [
-            { line: 17, blankText: '___________', hint: 'AWS credential property for the access key', answer: 'accessKeyId' },
-            { line: 18, blankText: '_______________', hint: 'AWS credential property for the secret key', answer: 'secretAccessKey' },
-            { line: 24, blankText: '___________________', hint: 'The class that handles encryption operations', answer: 'ClientEncryption' },
-            { line: 33, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
-            { line: 40, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
-            { line: 42, blankText: '___________', hint: 'Property for human-readable key identifiers', answer: 'keyAltNames' },
-            { line: 47, blankText: '___________', hint: 'The keyAltName for the taxId field DEK', answer: 'qe-taxid-dek' },
-            { line: 48, blankText: '______', hint: 'Same method to find a document for existence check', answer: 'findOne' },
-            { line: 55, blankText: '____________', hint: 'Same method as above for creating DEKs', answer: 'createDataKey' },
-            { line: 57, blankText: '___________', hint: 'Same keyAltNames property for the taxId DEK', answer: 'keyAltNames' }
+            { line: 18, blankText: '___________', hint: 'AWS credential property for the access key', answer: 'accessKeyId' },
+            { line: 19, blankText: '_______________', hint: 'AWS credential property for the secret key', answer: 'secretAccessKey' },
+            { line: 25, blankText: '___________________', hint: 'The class that handles encryption operations', answer: 'ClientEncryption' },
+            { line: 34, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
+            { line: 41, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
+            { line: 43, blankText: '___________', hint: 'Property for human-readable key identifiers', answer: 'keyAltNames' },
+            { line: 49, blankText: '___________', hint: 'The keyAltName for the taxId field DEK', answer: 'qe-taxid-dek' },
+            { line: 50, blankText: '______', hint: 'Same method to find a document for existence check', answer: 'findOne' },
+            { line: 57, blankText: '____________', hint: 'Same method as above for creating DEKs', answer: 'createDataKey' },
+            { line: 59, blankText: '___________', hint: 'Same keyAltNames property for the taxId DEK', answer: 'keyAltNames' }
           ],
           // Tier 2: Challenge
           challengeSkeleton: `// ══════════════════════════════════════════════════════════════
@@ -890,8 +890,8 @@ run().catch(console.error);`,
             { line: 48, blankText: '____________', hint: 'The keyAltName for taxId DEK', answer: 'qe-taxid-dek' },
             { line: 58, blankText: '___', hint: 'BSON type for integer', answer: 'int' },
             { line: 59, blankText: '______', hint: 'BSON type for text values', answer: 'string' },
-            { line: 64, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
-            { line: 80, blankText: '______', hint: 'Method to find a document by encrypted field', answer: 'findOne' }
+            { line: 65, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
+            { line: 81, blankText: '______', hint: 'Method to find a document by encrypted field', answer: 'findOne' }
           ]
         },
         {
