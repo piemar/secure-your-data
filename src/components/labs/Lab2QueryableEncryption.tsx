@@ -369,60 +369,6 @@ node createQECollection.cjs
 # Collection 'employees' created with encryptedFields!
 # MongoDB automatically created .esc and .ecoc metadata collections.`
         },
-        {
-          filename: 'Alternative: mongosh (MongoDB Shell)',
-          language: 'javascript',
-          code: `# Connect to MongoDB
-mongosh "${mongoUri}"
-
-# Switch to encryption database to look up DEKs
-use encryption
-
-# Look up DEKs by keyAltNames
-const salaryKeyDoc = db.getCollection("__keyVault").findOne({ keyAltNames: "qe-salary-dek" });
-const taxKeyDoc = db.getCollection("__keyVault").findOne({ keyAltNames: "qe-taxid-dek" });
-
-# Get the UUIDs
-const salaryDekId = salaryKeyDoc._id;
-const taxDekId = taxKeyDoc._id;
-
-# Switch to hr database
-use hr
-
-# Define encryptedFields configuration
-const encryptedFields = {
-  fields: [
-    {
-      path: "salary",
-      bsonType: "int",
-      keyId: salaryDekId,
-      queries: [
-        {
-          queryType: "range",
-          min: 0,
-          max: 1000000,
-          sparsity: 4
-        }
-      ]
-    },
-    {
-      path: "taxId",
-      bsonType: "string",
-      keyId: taxDekId,
-      queries: { queryType: "equality" }
-    }
-  ]
-};
-
-# Create the collection with encryptedFields
-db.createCollection("employees", { encryptedFields });
-
-# Verify metadata collections were created
-db.getCollectionNames().filter(c => c.includes("enxcol"))
-
-# Expected Output:
-# [ 'enxcol_.employees.esc', 'enxcol_.employees.ecoc' ]`
-        }
       ],
       hints: [
         'Blank 1: The method to find one document is "findOne".',
