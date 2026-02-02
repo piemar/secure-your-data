@@ -62,7 +62,25 @@ export function InlineHintEditor({
       const lineIndex = hint.line - 1;
       if (lineIndex >= 0 && lineIndex < lines.length) {
         const lineText = lines[lineIndex];
-        // Find blank pattern: 5+ consecutive underscores (to avoid matching variable names like KMS_KEY_ID)
+
+        // Prefer exact match of the provided blankText so shorter blanks like "___" also work.
+        // This also avoids accidental matches against underscores in identifiers.
+        const blankText = hint.blankText;
+        const explicitIndex = blankText ? lineText.indexOf(blankText) : -1;
+
+        if (explicitIndex !== -1 && blankText) {
+          positions.push({
+            hintIdx,
+            line: hint.line,
+            column: explicitIndex + Math.floor(blankText.length / 2) + 1,
+            blankStart: explicitIndex,
+            blankLength: blankText.length,
+            hint,
+          });
+          return;
+        }
+
+        // Fallback: find blank pattern (5+ underscores) to avoid matching variable names like KMS_KEY_ID
         const blankMatch = lineText.match(/_{5,}/);
         if (blankMatch && blankMatch.index !== undefined) {
           positions.push({
