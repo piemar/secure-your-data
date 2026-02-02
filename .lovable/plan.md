@@ -1,129 +1,183 @@
 
-# Plan: Align Lab 1 Structure with Lab 2
+# Plan: Fix Black Empty Space Below Code Editors
 
 ## Problem Analysis
 
-After comparing Lab 1 and Lab 2 step structures, I found:
+Looking at the screenshot and the code structure, the black area below the first editor is caused by **the ResizablePanel system allocating a fixed percentage of height** regardless of content size.
 
-### Current State
+### Current Layout Structure
 
-| Lab 1 Step | Current Blocks | Issue |
-|------------|---------------|-------|
-| 1 (Create CMK) | 1 block: Terminal - AWS CLI | Single block - OK for CLI-only step |
-| 2 (Apply Policy) | 1 block: AWS CLI | Single block - OK for CLI-only step |
-| 3 (Configure mongosh) | 1 block: Terminal | Single block - OK |
-| 4 (Init Key Vault) | 1 block: mongosh | Single block - OK |
-| 5 (Generate DEKs) | 3 blocks: deps + code + terminal | **Already matches Lab 2 pattern** |
-| 6 (Test CSFLE) | 2 blocks: code + terminal | **Already matches Lab 2 pattern** |
-| 7 (Complete App) | 1 block: code | Missing "Terminal - Run" section |
+```
+┌─────────────────────────────────────────────────────┐
+│ Header (Lab info, step title)                       │
+├─────────────────────────────────────────────────────┤
+│ Read-only mode toggle (if hasSkeletons)             │
+├─────────────────────────────────────────────────────┤
+│ ResizablePanelGroup (vertical)                      │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ ResizablePanel (Code Editor) - defaultSize=85%  │ │
+│ │ ┌───────────────────────────────────────────┐   │ │
+│ │ │ Code block (~10 lines)                    │   │ │
+│ │ │ Footer (Guided/Challenge/Expert buttons)  │   │ │
+│ │ └───────────────────────────────────────────┘   │ │
+│ │                                                 │ │
+│ │ ◄── BLACK EMPTY SPACE (unused height) ──►      │ │
+│ │                                                 │ │
+│ └─────────────────────────────────────────────────┘ │
+│ ═══════════════ ResizableHandle ═══════════════════ │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ ResizablePanel (Output) - defaultSize=15%       │ │
+│ │ "// Run 'Check My Progress' to see output"      │ │
+│ └─────────────────────────────────────────────────┘ │
+├─────────────────────────────────────────────────────┤
+│ Footer Navigation (step indicators)                 │
+└─────────────────────────────────────────────────────┘
+```
 
-### Lab 2 Pattern (Reference)
+### Why This Happens
 
-| Lab 2 Step | Blocks |
-|------------|--------|
-| 1 (Create DEKs) | 2 blocks: code file + terminal |
-| 2 (Create Collection) | 3 blocks: Node.js + mongosh + terminal |
-| 3 (Insert Data) | 2 blocks: code file + terminal |
-| 4 (Query Data) | 2 blocks: code file + terminal |
+1. `ResizablePanel` (line 759) uses `defaultSize={outputOpen ? 50 : 85}` - it takes 85% of available height
+2. The Monaco editor fills its container with `height="100%"` but has `scrollBeyondLastLine: false`
+3. When code is short (10-15 lines), Monaco renders the lines then leaves the rest as empty dark background
+4. The container doesn't shrink to fit content - it maintains the 85% panel size
 
-### Key Structural Difference
+### Lab 2 Comparison
 
-Lab 2 consistently separates:
-1. **Code file creation** (interactive, with skeleton) - for files the user creates
-2. **Terminal instructions** (read-only, no skeleton) - how to run the file
-
-Lab 1 Steps 1-4 are **pure CLI commands** (AWS CLI or mongosh) - they don't create files, so a single terminal block is appropriate.
-
-Lab 1 Steps 5-7 involve **Node.js scripts** - should follow the Lab 2 pattern (and Steps 5-6 already do!).
+Lab 2 doesn't show this as prominently because:
+- Code blocks are typically 40-80 lines (fill more vertical space)
+- Multiple code blocks stack, using more of the allocated panel height
+- The visual gap is proportionally smaller
 
 ---
 
-## Solution
+## Solution Options
 
-### Part 1: Add "Terminal - Run" Section to Lab 1 Step 7
+### Option A: Content-Fit Editor Height (Recommended)
 
-Step 7 (Complete Application) currently only shows the code file without instructions on how to run it.
+Change the Monaco editor to use a calculated height based on line count instead of `height="100%"`.
 
-**Current:** 1 code block (`app.js`)
+**Benefits:**
+- Each code block sizes exactly to its content
+- No wasted black space
+- Scrolling happens in the outer container if multiple blocks overflow
 
-**After:** 2 code blocks:
-1. `app.js (Node.js - Create this file)` - the application code
-2. `Terminal - Run the application` - instructions to run it
+**Implementation:**
+```typescript
+// In InlineHintEditor.tsx
+const lineCount = displayCode.split('\n').length;
+const calculatedHeight = Math.max(150, Math.min(500, lineCount * lineHeight + 32));
 
-```javascript
-// Add this as second code block
-{
-  filename: 'Terminal - Run the application',
-  language: 'bash',
-  code: `# Run the complete CSFLE application:
-node app.js
-
-# Expected Output:
-# ✓ Connected to MongoDB
-# ✓ Inserted patient with encrypted SSN
-# ✓ Retrieved patient (SSN decrypted automatically)
-# 
-# Patient: { name: "Alice Johnson", ssn: "123-45-6789" }`
-}
+<Editor
+  height={`${calculatedHeight}px`}  // Instead of "100%"
+  ...
+/>
 ```
 
-### Part 2: Verify No "Empty Editor" Issues
+### Option B: Collapse Empty Space with Flexbox
 
-The earlier fix (checking `hasAnySkeleton(block)` per-block instead of step-level) should have resolved empty editor issues. However, I'll verify:
+Keep `height="100%"` but change the code block wrapper to not force minimum heights when content is short.
 
-**Confirmed Working:**
-- Footer with Challenge Mode controls only appears for blocks WITH skeletons
-- Terminal blocks without skeletons show cleanly without footer controls
-- Output panel is separate from code blocks
+**Implementation:**
+```typescript
+// In StepView.tsx line 771
+// Change from:
+<div key={idx} className="flex flex-col min-h-[200px] sm:min-h-[250px]">
 
-### Part 3: Add Terminal Sections to Relevant Steps (Optional Enhancement)
+// To:
+<div key={idx} className="flex flex-col flex-shrink-0">
+```
 
-For better consistency with Lab 2, consider adding terminal sections to:
+### Option C: Smart Panel Sizing
 
-**Step 1 (Create CMK):** Already self-contained - commands run directly
-**Step 2 (Apply Policy):** Already self-contained  
-**Step 3 (Configure mongosh):** Could add verification commands
-**Step 4 (Init Key Vault):** Could add verification commands
-**Step 5 (Generate DEKs):** Already has terminal section
-**Step 6 (Test CSFLE):** Already has terminal section
-**Step 7 (Complete App):** **Needs terminal section** (this plan)
+Dynamically calculate the defaultSize based on total code block content height.
+
+---
+
+## Recommended Approach: Option A + B Combined
+
+1. **Remove fixed min-heights** from code block wrappers
+2. **Calculate editor height** based on line count
+3. **Set reasonable min/max bounds** (150px min, 500px max per editor)
 
 ---
 
 ## File Changes
 
-| File | Action | Description |
-|------|--------|-------------|
-| `src/components/labs/Lab1CSFLE.tsx` | Modify | Add "Terminal - Run" block to Step 7 |
+| File | Change |
+|------|--------|
+| `src/components/labs/StepView.tsx` | Remove `min-h-[200px]` from code block wrapper |
+| `src/components/labs/InlineHintEditor.tsx` | Calculate height based on line count |
 
 ---
 
-## Implementation Details
+## Detailed Implementation
 
-### Lab1CSFLE.tsx - Step 7 Update
+### 1. InlineHintEditor.tsx - Dynamic Height
 
-Add a second code block after the existing `app.js` code block:
+```typescript
+// Add height calculation based on content
+const lineCount = displayCode.split('\n').length;
+const paddingVertical = 16; // 8px top + 8px bottom
+const calculatedHeight = Math.max(
+  150,  // minimum height
+  Math.min(
+    500, // maximum height per editor (enables scrolling within)
+    lineCount * lineHeight + paddingVertical
+  )
+);
 
-```javascript
-// In step l1s7, add after the first code block:
-{
-  filename: 'Terminal - Run the application',
-  language: 'bash',
-  code: `# Run the complete CSFLE application:
-node app.js
+// Update Editor component
+<Editor
+  height={`${calculatedHeight}px`}  // Dynamic instead of "100%"
+  ...
+/>
+```
 
-# Expected Output:
-# ✓ Connected to MongoDB with CSFLE enabled
-# ✓ Inserted encrypted patient record
-# ✓ Query result (automatically decrypted):
-#   { name: "Alice Johnson", ssn: "123-45-6789", dateOfBirth: "1990-01-15" }
-#
-# Verify encryption in mongosh:
-# mongosh "${mongoUri}"
-# use medical
-# db.patients.findOne()
-# // SSN will appear as Binary (Subtype 6) - encrypted!`
-}
+### 2. StepView.tsx - Flexible Code Block Wrapper
+
+```typescript
+// Line 771: Remove fixed min-height, allow shrinking
+<div key={idx} className="flex flex-col">
+  {/* ... editor header ... */}
+  <InlineHintEditor ... />
+  {/* ... footer ... */}
+</div>
+```
+
+### 3. Outer Container Adjustment
+
+Change the code blocks container to enable scrolling when multiple blocks exceed panel height:
+
+```typescript
+// Line 760: Add overflow-auto to allow scrolling through multiple blocks
+<div className="h-full flex flex-col overflow-auto">
+```
+
+---
+
+## Expected Result
+
+```
+┌─────────────────────────────────────────────────────┐
+│ Header (Lab info, step title)                       │
+├─────────────────────────────────────────────────────┤
+│ Read-only mode toggle                               │
+├─────────────────────────────────────────────────────┤
+│ ResizablePanelGroup                                 │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ Code block (~10 lines) - fits content exactly   │ │
+│ │ Footer (Guided/Challenge/Expert)                │ │
+│ └─────────────────────────────────────────────────┘ │
+│                                                     │
+│     (Natural space - not black, just background)    │
+│                                                     │
+│ ═══════════════ ResizableHandle ═══════════════════ │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ Output Panel                                    │ │
+│ └─────────────────────────────────────────────────┘ │
+├─────────────────────────────────────────────────────┤
+│ Footer Navigation                                   │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -131,22 +185,8 @@ node app.js
 ## Verification Steps
 
 After implementation:
-1. Navigate to Lab 1 → Steps → Step 7
-2. Verify two code blocks appear:
-   - `app.js` with full application code
-   - `Terminal - Run the application` with execution instructions
-3. Verify no empty sections below either block
-4. Compare with Lab 2 Step 1 - structure should be similar
-
----
-
-## Technical Note
-
-The "empty editor" issue the user mentioned was likely:
-1. **Resolved** by the previous fix (per-block skeleton check)
-2. **Or** a visual perception issue where the Output panel at the bottom was mistaken for an empty editor
-
-The current implementation correctly:
-- Only shows Challenge Mode footer for blocks WITH skeletons
-- Displays terminal/instruction blocks cleanly without extra UI
-- Keeps the Output panel separate at the very bottom
+1. Navigate to Lab 1 Step 1
+2. Verify the code editor only takes as much height as needed for its content
+3. Verify there's no excessive black space below the code
+4. Test with longer code blocks (Lab 1 Step 5/6/7) to ensure they still look good
+5. Test Lab 2 steps to ensure no regression
