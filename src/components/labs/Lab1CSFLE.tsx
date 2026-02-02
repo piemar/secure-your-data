@@ -147,6 +147,8 @@ echo "Alias Created: ${aliasName}"`,
 
 `,
           // Inline hints for Guided mode - line numbers match skeleton
+          // L1-L7: comments, L8: empty, L9: KMS_KEY_ID line with _________ blank, L10: --description, L11: --query with _______ blank
+          // L12-L21: more lines, L22: aws kms _____________ blank
           inlineHints: [
             { 
               line: 9, 
@@ -324,7 +326,10 @@ aws kms ______________ --key-id $KMS_KEY_ID --policy-name default --policy file:
 
 `
         ,
-          // Inline hints for Guided mode - line numbers match skeleton
+          // Inline hints for Guided mode - line numbers match skeleton exactly
+          // L1-6: comments, L7: empty, L8: comment, L9: KMS_KEY_ID line with ____________ blank
+          // L10-11: more lines, L12: IAM_ARN with ___________________ blank, L13: ACCOUNT_ID with ________ blank
+          // L14-35: more lines, L36: aws kms ______________ blank
           inlineHints: [
             { 
               line: 9, 
@@ -463,28 +468,30 @@ mongosh "${mongoUri}"
 `
         ,
           // Inline hints for Guided mode - line numbers match skeleton exactly
-          // Counted: L1-7 comments, L8 empty, L9 comment, L10 mongosh, L11 empty, L12 comment, L13 use, L14 empty, L15-16 comments, L17-23 createIndex
+          // L1-7: header comments, L8: empty, L9: comment, L10: mongosh, L11: empty
+          // L12: use _________, L13: empty, L14-15: comments, L16: db.getCollection.____________
+          // L17: { ___________: 1 }, L18-20: { unique: true, partialFilter with $_______: true }
           inlineHints: [
             { 
-              line: 13, 
+              line: 12, 
               blankText: '_________', 
               hint: 'The database name used by MongoDB encryption operations', 
               answer: 'encryption' 
             },
             { 
-              line: 17, 
+              line: 16, 
               blankText: '____________', 
               hint: 'MongoDB method to create an index on a collection', 
               answer: 'createIndex' 
             },
             { 
-              line: 18, 
+              line: 17, 
               blankText: '___________', 
               hint: 'The field that stores alternate names for DEKs', 
               answer: 'keyAltNames' 
             },
             { 
-              line: 21, 
+              line: 20, 
               blankText: '$_______', 
               hint: 'MongoDB operator to check if a field exists', 
               answer: 'exists' 
@@ -623,8 +630,10 @@ async function run() {
 }
 
 run().catch(console.dir);`,
-          // Inline hints for Guided mode - line numbers match skeleton
-          // Skeleton lines: 1-6 comments, 7 empty, 8 require MongoClient, 9 require fromSSO, etc.
+          // Inline hints for Guided mode - line numbers match skeleton exactly
+          // L1-6: comments, L7: empty, L8: require with ________________, L9: require fromSSO
+          // L10-27: more setup, L28: new ________________(client, L29-35: more code
+          // L36: encryption.________________("aws", L37: masterKey, L38: ___________: [keyAltName]
           inlineHints: [
             { 
               line: 8, 
@@ -973,7 +982,11 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints for the skeleton
+          // Inline hints for the skeleton - line numbers match exactly
+          // L1-21: setup code, L22: findOne({ _____________: keyAltName })
+          // L23-30: more code, L31: "_______": { encryption config }
+          // L32: bsonType, L33: algorithm with ___________
+          // L34-62: more code (variable based on cryptSharedLibPath), L63: ______________: { config }
           inlineHints: [
             { 
               line: 22, 
@@ -982,19 +995,19 @@ run().catch(console.error);`,
               answer: 'keyAltNames' 
             },
             { 
-              line: 31, 
+              line: 32, 
               blankText: '_______', 
               hint: 'Schema map keyword to specify field should be encrypted', 
               answer: 'encrypt' 
             },
             { 
-              line: 33, 
+              line: 34, 
               blankText: '___________', 
               hint: 'Algorithm suffix for fields that need equality queries', 
               answer: 'Deterministic' 
             },
             { 
-              line: 65, 
+              line: 64, 
               blankText: '______________', 
               hint: 'MongoClient option that enables automatic encryption', 
               answer: 'autoEncryption' 
@@ -1171,7 +1184,10 @@ async function main() {
 }
 
 main().catch(console.error);`,
-          // Inline hints for the skeleton
+          // Inline hints for the skeleton - line numbers match exactly
+          // L1-12: imports/config, L13: split('.'), L14: findOne, L15: dekId = keyDoc._____
+          // L16-18: more code, L19: "_______": "object"
+          // L20-37: more code (variable based on cryptSharedLibPath), L38: _____________,
           inlineHints: [
             { 
               line: 13, 
@@ -1192,7 +1208,7 @@ main().catch(console.error);`,
               answer: 'bsonType' 
             },
             { 
-              line: 39, 
+              line: 38, 
               blankText: '_____________', 
               hint: 'Object that contains AWS KMS credentials configuration', 
               answer: 'kmsProviders' 
