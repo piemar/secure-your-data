@@ -817,7 +817,7 @@ export function StepView({
                         />
 
                         {/* Simplified Challenge Mode Footer - Mobile Optimized */}
-                        {hasSkeleton && !isSolutionRevealed && (
+                        {hasAnySkeleton(block) && !isSolutionRevealed && (
                           <div className="flex-shrink-0 px-2 sm:px-4 py-1.5 sm:py-2 bg-muted/50 border-t border-border">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                               {/* Left: Difficulty selector & Score */}
@@ -902,7 +902,7 @@ export function StepView({
                         )}
 
                         {/* Solution Revealed Banner */}
-                        {hasSkeleton && isSolutionRevealed && !alwaysShowSolutions && showSolution[blockKey] && (
+                        {hasAnySkeleton(block) && isSolutionRevealed && !alwaysShowSolutions && showSolution[blockKey] && (
                           <div className="flex-shrink-0 px-4 py-2 bg-green-500/10 border-t border-green-500/30">
                             <div className="flex items-center gap-2">
                               <CheckCircle2 className="w-4 h-4 text-green-600" />
