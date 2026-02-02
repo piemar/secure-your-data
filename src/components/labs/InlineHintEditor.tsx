@@ -222,10 +222,21 @@ export function InlineHintEditor({
     }
   }, []);
 
+  // Calculate dynamic height based on line count
+  const lineCount = displayCode.split('\n').length;
+  const paddingVertical = 16; // 8px top + 8px bottom
+  const calculatedHeight = Math.max(
+    150,  // minimum height
+    Math.min(
+      500, // maximum height per editor (enables scrolling within)
+      lineCount * lineHeight + paddingVertical
+    )
+  );
+
   return (
-    <div className="flex-1 min-h-[150px] sm:min-h-[200px] relative" ref={containerRef}>
+    <div className="flex-shrink-0 relative" ref={containerRef}>
       <Editor
-        height="100%"
+        height={`${calculatedHeight}px`}
         language={language === 'bash' ? 'shell' : language}
         value={displayCode}
         theme="vs-dark"
