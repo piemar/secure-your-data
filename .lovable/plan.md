@@ -1,166 +1,63 @@
 
-# Compact Lab Step Header Design
+# Plan: Add Missing Hints for Complete Coverage
 
-## Problem Analysis
+## Overview
+Add the missing `hints[]` arrays to Lab 2 Steps 1 and 3, which have `inlineHints` but lack the traditional progressive hint system. This ensures consistency across all labs and enables the HintSystem component to work properly.
 
-The current lab step header uses approximately **272px** of vertical space before the code editor appears:
+## Changes Required
 
-| Element | Height | Location |
-|---------|--------|----------|
-| Tab bar (Overview/Steps) | ~48px | LabViewWithTabs.tsx |
-| Lab header (Lab 01, Title, Description, Atlas Capability) | ~80px | StepView.tsx |
-| Business Value banner | ~44px | StepView.tsx |
-| Step header (title, buttons) | ~64px | StepView.tsx |
-| Read-only toggle | ~36px | StepView.tsx |
-| **Total** | **~272px** | |
+### 1. Lab 2 Step 1: Create QE DEKs
+**File:** `src/components/labs/Lab2QueryableEncryption.tsx`
+**Location:** Lines ~39-224 (step `l2s1`)
 
-On smaller screens, this leaves minimal space for the actual code content.
+Add `hints` array after the `codeBlocks` array:
+```javascript
+hints: [
+  'Blank 1: The method to generate a new Data Encryption Key is "createDataKey".',
+  'Blank 2: The property for human-readable key identifiers is "keyAltNames".',
+  'Blank 3: Same method as above - "createDataKey" for the second DEK.',
+  'Blank 4: The keyAltName for the taxId field should be "qe-taxid-dek".'
+]
+```
+
+### 2. Lab 2 Step 3: Insert Test Data
+**File:** `src/components/labs/Lab2QueryableEncryption.tsx`
+**Location:** Lines ~430-619 (step `l2s3`)
+
+Add `hints` array after the `codeBlocks` array:
+```javascript
+hints: [
+  'Blank 1: The method to find a single document is "findOne".',
+  'Blank 2: The keyAltName for the taxId DEK is "qe-taxid-dek".',
+  'Blank 3: The BSON type for integer values is "int".',
+  'Blank 4: The field name for tax identification is "taxId".',
+  'Blank 5: The config property to enable automatic encryption is "autoEncryption".',
+  'Blank 6: The method to insert multiple documents is "insertMany".'
+]
+```
 
 ---
 
-## Proposed Solution: Single-Row Condensed Header
+## Summary Table
 
-Redesign to use a **single compact header row** with essential info inline:
-
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│ Lab 01 │ Basic │ Step 1/7: Create CMK (5min) │ ⏱️ │ ✓ Check │ ? Help │
-└─────────────────────────────────────────────────────────────────────┘
-│ [Read-only toggle]                                                  │
-└─────────────────────────────────────────────────────────────────────┘
-│                                                                     │
-│                    CODE EDITOR (maximized)                          │
-│                                                                     │
-```
-
-**Expected height reduction: ~120px saved** (from ~272px to ~152px)
-
----
-
-## Implementation Details
-
-### Changes to StepView.tsx
-
-**1. Merge Lab Header + Step Header into single row**
-- Remove full `labTitle` and `labDescription` text (available on Overview tab)
-- Show only: `Lab XX` | Difficulty badge | `Step X/Y: [Step Title]` | Buttons
-- Move Atlas Capability to a tooltip on hover
-
-**2. Relocate Business Value**
-- Move from permanent banner to:
-  - Option A: Tooltip on an info icon
-  - Option B: Part of the Help & Tips drawer content
-  - Option C: Collapsible section that starts collapsed
-
-**3. Inline step title with step counter**
-- Instead of separate "Step 1/7" and step title rows
-- Use: `Step 1/7: Create Customer Master Key (CMK)` 
-
-**4. Condense buttons**
-- Keep only: Check My Progress | Help & Tips
-- Remove separate Info icon (merge into Help & Tips)
-
-### New Compact Layout Structure
-
-```tsx
-{/* Compact Header - Single Row */}
-<div className="flex items-center justify-between px-4 py-2 border-b">
-  {/* Left: Lab info + Step info */}
-  <div className="flex items-center gap-3">
-    <span className="text-xs font-mono border px-2 py-0.5 rounded">
-      Lab {labNumber}
-    </span>
-    {difficulty && <DifficultyBadge level={difficulty} size="sm" />}
-    <div className="text-sm">
-      <span className="text-muted-foreground">Step {n}/{total}:</span>
-      <span className="font-medium ml-1">{stepTitle}</span>
-      <span className="text-muted-foreground ml-2">⏱️ {time}</span>
-    </div>
-  </div>
-  
-  {/* Right: Actions */}
-  <div className="flex items-center gap-2">
-    <Button size="sm">Check</Button>
-    <StepContextDrawer />
-  </div>
-</div>
-```
-
-### Atlas Capability & Business Value
-
-Both will be accessible via the Help & Tips drawer:
-- Add "Context" section at top of drawer
-- Display: Atlas Capability badge, Business Value text
-- This removes ~124px from always-visible header
-
----
-
-## Visual Comparison
-
-**Before (current):**
-```
-┌──────────────────────────────────────────────────────────────┐ 
-│  📖 Overview    🔧 Steps (1/7)                  👑 Moderator │  48px
-├──────────────────────────────────────────────────────────────┤
-│  Lab 01  ● Basic                     Atlas Capability        │
-│  CSFLE Fundamentals with AWS KMS    [Client-Side Field...]  │  80px
-│  Master the rollout of KMS infrastructure...                 │
-├──────────────────────────────────────────────────────────────┤
-│  💡 Business Value: Protect PII at the application layer... │  44px
-├──────────────────────────────────────────────────────────────┤
-│  Create Customer Master Key (CMK)     Step 1/7  ✓ Check  ? │  64px
-│  Create your Customer Master Key (CMK) in AWS KMS...        │
-├──────────────────────────────────────────────────────────────┤
-│  🔓 Read-only mode (show all solutions)                      │  36px
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│                      CODE EDITOR                             │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
-                        Total: ~272px header
-```
-
-**After (proposed):**
-```
-┌──────────────────────────────────────────────────────────────┐
-│  📖 Overview    🔧 Steps (1/7)                  👑 Moderator │  48px
-├──────────────────────────────────────────────────────────────┤
-│  Lab 01 │ ● Basic │ Step 1/7: Create CMK (5min) │ ✓ │ 📖    │  40px
-├──────────────────────────────────────────────────────────────┤
-│  🔓 Read-only mode                                           │  28px
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│                      CODE EDITOR                             │
-│                     (much taller!)                           │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
-                        Total: ~116px header
-```
-
-**Space saved: ~156px** - significantly more room for code!
-
----
+| Lab | Step | Current Status | Action |
+|-----|------|----------------|--------|
+| Lab 1 | Steps 1-4 | ✅ Complete | None |
+| Lab 1 | Steps 5-7 | Demo/Reference | None (acceptable) |
+| Lab 2 | Step 1 | Missing `hints[]` | **Add hints array** |
+| Lab 2 | Step 2 | ✅ Complete | None |
+| Lab 2 | Step 3 | Missing `hints[]` | **Add hints array** |
+| Lab 2 | Step 4 | Demo step | None (acceptable) |
+| Lab 3 | Steps 1-2 | ✅ Complete | None |
+| Lab 3 | Steps 3-4 | Conceptual | None (acceptable) |
 
 ## Files to Modify
 
-1. **`src/components/labs/StepView.tsx`**
-   - Merge Lab header and Step header into single compact row
-   - Remove Business Value permanent banner
-   - Remove inline Atlas Capability display
-   - Condense step title into step counter line
-
-2. **`src/components/labs/StepContextDrawer.tsx`**
-   - Add new "Context" section at top
-   - Accept and display `businessValue` and `atlasCapability` props
-
-3. **`src/components/labs/DifficultyBadge.tsx`** (optional)
-   - Add a `size="sm"` variant for compact display
-
----
+1. `src/components/labs/Lab2QueryableEncryption.tsx` - Add 2 `hints[]` arrays
 
 ## Technical Notes
 
-- The Overview tab already contains the full lab title, description, and detailed intro content
-- Moving Business Value and Atlas Capability to Help & Tips keeps them accessible without cluttering the always-visible header
-- The step description can be shown in a tooltip on step title hover for those who want more context
-- Mobile will benefit most from this change due to limited viewport height
+- The `HintSystem` component uses the `hints[]` array to show progressive hints before revealing the full solution
+- `inlineHints` are used by the `InlineHintEditor` for Monaco-based `?` markers in the code
+- Both systems should be in sync for steps with fill-in-the-blank skeletons
+- Steps without skeletons (demo/verification steps) don't need hints
