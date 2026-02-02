@@ -220,6 +220,12 @@ node createQEDeks.cjs
 # (Your UUIDs will be different)`
         },
       ],
+      hints: [
+        'Blank 1: The method to generate a new Data Encryption Key is "createDataKey".',
+        'Blank 2: The property for human-readable key identifiers is "keyAltNames".',
+        'Blank 3: Same method as above - "createDataKey" for the second DEK.',
+        'Blank 4: The keyAltName for the taxId field should be "qe-taxid-dek".'
+      ],
       onVerify: async () => validatorUtils.checkQEDEKs(mongoUri)
     },
     {
@@ -614,6 +620,14 @@ node insertQEData.cjs
 # Expected Output:
 # Inserted 5 test documents with encrypted salary and taxId fields!`
         },
+      ],
+      hints: [
+        'Blank 1: The method to find a single document is "findOne".',
+        'Blank 2: The keyAltName for the taxId DEK is "qe-taxid-dek".',
+        'Blank 3: The BSON type for integer values is "int".',
+        'Blank 4: The field name for tax identification is "taxId".',
+        'Blank 5: The config property to enable automatic encryption is "autoEncryption".',
+        'Blank 6: The method to insert multiple documents is "insertMany".'
       ],
       onVerify: async () => validatorUtils.checkQERangeQuery('hr', 'employees', mongoUri)
     },
