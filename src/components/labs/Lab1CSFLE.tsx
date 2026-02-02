@@ -462,29 +462,29 @@ mongosh "${mongoUri}"
 
 `
         ,
-          // Inline hints for Guided mode - line numbers match skeleton
-          // Skeleton lines: 1-7 comments, 8-9 mongosh connect, 10 comment, 11 use ___, 12-13 comments, 14-18 createIndex
+          // Inline hints for Guided mode - line numbers match skeleton exactly
+          // Counted: L1-7 comments, L8 empty, L9 comment, L10 mongosh, L11 empty, L12 comment, L13 use, L14 empty, L15-16 comments, L17-23 createIndex
           inlineHints: [
             { 
-              line: 11, 
+              line: 13, 
               blankText: '_________', 
               hint: 'The database name used by MongoDB encryption operations', 
               answer: 'encryption' 
             },
             { 
-              line: 15, 
+              line: 17, 
               blankText: '____________', 
               hint: 'MongoDB method to create an index on a collection', 
               answer: 'createIndex' 
             },
             { 
-              line: 16, 
+              line: 18, 
               blankText: '___________', 
               hint: 'The field that stores alternate names for DEKs', 
               answer: 'keyAltNames' 
             },
             { 
-              line: 19, 
+              line: 21, 
               blankText: '$_______', 
               hint: 'MongoDB operator to check if a field exists', 
               answer: 'exists' 
