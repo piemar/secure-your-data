@@ -126,34 +126,50 @@ async function run() {
     kmsProviders,
   });
 
-  // TASK: Create DEK for salary field
-  // Fill in the method name and the keyAltNames array
-  const salaryDekId = await encryption.____________("aws", {
-    masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" },
-    ___________: ["qe-salary-dek"]
+  const keyVaultDB = client.db("encryption");
+
+  // TASK: Create DEK for salary field (check if exists first)
+  const salaryKeyAltName = "qe-salary-dek";
+  const existingSalaryKey = await keyVaultDB.collection("__keyVault").findOne({ 
+    keyAltNames: salaryKeyAltName 
   });
-  console.log("Salary DEK created:", salaryDekId.toString());
+
+  if (existingSalaryKey) {
+    console.log("✓ Salary DEK already exists:", existingSalaryKey._id.toString());
+  } else {
+    const salaryDekId = await encryption.____________("aws", {
+      masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" },
+      ___________: [salaryKeyAltName]
+    });
+    console.log("Salary DEK created:", salaryDekId.toString());
+  }
 
   // TASK: Create DEK for taxId field (same pattern)
-  const taxDekId = await encryption.____________("aws", {
-    masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" },
-    keyAltNames: ["___________"]
+  const taxKeyAltName = "___________";
+  const existingTaxKey = await keyVaultDB.collection("__keyVault").findOne({ 
+    keyAltNames: taxKeyAltName 
   });
-  console.log("TaxId DEK created:", taxDekId.toString());
+
+  if (existingTaxKey) {
+    console.log("✓ TaxId DEK already exists:", existingTaxKey._id.toString());
+  } else {
+    const taxDekId = await encryption.____________("aws", {
+      masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" },
+      keyAltNames: [taxKeyAltName]
+    });
+    console.log("TaxId DEK created:", taxDekId.toString());
+  }
 
   await client.close();
 }
 
 run().catch(console.error);`,
-          // Inline hints for Guided mode - line numbers match skeleton exactly
-          // L1-27: setup code, L28-31: comment + const salaryDekId, L32: encryption.____________("aws"
-          // L33: masterKey, L34: ___________: ["qe-salary-dek"], L35-38: more code
-          // L39: encryption.____________("aws", L40: masterKey, L41: keyAltNames: ["___________"]
+          // Inline hints - updated line numbers after adding DEK existence checks
           inlineHints: [
-            { line: 32, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
-            { line: 34, blankText: '___________', hint: 'Property for human-readable key identifiers', answer: 'keyAltNames' },
-            { line: 39, blankText: '____________', hint: 'Same method as above for creating DEKs', answer: 'createDataKey' },
-            { line: 41, blankText: '___________', hint: 'The keyAltName for the taxId field DEK', answer: 'qe-taxid-dek' }
+            { line: 41, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
+            { line: 43, blankText: '___________', hint: 'Property for human-readable key identifiers', answer: 'keyAltNames' },
+            { line: 48, blankText: '___________', hint: 'The keyAltName for the taxId field DEK', answer: 'qe-taxid-dek' },
+            { line: 56, blankText: '____________', hint: 'Same method as above for creating DEKs', answer: 'createDataKey' }
           ],
           // Tier 2: Challenge
           challengeSkeleton: `// ══════════════════════════════════════════════════════════════

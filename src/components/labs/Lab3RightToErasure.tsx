@@ -163,7 +163,14 @@ const keyVaultNamespace = "encryption.__keyVault";
 
 async function run() {
   const credentials = await fromSSO()();
-  const kmsProviders = { aws: { /* credentials */ } };
+
+  const kmsProviders = {
+    aws: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
+  };
 
   const client = await MongoClient.connect(uri);
   
@@ -172,6 +179,10 @@ async function run() {
   const keyDoc = await keyVaultDB.collection("__keyVault").______({ 
     keyAltNames: "user-${suffix}-ssn-key" 
   });
+
+  if (!keyDoc) {
+    throw new Error("DEK not found! Run createKey.cjs from Lab 1 first.");
+  }
   const dekId = keyDoc._id;
 
   // TASK: Initialize ClientEncryption for explicit encryption
@@ -180,10 +191,21 @@ async function run() {
     kmsProviders,
   });
 
-  // Read from legacy collection (plaintext)
+  // Source and target collections
   const legacyDB = client.db("medical");
   const legacyCollection = legacyDB.collection("patients_legacy");
   const secureCollection = legacyDB.collection("patients_secure");
+
+  // Create sample legacy data if it doesn't exist
+  const legacyCount = await legacyCollection.countDocuments();
+  if (legacyCount === 0) {
+    console.log("Creating sample legacy data...");
+    await legacyCollection.insertMany([
+      { name: "John Doe", ssn: "111-22-3333", dob: "1980-01-01" },
+      { name: "Jane Smith", ssn: "444-55-6666", dob: "1985-05-15" },
+      { name: "Bob Johnson", ssn: "777-88-9999", dob: "1990-10-20" }
+    ]);
+  }
 
   const legacyDocs = await legacyCollection.find({}).toArray();
   
@@ -206,13 +228,12 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints for Lab 3 Step 1 - user confirmed: L21, L27, L41, L42
-          // Note: L15 is { aws: { /* credentials */ } } which has no blank
+          // Inline hints - updated line numbers after expanding kmsProviders and adding sample data
           inlineHints: [
-            { line: 21, blankText: '______', hint: 'Method to retrieve a single document', answer: 'findOne' },
-            { line: 27, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
-            { line: 41, blankText: '_________', hint: 'Method to encrypt a value manually', answer: 'encrypt' },
-            { line: 42, blankText: '____________', hint: 'Algorithm suffix for queryable encryption', answer: 'Deterministic' }
+            { line: 28, blankText: '______', hint: 'Method to retrieve a single document', answer: 'findOne' },
+            { line: 38, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
+            { line: 63, blankText: '_________', hint: 'Method to encrypt a value manually', answer: 'encrypt' },
+            { line: 64, blankText: '____________', hint: 'Algorithm suffix for queryable encryption', answer: 'Deterministic' }
           ],
           // Tier 2: Challenge
           challengeSkeleton: `// ══════════════════════════════════════════════════════════════
@@ -394,7 +415,14 @@ const keyVaultNamespace = "encryption.__keyVault";
 
 async function run() {
   const credentials = await fromSSO()();
-  const kmsProviders = { aws: { /* credentials */ } };
+
+  const kmsProviders = {
+    aws: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
+  };
 
   const client = await MongoClient.connect(uri);
   const encryption = new ClientEncryption(client, {
@@ -415,7 +443,9 @@ async function run() {
       ___________: keyAltName   // Which field to query?
     });
 
-    if (!existingKey) {
+    if (existingKey) {
+      console.log(\`✓ DEK already exists for tenant: \${tenantId}\`);
+    } else {
       // TASK: Create a new DEK for this tenant
       const dekId = await encryption.____________("aws", {
         masterKey: { 
@@ -424,23 +454,20 @@ async function run() {
         },
         keyAltNames: [keyAltName]
       });
-      console.log(\`Created DEK for tenant: \${tenantId}\`);
+      console.log(\`✓ Created DEK for tenant: \${tenantId} (UUID: \${dekId.toString()})\`);
     }
   }
 
-  console.log("Multi-tenant isolation setup complete!");
+  console.log("\\n✓ Multi-tenant isolation setup complete!");
   await client.close();
 }
 
 run().catch(console.error);`,
-          // Inline hints for Lab 3 Step 2 - line numbers match skeleton exactly
-          // L1-27: setup, L28: keyAltName = `_______-${tenantId}`
-          // L29-32: more, L33: { ___________: keyAltName }
-          // L34-37: more, L38: encryption.____________("aws"
+          // Inline hints - updated line numbers after expanding kmsProviders
           inlineHints: [
-            { line: 28, blankText: '_______', hint: 'Prefix for tenant-specific key names', answer: 'tenant' },
-            { line: 33, blankText: '___________', hint: 'Field to query for existing DEK names', answer: 'keyAltNames' },
-            { line: 38, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' }
+            { line: 35, blankText: '_______', hint: 'Prefix for tenant-specific key names', answer: 'tenant' },
+            { line: 40, blankText: '___________', hint: 'Field to query for existing DEK names', answer: 'keyAltNames' },
+            { line: 47, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' }
           ]
         },
         {
@@ -591,7 +618,14 @@ const keyVaultNamespace = "encryption.__keyVault";
 
 async function run() {
   const credentials = await fromSSO()();
-  const kmsProviders = { aws: { /* credentials */ } };
+
+  const kmsProviders = {
+    aws: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
+  };
 
   const client = await MongoClient.connect(uri);
   const encryption = new ________________(client, {
@@ -608,9 +642,13 @@ async function run() {
     keyAltNames: keyAltName 
   });
 
-  if (!keyDoc) throw new Error("DEK not found");
+  if (!keyDoc) {
+    throw new Error(\`DEK with keyAltName "\${keyAltName}" not found. Run createKey.cjs first.\`);
+  }
+  console.log(\`Found DEK: \${keyDoc._id.toString()}\`);
 
   // TASK: Define the NEW CMK for rotation
+  // NOTE: In production, you would use a NEW CMK alias here
   const newCMKAlias = "${aliasName}";
 
   // TASK: Rotate the DEK to use the new CMK
@@ -622,21 +660,21 @@ async function run() {
     }
   );
 
-  console.log("Rotation complete!");
-  console.log("Matched:", result.bulkWriteResult.matchedCount);
-  console.log("Modified:", result.bulkWriteResult.modifiedCount);
+  console.log("\\n✓ Rotation complete!");
+  console.log("  - Matched DEKs:", result.bulkWriteResult.matchedCount);
+  console.log("  - Modified DEKs:", result.bulkWriteResult.modifiedCount);
 
   await client.close();
 }
 
 run().catch(console.error);`,
-          // Inline hints for Lab 3 Step 3 - user confirmed: L21, L27, L41
+          // Inline hints - updated line numbers after expanding kmsProviders
           inlineHints: [
-            { line: 21, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
-            { line: 27, blankText: '___', hint: 'The field name in keyAltName pattern', answer: 'ssn' },
-            { line: 31, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
-            { line: 41, blankText: '___________________', hint: 'Method to rotate DEKs to a new CMK', answer: 'rewrapManyDataKey' },
-            { line: 42, blankText: '___________', hint: 'Field to filter which DEKs to rotate', answer: 'keyAltNames' }
+            { line: 24, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
+            { line: 30, blankText: '___', hint: 'The field name in keyAltName pattern', answer: 'ssn' },
+            { line: 34, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
+            { line: 48, blankText: '___________________', hint: 'Method to rotate DEKs to a new CMK', answer: 'rewrapManyDataKey' },
+            { line: 49, blankText: '___________', hint: 'Field to filter which DEKs to rotate', answer: 'keyAltNames' }
           ]
         },
         {

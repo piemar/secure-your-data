@@ -617,6 +617,19 @@ async function run() {
 
   const keyAltName = "user-${suffix}-ssn-key";
 
+  // Check if DEK already exists (idempotent operation)
+  const keyVaultDB = client.db("encryption");
+  const existingKey = await keyVaultDB.collection("__keyVault").findOne({ 
+    keyAltNames: keyAltName 
+  });
+
+  if (existingKey) {
+    console.log("✓ DEK already exists with keyAltName:", keyAltName);
+    console.log("  DEK UUID:", existingKey._id.toString());
+    await client.close();
+    return;
+  }
+
   // TASK: Create the Data Encryption Key using the correct method
   const dekId = await encryption.________________("aws", {
     masterKey: { key: "${aliasName}", region: "${awsRegion}" },
@@ -632,6 +645,7 @@ run().catch(console.dir);`,
           // L1-6: comments, L7: empty, L8: require with ________________, L9: require fromSSO
           // L10-27: more setup, L28: new ________________(client, L29-35: more code
           // L36: encryption.________________("aws", L37: masterKey, L38: ___________: [keyAltName]
+          // Inline hints - updated line numbers after adding DEK existence check
           inlineHints: [
             { 
               line: 8, 
@@ -646,13 +660,13 @@ run().catch(console.dir);`,
               answer: 'ClientEncryption' 
             },
             { 
-              line: 36, 
+              line: 48, 
               blankText: '________________', 
               hint: 'Method to generate a new Data Encryption Key', 
               answer: 'createDataKey' 
             },
             { 
-              line: 38, 
+              line: 50, 
               blankText: '___________', 
               hint: 'Option to assign a human-readable name to the DEK', 
               answer: 'keyAltNames' 
