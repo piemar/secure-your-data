@@ -987,6 +987,24 @@ async function main() {
 
 main().catch(console.error);`,
           // No skeleton - this is a summary/reference step (full code shown by default)
+        },
+        {
+          filename: 'Terminal - Run the application',
+          language: 'bash',
+          code: `# Run the complete CSFLE application:
+node app.js
+
+# Expected Output:
+# ✓ Connected to MongoDB with CSFLE enabled
+# ✓ Inserted encrypted patient record
+# ✓ Query result (automatically decrypted):
+#   { name: "Alice", ssn: "987-65-4321" }
+#
+# Verify encryption in mongosh (as a DBA would see it):
+# mongosh "\${mongoUri}"
+# use medical
+# db.patients.findOne()
+# // SSN appears as Binary (Subtype 6) - encrypted ciphertext!`
         }
       ],
       onVerify: async () => { return { success: true, message: 'Lab 1 Complete! You have built a secure app.' }; }
