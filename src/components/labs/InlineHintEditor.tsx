@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Editor, { Monaco } from '@monaco-editor/react';
 import { InlineHintMarker, type InlineHint, type SkeletonTier } from './InlineHintMarker';
 import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 interface InlineHintEditorProps {
   code: string;
@@ -16,6 +17,7 @@ interface InlineHintEditorProps {
   revealedAnswers: number[];
   onRevealHint: (hintIdx: number) => void;
   onRevealAnswer: (hintIdx: number) => void;
+  equalHeightSplit?: boolean;
 }
 
 interface BlankPosition {
@@ -40,6 +42,7 @@ export function InlineHintEditor({
   revealedAnswers,
   onRevealHint,
   onRevealAnswer,
+  equalHeightSplit,
 }: InlineHintEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [editorInstance, setEditorInstance] = useState<any>(null);
@@ -231,20 +234,24 @@ export function InlineHintEditor({
   }, []);
 
   // Calculate dynamic height based on line count
+  // For 2-block pattern: use flex-based equal split
+  // For single blocks or more: use line-based calculation
   const lineCount = displayCode.split('\n').length;
   const paddingVertical = 16; // 8px top + 8px bottom
-  const calculatedHeight = Math.max(
-    150,  // minimum height
-    Math.min(
-      500, // maximum height per editor (enables scrolling within)
-      lineCount * lineHeight + paddingVertical
-    )
-  );
+  const calculatedHeight = equalHeightSplit
+    ? Math.max(200, Math.min(350, lineCount * lineHeight + paddingVertical))
+    : Math.max(150, Math.min(500, lineCount * lineHeight + paddingVertical));
 
   return (
-    <div className="flex-shrink-0 relative" ref={containerRef}>
+    <div 
+      className={cn(
+        "flex-shrink-0 relative",
+        equalHeightSplit && "flex-1 min-h-[200px]"
+      )} 
+      ref={containerRef}
+    >
       <Editor
-        height={`${calculatedHeight}px`}
+        height={equalHeightSplit ? "100%" : `${calculatedHeight}px`}
         language={language === 'bash' ? 'shell' : language}
         value={displayCode}
         theme="vs-dark"

@@ -742,7 +742,10 @@ export function StepView({
             <ResizablePanelGroup direction="vertical" className="h-full">
               {/* Code Editor Panel */}
               <ResizablePanel defaultSize={outputOpen ? 50 : 85} minSize={30}>
-                <div className="h-full flex flex-col overflow-auto justify-start">
+                <div className={cn(
+                  "h-full flex flex-col overflow-auto justify-start",
+                  currentStep.codeBlocks.length === 2 && "gap-1"
+                )}>
                   {currentStep.codeBlocks.map((block, idx) => {
                     const blockKey = `${currentStepIndex}-${idx}`;
                     const hasSkeleton = hasAnySkeleton(block);
@@ -751,9 +754,16 @@ export function StepView({
                     const displayCode = getDisplayCode(block, tier, isSolutionRevealed);
                     const maxPoints = getMaxPoints(tier);
                     const solutionPenalty = getSolutionPenalty(tier);
+                    const isTwoBlockPattern = currentStep.codeBlocks.length === 2;
                     
                     return (
-                      <div key={idx} className="flex flex-col flex-shrink-0">
+                      <div 
+                        key={idx} 
+                        className={cn(
+                          "flex flex-col flex-shrink-0",
+                          isTwoBlockPattern && "flex-1 min-h-0"
+                        )}
+                      >
                         {/* Editor Header - Merged Toolbar (Filename + Difficulty + Score + Actions) */}
                         <div className="flex-shrink-0 px-2 sm:px-4 py-1.5 sm:py-2 bg-muted/50 border-b border-border">
                           <div className="flex items-center justify-between gap-2">
@@ -860,6 +870,7 @@ export function StepView({
                           revealedAnswers={revealedAnswers[blockKey] || []}
                           onRevealHint={(hintIdx) => revealInlineHint(blockKey, hintIdx, tier)}
                           onRevealAnswer={(hintIdx) => revealInlineAnswer(blockKey, hintIdx, tier)}
+                          equalHeightSplit={isTwoBlockPattern}
                         />
 
                         {/* Footer removed - controls now in header */}
