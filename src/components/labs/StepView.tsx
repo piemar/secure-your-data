@@ -768,7 +768,7 @@ export function StepView({
                     const solutionPenalty = getSolutionPenalty(tier);
                     
                     return (
-                      <div key={idx} className="flex flex-col min-h-[200px] sm:min-h-[250px]">
+                      <div key={idx} className="flex flex-col flex-shrink-0">
                         {/* Editor Header - Mobile Optimized */}
                         <div className="flex-shrink-0 px-2 sm:px-4 py-1.5 sm:py-2 bg-muted/50 border-b border-border flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 overflow-hidden">
