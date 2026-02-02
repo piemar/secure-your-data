@@ -12,12 +12,14 @@ import {
   Crown,
   TrendingUp,
   RotateCcw,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { useRole } from '@/contexts/RoleContext';
 import { useLab } from '@/context/LabContext';
 import { getSortedLeaderboard } from '@/utils/leaderboardUtils';
+import { areLabsEnabled } from '@/utils/workshopUtils';
 import type { Section } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -82,6 +84,7 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
   const { isModerator, logout } = useRole();
   const [userRank, setUserRank] = useState<number>(0);
   const [totalParticipants, setTotalParticipants] = useState<number>(0);
+  const [labsEnabled, setLabsEnabled] = useState<boolean>(areLabsEnabled());
 
   const handleLogout = () => {
     logout();
@@ -108,17 +111,18 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
     }
   };
 
-  // Calculate user rank and progress
+  // Calculate user rank, progress, and check lab status
   useEffect(() => {
-    const updateRank = () => {
+    const updateStatus = () => {
       const leaderboard = getSortedLeaderboard();
       setTotalParticipants(leaderboard.length);
       const rank = leaderboard.findIndex(e => e.email === userEmail) + 1;
       setUserRank(rank);
+      setLabsEnabled(areLabsEnabled());
     };
     
-    updateRank();
-    const interval = setInterval(updateRank, 5000);
+    updateStatus();
+    const interval = setInterval(updateStatus, 5000);
     return () => clearInterval(interval);
   }, [userEmail]);
 
@@ -213,8 +217,10 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
           const Icon = item.icon;
           const isActive = currentSection === item.id;
           const labNumber = item.id.startsWith('lab') ? parseInt(item.id.replace('lab', '')) : null;
-          // Moderators have access to all labs - never show as locked
-          const isLocked = !isModerator && labNumber !== null && labNumber > 1 && !isLabAccessible(labNumber);
+          // For attendees: labs are locked if workshop hasn't started OR if progression requirements not met
+          const isWorkshopLocked = !isModerator && labNumber !== null && !labsEnabled;
+          const isProgressionLocked = !isModerator && labNumber !== null && labNumber > 1 && !isLabAccessible(labNumber);
+          const isLocked = isWorkshopLocked || isProgressionLocked;
           const isLabComplete = labNumber !== null && completedLabs.includes(labNumber);
 
           const handleClick = () => {
@@ -259,7 +265,7 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
                   <span className="text-sm font-medium truncate">{item.label}</span>
                   {item.subLabel && (
                     <span className="text-xs text-muted-foreground truncate">
-                      {isLocked ? 'Complete Lab 1 first' : item.subLabel}
+                      {isWorkshopLocked ? 'Workshop not started' : isProgressionLocked ? 'Complete Lab 1 first' : item.subLabel}
                     </span>
                   )}
                 </div>
@@ -288,8 +294,29 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
         </div>
       )}
 
-      {/* Reset Progress & Logout */}
+      {/* Settings (Moderator Only), Reset Progress & Logout */}
       <div className="p-2 border-t border-sidebar-border space-y-1">
+        {isModerator && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (isMobileOverlay && onMobileNavigate) {
+                onMobileNavigate('settings');
+              } else {
+                setSection('settings');
+              }
+            }}
+            className={cn(
+              'w-full justify-start gap-2 text-muted-foreground hover:text-primary hover:bg-primary/10',
+              !isExpanded && 'justify-center px-0',
+              currentSection === 'settings' && 'bg-primary/10 text-primary'
+            )}
+          >
+            <Settings className="w-4 h-4" />
+            {isExpanded && <span>Settings</span>}
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"
