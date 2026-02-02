@@ -463,27 +463,28 @@ mongosh "${mongoUri}"
 `
         ,
           // Inline hints for Guided mode - line numbers match skeleton
+          // Skeleton lines: 1-7 comments, 8-9 mongosh connect, 10 comment, 11 use ___, 12-13 comments, 14-18 createIndex
           inlineHints: [
             { 
-              line: 8, 
+              line: 11, 
               blankText: '_________', 
               hint: 'The database name used by MongoDB encryption operations', 
               answer: 'encryption' 
             },
             { 
-              line: 12, 
+              line: 15, 
               blankText: '____________', 
               hint: 'MongoDB method to create an index on a collection', 
               answer: 'createIndex' 
             },
             { 
-              line: 13, 
+              line: 16, 
               blankText: '___________', 
               hint: 'The field that stores alternate names for DEKs', 
               answer: 'keyAltNames' 
             },
             { 
-              line: 16, 
+              line: 19, 
               blankText: '$_______', 
               hint: 'MongoDB operator to check if a field exists', 
               answer: 'exists' 
@@ -623,6 +624,7 @@ async function run() {
 
 run().catch(console.dir);`,
           // Inline hints for Guided mode - line numbers match skeleton
+          // Skeleton lines: 1-6 comments, 7 empty, 8 require MongoClient, 9 require fromSSO, etc.
           inlineHints: [
             { 
               line: 8, 
@@ -631,19 +633,19 @@ run().catch(console.dir);`,
               answer: 'ClientEncryption' 
             },
             { 
-              line: 27, 
+              line: 28, 
               blankText: '________________', 
               hint: 'Constructor for the encryption helper class', 
               answer: 'ClientEncryption' 
             },
             { 
-              line: 35, 
+              line: 36, 
               blankText: '________________', 
               hint: 'Method to generate a new Data Encryption Key', 
               answer: 'createDataKey' 
             },
             { 
-              line: 37, 
+              line: 38, 
               blankText: '___________', 
               hint: 'Option to assign a human-readable name to the DEK', 
               answer: 'keyAltNames' 
@@ -878,7 +880,126 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // No skeleton - this is a demo/reference step (full code shown by default)
+          // Skeleton with blanks for key CSFLE concepts
+          skeleton: `const { MongoClient } = require("mongodb");
+const { fromSSO } = require("@aws-sdk/credential-providers");
+
+const uri = "${mongoUri}";
+const keyAltName = "user-${suffix}-ssn-key";
+
+async function run() {
+  const credentials = await fromSSO()();
+  const kmsProviders = {
+    aws: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
+  };
+
+  // Look up DEK by keyAltName (BEST PRACTICE)
+  const keyVaultClient = new MongoClient(uri);
+  await keyVaultClient.connect();
+  const keyVaultDB = keyVaultClient.db("encryption");
+  const keyDoc = await keyVaultDB.collection("__keyVault").findOne({ _____________: keyAltName });
+  const dekId = keyDoc._id;
+  await keyVaultClient.close();
+
+  // Schema Map for CSFLE - defines which fields to encrypt
+  const schemaMap = {
+    "medical.patients": {
+      "bsonType": "object",
+      "properties": {
+        "ssn": {
+          "_______": {                              // BLANK 2: encryption config key
+            "bsonType": "string",
+            "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-___________",  // BLANK 3: algorithm type
+            "keyId": [dekId]
+          }
+        }
+      }
+    }
+  };
+
+  // 1. STANDARD CONNECTION (No CSFLE) - Insert unencrypted data
+  console.log("\\n=== WITHOUT CSFLE ===");
+  const clientStandard = new MongoClient(uri);
+  await clientStandard.connect();
+  const standardDb = clientStandard.db("medical");
+  await standardDb.collection("patients").deleteMany({ name: "Alice Johnson" });
+  await standardDb.collection("patients").insertOne({
+    name: "Alice Johnson",
+    ssn: "123-45-6789",
+    dob: "1990-01-15"
+  });
+  const docStandard = await standardDb.collection("patients").findOne({ name: "Alice Johnson" });
+  console.log("SSN stored as:", docStandard.ssn); // Plain text!
+  await clientStandard.close();
+
+  // 2. CSFLE-ENABLED CONNECTION - Uses autoEncryption${cryptSharedLibPath ? `
+  const extraOptions = {
+    cryptSharedLibPath: "${cryptSharedLibPath}",
+    cryptSharedLibRequired: false
+  };` : ''}
+  console.log("\\n=== WITH CSFLE ===");
+  const clientEncrypted = new MongoClient(uri, {
+    ______________: {                               // BLANK 4: auto encryption config key
+      keyVaultNamespace: "encryption.__keyVault",
+      kmsProviders,
+      schemaMap${cryptSharedLibPath ? ',\n      ...extraOptions' : ''}
+    }
+  });
+  await clientEncrypted.connect();
+  const encryptedDb = clientEncrypted.db("medical");
+
+  await encryptedDb.collection("patients").insertOne({
+    name: "Bob Smith",
+    ssn: "987-65-4321",
+    dob: "1985-06-20"
+  });
+  console.log("Inserted Bob Smith with CSFLE (SSN encrypted)");
+
+  const docEncrypted = await encryptedDb.collection("patients").findOne({ name: "Bob Smith" });
+  console.log("SSN returned as:", docEncrypted.ssn); // Decrypted!
+  await clientEncrypted.close();
+
+  // 3. THE PROOF: Query encrypted data WITHOUT CSFLE
+  console.log("\\n=== PROOF: Query Bob's record WITHOUT CSFLE ===");
+  const clientProof = new MongoClient(uri);
+  await clientProof.connect();
+  const docProof = await clientProof.db("medical").collection("patients").findOne({ name: "Bob Smith" });
+  console.log("SSN field type:", docProof.ssn.constructor.name); // Binary = ciphertext!
+  await clientProof.close();
+}
+
+run().catch(console.error);`,
+          // Inline hints for the skeleton
+          inlineHints: [
+            { 
+              line: 22, 
+              blankText: '_____________', 
+              hint: 'The field in __keyVault that stores human-readable key names', 
+              answer: 'keyAltNames' 
+            },
+            { 
+              line: 31, 
+              blankText: '_______', 
+              hint: 'Schema map keyword to specify field should be encrypted', 
+              answer: 'encrypt' 
+            },
+            { 
+              line: 33, 
+              blankText: '___________', 
+              hint: 'Algorithm suffix for fields that need equality queries', 
+              answer: 'Deterministic' 
+            },
+            { 
+              line: 65, 
+              blankText: '______________', 
+              hint: 'MongoClient option that enables automatic encryption', 
+              answer: 'autoEncryption' 
+            }
+          ]
         },
         {
           filename: '2. Terminal (NOT mongosh) - Run with Node.js',
@@ -985,7 +1106,98 @@ async function main() {
 }
 
 main().catch(console.error);`,
-          // No skeleton - this is a summary/reference step (full code shown by default)
+          // Skeleton with blanks for production CSFLE patterns
+          skeleton: `import { MongoClient } from "mongodb";
+
+// --- CONFIGURATION ---
+const uri = "${mongoUri}";
+const keyVaultNamespace = "encryption.__keyVault";
+const kmsProviders = { aws: {} }; // Use implicit AWS credentials
+const keyAltName = "user-${suffix}-ssn-key";
+
+async function main() {
+  // BEST PRACTICE: Look up DEK by alternative name
+  const keyVaultClient = new MongoClient(uri);
+  await keyVaultClient.connect();
+  const [db, coll] = keyVaultNamespace._____(\'.\');    // BLANK 1: string method
+  const keyDoc = await keyVaultClient.db(db).collection(coll).findOne({ keyAltNames: keyAltName });
+  const dekId = keyDoc._____;                           // BLANK 2: document field
+  await keyVaultClient.close();
+
+  const schemaMap = {
+    "medical.patients": {
+      "_______": "object",                              // BLANK 3: BSON type key
+      "properties": {
+        "ssn": {
+          "encrypt": {
+            "bsonType": "string",
+            "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic",
+            "keyId": [dekId]
+          }
+        }
+      }
+    }
+  };${cryptSharedLibPath ? `
+
+  const extraOptions = {
+    cryptSharedLibPath: "${cryptSharedLibPath}",
+    cryptSharedLibRequired: false
+  };` : ''}
+
+  const client = new MongoClient(uri, {
+    autoEncryption: {
+      keyVaultNamespace,
+      _____________,                                   // BLANK 4: KMS config object
+      schemaMap${cryptSharedLibPath ? ',\n      ...extraOptions' : ''}
+    }
+  });
+
+  try {
+    await client.connect();
+    const db = client.db("medical");
+    
+    await db.collection("patients").insertOne({
+      name: "Alice",
+      ssn: "987-65-4321"
+    });
+    console.log("Document inserted (Encrypted in Atlas).");
+
+    const doc = await db.collection("patients").findOne({ ssn: "987-65-4321" });
+    console.log("Decrypted Document:", doc);
+
+  } finally {
+    await client.close();
+  }
+}
+
+main().catch(console.error);`,
+          // Inline hints for the skeleton
+          inlineHints: [
+            { 
+              line: 13, 
+              blankText: '_____', 
+              hint: 'JavaScript string method to divide into array of substrings', 
+              answer: 'split' 
+            },
+            { 
+              line: 15, 
+              blankText: '_____', 
+              hint: 'MongoDB document field that stores the primary key', 
+              answer: '_id' 
+            },
+            { 
+              line: 19, 
+              blankText: '_______', 
+              hint: 'JSON Schema keyword to specify the BSON type', 
+              answer: 'bsonType' 
+            },
+            { 
+              line: 39, 
+              blankText: '_____________', 
+              hint: 'Object that contains AWS KMS credentials configuration', 
+              answer: 'kmsProviders' 
+            }
+          ]
         },
         {
           filename: 'Terminal - Run the application',
