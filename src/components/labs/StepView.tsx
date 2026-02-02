@@ -734,22 +734,7 @@ export function StepView({
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-        {/* Read-Only Mode Toggle - Compact */}
-        {hasSkeletons && (
-          <div className="flex-shrink-0 flex items-center gap-2 px-3 sm:px-4 py-1 border-b border-border bg-muted/20">
-            <Switch 
-              id="read-only-mode"
-              checked={alwaysShowSolutions} 
-              onCheckedChange={setAlwaysShowSolutions}
-              className="scale-90"
-            />
-            <Label htmlFor="read-only-mode" className="text-[10px] sm:text-xs text-muted-foreground cursor-pointer">
-              <Unlock className="w-3 h-3 inline mr-1" />
-              <span className="hidden sm:inline">Read-only mode (show solutions)</span>
-              <span className="sm:hidden">Solutions</span>
-            </Label>
-          </div>
-        )}
+        {/* Read-only mode toggle removed - difficulty/solution controls are now per-block in header */}
 
         {/* Code Editor & Output - Resizable Split */}
         <div className="flex-1 overflow-hidden min-h-0">
@@ -769,34 +754,95 @@ export function StepView({
                     
                     return (
                       <div key={idx} className="flex flex-col flex-shrink-0">
-                        {/* Editor Header - Mobile Optimized */}
-                        <div className="flex-shrink-0 px-2 sm:px-4 py-1.5 sm:py-2 bg-muted/50 border-b border-border flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 overflow-hidden">
-                            <span className="text-[10px] sm:text-xs font-mono text-muted-foreground truncate max-w-[100px] sm:max-w-none">{block.filename}</span>
-                            {currentStep.estimatedTime && (
-                              <span className="hidden sm:inline text-xs text-muted-foreground">
-                                ⏱️ {currentStep.estimatedTime}
-                              </span>
-                            )}
-                            {hasSkeleton && !isSolutionRevealed && (
-                              <span className="flex items-center gap-1 text-[10px] sm:text-xs bg-amber-500/10 text-amber-600 px-1.5 sm:px-2 py-0.5 rounded flex-shrink-0">
-                                <Lock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                                <span className="hidden xs:inline">
-                                  {tier === 'expert' ? 'Expert' : tier === 'challenge' ? 'Challenge' : 'Guided'}
-                                </span>
-                                <span className="text-amber-500/70">({maxPoints}pts)</span>
-                              </span>
-                            )}
+                        {/* Editor Header - Merged Toolbar (Filename + Difficulty + Score + Actions) */}
+                        <div className="flex-shrink-0 px-2 sm:px-4 py-1.5 sm:py-2 bg-muted/50 border-b border-border">
+                          <div className="flex items-center justify-between gap-2">
+                            {/* Left: Filename + Difficulty selector + Score */}
+                            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 flex-wrap">
+                              <span className="text-[10px] sm:text-xs font-mono text-muted-foreground truncate max-w-[80px] sm:max-w-none">{block.filename}</span>
+                              
+                              {/* Inline difficulty selector (only for skeleton blocks that aren't revealed) */}
+                              {hasSkeleton && !isSolutionRevealed && (
+                                <>
+                                  <div className="flex gap-0.5 bg-background rounded p-0.5 border border-border">
+                                    <button
+                                      onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'guided' }))}
+                                      className={cn(
+                                        "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors",
+                                        tier === 'guided' 
+                                          ? "bg-primary text-primary-foreground" 
+                                          : "hover:bg-muted"
+                                      )}
+                                    >
+                                      Guided
+                                    </button>
+                                    <button
+                                      onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'challenge' }))}
+                                      disabled={!block.challengeSkeleton && !block.expertSkeleton}
+                                      className={cn(
+                                        "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors",
+                                        tier === 'challenge' 
+                                          ? "bg-primary text-primary-foreground" 
+                                          : "hover:bg-muted",
+                                        !block.challengeSkeleton && !block.expertSkeleton && "opacity-40 cursor-not-allowed"
+                                      )}
+                                    >
+                                      Challenge
+                                    </button>
+                                    <button
+                                      onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'expert' }))}
+                                      disabled={!block.expertSkeleton}
+                                      className={cn(
+                                        "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors",
+                                        tier === 'expert' 
+                                          ? "bg-primary text-primary-foreground" 
+                                          : "hover:bg-muted",
+                                        !block.expertSkeleton && "opacity-40 cursor-not-allowed"
+                                      )}
+                                    >
+                                      Expert
+                                    </button>
+                                  </div>
+                                  
+                                  {/* Score display */}
+                                  <div className="flex items-center gap-1 text-[10px] sm:text-xs">
+                                    <span className={cn(
+                                      "font-mono font-medium",
+                                      (pointsDeducted[blockKey] || 0) > 0 ? "text-amber-600" : "text-foreground"
+                                    )}>
+                                      {Math.max(0, maxPoints - (pointsDeducted[blockKey] || 0))}
+                                    </span>
+                                    <span className="text-muted-foreground">/ {maxPoints}pts</span>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                            
+                            {/* Right: Solution + Copy buttons */}
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {hasSkeleton && !isSolutionRevealed && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => revealSolution(blockKey, tier)}
+                                  className="gap-1 h-6 text-[10px] sm:text-xs px-1.5 sm:px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  <span className="hidden sm:inline">Solution</span>
+                                  <span>(-{solutionPenalty})</span>
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleCopyCode(idx)}
+                                className="gap-1 h-6 text-[10px] sm:text-xs px-1.5 sm:px-2"
+                              >
+                                {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                                <span className="hidden xs:inline">{copied ? 'Copied!' : 'Copy'}</span>
+                              </Button>
+                            </div>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCopyCode(idx)}
-                            className="gap-1 h-6 text-[10px] sm:text-xs px-1.5 sm:px-2 flex-shrink-0"
-                          >
-                            {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                            <span className="hidden xs:inline">{copied ? 'Copied!' : 'Copy'}</span>
-                          </Button>
                         </div>
                         
                         {/* Monaco Editor with Inline Hint Widgets */}
@@ -816,90 +862,7 @@ export function StepView({
                           onRevealAnswer={(hintIdx) => revealInlineAnswer(blockKey, hintIdx, tier)}
                         />
 
-                        {/* Simplified Challenge Mode Footer - Mobile Optimized */}
-                        {hasAnySkeleton(block) && !isSolutionRevealed && (
-                          <div className="flex-shrink-0 px-2 sm:px-4 py-1.5 sm:py-2 bg-muted/50 border-t border-border">
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                              {/* Left: Difficulty selector & Score */}
-                              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                                {/* Compact difficulty selector */}
-                                <div className="flex gap-0.5 bg-background rounded p-0.5 border border-border">
-                                  <button
-                                    onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'guided' }))}
-                                    className={cn(
-                                      "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors",
-                                      tier === 'guided' 
-                                        ? "bg-primary text-primary-foreground" 
-                                        : "hover:bg-muted"
-                                    )}
-                                  >
-                                    Guided
-                                  </button>
-                                  <button
-                                    onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'challenge' }))}
-                                    disabled={!block.challengeSkeleton && !block.expertSkeleton}
-                                    className={cn(
-                                      "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors",
-                                      tier === 'challenge' 
-                                        ? "bg-primary text-primary-foreground" 
-                                        : "hover:bg-muted",
-                                      !block.challengeSkeleton && !block.expertSkeleton && "opacity-40 cursor-not-allowed"
-                                    )}
-                                  >
-                                    Challenge
-                                  </button>
-                                  <button
-                                    onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'expert' }))}
-                                    disabled={!block.expertSkeleton}
-                                    className={cn(
-                                      "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors",
-                                      tier === 'expert' 
-                                        ? "bg-primary text-primary-foreground" 
-                                        : "hover:bg-muted",
-                                      !block.expertSkeleton && "opacity-40 cursor-not-allowed"
-                                    )}
-                                  >
-                                    Expert
-                                  </button>
-                                </div>
-                                
-                                {/* Score display */}
-                                <div className="flex items-center gap-1 text-xs sm:text-sm">
-                                  <span className="text-muted-foreground">Score:</span>
-                                  <span className={cn(
-                                    "font-mono font-medium",
-                                    (pointsDeducted[blockKey] || 0) > 0 ? "text-amber-600" : "text-foreground"
-                                  )}>
-                                    {Math.max(0, maxPoints - (pointsDeducted[blockKey] || 0))}
-                                  </span>
-                                  <span className="text-muted-foreground">/ {maxPoints}</span>
-                                </div>
-                                
-                                {/* Hints used indicator (for inline hints) - Hidden on mobile */}
-                                {tier === 'guided' && block.inlineHints && (
-                                  <span className="hidden sm:inline text-xs text-muted-foreground">
-                                    {block.inlineHints.length > 0 && (
-                                      <>Click <span className="bg-muted px-1 rounded">?</span> markers for hints</>
-                                    )}
-                                  </span>
-                                )}
-                              </div>
-                              
-                              {/* Right: Show full solution button */}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => revealSolution(blockKey, tier)}
-                                className="gap-1 h-6 sm:h-7 text-[10px] sm:text-xs text-destructive hover:text-destructive hover:bg-destructive/10 w-full sm:w-auto"
-                              >
-                                <Eye className="w-3 h-3" />
-                                <span className="hidden xs:inline">Show Full Solution</span>
-                                <span className="xs:hidden">Solution</span>
-                                <span>(-{solutionPenalty}pts)</span>
-                              </Button>
-                            </div>
-                          </div>
-                        )}
+                        {/* Footer removed - controls now in header */}
 
                         {/* Solution Revealed Banner */}
                         {hasAnySkeleton(block) && isSolutionRevealed && !alwaysShowSolutions && showSolution[blockKey] && (
