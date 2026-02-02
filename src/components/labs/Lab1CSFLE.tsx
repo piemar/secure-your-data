@@ -468,30 +468,28 @@ mongosh "${mongoUri}"
 `
         ,
           // Inline hints for Guided mode - line numbers match skeleton exactly
-          // L1-7: header comments, L8: empty, L9: comment, L10: mongosh, L11: empty
-          // L12: use _________, L13: empty, L14-15: comments, L16: db.getCollection.____________
-          // L17: { ___________: 1 }, L18-20: { unique: true, partialFilter with $_______: true }
+          // User confirmed: L13: use _________, L17: ____________, L18: ___________, L21: $_______
           inlineHints: [
             { 
-              line: 12, 
+              line: 13, 
               blankText: '_________', 
               hint: 'The database name used by MongoDB encryption operations', 
               answer: 'encryption' 
             },
             { 
-              line: 16, 
+              line: 17, 
               blankText: '____________', 
               hint: 'MongoDB method to create an index on a collection', 
               answer: 'createIndex' 
             },
             { 
-              line: 17, 
+              line: 18, 
               blankText: '___________', 
               hint: 'The field that stores alternate names for DEKs', 
               answer: 'keyAltNames' 
             },
             { 
-              line: 20, 
+              line: 21, 
               blankText: '$_______', 
               hint: 'MongoDB operator to check if a field exists', 
               answer: 'exists' 
@@ -982,32 +980,28 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints for the skeleton - line numbers match exactly
-          // L1-21: setup code, L22: findOne({ _____________: keyAltName })
-          // L23-30: more code, L31: "_______": { encryption config }
-          // L32: bsonType, L33: algorithm with ___________
-          // L34-62: more code (variable based on cryptSharedLibPath), L63: ______________: { config }
+          // Inline hints for the skeleton - user confirmed: L21, L31, L33, L59
           inlineHints: [
             { 
-              line: 22, 
+              line: 21, 
               blankText: '_____________', 
               hint: 'The field in __keyVault that stores human-readable key names', 
               answer: 'keyAltNames' 
             },
             { 
-              line: 32, 
+              line: 31, 
               blankText: '_______', 
               hint: 'Schema map keyword to specify field should be encrypted', 
               answer: 'encrypt' 
             },
             { 
-              line: 34, 
+              line: 33, 
               blankText: '___________', 
               hint: 'Algorithm suffix for fields that need equality queries', 
               answer: 'Deterministic' 
             },
             { 
-              line: 64, 
+              line: 59, 
               blankText: '______________', 
               hint: 'MongoClient option that enables automatic encryption', 
               answer: 'autoEncryption' 
@@ -1184,10 +1178,7 @@ async function main() {
 }
 
 main().catch(console.error);`,
-          // Inline hints for the skeleton - line numbers match exactly
-          // L1-12: imports/config, L13: split('.'), L14: findOne, L15: dekId = keyDoc._____
-          // L16-18: more code, L19: "_______": "object"
-          // L20-37: more code (variable based on cryptSharedLibPath), L38: _____________,
+          // Inline hints for the skeleton - user confirmed: L13, L15, L20, L36
           inlineHints: [
             { 
               line: 13, 
@@ -1202,13 +1193,13 @@ main().catch(console.error);`,
               answer: '_id' 
             },
             { 
-              line: 19, 
+              line: 20, 
               blankText: '_______', 
               hint: 'JSON Schema keyword to specify the BSON type', 
               answer: 'bsonType' 
             },
             { 
-              line: 38, 
+              line: 36, 
               blankText: '_____________', 
               hint: 'Object that contains AWS KMS credentials configuration', 
               answer: 'kmsProviders' 
