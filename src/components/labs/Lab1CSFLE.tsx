@@ -879,8 +879,7 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          skeleton: `// Create testCSFLE.cjs with CSFLE-enabled and standard clients
-// Compare the output when querying encrypted vs non-encrypted`
+          // No skeleton - this is a demo/reference step (full code shown by default)
         },
         {
           filename: '2. Terminal (NOT mongosh) - Run with Node.js',
@@ -987,7 +986,7 @@ async function main() {
 }
 
 main().catch(console.error);`,
-          skeleton: `// Full application structure`
+          // No skeleton - this is a summary/reference step (full code shown by default)
         }
       ],
       onVerify: async () => { return { success: true, message: 'Lab 1 Complete! You have built a secure app.' }; }
