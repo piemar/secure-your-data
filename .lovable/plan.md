@@ -1,227 +1,94 @@
 
-# Workshop Settings and Lab Control System
+# Plan: Lab 1 Consistency and UI Fixes
 
 ## Overview
 
-This plan implements three major features:
-1. **Clear prerequisites overview** in Lab Setup with a visual checklist
-2. **Workshop management settings** for moderators (enable/disable labs, manage workshops)
-3. **Workshop session tracking** with customer name, date, and leaderboard reset
+Fix Lab 1 to match the quality and consistency of Lab 2 by addressing:
+1. Empty section rendering below code blocks without skeletons
+2. Step 4 (now visible as Step 5 in the UI based on step indices) with multiple code blocks appearing cluttered
+3. Steps 6 and 7 having useless skeletons - convert them to "Summary/Demo" steps
+4. Ensure consistent hint coverage across all interactive steps
 
 ---
 
-## Current Architecture
+## Issues Identified
 
-| Component | Storage | Purpose |
-|-----------|---------|---------|
-| Leaderboard data | `localStorage` (`workshop_leaderboard`) | Participant scores, lab times |
-| User role | `localStorage` (`user_role`) | moderator/attendee |
-| Lab progress | `localStorage` (multiple keys) | Step completion, start times |
-
-**Key insight:** Data is currently stored in localStorage, which is browser-local. For workshop management (enabling labs globally for all users), we need a shared storage mechanism.
-
----
-
-## Implementation Plan
-
-### Part 1: Clear Prerequisites Overview
-
-Add a visual "What You'll Need" checklist at the top of the Lab Setup wizard before any interactive elements.
-
-**Location:** `src/components/labs/LabSetupWizard.tsx`
-
-```text
-┌──────────────────────────────────────────────────────────────┐
-│  📋 Lab Environment Setup                                    │
-├──────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │  📦 WHAT YOU'LL NEED                                    │ │
-│  │  Before starting, ensure you have:                      │ │
-│  │                                                          │ │
-│  │  Required:                                               │ │
-│  │  ☐ Node.js v18+      - JavaScript runtime               │ │
-│  │  ☐ npm               - Package manager                  │ │
-│  │  ☐ AWS CLI v2        - For KMS operations               │ │
-│  │  ☐ mongosh           - MongoDB Shell                    │ │
-│  │  ☐ MongoDB Atlas     - M10+ cluster with connection URI │ │
-│  │                                                          │ │
-│  │  Optional (Lab 2):                                       │ │
-│  │  ☐ mongo_crypt_shared - For Queryable Encryption        │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│                                                              │
-│  [Architecture Diagram]                                      │
-│  [Check Prerequisites Button]                                │
-└──────────────────────────────────────────────────────────────┘
-```
-
-**Changes:**
-- Add a new `PrerequisitesChecklist` component at the top of the setup wizard
-- Use clear iconography and grouping (Required vs Optional)
-- Include brief descriptions of each tool's purpose
-- Make this visible BEFORE the interactive check
+| Step | ID | Issue | Fix |
+|------|----|-------|-----|
+| Step 1 | l1s1 | Works correctly | None |
+| Step 2 | l1s2 | Works correctly | None |
+| Step 3 | l1s3 | Works correctly | None |
+| Step 4 | l1s4 | Renamed as l1s5 - has 3 code blocks, first block has NO skeleton but footer shows | Only show Challenge Mode footer for blocks that HAVE skeletons |
+| Step 5 | l1s5verify | Demo step, no skeleton needed | Mark as reference step (no Challenge Mode) |
+| Step 6 | l1s6 | Skeleton is just 2-line comment - not useful | Convert to Demo/Reference step (remove skeleton) |
+| Step 7 | l1s7 | Skeleton is just 1 line - not useful | Convert to "Summary" step (remove skeleton, add summary tag) |
 
 ---
 
-### Part 2: Moderator Settings Page
+## Part 1: Fix StepView.tsx - Only Show Footer for Blocks with Skeletons
 
-Add a Settings button (cog icon) in the sidebar above "Reset Progress" for moderators only.
+**File:** `src/components/labs/StepView.tsx`
 
-**New Files:**
-- `src/components/settings/WorkshopSettings.tsx` - Settings page component
-- `src/utils/workshopUtils.ts` - Workshop state management utilities
+**Current Problem:** The Challenge Mode footer renders for ALL code blocks if ANY block in the step has a skeleton.
 
-**Modified Files:**
-- `src/components/layout/AppSidebar.tsx` - Add Settings button
-- `src/utils/leaderboardUtils.ts` - Add workshop session fields
-- `src/pages/Index.tsx` - Add settings route
-- `src/contexts/NavigationContext.tsx` - Add 'settings' section
-- `src/types/index.ts` - Add Section type
-
-**Settings Page Features:**
-
-```text
-┌──────────────────────────────────────────────────────────────┐
-│  ⚙️ Workshop Settings                     (Moderator Only)   │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ┌─ CURRENT WORKSHOP SESSION ─────────────────────────────┐ │
-│  │  Customer: [Acme Corp]                                  │ │
-│  │  Date: [February 2, 2026]                               │ │
-│  │  Status: 🟢 Labs Enabled                                │ │
-│  │  Participants: 12                                       │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│                                                              │
-│  ┌─ LAB ACCESS CONTROL ───────────────────────────────────┐ │
-│  │                                                          │ │
-│  │  Labs Enabled:  [====OFF====]  / [====ON====]           │ │
-│  │                                                          │ │
-│  │  When disabled, attendees see "Workshop not yet         │ │
-│  │  started" message. Moderators always have access.       │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│                                                              │
-│  ┌─ START NEW WORKSHOP ───────────────────────────────────┐ │
-│  │                                                          │ │
-│  │  Customer Name: [________________]                       │ │
-│  │  Workshop Date: [📅 Select Date]                         │ │
-│  │                                                          │ │
-│  │  [Start New Workshop]                                    │ │
-│  │                                                          │ │
-│  │  ⚠️ Starting a new workshop will:                       │ │
-│  │     • Reset the leaderboard for the new session         │ │
-│  │     • Enable labs for all participants                   │ │
-│  │     • Archive the previous session data                  │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│                                                              │
-│  ┌─ DANGER ZONE ──────────────────────────────────────────┐ │
-│  │                                                          │ │
-│  │  [🗑️ Reset Leaderboard Only]                             │ │
-│  │  Clear all participant scores without starting new      │ │
-│  │  workshop session.                                       │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
-```
-
----
-
-### Part 3: Workshop State Storage
-
-Extend localStorage structure to include workshop session information.
-
-**New localStorage key:** `workshop_session`
+**Solution:** Check per-block whether it has a skeleton, not just step-level.
 
 ```typescript
-interface WorkshopSession {
-  id: string;                    // Unique session ID
-  customerName: string;          // e.g., "Acme Corp"
-  workshopDate: string;          // ISO date string
-  startedAt: number;             // Timestamp when started
-  labsEnabled: boolean;          // Whether labs are accessible
-  archivedLeaderboards: {        // Previous sessions
-    sessionId: string;
-    customerName: string;
-    workshopDate: string;
-    entries: LeaderboardEntry[];
-  }[];
-}
+// Current logic (line ~820):
+{hasSkeleton && !isSolutionRevealed && (
+  <div className="flex-shrink-0 px-2 sm:px-4 py-1.5...">
+    {/* Footer content */}
+  </div>
+)}
+
+// Fix: Check THIS block's skeleton, not step-level
+{hasAnySkeleton(block) && !isSolutionRevealed && (
+  <div className="flex-shrink-0 px-2 sm:px-4 py-1.5...">
+    {/* Footer content */}
+  </div>
+)}
 ```
 
-**New utility functions in `src/utils/workshopUtils.ts`:**
-
-```typescript
-// Get current workshop session
-getWorkshopSession(): WorkshopSession | null
-
-// Check if labs are enabled
-areLabsEnabled(): boolean
-
-// Enable/disable labs
-setLabsEnabled(enabled: boolean): void
-
-// Start new workshop (with confirmation)
-startNewWorkshop(customerName: string, workshopDate: string): void
-
-// Reset leaderboard only
-resetLeaderboard(): void
-
-// Get workshop history
-getWorkshopHistory(): WorkshopSession['archivedLeaderboards']
-```
+Also update the Solution Revealed Banner similarly.
 
 ---
 
-### Part 4: Lab Access Control
+## Part 2: Convert Lab 1 Steps 6 & 7 to Reference/Summary Steps
 
-Modify lab access logic to check workshop state.
+**File:** `src/components/labs/Lab1CSFLE.tsx`
 
-**Modified Files:**
-- `src/context/LabContext.tsx` - Add workshop state check
-- `src/pages/Index.tsx` - Show "Workshop not started" message
-- `src/components/layout/AppSidebar.tsx` - Show locked state
+### Step 6 (l1s6) - "Test CSFLE: Insert & Query with Encryption"
 
-**Logic Flow:**
+This is a demonstration step - the user copies a large script, runs it, and observes the output. It's not suitable for fill-in-the-blank because:
+- The skeleton is just 2 lines: `// Create testCSFLE.cjs with CSFLE-enabled and standard clients...`
+- The actual code is 100+ lines - not practical for blanks
+- It's meant to demonstrate the concept, not test understanding
 
-```text
-User tries to access Lab 1/2/3
-        │
-        ▼
-┌───────────────────┐
-│  Is Moderator?    │──Yes──▶ Allow access
-└───────────────────┘
-        │ No
-        ▼
-┌───────────────────┐
-│  Labs enabled?    │──No──▶ Show "Workshop not started"
-└───────────────────┘
-        │ Yes
-        ▼
-┌───────────────────┐
-│  Lab accessible?  │──No──▶ Show "Complete Lab 1 first"
-│  (progression)    │
-└───────────────────┘
-        │ Yes
-        ▼
-    Allow access
-```
+**Change:**
+- Remove the `skeleton` property from the code block
+- Keep the full code visible (Read-only/Demo mode by default)
+- Add a `isDemo: true` or just remove skeleton entirely
 
-**"Workshop Not Started" Screen:**
+### Step 7 (l1s7) - "The Complete Application"
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│                                                              │
-│           🔒 Workshop Not Yet Started                        │
-│                                                              │
-│           The workshop moderator has not enabled             │
-│           the labs yet. Please wait for the                  │
-│           presentation to begin.                             │
-│                                                              │
-│           In the meantime, you can review the                │
-│           Lab Setup requirements.                            │
-│                                                              │
-│           [Go to Lab Setup]                                  │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
-```
+This is a summary/reference step - shows the final clean code. Not for challenge mode.
+
+**Change:**
+- Remove the `skeleton` property (`skeleton: '// Full application structure'`)
+- Keep the full code visible
+- This step is a reference, not a challenge
+
+---
+
+## Part 3: Add Visual Indicator for "Reference/Demo" Steps
+
+To make it clear that some steps are for reference/demonstration rather than challenge mode, we can add a visual badge.
+
+**Option A:** Just remove skeletons (simplest) - steps without skeletons automatically show full code.
+
+**Option B:** Add a step-level flag like `isReference: true` that displays a "Reference" badge instead of Challenge Mode controls.
+
+Recommend **Option A** for simplicity - removing skeletons naturally hides Challenge Mode UI.
 
 ---
 
@@ -229,55 +96,109 @@ User tries to access Lab 1/2/3
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/components/labs/LabSetupWizard.tsx` | Modify | Add prerequisites checklist |
-| `src/components/settings/WorkshopSettings.tsx` | Create | New settings page |
-| `src/utils/workshopUtils.ts` | Create | Workshop state management |
-| `src/utils/leaderboardUtils.ts` | Modify | Add reset function |
-| `src/components/layout/AppSidebar.tsx` | Modify | Add Settings button |
-| `src/contexts/NavigationContext.tsx` | Modify | Add 'settings' section |
-| `src/context/LabContext.tsx` | Modify | Add workshop state check |
-| `src/pages/Index.tsx` | Modify | Add settings route, workshop check |
-| `src/types/index.ts` | Modify | Add Section type |
-| `src/components/labs/WorkshopNotStarted.tsx` | Create | Placeholder screen |
+| `src/components/labs/StepView.tsx` | Modify | Fix footer/banner to only show for blocks WITH skeletons |
+| `src/components/labs/Lab1CSFLE.tsx` | Modify | Remove useless skeletons from Steps 6 & 7 |
 
 ---
 
-## Implementation Order
+## Technical Details
 
-1. **Prerequisites Checklist** - Improve Lab Setup UX
-2. **Workshop Utilities** - Create state management layer
-3. **Settings Page** - Build moderator controls
-4. **Sidebar Integration** - Add Settings button
-5. **Lab Access Control** - Implement global enable/disable
-6. **Workshop Not Started Screen** - User-facing message
-7. **Leaderboard Reset** - Add reset functionality
+### StepView.tsx Changes (Lines ~820-915)
+
+**Change 1:** Footer check (around line 820)
+```typescript
+// Before:
+{hasSkeleton && !isSolutionRevealed && (
+
+// After - check this specific block:
+{hasAnySkeleton(block) && !isSolutionRevealed && (
+```
+
+**Change 2:** Solution Revealed Banner (around line 905)
+```typescript
+// Before:
+{hasSkeleton && isSolutionRevealed && !alwaysShowSolutions && showSolution[blockKey] && (
+
+// After:
+{hasAnySkeleton(block) && isSolutionRevealed && !alwaysShowSolutions && showSolution[blockKey] && (
+```
+
+### Lab1CSFLE.tsx Changes
+
+**Step 6 (l1s6)** - Around line 882:
+Remove the skeleton property:
+```javascript
+// Before:
+skeleton: `// Create testCSFLE.cjs with CSFLE-enabled and standard clients
+// Compare the output when querying encrypted vs non-encrypted`
+
+// After:
+// Remove skeleton property entirely - code shows in full by default
+```
+
+**Step 7 (l1s7)** - Around line 990:
+Remove the skeleton property:
+```javascript
+// Before:
+skeleton: `// Full application structure`
+
+// After:
+// Remove skeleton property entirely
+```
 
 ---
 
-## Technical Notes
+## Expected Outcome
 
-### Storage Considerations
+After these changes:
 
-Since this is a localStorage-based system (no Supabase backend per project architecture), the "global" lab enable/disable works as follows:
+1. **Lab 1 Step 4 (Generate DEKs)**: 
+   - "Install Deps" block shows WITHOUT Challenge Mode footer (no skeleton)
+   - "createKey.cjs" block shows WITH Challenge Mode footer (has skeleton)
+   - "Run command" block shows WITHOUT Challenge Mode footer (no skeleton)
 
-- Each browser has its own localStorage
-- The workshop state is stored per browser
-- **For true multi-user sync**, the moderator would need to tell attendees when to refresh
+2. **Lab 1 Step 6 (Test CSFLE)**:
+   - Shows full code immediately (no Challenge Mode)
+   - Clear that it's a demo/reference step
 
-**Alternative approach (if needed later):** 
-- Use a simple polling mechanism to check a shared JSON file
-- Or implement Supabase later for real-time sync
+3. **Lab 1 Step 7 (Complete Application)**:
+   - Shows full code immediately (no Challenge Mode)  
+   - Acts as a summary/reference
 
-### Default State
+4. **No more empty sections** below code blocks
 
-- Labs are **disabled by default** (no active workshop)
-- When moderator starts a new workshop, labs become enabled
-- Workshop state persists until explicitly reset
+---
 
-### Moderator Always Has Access
+## Visual Representation
 
-Regardless of `labsEnabled` state, moderators can:
-- Access all labs
-- View the settings page
-- Manage workshop state
+```text
+BEFORE (Step 4):
+┌─────────────────────────────────────────┐
+│ 1. Terminal: Install Deps  ⏱️ 8 min     │
+├─────────────────────────────────────────┤
+│ npm install mongodb...                  │
+├─────────────────────────────────────────┤
+│ [Guided] [Challenge] [Expert]  Score: X │  ← WRONG: No skeleton
+└─────────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│ 2. createKey.cjs  🔒 Guided (10pts)     │
+├─────────────────────────────────────────┤
+│ const { MongoClient, ____ } = ...       │
+├─────────────────────────────────────────┤
+│ [Guided] [Challenge] [Expert]  Score: X │  ← CORRECT: Has skeleton
+└─────────────────────────────────────────┘
 
+AFTER (Step 4):
+┌─────────────────────────────────────────┐
+│ 1. Terminal: Install Deps  ⏱️ 8 min     │
+├─────────────────────────────────────────┤
+│ npm install mongodb...                  │
+└─────────────────────────────────────────┘  ← Clean: No footer
+┌─────────────────────────────────────────┐
+│ 2. createKey.cjs  🔒 Guided (10pts)     │
+├─────────────────────────────────────────┤
+│ const { MongoClient, ____ } = ...       │
+├─────────────────────────────────────────┤
+│ [Guided] [Challenge] [Expert]  Score: X │
+└─────────────────────────────────────────┘
+```
