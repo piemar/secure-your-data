@@ -350,13 +350,13 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints for Step 2 - line numbers match skeleton
+          // Inline hints for Step 2 - line numbers must match exact skeleton line positions
           inlineHints: [
-            { line: 11, blankText: '______', hint: 'Method to find a single document by query', answer: 'findOne' },
-            { line: 15, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
-            { line: 25, blankText: '_______', hint: 'The field name for salary data', answer: 'salary' },
-            { line: 28, blankText: '________', hint: 'Query type for searching encrypted fields', answer: 'equality' },
-            { line: 41, blankText: '________________', hint: 'Method to create a new collection', answer: 'createCollection' }
+            { line: 15, blankText: '______', hint: 'Method to find a single document by query', answer: 'findOne' },
+            { line: 19, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
+            { line: 29, blankText: '_______', hint: 'The field name for salary data', answer: 'salary' },
+            { line: 32, blankText: '________', hint: 'Query type for searching encrypted fields', answer: 'equality' },
+            { line: 45, blankText: '________________', hint: 'Method to create a new collection', answer: 'createCollection' }
           ]
         },
         {
