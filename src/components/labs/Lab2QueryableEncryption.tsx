@@ -145,7 +145,10 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints for Guided mode - line numbers match skeleton
+          // Inline hints for Guided mode - line numbers match skeleton exactly
+          // L1-27: setup code, L28-31: comment + const salaryDekId, L32: encryption.____________("aws"
+          // L33: masterKey, L34: ___________: ["qe-salary-dek"], L35-38: more code
+          // L39: encryption.____________("aws", L40: masterKey, L41: keyAltNames: ["___________"]
           inlineHints: [
             { line: 32, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
             { line: 34, blankText: '___________', hint: 'Property for human-readable key identifiers', answer: 'keyAltNames' },
@@ -350,13 +353,16 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints for Step 2 - line numbers must match exact skeleton line positions
+          // Inline hints for Step 2 - line numbers match skeleton exactly
+          // L1-14: setup, L15: .______({ keyAltNames }), L16-18: more, L19: "____________"
+          // L20-28: more, L29: path: "_______", L30-31: more, L32: queryType: "________"
+          // L33-44: more, L45: db.________________("employees"
           inlineHints: [
-            { line: 15, blankText: '______', hint: 'Method to find a single document by query', answer: 'findOne' },
-            { line: 19, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
-            { line: 29, blankText: '_______', hint: 'The field name for salary data', answer: 'salary' },
-            { line: 32, blankText: '________', hint: 'Query type for searching encrypted fields', answer: 'equality' },
-            { line: 45, blankText: '________________', hint: 'Method to create a new collection', answer: 'createCollection' }
+            { line: 16, blankText: '______', hint: 'Method to find a single document by query', answer: 'findOne' },
+            { line: 20, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
+            { line: 30, blankText: '_______', hint: 'The field name for salary data', answer: 'salary' },
+            { line: 33, blankText: '________', hint: 'Query type for searching encrypted fields', answer: 'equality' },
+            { line: 46, blankText: '________________', hint: 'Method to create a new collection', answer: 'createCollection' }
           ]
         },
         {
@@ -547,7 +553,10 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints for Step 3 - line numbers match skeleton
+          // Inline hints for Step 3 - line numbers match skeleton exactly
+          // L1-17: setup, L18: .______({ keyAltNames }), L19-21: more, L22: "____________"
+          // L23-31: more, L32: bsonType: "___", L33: path: "______"
+          // L34-37: more, L38: _______________: {, L39-49: more, L50: .___________([
           inlineHints: [
             { line: 18, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
             { line: 22, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
