@@ -631,9 +631,10 @@ async function run() {
   }
 
   // TASK: Create the Data Encryption Key using the correct method
+  // (Line 49)
   const dekId = await encryption.________________("aws", {
     masterKey: { key: "${aliasName}", region: "${awsRegion}" },
-    ___________: [keyAltName]  // Human-readable key name
+    ___________: [keyAltName]  // Human-readable key name (Line 51)
   });
 
   console.log("✓ Created new DEK UUID:", dekId.toString());
@@ -646,6 +647,8 @@ run().catch(console.dir);`,
           // L10-27: more setup, L28: new ________________(client, L29-35: more code
           // L36: encryption.________________("aws", L37: masterKey, L38: ___________: [keyAltName]
           // Inline hints - updated line numbers after adding DEK existence check
+          // L8: ClientEncryption import, L28: ClientEncryption constructor
+          // L49: createDataKey method, L51: keyAltNames option
           inlineHints: [
             { 
               line: 8, 
@@ -660,13 +663,13 @@ run().catch(console.dir);`,
               answer: 'ClientEncryption' 
             },
             { 
-              line: 48, 
+              line: 49, 
               blankText: '________________', 
               hint: 'Method to generate a new Data Encryption Key', 
               answer: 'createDataKey' 
             },
             { 
-              line: 50, 
+              line: 51, 
               blankText: '___________', 
               hint: 'Option to assign a human-readable name to the DEK', 
               answer: 'keyAltNames' 
