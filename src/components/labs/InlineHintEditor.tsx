@@ -47,6 +47,7 @@ export function InlineHintEditor({
   const [blankPositions, setBlankPositions] = useState<BlankPosition[]>([]);
   const [scrollTop, setScrollTop] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
+  const [isEditorReady, setIsEditorReady] = useState(false);
 
   // Find all blank positions in the code by matching each hint's blankText
   const findBlankPositions = useCallback((codeText: string, hints: InlineHint[]): BlankPosition[] => {
@@ -123,6 +124,12 @@ export function InlineHintEditor({
     editor.onDidScrollChange((e: any) => {
       setScrollTop(e.scrollTop || 0);
       setScrollLeft(e.scrollLeft || 0);
+    });
+    
+    // Mark editor as ready after a short delay to ensure layout is complete
+    // This triggers a re-render so hint markers position correctly
+    requestAnimationFrame(() => {
+      setIsEditorReady(true);
     });
   }, [setLineHeight]);
 
@@ -201,7 +208,8 @@ export function InlineHintEditor({
 
   // Show hint markers only in guided mode with unrevealed solution
   // Only show markers for blanks that haven't been answered yet
-  const showMarkers = hasSkeleton && !isSolutionRevealed && tier === 'guided' && blankPositions.length > 0;
+  // Also requires editor to be ready (so positions are calculated correctly)
+  const showMarkers = hasSkeleton && !isSolutionRevealed && tier === 'guided' && blankPositions.length > 0 && isEditorReady;
 
   // Filter out positions where answer is already revealed
   const visiblePositions = blankPositions.filter(pos => !revealedAnswers.includes(pos.hintIdx));
@@ -267,8 +275,9 @@ export function InlineHintEditor({
             const answerRevealed = revealedAnswers.includes(hintIdx);
             const pos = getPositionPixels(line, column);
             
-            // Don't render if position is off-screen
-            if (pos.top < -20 || pos.top > 1000) return null;
+            // Don't render if position is significantly off-screen (allow some buffer)
+            // Use calculatedHeight as upper bound instead of arbitrary 1000
+            if (pos.top < -30 || pos.top > calculatedHeight + 50) return null;
             
             return (
               <motion.div 
