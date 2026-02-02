@@ -98,88 +98,94 @@ async function run() {
 run().catch(console.error);`,
           // Tier 1: Guided
           skeleton: `// ══════════════════════════════════════════════════════════════
-// Create DEKs for Queryable Encryption (QE)                       // 1
-// ══════════════════════════════════════════════════════════════  // 2
-// QE requires a SEPARATE DEK for each encrypted field (unlike CSFLE). // 3
-// You need one DEK for 'salary' and one for 'taxId'.              // 4
-                                                                   // 5
-const { MongoClient, ClientEncryption } = require("mongodb");      // 6
-const { fromSSO } = require("@aws-sdk/credential-providers");      // 7
-                                                                   // 8
-const uri = "${mongoUri}";                                         // 9
-const keyVaultNamespace = "encryption.__keyVault";                 // 10
-                                                                   // 11
-async function run() {                                             // 12
-  const credentials = await fromSSO()();                           // 13
-                                                                   // 14
-  const kmsProviders = {                                           // 15
-    aws: {                                                         // 16
-      ___________: credentials.accessKeyId,                        // 17 ← NEW BLANK
-      secretAccessKey: credentials.secretAccessKey,                // 18
-      sessionToken: credentials.sessionToken                       // 19
-    }                                                              // 20
-  };                                                               // 21
-                                                                   // 22
-  const client = await MongoClient.connect(uri);                   // 23
-  const encryption = new ClientEncryption(client, {                // 24
-    keyVaultNamespace,                                             // 25
-    kmsProviders,                                                  // 26
-  });                                                              // 27
-                                                                   // 28
-  const keyVaultDB = client.db("encryption");                      // 29
-                                                                   // 30
-  // TASK: Create DEK for salary field (check if exists first)    // 31
-  const salaryKeyAltName = "qe-salary-dek";                        // 32
-  const existingSalaryKey = await keyVaultDB.collection("__keyVault").______({ // 33
-    keyAltNames: salaryKeyAltName                                  // 34
-  });                                                              // 35
-                                                                   // 36
-  if (existingSalaryKey) {                                         // 37
-    console.log("✓ Salary DEK already exists:", existingSalaryKey._id.toString()); // 38
-  } else {                                                         // 39
-    const salaryDekId = await encryption.____________("aws", {     // 40
-      masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" }, // 41
-      ___________: [salaryKeyAltName]                              // 42
-    });                                                            // 43
-    console.log("Salary DEK created:", salaryDekId.toString());    // 44
-  }                                                                // 45
-                                                                   // 46
-  // TASK: Create DEK for taxId field (same pattern)              // 47
-  const taxKeyAltName = "___________";                             // 48
-  const existingTaxKey = await keyVaultDB.collection("__keyVault").______({ // 49 ← NEW BLANK
-    keyAltNames: taxKeyAltName                                     // 50
-  });                                                              // 51
-                                                                   // 52
-  if (existingTaxKey) {                                            // 53
-    console.log("✓ TaxId DEK already exists:", existingTaxKey._id.toString()); // 54
-  } else {                                                         // 55
-    const taxDekId = await encryption.____________("aws", {        // 56
-      masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" }, // 57
-      keyAltNames: [taxKeyAltName]                                 // 58
-    });                                                            // 59
-    console.log("TaxId DEK created:", taxDekId.toString());        // 60
-  }                                                                // 61
-                                                                   // 62
-  await client.close();                                            // 63
-}                                                                  // 64
-                                                                   // 65
-run().catch(console.error);`,                                      // 66
-          // Inline hints mapping:
+// Create DEKs for Queryable Encryption (QE)
+// ══════════════════════════════════════════════════════════════
+// QE requires a SEPARATE DEK for each encrypted field (unlike CSFLE).
+// You need one DEK for 'salary' and one for 'taxId'.
+
+const { MongoClient, ClientEncryption } = require("mongodb");
+const { fromSSO } = require("@aws-sdk/credential-providers");
+
+const uri = "${mongoUri}";
+const keyVaultNamespace = "encryption.__keyVault";
+
+async function run() {
+  const credentials = await fromSSO()();
+
+  const kmsProviders = {
+    aws: {
+      ___________: credentials.accessKeyId,
+      _______________: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
+  };
+
+  const client = await MongoClient.connect(uri);
+  const encryption = new ___________________(client, {
+    keyVaultNamespace,
+    kmsProviders,
+  });
+
+  const keyVaultDB = client.db("encryption");
+
+  // TASK: Create DEK for salary field (check if exists first)
+  const salaryKeyAltName = "qe-salary-dek";
+  const existingSalaryKey = await keyVaultDB.collection("__keyVault").______({
+    keyAltNames: salaryKeyAltName
+  });
+
+  if (existingSalaryKey) {
+    console.log("✓ Salary DEK already exists:", existingSalaryKey._id.toString());
+  } else {
+    const salaryDekId = await encryption.____________("aws", {
+      masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" },
+      ___________: [salaryKeyAltName]
+    });
+    console.log("Salary DEK created:", salaryDekId.toString());
+  }
+
+  // TASK: Create DEK for taxId field (same pattern)
+  const taxKeyAltName = "___________";
+  const existingTaxKey = await keyVaultDB.collection("__keyVault").______({
+    keyAltNames: taxKeyAltName
+  });
+
+  if (existingTaxKey) {
+    console.log("✓ TaxId DEK already exists:", existingTaxKey._id.toString());
+  } else {
+    const taxDekId = await encryption.____________("aws", {
+      masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" },
+      ___________: [taxKeyAltName]
+    });
+    console.log("TaxId DEK created:", taxDekId.toString());
+  }
+
+  await client.close();
+}
+
+run().catch(console.error);`,
+          // Inline hints mapping (line numbers match skeleton without trailing comments):
           // Row 17: accessKeyId blank
+          // Row 18: secretAccessKey blank
+          // Row 24: ClientEncryption constructor blank
           // Row 33: findOne blank for salary existence check
           // Row 40: createDataKey blank
           // Row 42: keyAltNames blank
-          // Row 48: qe-taxid-dek blank
-          // Row 49: findOne blank for taxId existence check
-          // Row 56: createDataKey blank
+          // Row 47: qe-taxid-dek blank
+          // Row 48: findOne blank for taxId existence check
+          // Row 55: createDataKey blank
+          // Row 57: keyAltNames blank
           inlineHints: [
             { line: 17, blankText: '___________', hint: 'AWS credential property for the access key', answer: 'accessKeyId' },
+            { line: 18, blankText: '_______________', hint: 'AWS credential property for the secret key', answer: 'secretAccessKey' },
+            { line: 24, blankText: '___________________', hint: 'The class that handles encryption operations', answer: 'ClientEncryption' },
             { line: 33, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
             { line: 40, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
             { line: 42, blankText: '___________', hint: 'Property for human-readable key identifiers', answer: 'keyAltNames' },
-            { line: 48, blankText: '___________', hint: 'The keyAltName for the taxId field DEK', answer: 'qe-taxid-dek' },
-            { line: 49, blankText: '______', hint: 'Same method to find a document for existence check', answer: 'findOne' },
-            { line: 56, blankText: '____________', hint: 'Same method as above for creating DEKs', answer: 'createDataKey' }
+            { line: 47, blankText: '___________', hint: 'The keyAltName for the taxId field DEK', answer: 'qe-taxid-dek' },
+            { line: 48, blankText: '______', hint: 'Same method to find a document for existence check', answer: 'findOne' },
+            { line: 55, blankText: '____________', hint: 'Same method as above for creating DEKs', answer: 'createDataKey' },
+            { line: 57, blankText: '___________', hint: 'Same keyAltNames property for the taxId DEK', answer: 'keyAltNames' }
           ],
           // Tier 2: Challenge
           challengeSkeleton: `// ══════════════════════════════════════════════════════════════
@@ -787,8 +793,106 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Step 4 is a Reference/Demo step - no skeleton
-          // The side-by-side comparison is the learning goal, not fill-in-the-blanks
+          // Tier 1: Guided - skeleton with blanks for Step 4
+          skeleton: `// ══════════════════════════════════════════════════════════════
+// Query Encrypted Data - QE vs Non-QE Client Comparison
+// ══════════════════════════════════════════════════════════════
+// This script demonstrates the power of Queryable Encryption
+
+const { MongoClient } = require("mongodb");
+const { fromSSO } = require("@aws-sdk/credential-providers");
+
+const uri = "${mongoUri}";
+
+async function run() {
+  const credentials = await fromSSO()();
+
+  const kmsProviders = {
+    aws: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
+  };
+
+  // ============================================
+  // 1. STANDARD CLIENT (NO QE) - Shows Binary Data
+  // ============================================
+  console.log("\\n=== WITHOUT Queryable Encryption ===");
+  const clientStandard = new ___________(uri);
+  await clientStandard._______();
+  const standardCollection = clientStandard.db("hr").collection("employees");
+
+  // Query - encrypted fields show as Binary ciphertext
+  const docStandard = await standardCollection.______({ name: "Alice Johnson" });
+  console.log("Salary (encrypted):", docStandard.salary); // Binary(...)
+  console.log("⚠️ Cannot query encrypted fields without QE!");
+  await clientStandard.close();
+
+  // ============================================
+  // 2. QE-ENABLED CLIENT - Shows Decrypted Data
+  // ============================================
+  console.log("\\n=== WITH Queryable Encryption ===");
+
+  // Look up DEKs by keyAltNames
+  const tempClient = await MongoClient.connect(uri);
+  const keyVaultDB = tempClient.db("encryption");
+  const salaryKeyDoc = await keyVaultDB.collection("__keyVault").______({ 
+    keyAltNames: "qe-salary-dek" 
+  });
+  const taxKeyDoc = await keyVaultDB.collection("__keyVault").findOne({ 
+    keyAltNames: "____________" 
+  });
+
+  const salaryDekId = salaryKeyDoc._id;
+  const taxDekId = taxKeyDoc._id;
+  await tempClient.close();
+
+  // Configure encryptedFields
+  const encryptedFields = {
+    fields: [
+      { path: "salary", bsonType: "___", keyId: salaryDekId, queries: { queryType: "equality" } },
+      { path: "taxId", bsonType: "______", keyId: taxDekId, queries: { queryType: "equality" } }
+    ]
+  };
+
+  // Create QE-enabled client
+  const clientQE = new MongoClient(uri, {
+    _______________: {
+      keyVaultNamespace: "encryption.__keyVault",
+      kmsProviders,
+      encryptedFieldsMap: { "hr.employees": encryptedFields }
+    }
+  });
+
+  await clientQE.connect();
+  const qeCollection = clientQE.db("hr").collection("employees");
+
+  // Query with QE - fields auto-decrypted!
+  const docQE = await qeCollection.findOne({ name: "Alice Johnson" });
+  console.log("Salary (decrypted):", docQE.salary); // 75000
+  console.log("✅ Fields are automatically decrypted!");
+
+  // Equality query on encrypted field - THIS IS THE BREAKTHROUGH!
+  const equalityResult = await qeCollection.______({ taxId: "123-45-6789" });
+  console.log("Found by taxId:", equalityResult?.name);
+
+  await clientQE.close();
+}
+
+run().catch(console.error);`,
+          // Inline hints for Step 4 - line numbers match skeleton
+          inlineHints: [
+            { line: 26, blankText: '___________', hint: 'The MongoDB client class', answer: 'MongoClient' },
+            { line: 27, blankText: '_______', hint: 'Method to establish a connection', answer: 'connect' },
+            { line: 31, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
+            { line: 44, blankText: '______', hint: 'Same method to find a DEK document', answer: 'findOne' },
+            { line: 48, blankText: '____________', hint: 'The keyAltName for taxId DEK', answer: 'qe-taxid-dek' },
+            { line: 58, blankText: '___', hint: 'BSON type for integer', answer: 'int' },
+            { line: 59, blankText: '______', hint: 'BSON type for text values', answer: 'string' },
+            { line: 64, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
+            { line: 80, blankText: '______', hint: 'Method to find a document by encrypted field', answer: 'findOne' }
+          ]
         },
         {
           filename: 'Terminal - Run the Node.js script',
