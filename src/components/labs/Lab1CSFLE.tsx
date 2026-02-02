@@ -506,26 +506,21 @@ mongosh "${mongoUri}"
       difficulty: 'intermediate' as DifficultyLevel,
       understandSection: 'The DEK (Data Encryption Key) is what actually encrypts your data. The CMK "wraps" the DEK, meaning the DEK is stored encrypted in MongoDB using the CMK from AWS KMS.',
       doThisSection: [
-        'Install required npm packages',
         'Create a Node.js script (createKey.cjs)',
         'Configure KMS providers with AWS credentials',
-        'Use ClientEncryption.createDataKey() to generate and store the DEK'
+        'Use ClientEncryption.createDataKey() to generate and store the DEK',
+        'Run the script with Node.js'
       ],
       description: 'Generate the actual keys used to encrypt data using a Node.js script with the mongodb-client-encryption library.',
       tips: [
+        'PREREQUISITE: First run: npm install mongodb mongodb-client-encryption @aws-sdk/credential-providers',
         'RUN WITH NODE.JS: This is a Node.js script. Run with: node createKey.cjs',
         'NOT MONGOSH: This is NOT a mongosh command - it must run in your terminal with Node.js.',
-        'DEPENDENCIES: Ensure you run npm install first (see step 1 below).',
         'MULTI-DEK: In production, create different keys for different sensitivity levels.'
       ],
       codeBlocks: [
         {
-          filename: '1. Terminal: Install Deps',
-          language: 'bash',
-          code: `npm install mongodb mongodb-client-encryption @aws-sdk/credential-providers`
-        },
-        {
-          filename: '2. createKey.cjs (Node.js - Create this file in your project root)',
+          filename: 'createKey.cjs (Node.js - Create this file)',
           language: 'javascript',
           code: `const { MongoClient, ClientEncryption } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
@@ -636,19 +631,19 @@ run().catch(console.dir);`,
               answer: 'ClientEncryption' 
             },
             { 
-              line: 18, 
+              line: 27, 
               blankText: '________________', 
               hint: 'Constructor for the encryption helper class', 
               answer: 'ClientEncryption' 
             },
             { 
-              line: 26, 
+              line: 35, 
               blankText: '________________', 
               hint: 'Method to generate a new Data Encryption Key', 
               answer: 'createDataKey' 
             },
             { 
-              line: 28, 
+              line: 37, 
               blankText: '___________', 
               hint: 'Option to assign a human-readable name to the DEK', 
               answer: 'keyAltNames' 
@@ -656,13 +651,17 @@ run().catch(console.dir);`,
           ]
         },
         {
-          filename: '3. Terminal (NOT mongosh) - Run with Node.js',
+          filename: 'Terminal - Run the script',
           language: 'bash',
-          code: `# Run in your terminal (NOT in mongosh):
+          code: `# First, install dependencies (if not already done):
+npm install mongodb mongodb-client-encryption @aws-sdk/credential-providers
+
+# Run the script in your terminal (NOT mongosh):
 node createKey.cjs
 
 # Expected Output:
-# Created DEK UUID: 7274650f-1ea0-48e1-b47e-33d3bba95a21
+# ✓ Created new DEK UUID: 7274650f-1ea0-48e1-b47e-33d3bba95a21
+#   keyAltName: user-${suffix}-ssn-key
 # (Your UUID will be different - save it for the next step!)`
         }
       ],
