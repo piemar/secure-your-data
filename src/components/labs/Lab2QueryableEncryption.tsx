@@ -585,7 +585,7 @@ async function run() {
   await client.close();
 }
 
-run().catch(console.error);\`,
+run().catch(console.error);`,
           // Inline hints for Step 3 - line numbers match skeleton exactly
           // L1-12: setup with full kmsProviders, L24: .______({ keyAltNames })
           // L28: "____________", L38: bsonType: "___", L39: path: "______"
