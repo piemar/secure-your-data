@@ -534,7 +534,13 @@ const uri = "${mongoUri}";
 
 async function run() {
   const credentials = await fromSSO()();
-  const kmsProviders = { aws: { /* credentials */ } };
+  const kmsProviders = {
+    aws: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
+  };
 
   // TASK: Look up DEKs by their keyAltNames
   const tempClient = await MongoClient.connect(uri);
@@ -579,19 +585,18 @@ async function run() {
   await client.close();
 }
 
-run().catch(console.error);`,
+run().catch(console.error);\`,
           // Inline hints for Step 3 - line numbers match skeleton exactly
-          // L1-17: setup, L18: .______({ keyAltNames }), L19-21: more, L22: "____________"
-          // L23-31: more, L32: bsonType: "___", L33: path: "______"
-          // L34-37: more, L38: _______________: {, L39-49: more, L50: .___________([
+          // L1-12: setup with full kmsProviders, L24: .______({ keyAltNames })
+          // L28: "____________", L38: bsonType: "___", L39: path: "______"
+          // L45: _______________: {, L56: .___________([
           inlineHints: [
-            { line: 18, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
-            { line: 22, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
-            { line: 32, blankText: '___', hint: 'BSON type for integer values', answer: 'int' },
-            { line: 33, blankText: '______', hint: 'Field name for tax identification', answer: 'taxId' },
-            // User-reported missing marker row: 39
-            { line: 39, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
-            { line: 50, blankText: '___________', hint: 'Method to insert multiple documents', answer: 'insertMany' }
+            { line: 24, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
+            { line: 28, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
+            { line: 38, blankText: '___', hint: 'BSON type for integer values', answer: 'int' },
+            { line: 39, blankText: '______', hint: 'Field name for tax identification', answer: 'taxId' },
+            { line: 45, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
+            { line: 56, blankText: '___________', hint: 'Method to insert multiple documents', answer: 'insertMany' }
           ]
         },
         {
