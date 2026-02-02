@@ -105,13 +105,23 @@ export function InlineHintEditor({
 
   // Update blank positions when code or hints change
   useEffect(() => {
+    console.log('[InlineHintEditor] Effect triggered:', {
+      hasInlineHints: !!inlineHints,
+      inlineHintsLength: inlineHints?.length,
+      hasSkeleton,
+      isSolutionRevealed,
+      tier,
+      codePreview: code?.substring(0, 100)
+    });
+    
     if (inlineHints && inlineHints.length > 0 && hasSkeleton && !isSolutionRevealed) {
       const positions = findBlankPositions(code, inlineHints);
+      console.log('[InlineHintEditor] Found blank positions:', positions);
       setBlankPositions(positions);
     } else {
       setBlankPositions([]);
     }
-  }, [code, inlineHints, hasSkeleton, isSolutionRevealed, findBlankPositions]);
+  }, [code, inlineHints, hasSkeleton, isSolutionRevealed, findBlankPositions, tier]);
 
   // Handle editor mount
   const handleEditorMount = useCallback((editor: any, monaco: Monaco) => {
