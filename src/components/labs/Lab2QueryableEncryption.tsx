@@ -98,77 +98,87 @@ async function run() {
 run().catch(console.error);`,
           // Tier 1: Guided
           skeleton: `// ══════════════════════════════════════════════════════════════
-// Create DEKs for Queryable Encryption (QE)
-// ══════════════════════════════════════════════════════════════
-// QE requires a SEPARATE DEK for each encrypted field (unlike CSFLE).
-// You need one DEK for 'salary' and one for 'taxId'.
-
-const { MongoClient, ClientEncryption } = require("mongodb");
-const { fromSSO } = require("@aws-sdk/credential-providers");
-
-const uri = "${mongoUri}";
-const keyVaultNamespace = "encryption.__keyVault";
-
-async function run() {
-  const credentials = await fromSSO()();
-
-  const kmsProviders = {
-    aws: {
-      accessKeyId: credentials.accessKeyId,
-      secretAccessKey: credentials.secretAccessKey,
-      sessionToken: credentials.sessionToken
-    }
-  };
-
-  const client = await MongoClient.connect(uri);
-  const encryption = new ClientEncryption(client, {
-    keyVaultNamespace,
-    kmsProviders,
-  });
-
-  const keyVaultDB = client.db("encryption");
-
-  // TASK: Create DEK for salary field (check if exists first)
-  const salaryKeyAltName = "qe-salary-dek";
-  const existingSalaryKey = await keyVaultDB.collection("__keyVault").findOne({ 
-    keyAltNames: salaryKeyAltName 
-  });
-
-  if (existingSalaryKey) {
-    console.log("✓ Salary DEK already exists:", existingSalaryKey._id.toString());
-  } else {
-    const salaryDekId = await encryption.____________("aws", {
-      masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" },
-      ___________: [salaryKeyAltName]
-    });
-    console.log("Salary DEK created:", salaryDekId.toString());
-  }
-
-  // TASK: Create DEK for taxId field (same pattern)
-  const taxKeyAltName = "___________";
-  const existingTaxKey = await keyVaultDB.collection("__keyVault").findOne({ 
-    keyAltNames: taxKeyAltName 
-  });
-
-  if (existingTaxKey) {
-    console.log("✓ TaxId DEK already exists:", existingTaxKey._id.toString());
-  } else {
-    const taxDekId = await encryption.____________("aws", {
-      masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" },
-      keyAltNames: [taxKeyAltName]
-    });
-    console.log("TaxId DEK created:", taxDekId.toString());
-  }
-
-  await client.close();
-}
-
-run().catch(console.error);`,
-          // Inline hints - updated line numbers after adding DEK existence checks
+// Create DEKs for Queryable Encryption (QE)                       // 1
+// ══════════════════════════════════════════════════════════════  // 2
+// QE requires a SEPARATE DEK for each encrypted field (unlike CSFLE). // 3
+// You need one DEK for 'salary' and one for 'taxId'.              // 4
+                                                                   // 5
+const { MongoClient, ClientEncryption } = require("mongodb");      // 6
+const { fromSSO } = require("@aws-sdk/credential-providers");      // 7
+                                                                   // 8
+const uri = "${mongoUri}";                                         // 9
+const keyVaultNamespace = "encryption.__keyVault";                 // 10
+                                                                   // 11
+async function run() {                                             // 12
+  const credentials = await fromSSO()();                           // 13
+                                                                   // 14
+  const kmsProviders = {                                           // 15
+    aws: {                                                         // 16
+      ___________: credentials.accessKeyId,                        // 17 ← NEW BLANK
+      secretAccessKey: credentials.secretAccessKey,                // 18
+      sessionToken: credentials.sessionToken                       // 19
+    }                                                              // 20
+  };                                                               // 21
+                                                                   // 22
+  const client = await MongoClient.connect(uri);                   // 23
+  const encryption = new ClientEncryption(client, {                // 24
+    keyVaultNamespace,                                             // 25
+    kmsProviders,                                                  // 26
+  });                                                              // 27
+                                                                   // 28
+  const keyVaultDB = client.db("encryption");                      // 29
+                                                                   // 30
+  // TASK: Create DEK for salary field (check if exists first)    // 31
+  const salaryKeyAltName = "qe-salary-dek";                        // 32
+  const existingSalaryKey = await keyVaultDB.collection("__keyVault").______({ // 33
+    keyAltNames: salaryKeyAltName                                  // 34
+  });                                                              // 35
+                                                                   // 36
+  if (existingSalaryKey) {                                         // 37
+    console.log("✓ Salary DEK already exists:", existingSalaryKey._id.toString()); // 38
+  } else {                                                         // 39
+    const salaryDekId = await encryption.____________("aws", {     // 40
+      masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" }, // 41
+      ___________: [salaryKeyAltName]                              // 42
+    });                                                            // 43
+    console.log("Salary DEK created:", salaryDekId.toString());    // 44
+  }                                                                // 45
+                                                                   // 46
+  // TASK: Create DEK for taxId field (same pattern)              // 47
+  const taxKeyAltName = "___________";                             // 48
+  const existingTaxKey = await keyVaultDB.collection("__keyVault").______({ // 49 ← NEW BLANK
+    keyAltNames: taxKeyAltName                                     // 50
+  });                                                              // 51
+                                                                   // 52
+  if (existingTaxKey) {                                            // 53
+    console.log("✓ TaxId DEK already exists:", existingTaxKey._id.toString()); // 54
+  } else {                                                         // 55
+    const taxDekId = await encryption.____________("aws", {        // 56
+      masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" }, // 57
+      keyAltNames: [taxKeyAltName]                                 // 58
+    });                                                            // 59
+    console.log("TaxId DEK created:", taxDekId.toString());        // 60
+  }                                                                // 61
+                                                                   // 62
+  await client.close();                                            // 63
+}                                                                  // 64
+                                                                   // 65
+run().catch(console.error);`,                                      // 66
+          // Inline hints mapping:
+          // Row 17: accessKeyId blank
+          // Row 33: findOne blank for salary existence check
+          // Row 40: createDataKey blank
+          // Row 42: keyAltNames blank
+          // Row 48: qe-taxid-dek blank
+          // Row 49: findOne blank for taxId existence check
+          // Row 56: createDataKey blank
           inlineHints: [
-            { line: 41, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
-            { line: 43, blankText: '___________', hint: 'Property for human-readable key identifiers', answer: 'keyAltNames' },
+            { line: 17, blankText: '___________', hint: 'AWS credential property for the access key', answer: 'accessKeyId' },
+            { line: 33, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
+            { line: 40, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
+            { line: 42, blankText: '___________', hint: 'Property for human-readable key identifiers', answer: 'keyAltNames' },
             { line: 48, blankText: '___________', hint: 'The keyAltName for the taxId field DEK', answer: 'qe-taxid-dek' },
+            { line: 49, blankText: '______', hint: 'Same method to find a document for existence check', answer: 'findOne' },
             { line: 56, blankText: '____________', hint: 'Same method as above for creating DEKs', answer: 'createDataKey' }
           ],
           // Tier 2: Challenge
