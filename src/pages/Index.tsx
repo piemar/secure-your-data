@@ -6,11 +6,14 @@ import { Lab2QueryableEncryption } from '@/components/labs/Lab2QueryableEncrypti
 import { Lab3RightToErasure } from '@/components/labs/Lab3RightToErasure';
 import { LabSetupWizard } from '@/components/labs/LabSetupWizard';
 import { Leaderboard } from '@/components/labs/Leaderboard';
+import { WorkshopNotStarted } from '@/components/labs/WorkshopNotStarted';
+import { WorkshopSettings } from '@/components/settings/WorkshopSettings';
 import { AttendeeRegistration } from '@/components/AttendeeRegistration';
 import { PresenterLogin } from '@/components/PresenterLogin';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { useRole } from '@/contexts/RoleContext';
 import { useLab } from '@/context/LabContext';
+import { areLabsEnabled } from '@/utils/workshopUtils';
 import { Lock } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -21,6 +24,7 @@ function ContentRouter() {
   const { isLabAccessible, isLabCompleted } = useLab();
   const { isModerator } = useRole();
   const location = useLocation();
+  const labsEnabled = areLabsEnabled();
 
   // Sync URL with navigation context
   useEffect(() => {
@@ -28,6 +32,9 @@ function ContentRouter() {
       setSection('leaderboard');
     }
   }, [location.pathname, setSection]);
+
+  // Check if labs are enabled for attendees
+  const canAccessLabs = isModerator || labsEnabled;
 
   switch (currentSection) {
     case 'presentation':
@@ -38,12 +45,26 @@ function ContentRouter() {
       return <NewPresentationView />;
     case 'setup':
       return <LabSetupWizard />;
+    case 'settings':
+      // Only moderators can access settings
+      if (!isModerator) {
+        return <LabSetupWizard />;
+      }
+      return <WorkshopSettings />;
     case 'leaderboard':
       // Leaderboard is now open to everyone
       return <Leaderboard />;
     case 'lab1':
+      // Check if workshop is started for attendees
+      if (!canAccessLabs) {
+        return <WorkshopNotStarted />;
+      }
       return <Lab1CSFLE />;
     case 'lab2':
+      // Check if workshop is started for attendees
+      if (!canAccessLabs) {
+        return <WorkshopNotStarted />;
+      }
       // Moderators have access to all labs, attendees need to complete Lab 1 first
       if (!isModerator && !isLabAccessible(2)) {
         return (
@@ -67,6 +88,10 @@ function ContentRouter() {
       }
       return <Lab2QueryableEncryption />;
     case 'lab3':
+      // Check if workshop is started for attendees
+      if (!canAccessLabs) {
+        return <WorkshopNotStarted />;
+      }
       // Moderators have access to all labs, attendees need to complete Lab 1 first
       if (!isModerator && !isLabAccessible(3)) {
         return (
