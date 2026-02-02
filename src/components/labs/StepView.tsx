@@ -757,7 +757,7 @@ export function StepView({
             <ResizablePanelGroup direction="vertical" className="h-full">
               {/* Code Editor Panel */}
               <ResizablePanel defaultSize={outputOpen ? 50 : 85} minSize={30}>
-                <div className="h-full flex flex-col overflow-auto">
+                <div className="h-full flex flex-col overflow-auto justify-start">
                   {currentStep.codeBlocks.map((block, idx) => {
                     const blockKey = `${currentStepIndex}-${idx}`;
                     const hasSkeleton = hasAnySkeleton(block);
