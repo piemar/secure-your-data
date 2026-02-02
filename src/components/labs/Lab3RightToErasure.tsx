@@ -206,7 +206,10 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints for Lab 3 Step 1 - line numbers match skeleton
+          // Inline hints for Lab 3 Step 1 - line numbers match skeleton exactly
+          // L1-21: setup, L22: .______({ keyAltNames }), L23-27: more
+          // L28: new ________________(client, L29-41: more
+          // L42: encryption._________(doc.ssn, L43: algorithm with ____________
           inlineHints: [
             { line: 22, blankText: '______', hint: 'Method to retrieve a single document', answer: 'findOne' },
             { line: 28, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
@@ -432,7 +435,10 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints for Lab 3 Step 2 - line numbers match skeleton
+          // Inline hints for Lab 3 Step 2 - line numbers match skeleton exactly
+          // L1-27: setup, L28: keyAltName = `_______-${tenantId}`
+          // L29-32: more, L33: { ___________: keyAltName }
+          // L34-37: more, L38: encryption.____________("aws"
           inlineHints: [
             { line: 28, blankText: '_______', hint: 'Prefix for tenant-specific key names', answer: 'tenant' },
             { line: 33, blankText: '___________', hint: 'Field to query for existing DEK names', answer: 'keyAltNames' },
