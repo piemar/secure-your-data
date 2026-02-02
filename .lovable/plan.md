@@ -1,204 +1,152 @@
 
-# Plan: Lab 1 Consistency and UI Fixes
+# Plan: Align Lab 1 Structure with Lab 2
 
-## Overview
+## Problem Analysis
 
-Fix Lab 1 to match the quality and consistency of Lab 2 by addressing:
-1. Empty section rendering below code blocks without skeletons
-2. Step 4 (now visible as Step 5 in the UI based on step indices) with multiple code blocks appearing cluttered
-3. Steps 6 and 7 having useless skeletons - convert them to "Summary/Demo" steps
-4. Ensure consistent hint coverage across all interactive steps
+After comparing Lab 1 and Lab 2 step structures, I found:
+
+### Current State
+
+| Lab 1 Step | Current Blocks | Issue |
+|------------|---------------|-------|
+| 1 (Create CMK) | 1 block: Terminal - AWS CLI | Single block - OK for CLI-only step |
+| 2 (Apply Policy) | 1 block: AWS CLI | Single block - OK for CLI-only step |
+| 3 (Configure mongosh) | 1 block: Terminal | Single block - OK |
+| 4 (Init Key Vault) | 1 block: mongosh | Single block - OK |
+| 5 (Generate DEKs) | 3 blocks: deps + code + terminal | **Already matches Lab 2 pattern** |
+| 6 (Test CSFLE) | 2 blocks: code + terminal | **Already matches Lab 2 pattern** |
+| 7 (Complete App) | 1 block: code | Missing "Terminal - Run" section |
+
+### Lab 2 Pattern (Reference)
+
+| Lab 2 Step | Blocks |
+|------------|--------|
+| 1 (Create DEKs) | 2 blocks: code file + terminal |
+| 2 (Create Collection) | 3 blocks: Node.js + mongosh + terminal |
+| 3 (Insert Data) | 2 blocks: code file + terminal |
+| 4 (Query Data) | 2 blocks: code file + terminal |
+
+### Key Structural Difference
+
+Lab 2 consistently separates:
+1. **Code file creation** (interactive, with skeleton) - for files the user creates
+2. **Terminal instructions** (read-only, no skeleton) - how to run the file
+
+Lab 1 Steps 1-4 are **pure CLI commands** (AWS CLI or mongosh) - they don't create files, so a single terminal block is appropriate.
+
+Lab 1 Steps 5-7 involve **Node.js scripts** - should follow the Lab 2 pattern (and Steps 5-6 already do!).
 
 ---
 
-## Issues Identified
+## Solution
 
-| Step | ID | Issue | Fix |
-|------|----|-------|-----|
-| Step 1 | l1s1 | Works correctly | None |
-| Step 2 | l1s2 | Works correctly | None |
-| Step 3 | l1s3 | Works correctly | None |
-| Step 4 | l1s4 | Renamed as l1s5 - has 3 code blocks, first block has NO skeleton but footer shows | Only show Challenge Mode footer for blocks that HAVE skeletons |
-| Step 5 | l1s5verify | Demo step, no skeleton needed | Mark as reference step (no Challenge Mode) |
-| Step 6 | l1s6 | Skeleton is just 2-line comment - not useful | Convert to Demo/Reference step (remove skeleton) |
-| Step 7 | l1s7 | Skeleton is just 1 line - not useful | Convert to "Summary" step (remove skeleton, add summary tag) |
+### Part 1: Add "Terminal - Run" Section to Lab 1 Step 7
 
----
+Step 7 (Complete Application) currently only shows the code file without instructions on how to run it.
 
-## Part 1: Fix StepView.tsx - Only Show Footer for Blocks with Skeletons
+**Current:** 1 code block (`app.js`)
 
-**File:** `src/components/labs/StepView.tsx`
+**After:** 2 code blocks:
+1. `app.js (Node.js - Create this file)` - the application code
+2. `Terminal - Run the application` - instructions to run it
 
-**Current Problem:** The Challenge Mode footer renders for ALL code blocks if ANY block in the step has a skeleton.
+```javascript
+// Add this as second code block
+{
+  filename: 'Terminal - Run the application',
+  language: 'bash',
+  code: `# Run the complete CSFLE application:
+node app.js
 
-**Solution:** Check per-block whether it has a skeleton, not just step-level.
-
-```typescript
-// Current logic (line ~820):
-{hasSkeleton && !isSolutionRevealed && (
-  <div className="flex-shrink-0 px-2 sm:px-4 py-1.5...">
-    {/* Footer content */}
-  </div>
-)}
-
-// Fix: Check THIS block's skeleton, not step-level
-{hasAnySkeleton(block) && !isSolutionRevealed && (
-  <div className="flex-shrink-0 px-2 sm:px-4 py-1.5...">
-    {/* Footer content */}
-  </div>
-)}
+# Expected Output:
+# ✓ Connected to MongoDB
+# ✓ Inserted patient with encrypted SSN
+# ✓ Retrieved patient (SSN decrypted automatically)
+# 
+# Patient: { name: "Alice Johnson", ssn: "123-45-6789" }`
+}
 ```
 
-Also update the Solution Revealed Banner similarly.
+### Part 2: Verify No "Empty Editor" Issues
+
+The earlier fix (checking `hasAnySkeleton(block)` per-block instead of step-level) should have resolved empty editor issues. However, I'll verify:
+
+**Confirmed Working:**
+- Footer with Challenge Mode controls only appears for blocks WITH skeletons
+- Terminal blocks without skeletons show cleanly without footer controls
+- Output panel is separate from code blocks
+
+### Part 3: Add Terminal Sections to Relevant Steps (Optional Enhancement)
+
+For better consistency with Lab 2, consider adding terminal sections to:
+
+**Step 1 (Create CMK):** Already self-contained - commands run directly
+**Step 2 (Apply Policy):** Already self-contained  
+**Step 3 (Configure mongosh):** Could add verification commands
+**Step 4 (Init Key Vault):** Could add verification commands
+**Step 5 (Generate DEKs):** Already has terminal section
+**Step 6 (Test CSFLE):** Already has terminal section
+**Step 7 (Complete App):** **Needs terminal section** (this plan)
 
 ---
 
-## Part 2: Convert Lab 1 Steps 6 & 7 to Reference/Summary Steps
-
-**File:** `src/components/labs/Lab1CSFLE.tsx`
-
-### Step 6 (l1s6) - "Test CSFLE: Insert & Query with Encryption"
-
-This is a demonstration step - the user copies a large script, runs it, and observes the output. It's not suitable for fill-in-the-blank because:
-- The skeleton is just 2 lines: `// Create testCSFLE.cjs with CSFLE-enabled and standard clients...`
-- The actual code is 100+ lines - not practical for blanks
-- It's meant to demonstrate the concept, not test understanding
-
-**Change:**
-- Remove the `skeleton` property from the code block
-- Keep the full code visible (Read-only/Demo mode by default)
-- Add a `isDemo: true` or just remove skeleton entirely
-
-### Step 7 (l1s7) - "The Complete Application"
-
-This is a summary/reference step - shows the final clean code. Not for challenge mode.
-
-**Change:**
-- Remove the `skeleton` property (`skeleton: '// Full application structure'`)
-- Keep the full code visible
-- This step is a reference, not a challenge
-
----
-
-## Part 3: Add Visual Indicator for "Reference/Demo" Steps
-
-To make it clear that some steps are for reference/demonstration rather than challenge mode, we can add a visual badge.
-
-**Option A:** Just remove skeletons (simplest) - steps without skeletons automatically show full code.
-
-**Option B:** Add a step-level flag like `isReference: true` that displays a "Reference" badge instead of Challenge Mode controls.
-
-Recommend **Option A** for simplicity - removing skeletons naturally hides Challenge Mode UI.
-
----
-
-## File Changes Summary
+## File Changes
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/components/labs/StepView.tsx` | Modify | Fix footer/banner to only show for blocks WITH skeletons |
-| `src/components/labs/Lab1CSFLE.tsx` | Modify | Remove useless skeletons from Steps 6 & 7 |
+| `src/components/labs/Lab1CSFLE.tsx` | Modify | Add "Terminal - Run" block to Step 7 |
 
 ---
 
-## Technical Details
+## Implementation Details
 
-### StepView.tsx Changes (Lines ~820-915)
+### Lab1CSFLE.tsx - Step 7 Update
 
-**Change 1:** Footer check (around line 820)
-```typescript
-// Before:
-{hasSkeleton && !isSolutionRevealed && (
+Add a second code block after the existing `app.js` code block:
 
-// After - check this specific block:
-{hasAnySkeleton(block) && !isSolutionRevealed && (
-```
-
-**Change 2:** Solution Revealed Banner (around line 905)
-```typescript
-// Before:
-{hasSkeleton && isSolutionRevealed && !alwaysShowSolutions && showSolution[blockKey] && (
-
-// After:
-{hasAnySkeleton(block) && isSolutionRevealed && !alwaysShowSolutions && showSolution[blockKey] && (
-```
-
-### Lab1CSFLE.tsx Changes
-
-**Step 6 (l1s6)** - Around line 882:
-Remove the skeleton property:
 ```javascript
-// Before:
-skeleton: `// Create testCSFLE.cjs with CSFLE-enabled and standard clients
-// Compare the output when querying encrypted vs non-encrypted`
+// In step l1s7, add after the first code block:
+{
+  filename: 'Terminal - Run the application',
+  language: 'bash',
+  code: `# Run the complete CSFLE application:
+node app.js
 
-// After:
-// Remove skeleton property entirely - code shows in full by default
-```
-
-**Step 7 (l1s7)** - Around line 990:
-Remove the skeleton property:
-```javascript
-// Before:
-skeleton: `// Full application structure`
-
-// After:
-// Remove skeleton property entirely
+# Expected Output:
+# ✓ Connected to MongoDB with CSFLE enabled
+# ✓ Inserted encrypted patient record
+# ✓ Query result (automatically decrypted):
+#   { name: "Alice Johnson", ssn: "123-45-6789", dateOfBirth: "1990-01-15" }
+#
+# Verify encryption in mongosh:
+# mongosh "${mongoUri}"
+# use medical
+# db.patients.findOne()
+# // SSN will appear as Binary (Subtype 6) - encrypted!`
+}
 ```
 
 ---
 
-## Expected Outcome
+## Verification Steps
 
-After these changes:
-
-1. **Lab 1 Step 4 (Generate DEKs)**: 
-   - "Install Deps" block shows WITHOUT Challenge Mode footer (no skeleton)
-   - "createKey.cjs" block shows WITH Challenge Mode footer (has skeleton)
-   - "Run command" block shows WITHOUT Challenge Mode footer (no skeleton)
-
-2. **Lab 1 Step 6 (Test CSFLE)**:
-   - Shows full code immediately (no Challenge Mode)
-   - Clear that it's a demo/reference step
-
-3. **Lab 1 Step 7 (Complete Application)**:
-   - Shows full code immediately (no Challenge Mode)  
-   - Acts as a summary/reference
-
-4. **No more empty sections** below code blocks
+After implementation:
+1. Navigate to Lab 1 → Steps → Step 7
+2. Verify two code blocks appear:
+   - `app.js` with full application code
+   - `Terminal - Run the application` with execution instructions
+3. Verify no empty sections below either block
+4. Compare with Lab 2 Step 1 - structure should be similar
 
 ---
 
-## Visual Representation
+## Technical Note
 
-```text
-BEFORE (Step 4):
-┌─────────────────────────────────────────┐
-│ 1. Terminal: Install Deps  ⏱️ 8 min     │
-├─────────────────────────────────────────┤
-│ npm install mongodb...                  │
-├─────────────────────────────────────────┤
-│ [Guided] [Challenge] [Expert]  Score: X │  ← WRONG: No skeleton
-└─────────────────────────────────────────┘
-┌─────────────────────────────────────────┐
-│ 2. createKey.cjs  🔒 Guided (10pts)     │
-├─────────────────────────────────────────┤
-│ const { MongoClient, ____ } = ...       │
-├─────────────────────────────────────────┤
-│ [Guided] [Challenge] [Expert]  Score: X │  ← CORRECT: Has skeleton
-└─────────────────────────────────────────┘
+The "empty editor" issue the user mentioned was likely:
+1. **Resolved** by the previous fix (per-block skeleton check)
+2. **Or** a visual perception issue where the Output panel at the bottom was mistaken for an empty editor
 
-AFTER (Step 4):
-┌─────────────────────────────────────────┐
-│ 1. Terminal: Install Deps  ⏱️ 8 min     │
-├─────────────────────────────────────────┤
-│ npm install mongodb...                  │
-└─────────────────────────────────────────┘  ← Clean: No footer
-┌─────────────────────────────────────────┐
-│ 2. createKey.cjs  🔒 Guided (10pts)     │
-├─────────────────────────────────────────┤
-│ const { MongoClient, ____ } = ...       │
-├─────────────────────────────────────────┤
-│ [Guided] [Challenge] [Expert]  Score: X │
-└─────────────────────────────────────────┘
-```
+The current implementation correctly:
+- Only shows Challenge Mode footer for blocks WITH skeletons
+- Displays terminal/instruction blocks cleanly without extra UI
+- Keeps the Output panel separate at the very bottom
