@@ -358,11 +358,12 @@ run().catch(console.error);`,
           // L20-28: more, L29: path: "_______", L30-31: more, L32: queryType: "________"
           // L33-44: more, L45: db.________________("employees"
           inlineHints: [
-            { line: 16, blankText: '______', hint: 'Method to find a single document by query', answer: 'findOne' },
-            { line: 20, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
-            { line: 30, blankText: '_______', hint: 'The field name for salary data', answer: 'salary' },
-            { line: 33, blankText: '________', hint: 'Query type for searching encrypted fields', answer: 'equality' },
-            { line: 46, blankText: '________________', hint: 'Method to create a new collection', answer: 'createCollection' }
+            // User-reported missing marker rows: 15, 19, 29, 32, 45
+            { line: 15, blankText: '______', hint: 'Method to find a single document by query', answer: 'findOne' },
+            { line: 19, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
+            { line: 29, blankText: '_______', hint: 'The field name for salary data', answer: 'salary' },
+            { line: 32, blankText: '________', hint: 'Query type for searching encrypted fields', answer: 'equality' },
+            { line: 45, blankText: '________________', hint: 'Method to create a new collection', answer: 'createCollection' }
           ]
         },
         {
@@ -562,7 +563,8 @@ run().catch(console.error);`,
             { line: 22, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
             { line: 32, blankText: '___', hint: 'BSON type for integer values', answer: 'int' },
             { line: 33, blankText: '______', hint: 'Field name for tax identification', answer: 'taxId' },
-            { line: 38, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
+            // User-reported missing marker row: 39
+            { line: 39, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
             { line: 50, blankText: '___________', hint: 'Method to insert multiple documents', answer: 'insertMany' }
           ]
         },
