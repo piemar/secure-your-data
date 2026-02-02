@@ -11,6 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { cn } from '@/lib/utils';
 import { ArchitectureDiagram } from '@/components/workshop/ArchitectureDiagram';
 import { LabEnvironmentDiagram } from './LabEnvironmentDiagram';
+import { PrerequisitesChecklist } from './PrerequisitesChecklist';
 
 type SetupPhase = 'onboarding' | 'ready';
 
@@ -228,6 +229,12 @@ export const LabSetupWizard: React.FC = () => {
             </CardHeader>
 
             <CardContent className="space-y-4 px-6">
+                {/* Prerequisites Overview Checklist */}
+                <PrerequisitesChecklist 
+                    prerequisites={PREREQUISITES}
+                    verifiedTools={verifiedTools}
+                />
+
                 {/* Architecture Overview */}
                 <LabEnvironmentDiagram />
 
@@ -236,7 +243,7 @@ export const LabSetupWizard: React.FC = () => {
                     <div className="flex items-center justify-between">
                         <h3 className="text-sm font-semibold flex items-center gap-2">
                             <Terminal className="w-4 h-4 text-primary" />
-                            Prerequisites
+                            Verify Installation
                         </h3>
                         <Button
                             onClick={checkAllPrerequisites}
