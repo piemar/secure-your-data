@@ -740,12 +740,46 @@ aws kms decrypt --ciphertext-blob <paste-ciphertext-from-step-4> --output text -
 # Expected Output: "dGVzdA==" (base64 for "test") - proves you can decrypt
 
 # ✓ If all steps succeed, your infrastructure is ready for rotation!`,
-          skeleton: `# 1. List KMS aliases to find your CMK
-# 2. Describe the key to verify it's enabled
-# 3. Get key policy to check IAM permissions
-# 4. Test encryption with the new key
-# 5. Test decryption with the new key
-# If all succeed, infrastructure is ready!`
+          skeleton: `# ══════════════════════════════════════════════════════════════
+# Rotation Readiness Check - Verify AWS KMS Infrastructure
+# ══════════════════════════════════════════════════════════════
+
+# 1. List all KMS aliases to find your new CMK
+aws kms ____________ --query "Aliases[?contains(AliasName, 'mongodb')].AliasName" --output table
+
+# 2. Verify the NEW key exists and is enabled
+aws kms ____________ --key-id "${aliasName}"
+
+# Expected Output: Should show KeyState: "Enabled"
+
+# 3. Check key policy to ensure your IAM user has access
+# First, get the key ID from the alias:
+KEY_ID=$(aws kms describe-key --key-id "${aliasName}" --region eu-central-1 --query 'KeyMetadata._______' --output text)
+
+# Then use the key ID to get the policy:
+aws kms ______________ --key-id $KEY_ID --policy-name default --region eu-central-1
+
+# 4. Verify you can use the key (test encryption/decryption)
+aws kms _______ --key-id "${aliasName}" --plaintext "test" --output text --query CiphertextBlob
+
+# Expected Output: Base64-encoded ciphertext (proves you can encrypt)
+
+# 5. Test decryption
+aws kms _______ --ciphertext-blob <paste-ciphertext-from-step-4> --output text --query Plaintext
+
+# Expected Output: "dGVzdA==" (base64 for "test") - proves you can decrypt
+
+# ✓ If all steps succeed, your infrastructure is ready for rotation!`,
+          // Inline hints - line numbers match skeleton
+          // L6: list-aliases, L9: describe-key, L15: KeyId, L18: get-key-policy, L21: encrypt, L26: decrypt
+          inlineHints: [
+            { line: 6, blankText: '____________', hint: 'AWS KMS command to list all aliases', answer: 'list-aliases' },
+            { line: 9, blankText: '____________', hint: 'AWS KMS command to get key details', answer: 'describe-key' },
+            { line: 15, blankText: '_______', hint: 'JMESPath query to extract the key identifier', answer: 'KeyId' },
+            { line: 18, blankText: '______________', hint: 'AWS KMS command to retrieve the key policy', answer: 'get-key-policy' },
+            { line: 21, blankText: '_______', hint: 'AWS KMS command to encrypt data', answer: 'encrypt' },
+            { line: 26, blankText: '_______', hint: 'AWS KMS command to decrypt data', answer: 'decrypt' }
+          ]
         },
         {
           filename: 'Note: Creating a New CMK for Rotation',
