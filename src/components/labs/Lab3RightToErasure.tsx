@@ -206,15 +206,13 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints for Lab 3 Step 1 - line numbers match skeleton exactly
-          // L1-21: setup, L22: .______({ keyAltNames }), L23-27: more
-          // L28: new ________________(client, L29-41: more
-          // L42: encryption._________(doc.ssn, L43: algorithm with ____________
+          // Inline hints for Lab 3 Step 1 - user confirmed: L21, L27, L41, L42
+          // Note: L15 is { aws: { /* credentials */ } } which has no blank
           inlineHints: [
-            { line: 22, blankText: '______', hint: 'Method to retrieve a single document', answer: 'findOne' },
-            { line: 28, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
-            { line: 42, blankText: '_________', hint: 'Method to encrypt a value manually', answer: 'encrypt' },
-            { line: 43, blankText: '____________', hint: 'Algorithm suffix for queryable encryption', answer: 'Deterministic' }
+            { line: 21, blankText: '______', hint: 'Method to retrieve a single document', answer: 'findOne' },
+            { line: 27, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
+            { line: 41, blankText: '_________', hint: 'Method to encrypt a value manually', answer: 'encrypt' },
+            { line: 42, blankText: '____________', hint: 'Algorithm suffix for queryable encryption', answer: 'Deterministic' }
           ],
           // Tier 2: Challenge
           challengeSkeleton: `// ══════════════════════════════════════════════════════════════
@@ -580,14 +578,66 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          skeleton: `// 1. Connect to MongoDB and get SSO credentials
-// 2. Initialize ClientEncryption
-// 3. Look up the DEK by keyAltName that you want to rotate
-// 4. Call rewrapManyDataKey() with:
-//    - Filter: { keyAltNames: "..." } to select which DEKs to rotate
-//    - New CMK configuration: { provider: "aws", masterKey: { key: "NEW_ALIAS", region: "..." } }
-// 5. Check the result to see how many DEKs were modified
-// Note: This is a metadata-only operation - encrypted data never changes!`
+          skeleton: `// ══════════════════════════════════════════════════════════════
+// Key Rotation: RewrapManyDataKey
+// ══════════════════════════════════════════════════════════════
+// Rotate the CMK without re-encrypting data - envelope encryption power!
+
+const { MongoClient, ClientEncryption } = require("mongodb");
+const { fromSSO } = require("@aws-sdk/credential-providers");
+
+const uri = "${mongoUri}";
+const keyVaultNamespace = "encryption.__keyVault";
+
+async function run() {
+  const credentials = await fromSSO()();
+  const kmsProviders = { aws: { /* credentials */ } };
+
+  const client = await MongoClient.connect(uri);
+  const encryption = new ________________(client, {
+    keyVaultNamespace,
+    kmsProviders,
+  });
+
+  // TASK: Specify the DEK to rotate by its keyAltName
+  const keyAltName = "user-${suffix}-___-key";
+
+  // Verify DEK exists
+  const keyVaultDB = client.db("encryption");
+  const keyDoc = await keyVaultDB.collection("__keyVault").______({ 
+    keyAltNames: keyAltName 
+  });
+
+  if (!keyDoc) throw new Error("DEK not found");
+
+  // TASK: Define the NEW CMK for rotation
+  const newCMKAlias = "${aliasName}";
+
+  // TASK: Rotate the DEK to use the new CMK
+  const result = await encryption.___________________(
+    { ___________: keyAltName },  // Filter: which DEKs to rotate
+    {
+      provider: "aws",
+      masterKey: { key: newCMKAlias, region: "${awsRegion || 'eu-central-1'}" }
+    }
+  );
+
+  console.log("Rotation complete!");
+  console.log("Matched:", result.bulkWriteResult.matchedCount);
+  console.log("Modified:", result.bulkWriteResult.modifiedCount);
+
+  await client.close();
+}
+
+run().catch(console.error);`,
+          // Inline hints for Lab 3 Step 3 - user confirmed: L21, L27, L41
+          inlineHints: [
+            { line: 21, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
+            { line: 27, blankText: '___', hint: 'The field name in keyAltName pattern', answer: 'ssn' },
+            { line: 31, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
+            { line: 41, blankText: '___________________', hint: 'Method to rotate DEKs to a new CMK', answer: 'rewrapManyDataKey' },
+            { line: 42, blankText: '___________', hint: 'Field to filter which DEKs to rotate', answer: 'keyAltNames' }
+          ]
         },
         {
           filename: 'Terminal - Run the script',
