@@ -662,13 +662,13 @@ run().catch(console.dir);`,
               answer: 'ClientEncryption' 
             },
             { 
-              line: 50, 
+              line: 49, 
               blankText: '________________', 
               hint: 'Method to generate a new Data Encryption Key', 
               answer: 'createDataKey' 
             },
             { 
-              line: 52, 
+              line: 51, 
               blankText: '___________', 
               hint: 'Option to assign a human-readable name to the DEK', 
               answer: 'keyAltNames' 
