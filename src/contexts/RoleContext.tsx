@@ -13,11 +13,17 @@ interface RoleContextType {
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
-// Simple PIN check for workshop setting
-const CORRECT_PIN = '163500';
+// Configurable PIN - can be set via environment variable or workshop config
+// Default remains '163500' for backward compatibility
+const getCorrectPin = (): string => {
+  // In future phases, this will come from backend/workshop config
+  const envPin = import.meta.env.VITE_MODERATOR_PIN;
+  const configPin = localStorage.getItem('workshop_moderator_pin');
+  return configPin || envPin || '163500';
+};
 
 function verifyPin(pin: string): boolean {
-  return pin === CORRECT_PIN;
+  return pin === getCorrectPin();
 }
 
 export function RoleProvider({ children }: { children: ReactNode }) {

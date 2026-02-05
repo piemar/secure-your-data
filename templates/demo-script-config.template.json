@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Demo Script Configuration Template",
+  "description": "Template for creating demo script configurations",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^demo-[a-z0-9-]+$",
+      "description": "Unique demo script identifier (must start with 'demo-' and use kebab-case)"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 100,
+      "description": "Demo script title (e.g., 'Encryption Workshop Demo Script')"
+    },
+    "povCapabilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "POV capability IDs demonstrated in this script"
+    },
+    "beats": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^beat-\\d+$",
+            "description": "Beat identifier (e.g., 'beat-1', 'beat-2')"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 5,
+            "description": "Beat title (e.g., 'Beat 1: Show Encrypted Data in Compass')"
+          },
+          "narrative": {
+            "type": "string",
+            "minLength": 50,
+            "description": "Scripted narrative for this beat - describe the key 'wow' moment"
+          },
+          "labId": {
+            "type": "string",
+            "pattern": "^lab-[a-z0-9-]+$",
+            "description": "Lab ID this beat demonstrates"
+          },
+          "stepId": {
+            "type": "string",
+            "description": "Specific step ID to jump to (optional, leave empty to start at lab beginning)"
+          },
+          "durationMinutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "Expected duration for this beat in minutes"
+          },
+          "competitiveNotes": {
+            "type": "string",
+            "description": "Competitive comparison notes - key differentiators to highlight"
+          }
+        },
+        "required": ["id", "title", "narrative", "labId", "durationMinutes"]
+      },
+      "description": "Demo beats (scripted moments) in order"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "povCapabilities",
+    "beats"
+  ],
+  "examples": [
+    {
+      "id": "demo-encryption-workshop",
+      "title": "Encryption Workshop Demo Script",
+      "povCapabilities": ["ENCRYPT-FIELDS", "FLE-QUERYABLE-KMIP"],
+      "beats": [
+        {
+          "id": "beat-1",
+          "title": "Beat 1: Show Encrypted Data in Compass",
+          "narrative": "Demonstrate how encrypted fields appear as Binary ciphertext in MongoDB Compass, proving that even database administrators cannot access plaintext customer data. This is the key 'wow' moment that shows zero-trust encryption.",
+          "labId": "lab-csfle-fundamentals",
+          "stepId": "lab-csfle-fundamentals-step-verify-dek",
+          "durationMinutes": 5,
+          "competitiveNotes": "MongoDB is the only database that offers client-side field-level encryption with queryable encryption, allowing queries on encrypted data without decrypting first."
+        },
+        {
+          "id": "beat-2",
+          "title": "Beat 2: Queryable Encryption Query Demonstration",
+          "narrative": "Show how Queryable Encryption allows running equality and range queries on encrypted salary fields without decrypting the data first. This demonstrates the revolutionary capability that many believed was impossible.",
+          "labId": "lab-queryable-encryption",
+          "stepId": "lab-queryable-encryption-step-test-queries",
+          "durationMinutes": 7,
+          "competitiveNotes": "No other database offers queryable encryption - competitors require full decryption before querying, which exposes sensitive data."
+        }
+      ]
+    }
+  ]
+}

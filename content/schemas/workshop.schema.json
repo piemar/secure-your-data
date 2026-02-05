@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mongodb.com/workshop-framework/workshop.schema.json",
+  "title": "Workshop Framework Core Schemas",
+  "description": "JSON Schemas for topics, labs, steps, quests, flags, templates and competitor scenarios used by the workshop framework.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {},
+  "definitions": {
+    "WorkshopMode": {
+      "type": "string",
+      "enum": ["demo", "lab", "challenge"]
+    },
+    "WorkshopRole": {
+      "type": "string",
+      "enum": ["moderator", "attendee", "observer"]
+    },
+    "LabDifficulty": {
+      "type": "string",
+      "enum": ["beginner", "intermediate", "advanced"]
+    },
+    "WorkshopTopic": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "defaultLabIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "prerequisites": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["id", "name", "description"]
+    },
+    "WorkshopLabStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "narrative": { "type": "string" },
+        "instructions": { "type": "string" },
+        "estimatedTimeMinutes": {
+          "type": "number",
+          "minimum": 0
+        },
+        "codeSnippets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "language": { "type": "string" },
+              "code": { "type": "string" },
+              "description": { "type": "string" }
+            },
+            "required": ["language", "code"]
+          }
+        },
+        "verificationId": { "type": "string" },
+        "points": { "type": "number", "minimum": 0 },
+        "hints": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "dependsOnStepIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "modes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/WorkshopMode" }
+        }
+      },
+      "required": ["id", "title", "instructions"]
+    },
+    "WorkshopLabDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "topicId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "difficulty": { "$ref": "#/definitions/LabDifficulty" },
+        "estimatedTotalTimeMinutes": {
+          "type": "number",
+          "minimum": 0
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "prerequisites": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/WorkshopLabStep" }
+        },
+        "modes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/WorkshopMode" }
+        },
+        "audience": {
+          "oneOf": [
+            { "$ref": "#/definitions/WorkshopRole" },
+            { "type": "string", "enum": ["all"] }
+          ]
+        }
+      },
+      "required": ["id", "topicId", "title", "description", "difficulty", "steps"]
+    },
+    "WorkshopGamificationConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "basePointsPerStep": { "type": "number", "minimum": 0 },
+        "bonusPointsPerFlag": { "type": "number", "minimum": 0 },
+        "bonusPointsPerQuest": { "type": "number", "minimum": 0 },
+        "allowTeams": { "type": "boolean" }
+      },
+      "required": ["enabled"]
+    },
+    "WorkshopQuest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "storyContext": { "type": "string" },
+        "objectiveSummary": { "type": "string" },
+        "labIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "requiredFlagIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "optionalFlagIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "modes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/WorkshopMode" }
+        }
+      },
+      "required": ["id", "title", "storyContext", "objectiveSummary", "labIds", "requiredFlagIds"]
+    },
+    "WorkshopFlag": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "visibility": {
+          "type": "string",
+          "enum": ["hidden", "visible"]
+        },
+        "verificationId": { "type": "string" },
+        "points": { "type": "number", "minimum": 0 }
+      },
+      "required": ["id", "name", "visibility", "verificationId"]
+    },
+    "WorkshopCompetitorImplementation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "competitorId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "codeSnippets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "language": { "type": "string" },
+              "code": { "type": "string" },
+              "description": { "type": "string" }
+            },
+            "required": ["language", "code"]
+          }
+        },
+        "painPoints": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["competitorId", "title", "description"]
+    },
+    "WorkshopCompetitorScenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "labId": { "type": "string" },
+        "stepId": { "type": "string" },
+        "mongodbDescription": { "type": "string" },
+        "competitorImplementations": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/WorkshopCompetitorImplementation" }
+        }
+      },
+      "required": ["id", "labId", "mongodbDescription", "competitorImplementations"]
+    },
+    "WorkshopTemplate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "topicIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "labIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "questIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "defaultMode": { "$ref": "#/definitions/WorkshopMode" },
+        "allowedModes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/WorkshopMode" }
+        },
+        "gamification": { "$ref": "#/definitions/WorkshopGamificationConfig" },
+        "includeCompetitorComparisons": { "type": "boolean" },
+        "industry": { "type": "string" },
+        "storyIntro": { "type": "string" },
+        "storyOutro": { "type": "string" }
+      },
+      "required": ["id", "name", "description", "topicIds", "labIds", "defaultMode"]
+    }
+  }
+}
+

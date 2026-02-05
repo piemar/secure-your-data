@@ -1,0 +1,18 @@
+{
+  "id": "demo-test-demo",
+  "title": "Test Demo",
+  "povCapabilities": [
+    "ENCRYPT-FIELDS"
+  ],
+  "beats": [
+    {
+      "id": "beat-1",
+      "title": "Beat 1 for lab-test-lab",
+      "narrative": "Scripted narrative for beat 1 in lab lab-test-lab. Describe the key \"wow\" moment here.",
+      "labId": "lab-test-lab",
+      "stepId": "",
+      "durationMinutes": 5,
+      "competitiveNotes": "Add competitive comparison notes here."
+    }
+  ]
+}

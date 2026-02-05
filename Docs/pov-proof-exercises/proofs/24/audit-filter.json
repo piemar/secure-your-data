@@ -1,0 +1,34 @@
+{
+  "$or": [
+    { 
+      "atype": { 
+        "$in": [
+          "authenticate",
+          "createCollection",
+          "createDatabase",
+          "createIndex",
+          "dropCollection",
+          "dropDatabase"
+        ]
+      }
+    },
+    {
+      "$and": [
+        { 
+          "atype": "authCheck"
+        },
+        { 
+          "param.command": { 
+            "$in": [
+              "find",
+              "insert",
+              "delete",
+              "update",
+              "findAndModify"
+            ]
+          }
+        }
+      ]   
+    }
+  ]
+}

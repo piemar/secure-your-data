@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Quest Configuration Template",
+  "description": "Template for creating new challenge quests",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^quest-[a-z0-9-]+$",
+      "description": "Unique quest identifier (must start with 'quest-' and use kebab-case)"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 100,
+      "description": "Quest title (e.g., 'Stop the Leak')"
+    },
+    "storyContext": {
+      "type": "string",
+      "minLength": 50,
+      "description": "Story narrative explaining the quest context and objectives"
+    },
+    "objectiveSummary": {
+      "type": "string",
+      "minLength": 20,
+      "maxLength": 200,
+      "description": "Brief summary of quest objectives"
+    },
+    "labIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^lab-[a-z0-9-]+$"
+      },
+      "minItems": 1,
+      "description": "Lab IDs that are part of this quest (in order)"
+    },
+    "requiredFlagIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^flag-[a-z0-9-]+$"
+      },
+      "description": "Flag IDs that must be captured to complete the quest"
+    },
+    "optionalFlagIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^flag-[a-z0-9-]+$"
+      },
+      "description": "Optional flag IDs for bonus points"
+    },
+    "modes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["demo", "lab", "challenge"]
+      },
+      "default": ["challenge"],
+      "description": "Workshop modes this quest supports"
+    },
+    "labContextOverlays": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "labId": {
+            "type": "string",
+            "pattern": "^lab-[a-z0-9-]+$"
+          },
+          "titleOverride": {
+            "type": "string",
+            "description": "Override lab title for this quest context"
+          },
+          "descriptionOverride": {
+            "type": "string",
+            "description": "Override lab description for this quest context"
+          },
+          "introNarrative": {
+            "type": "string",
+            "description": "Quest-specific introduction narrative for this lab"
+          },
+          "outroNarrative": {
+            "type": "string",
+            "description": "Quest-specific conclusion narrative for this lab"
+          },
+          "stepNarrativeOverrides": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Step-specific narrative overrides (keyed by step.id)"
+          }
+        },
+        "required": ["labId"]
+      },
+      "description": "Lab context overlays for quest-specific narrative customization"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "storyContext",
+    "objectiveSummary",
+    "labIds"
+  ],
+  "examples": [
+    {
+      "id": "quest-stop-the-leak",
+      "title": "Stop the Leak",
+      "storyContext": "A retail customer has discovered that sensitive customer data (PII) is being stored in plaintext in their MongoDB database. Your mission is to encrypt all PII fields before the next security audit.",
+      "objectiveSummary": "Encrypt all PII fields in the customer database using CSFLE and Queryable Encryption",
+      "labIds": [
+        "lab-csfle-fundamentals",
+        "lab-queryable-encryption"
+      ],
+      "requiredFlagIds": [
+        "flag-encrypted-pii-collections",
+        "flag-no-plaintext-pii"
+      ],
+      "optionalFlagIds": [
+        "flag-queryable-encryption-active"
+      ],
+      "modes": ["challenge", "lab"],
+      "labContextOverlays": [
+        {
+          "labId": "lab-csfle-fundamentals",
+          "introNarrative": "**Quest Context: Stop the Leak**\n\nYou're implementing CSFLE to encrypt customer PII in the retail database.",
+          "stepNarrativeOverrides": {
+            "lab-csfle-fundamentals-step-create-cmk": "**Quest Context:** Create the root encryption key that will protect all customer PII."
+          }
+        }
+      ]
+    }
+  ]
+}

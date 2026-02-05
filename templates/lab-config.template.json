@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Lab Configuration Template",
+  "description": "Template for creating new workshop labs",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^lab-[a-z0-9-]+$",
+      "description": "Unique lab identifier (must start with 'lab-' and use kebab-case)"
+    },
+    "topicId": {
+      "type": "string",
+      "enum": [
+        "query",
+        "encryption",
+        "analytics",
+        "scalability",
+        "operations",
+        "data-management",
+        "security",
+        "integration",
+        "deployment"
+      ],
+      "description": "Topic category this lab belongs to"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 100,
+      "description": "Lab title (e.g., 'Lab 1: CSFLE Fundamentals with AWS KMS')"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 20,
+      "maxLength": 200,
+      "description": "Brief description of what the lab teaches"
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": ["beginner", "intermediate", "advanced"],
+      "description": "Difficulty level"
+    },
+    "estimatedTotalTimeMinutes": {
+      "type": "number",
+      "minimum": 15,
+      "maximum": 180,
+      "description": "Estimated total time to complete the lab"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Tags for categorization and search"
+    },
+    "prerequisites": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Prerequisites (e.g., 'MongoDB Atlas M10+', 'AWS CLI installed')"
+    },
+    "povCapabilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "POV capability IDs this lab covers (e.g., ['ENCRYPT-FIELDS', 'FLE-QUERYABLE-KMIP'])"
+    },
+    "modes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["demo", "lab", "challenge"]
+      },
+      "minItems": 1,
+      "description": "Workshop modes this lab supports"
+    },
+    "sourceProof": {
+      "type": "string",
+      "pattern": "^proofs/\\d+/README\\.md$",
+      "description": "Reference to proof exercise (e.g., 'proofs/46/README.md')"
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+-step-[a-z0-9-]+$",
+            "description": "Unique step identifier"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 5,
+            "description": "Step title"
+          },
+          "narrative": {
+            "type": "string",
+            "description": "Context and explanation for this step"
+          },
+          "instructions": {
+            "type": "string",
+            "minLength": 20,
+            "description": "Clear instructions for completing this step"
+          },
+          "estimatedTimeMinutes": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Estimated time for this step"
+          },
+          "modes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["demo", "lab", "challenge"]
+            },
+            "description": "Modes this step applies to"
+          },
+          "verificationId": {
+            "type": "string",
+            "description": "ID of verification function (optional)"
+          },
+          "points": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Points awarded for completing this step"
+          },
+          "hints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Hints for this step (optional)"
+          }
+        },
+        "required": ["id", "title", "instructions"]
+      },
+      "description": "Lab steps (minimum 3 required)"
+    }
+  },
+  "required": [
+    "id",
+    "topicId",
+    "title",
+    "description",
+    "difficulty",
+    "povCapabilities",
+    "modes",
+    "steps"
+  ],
+  "examples": [
+    {
+      "id": "lab-csfle-fundamentals",
+      "topicId": "encryption",
+      "title": "Lab 1: CSFLE Fundamentals with AWS KMS",
+      "description": "Master the rollout of KMS infrastructure and Client-Side Field Level Encryption",
+      "difficulty": "intermediate",
+      "estimatedTotalTimeMinutes": 35,
+      "tags": ["csfle", "aws-kms", "security"],
+      "prerequisites": [
+        "MongoDB Atlas M10+ running MongoDB 7.0+",
+        "AWS IAM User with KMS Management Permissions"
+      ],
+      "povCapabilities": ["ENCRYPT-FIELDS", "FLE-QUERYABLE-KMIP"],
+      "modes": ["lab", "demo", "challenge"],
+      "sourceProof": "proofs/46/README.md",
+      "steps": [
+        {
+          "id": "lab-csfle-fundamentals-step-create-cmk",
+          "title": "Create Customer Master Key (CMK)",
+          "narrative": "The CMK is the root of trust in Envelope Encryption.",
+          "instructions": "Run the AWS CLI command to create a new symmetric key.",
+          "estimatedTimeMinutes": 10,
+          "modes": ["demo", "lab", "challenge"],
+          "verificationId": "csfle.verifyCmkExists",
+          "points": 10
+        }
+      ]
+    }
+  ]
+}
