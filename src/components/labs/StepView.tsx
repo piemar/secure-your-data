@@ -9,6 +9,7 @@ import { DifficultyBadge, DifficultyLevel } from './DifficultyBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 import Editor from '@monaco-editor/react';
 import { StepContextDrawer } from './StepContextDrawer';
+import { useLab } from '@/context/LabContext';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { trackHintUsage, trackSolutionReveal } from '@/utils/leaderboardUtils';
 import { type InlineHint, type SkeletonTier } from './InlineHintMarker';
@@ -72,7 +73,7 @@ function generateSimulatedOutput(code: string, stepTitle: string): { output: str
   const lowerCode = code.toLowerCase();
   const lowerTitle = stepTitle.toLowerCase();
   const timestamp = new Date().toISOString();
-  
+
   if (lowerCode.includes('create-key') || lowerTitle.includes('cmk') || lowerTitle.includes('master key')) {
     return {
       success: true,
@@ -114,7 +115,7 @@ function generateSimulatedOutput(code: string, stepTitle: string): { output: str
 ⏭️  NEXT: Create a key alias for easier reference`
     };
   }
-  
+
   if (lowerCode.includes('createdatakey') || lowerTitle.includes('dek') || lowerTitle.includes('data encryption')) {
     return {
       success: true,
@@ -158,7 +159,7 @@ Creating Data Encryption Key...
 ⏭️  NEXT: Configure your schema map for automatic encryption`
     };
   }
-  
+
   if (lowerCode.includes('createindex') || lowerTitle.includes('index') || lowerTitle.includes('key vault')) {
     return {
       success: true,
@@ -197,7 +198,7 @@ Index details:
    The unique index prevents duplicate key alt names.`
     };
   }
-  
+
   if (lowerCode.includes('insertone') || lowerCode.includes('insert')) {
     return {
       success: true,
@@ -229,7 +230,7 @@ Index details:
    Even MongoDB servers never see the plaintext values.`
     };
   }
-  
+
   if (lowerCode.includes('findone') || lowerCode.includes('find')) {
     return {
       success: true,
@@ -265,7 +266,7 @@ Index details:
    using your configured DEK and AWS KMS credentials.`
     };
   }
-  
+
   if (lowerCode.includes('createencryptedcollection') || lowerTitle.includes('queryable')) {
     return {
       success: true,
@@ -315,7 +316,7 @@ Metadata collections created:
    full end-to-end encryption. The server never sees plaintext.`
     };
   }
-  
+
   if (lowerCode.includes('policy') || lowerTitle.includes('policy')) {
     return {
       success: true,
@@ -406,7 +407,7 @@ Permitted actions:
    is now permanently unreadable - instant crypto-shredding!`
     };
   }
-  
+
   return {
     success: true,
     summary: 'Command executed successfully',
@@ -440,6 +441,7 @@ export function StepView({
   businessValue,
   atlasCapability,
 }: StepViewProps) {
+  const { completeStep } = useLab();
   const [activeTab, setActiveTab] = useState<string>('code');
   const [outputOpen, setOutputOpen] = useState(false);
   const [lastOutput, setLastOutput] = useState<string>('');
@@ -448,7 +450,7 @@ export function StepView({
   const [isRunning, setIsRunning] = useState(false);
   const [copied, setCopied] = useState(false);
   const [direction, setDirection] = useState(0);
-  
+
   // Challenge Mode State
   const [showSolution, setShowSolution] = useState<Record<string, boolean>>({});
   const [revealedHints, setRevealedHints] = useState<Record<string, number[]>>({});
@@ -486,7 +488,7 @@ export function StepView({
   // Get display code based on tier
   const getDisplayCode = (block: CodeBlock, tier: SkeletonTier, solutionRevealed: boolean): string => {
     if (solutionRevealed) return block.code;
-    
+
     switch (tier) {
       case 'expert':
         return block.expertSkeleton || block.challengeSkeleton || block.skeleton || block.code;
@@ -529,7 +531,7 @@ export function StepView({
       ...prev,
       [blockKey]: (prev[blockKey] || 0) + hintPenalty
     }));
-    
+
     // Track in leaderboard
     const email = localStorage.getItem('userEmail') || '';
     if (email) {
@@ -550,7 +552,7 @@ export function StepView({
       ...prev,
       [blockKey]: (prev[blockKey] || 0) + answerPenalty
     }));
-    
+
     // Track in leaderboard
     const email = localStorage.getItem('userEmail') || '';
     if (email) {
@@ -567,7 +569,7 @@ export function StepView({
       ...prev,
       [blockKey]: (prev[blockKey] || 0) + penalty
     }));
-    
+
     // Track in leaderboard
     const email = localStorage.getItem('userEmail') || '';
     if (email) {
@@ -582,7 +584,7 @@ export function StepView({
     const hasSkeleton = block ? hasAnySkeleton(block) : false;
     const isSolutionRevealed = alwaysShowSolutions || showSolution[blockKey] || !hasSkeleton;
     const tier = skeletonTier[blockKey] || 'guided';
-    
+
     // Copy the solution if revealed, otherwise copy current tier skeleton
     const code = isSolutionRevealed ? (block?.code || '') : getDisplayCode(block!, tier, false);
     await navigator.clipboard.writeText(code);
@@ -593,20 +595,32 @@ export function StepView({
   const handleCheckProgress = async () => {
     setIsRunning(true);
     const code = currentStep.codeBlocks?.[0]?.code || '';
-    
+
     // Simulate execution delay
     await new Promise(r => setTimeout(r, 800 + Math.random() * 600));
-    
+
     const result = generateSimulatedOutput(code, currentStep.title);
     setLastOutput(result.output);
     setOutputSummary(result.summary);
     setOutputSuccess(result.success);
     setOutputOpen(true);
     setIsRunning(false);
+
+    // Award points on success
+    if (result.success) {
+      const blockKey = `${currentStepIndex}-0`; // Assume first block is the main one for simulation
+      const hasSkeleton = currentStep.codeBlocks?.[0] ? hasAnySkeleton(currentStep.codeBlocks[0]) : false;
+      const assisted = hasSkeleton && (showSolution[blockKey] || revealedHints[blockKey]?.length > 0 || revealedAnswers[blockKey]?.length > 0);
+      completeStep(currentStep.id, !!assisted);
+    }
   };
 
   const handleNextStep = () => {
     if (!isCompleted) {
+      const blockKey = `${currentStepIndex}-0`;
+      const hasSkeleton = currentStep.codeBlocks?.[0] ? hasAnySkeleton(currentStep.codeBlocks[0]) : false;
+      const assisted = hasSkeleton && (showSolution[blockKey] || revealedHints[blockKey]?.length > 0 || revealedAnswers[blockKey]?.length > 0);
+      completeStep(currentStep.id, !!assisted);
       onComplete(currentStepIndex);
     }
     if (currentStepIndex < steps.length - 1) {
@@ -755,10 +769,10 @@ export function StepView({
                     const maxPoints = getMaxPoints(tier);
                     const solutionPenalty = getSolutionPenalty(tier);
                     const isTwoBlockPattern = currentStep.codeBlocks.length === 2;
-                    
+
                     return (
-                      <div 
-                        key={idx} 
+                      <div
+                        key={idx}
                         className={cn(
                           "flex flex-col flex-shrink-0",
                           isTwoBlockPattern && "flex-1 min-h-0"
@@ -770,7 +784,7 @@ export function StepView({
                             {/* Left: Filename + Difficulty selector + Score */}
                             <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 flex-wrap">
                               <span className="text-[10px] sm:text-xs font-mono text-muted-foreground truncate max-w-[80px] sm:max-w-none">{block.filename}</span>
-                              
+
                               {/* Inline difficulty selector (only for skeleton blocks that aren't revealed) */}
                               {hasSkeleton && !isSolutionRevealed && (
                                 <>
@@ -779,8 +793,8 @@ export function StepView({
                                       onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'guided' }))}
                                       className={cn(
                                         "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors",
-                                        tier === 'guided' 
-                                          ? "bg-primary text-primary-foreground" 
+                                        tier === 'guided'
+                                          ? "bg-primary text-primary-foreground"
                                           : "hover:bg-muted"
                                       )}
                                     >
@@ -791,8 +805,8 @@ export function StepView({
                                       disabled={!block.challengeSkeleton && !block.expertSkeleton}
                                       className={cn(
                                         "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors",
-                                        tier === 'challenge' 
-                                          ? "bg-primary text-primary-foreground" 
+                                        tier === 'challenge'
+                                          ? "bg-primary text-primary-foreground"
                                           : "hover:bg-muted",
                                         !block.challengeSkeleton && !block.expertSkeleton && "opacity-40 cursor-not-allowed"
                                       )}
@@ -804,8 +818,8 @@ export function StepView({
                                       disabled={!block.expertSkeleton}
                                       className={cn(
                                         "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors",
-                                        tier === 'expert' 
-                                          ? "bg-primary text-primary-foreground" 
+                                        tier === 'expert'
+                                          ? "bg-primary text-primary-foreground"
                                           : "hover:bg-muted",
                                         !block.expertSkeleton && "opacity-40 cursor-not-allowed"
                                       )}
@@ -813,7 +827,7 @@ export function StepView({
                                       Expert
                                     </button>
                                   </div>
-                                  
+
                                   {/* Score display */}
                                   <div className="flex items-center gap-1 text-[10px] sm:text-xs">
                                     <span className={cn(
@@ -827,7 +841,7 @@ export function StepView({
                                 </>
                               )}
                             </div>
-                            
+
                             {/* Right: Solution + Copy buttons */}
                             <div className="flex items-center gap-1 flex-shrink-0">
                               {hasSkeleton && !isSolutionRevealed && (
@@ -854,7 +868,7 @@ export function StepView({
                             </div>
                           </div>
                         </div>
-                        
+
                         {/* Monaco Editor with Inline Hint Widgets */}
                         <InlineHintEditor
                           key={`editor-${currentStepIndex}-${idx}-${isSolutionRevealed}`}
@@ -898,7 +912,7 @@ export function StepView({
               {/* Output Panel */}
               <ResizablePanel defaultSize={outputOpen ? 50 : 15} minSize={10} collapsible>
                 <div className="h-full flex flex-col bg-background/95">
-                  <button 
+                  <button
                     onClick={() => setOutputOpen(!outputOpen)}
                     className="flex-shrink-0 flex items-center gap-2 px-6 py-2 border-t border-border bg-muted/50 hover:bg-muted transition-colors text-sm"
                   >
@@ -908,8 +922,8 @@ export function StepView({
                     {outputSummary && (
                       <span className={cn(
                         "ml-2 px-2 py-0.5 rounded text-xs font-medium",
-                        outputSuccess 
-                          ? "bg-green-500/10 text-green-500" 
+                        outputSuccess
+                          ? "bg-green-500/10 text-green-500"
                           : "bg-red-500/10 text-red-500"
                       )}>
                         {outputSuccess ? '✓' : '✗'} {outputSummary}
@@ -962,8 +976,8 @@ export function StepView({
                       index === currentStepIndex
                         ? 'bg-primary text-primary-foreground ring-2 ring-primary/30'
                         : completedSteps.includes(index)
-                        ? 'bg-primary/20 text-primary'
-                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          ? 'bg-primary/20 text-primary'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
                     )}
                   >
                     {completedSteps.includes(index) ? (

@@ -42,7 +42,7 @@ export function LabView({
   objectives,
   steps,
 }: LabViewProps) {
-  const { startLab, completeLab, userEmail } = useLab();
+  const { startLab, completeLab, completeStep, userEmail } = useLab();
   const storageKey = `lab${labNumber}-progress`;
   const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -54,20 +54,20 @@ export function LabView({
   // Start lab tracking on mount and send heartbeat
   useEffect(() => {
     startLab(labNumber);
-    
+
     // Send heartbeat every 30 seconds to update time tracking
     const heartbeatInterval = setInterval(() => {
       if (userEmail) {
         heartbeat(userEmail, labNumber);
       }
     }, 30000);
-    
+
     return () => clearInterval(heartbeatInterval);
   }, [labNumber, startLab, userEmail]);
 
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify(completedSteps));
-    
+
     // Check if all steps are completed
     if (completedSteps.length === steps.length) {
       completeLab(labNumber);
@@ -75,11 +75,17 @@ export function LabView({
   }, [completedSteps, storageKey, steps.length, labNumber, completeLab]);
 
   const toggleStep = (stepIndex: number) => {
+    const isNowCompleted = !completedSteps.includes(stepIndex);
     setCompletedSteps((prev) =>
-      prev.includes(stepIndex)
-        ? prev.filter((s) => s !== stepIndex)
-        : [...prev, stepIndex]
+      isNowCompleted
+        ? [...prev, stepIndex]
+        : prev.filter((s) => s !== stepIndex)
     );
+
+    if (isNowCompleted) {
+      const step = steps[stepIndex];
+      completeStep(step.id, false); // Manual completion in this view is always unassisted
+    }
   };
 
   const scrollToNextStep = (currentIndex: number) => {
