@@ -18,6 +18,7 @@ import {
   startNewWorkshop,
   resetLeaderboard,
   getParticipantCount,
+  syncWorkshopSession,
   type WorkshopSession
 } from '@/utils/workshopUtils';
 
@@ -25,7 +26,7 @@ export const WorkshopSettings: React.FC = () => {
   const [session, setSession] = useState<WorkshopSession | null>(null);
   const [labsEnabled, setLabsEnabledState] = useState(false);
   const [participantCount, setParticipantCount] = useState(0);
-  
+
   // New workshop form state
   const [customerName, setCustomerName] = useState('');
   const [workshopDate, setWorkshopDate] = useState<Date | undefined>(new Date());
@@ -33,25 +34,26 @@ export const WorkshopSettings: React.FC = () => {
 
   // Load session data
   useEffect(() => {
-    const loadSession = () => {
+    const loadSession = async () => {
+      await syncWorkshopSession();
       setSession(getWorkshopSession());
       setLabsEnabledState(areLabsEnabled());
       setParticipantCount(getParticipantCount());
     };
-    
+
     loadSession();
-    // Refresh every 5 seconds for participant count
-    const interval = setInterval(loadSession, 5000);
+    // Refresh every 10 seconds for session and participant sync
+    const interval = setInterval(loadSession, 10000);
     return () => clearInterval(interval);
   }, []);
 
-  const handleToggleLabs = (enabled: boolean) => {
-    setLabsEnabled(enabled);
+  const handleToggleLabs = async (enabled: boolean) => {
+    await setLabsEnabled(enabled);
     setLabsEnabledState(enabled);
     toast.success(enabled ? 'Labs enabled for all participants' : 'Labs disabled');
   };
 
-  const handleStartNewWorkshop = () => {
+  const handleStartNewWorkshop = async () => {
     if (!customerName.trim()) {
       toast.error('Please enter a customer name');
       return;
@@ -61,27 +63,27 @@ export const WorkshopSettings: React.FC = () => {
       return;
     }
 
-    const confirmMessage = session 
+    const confirmMessage = session
       ? 'Starting a new workshop will archive the current leaderboard and reset all scores. Continue?'
       : 'Start a new workshop session?';
-    
+
     if (!window.confirm(confirmMessage)) return;
 
     const dateStr = format(workshopDate, 'yyyy-MM-dd');
-    const newSession = startNewWorkshop(customerName.trim(), dateStr);
+    const newSession = await startNewWorkshop(customerName.trim(), dateStr);
     setSession(newSession);
     setLabsEnabledState(true);
     setCustomerName('');
     setParticipantCount(0);
-    
+
     toast.success(`Workshop "${customerName}" started! Labs are now enabled.`);
   };
 
-  const handleResetLeaderboard = () => {
+  const handleResetLeaderboard = async () => {
     if (!window.confirm('Are you sure you want to reset the leaderboard? This will clear all participant scores but keep the workshop session active.')) {
       return;
     }
-    
+
     resetLeaderboard();
     setParticipantCount(0);
     toast.success('Leaderboard has been reset');
@@ -172,7 +174,7 @@ export const WorkshopSettings: React.FC = () => {
             <div>
               <p className="font-medium">Labs Enabled</p>
               <p className="text-sm text-muted-foreground">
-                {labsEnabled 
+                {labsEnabled
                   ? 'Participants can access all unlocked labs'
                   : 'Participants will see "Workshop not started" message'}
               </p>
@@ -209,7 +211,7 @@ export const WorkshopSettings: React.FC = () => {
               onChange={(e) => setCustomerName(e.target.value)}
             />
           </div>
-          
+
           <div className="space-y-2">
             <Label>Workshop Date</Label>
             <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
@@ -274,8 +276,8 @@ export const WorkshopSettings: React.FC = () => {
               Clear all participant scores without starting a new workshop session.
               This action cannot be undone.
             </p>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               size="sm"
               onClick={handleResetLeaderboard}
             >

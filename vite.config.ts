@@ -13,6 +13,7 @@ const OBFUSCATED_URI = "LjwoKyo7M24sPjd4cB1DUxkmPScuKTo8IDE4eyMqcwgEf3o/IwN2F2kP
 const LEADERBOARD_DB = "csfleqe";
 const LEADERBOARD_COLLECTION = "leaderboard";
 const POINTS_COLLECTION = "points";
+const SESSION_COLLECTION = "workshop_session";
 
 // Simple deobfuscation function (inline to avoid import issues)
 function deobfuscateMongoUri(obfuscated: string): string {
@@ -38,11 +39,10 @@ function getLeaderboardMongoUri(): string {
   if (process.env.LEADERBOARD_MONGODB_URI) {
     return process.env.LEADERBOARD_MONGODB_URI;
   }
-  
+
   // Fallback to deobfuscated value (shared leaderboard database)
   return deobfuscateMongoUri(OBFUSCATED_URI);
 }
-
 
 interface LeaderboardEntry {
   email: string;
@@ -50,6 +50,8 @@ interface LeaderboardEntry {
   completedLabs: number[];
   labTimes: Record<number, number>;
   lastActive: number;
+  hintsUsed: number;
+  solutionsRevealed: number;
 }
 
 interface PointEntry {
@@ -59,6 +61,22 @@ interface PointEntry {
   points: number;
   assisted: boolean;
   timestamp: number;
+}
+
+interface ArchivedLeaderboard {
+  sessionId: string;
+  customerName: string;
+  workshopDate: string;
+  entries: LeaderboardEntry[];
+}
+
+interface WorkshopSession {
+  id: string;
+  customerName: string;
+  workshopDate: string;
+  startedAt: number;
+  labsEnabled: boolean;
+  archivedLeaderboards: ArchivedLeaderboard[];
 }
 
 // MongoDB connection helper for leaderboard storage (shared database)
@@ -91,26 +109,27 @@ async function updateLeaderboardEntry(email: string, updates: Partial<Leaderboar
     const client = await getLeaderboardMongoClient();
     const db = client.db(LEADERBOARD_DB);
     const collection = db.collection<LeaderboardEntry>(LEADERBOARD_COLLECTION);
-    
+
     const result = await collection.findOneAndUpdate(
       { email },
-      { 
+      {
         $set: { ...updates, lastActive: Date.now() },
         $setOnInsert: {
           email,
           score: 0,
           completedLabs: [],
           labTimes: {},
-          lastActive: Date.now()
+          hintsUsed: 0,
+          solutionsRevealed: 0
         }
       },
       { upsert: true, returnDocument: 'after' }
     );
-    
-    return result || { email, score: 0, completedLabs: [], labTimes: {}, lastActive: Date.now() };
+
+    return result || { email, score: 0, completedLabs: [], labTimes: {}, lastActive: Date.now(), hintsUsed: 0, solutionsRevealed: 0 };
   } catch (error) {
     console.error('Error updating leaderboard entry:', error);
-    return { email, score: 0, completedLabs: [], labTimes: {}, lastActive: Date.now() };
+    return { email, score: 0, completedLabs: [], labTimes: {}, lastActive: Date.now(), hintsUsed: 0, solutionsRevealed: 0 };
   }
 }
 
@@ -119,7 +138,7 @@ async function addPointEntry(email: string, stepId: string, labNumber: number, p
     const client = await getLeaderboardMongoClient();
     const db = client.db(LEADERBOARD_DB);
     const collection = db.collection<PointEntry>(POINTS_COLLECTION);
-    
+
     await collection.insertOne({
       email,
       stepId,
@@ -130,6 +149,40 @@ async function addPointEntry(email: string, stepId: string, labNumber: number, p
     });
   } catch (error) {
     console.error('Error adding point entry:', error);
+  }
+}
+
+async function getWorkshopSession(): Promise<WorkshopSession | null> {
+  try {
+    const client = await getLeaderboardMongoClient();
+    const db = client.db(LEADERBOARD_DB);
+    const collection = db.collection<WorkshopSession>(SESSION_COLLECTION);
+    // There should only be one active session, but we'll find the most recent one
+    const session = await collection.findOne({}, { sort: { startedAt: -1 } });
+    return session;
+  } catch (error) {
+    console.error('Error fetching workshop session:', error);
+    return null;
+  }
+}
+
+async function updateWorkshopSession(session: WorkshopSession): Promise<void> {
+  try {
+    const client = await getLeaderboardMongoClient();
+    const db = client.db(LEADERBOARD_DB);
+    const collection = db.collection<WorkshopSession>(SESSION_COLLECTION);
+
+    // Use upsert to maintain the single session
+    // We use the same ID if provided, or upsert by a constant key if we only want one session ever
+    // Actually, let's just upsert by ID or if none exists, just insert.
+    // For simplicity in a lab, we'll just keep one "current" session.
+    await collection.updateOne(
+      { id: session.id },
+      { $set: session },
+      { upsert: true }
+    );
+  } catch (error) {
+    console.error('Error updating workshop session:', error);
   }
 }
 
@@ -888,13 +941,13 @@ export default defineConfig(({ mode }) => ({
             const url = new URL(req.url, `http://${req.headers.host}`);
             const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
             const keyAltName = url.searchParams.get('keyAltName') || '';
-            
+
             if (!uri) {
               res.statusCode = 400;
               res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' }));
               return;
             }
-            
+
             if (!keyAltName) {
               res.statusCode = 400;
               res.end(JSON.stringify({ success: false, message: 'Key Alt Name is required.' }));
@@ -977,7 +1030,7 @@ export default defineConfig(({ mode }) => ({
                       await updateLeaderboardEntry(entry.email, { labTimes: entry.labTimes });
                     }
                   }
-                  
+
                   res.setHeader('Content-Type', 'application/json');
                   res.end(JSON.stringify({ entries }));
                 } catch (error: any) {
@@ -987,14 +1040,14 @@ export default defineConfig(({ mode }) => ({
               })();
               return;
             }
-            
+
             if (req.method === 'POST') {
               let body = '';
               req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
               req.on('end', async () => {
                 try {
                   const data = JSON.parse(body);
-                  
+
                   if (req.url?.includes('/start-lab')) {
                     const { email, labNumber, timestamp } = data;
                     const entries = await getLeaderboard();
@@ -1011,7 +1064,7 @@ export default defineConfig(({ mode }) => ({
                     res.end(JSON.stringify({ success: true, entry }));
                     return;
                   }
-                  
+
                   if (req.url?.includes('/complete-lab')) {
                     const { email, labNumber, score, timestamp } = data;
                     const entries = await getLeaderboard();
@@ -1025,7 +1078,7 @@ export default defineConfig(({ mode }) => ({
                     const labStartTime = labTimes[labNumber] || timestamp;
                     const labDuration = timestamp - labStartTime;
                     labTimes[labNumber] = labDuration;
-                    
+
                     const entry = await updateLeaderboardEntry(email, {
                       completedLabs,
                       score: (currentEntry?.score || 0) + score,
@@ -1035,7 +1088,7 @@ export default defineConfig(({ mode }) => ({
                     res.end(JSON.stringify({ success: true, entry }));
                     return;
                   }
-                  
+
                   if (req.url?.includes('/add-points')) {
                     const { email, stepId, labNumber, points, assisted } = data;
                     // Add point entry to MongoDB
@@ -1049,7 +1102,7 @@ export default defineConfig(({ mode }) => ({
                     res.end(JSON.stringify({ success: true }));
                     return;
                   }
-                  
+
                   // Heartbeat endpoint to update active time
                   if (req.url?.includes('/heartbeat')) {
                     const { email, labNumber } = data;
@@ -1067,9 +1120,42 @@ export default defineConfig(({ mode }) => ({
                     res.end(JSON.stringify({ success: true }));
                     return;
                   }
-                  
+
                   res.statusCode = 400;
                   res.end(JSON.stringify({ success: false, message: 'Invalid endpoint' }));
+                } catch (e: any) {
+                  res.statusCode = 400;
+                  res.end(JSON.stringify({ success: false, message: e.message }));
+                }
+              });
+              return;
+            }
+          }
+
+          if (req.url && req.url.startsWith('/api/workshop-session')) {
+            if (req.method === 'GET') {
+              (async () => {
+                try {
+                  const session = await getWorkshopSession();
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ session }));
+                } catch (error: any) {
+                  res.statusCode = 500;
+                  res.end(JSON.stringify({ success: false, message: error.message }));
+                }
+              })();
+              return;
+            }
+
+            if (req.method === 'POST') {
+              let body = '';
+              req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+              req.on('end', async () => {
+                try {
+                  const data = JSON.parse(body);
+                  await updateWorkshopSession(data);
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: true }));
                 } catch (e: any) {
                   res.statusCode = 400;
                   res.end(JSON.stringify({ success: false, message: e.message }));
@@ -1083,17 +1169,17 @@ export default defineConfig(({ mode }) => ({
             try {
               const url = new URL(req.url, `http://${req.headers.host}`);
               let filePath = decodeURIComponent(url.searchParams.get('path') || '');
-              
+
               if (!filePath) {
                 res.setHeader('Content-Type', 'application/json');
                 res.statusCode = 400;
                 res.end(JSON.stringify({ success: false, exists: false, message: 'File path is required' }));
                 return;
               }
-              
+
               // Remove trailing slash if present
               filePath = filePath.replace(/\/$/, '');
-              
+
               // Basic security: prevent directory traversal (but allow absolute paths)
               if (filePath.includes('..')) {
                 res.setHeader('Content-Type', 'application/json');
@@ -1101,7 +1187,7 @@ export default defineConfig(({ mode }) => ({
                 res.end(JSON.stringify({ success: false, exists: false, message: 'Invalid file path: directory traversal not allowed' }));
                 return;
               }
-              
+
               // Check if file exists
               // Use imported fs and path modules (already imported at top)
               if (!existsSync(filePath)) {
@@ -1111,23 +1197,23 @@ export default defineConfig(({ mode }) => ({
                   const expectedFile = path.join(parentDir, 'mongo_crypt_v1.dylib');
                   if (existsSync(expectedFile)) {
                     res.setHeader('Content-Type', 'application/json');
-                    res.end(JSON.stringify({ 
-                      success: false, 
-                      exists: false, 
-                      message: `Path is a directory. Use the full file path: ${expectedFile}` 
+                    res.end(JSON.stringify({
+                      success: false,
+                      exists: false,
+                      message: `Path is a directory. Use the full file path: ${expectedFile}`
                     }));
                     return;
                   }
                 }
                 res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ 
-                  success: false, 
-                  exists: false, 
-                  message: 'File not found. Make sure the path points to mongo_crypt_v1.dylib (not a directory)' 
+                res.end(JSON.stringify({
+                  success: false,
+                  exists: false,
+                  message: 'File not found. Make sure the path points to mongo_crypt_v1.dylib (not a directory)'
                 }));
                 return;
               }
-              
+
               // Check if it's actually a file (not a directory)
               const stats = statSync(filePath);
               if (stats.isDirectory()) {
@@ -1135,17 +1221,17 @@ export default defineConfig(({ mode }) => ({
                 const expectedFile = path.join(filePath, 'mongo_crypt_v1.dylib');
                 if (existsSync(expectedFile)) {
                   res.setHeader('Content-Type', 'application/json');
-                  res.end(JSON.stringify({ 
-                    success: false, 
-                    exists: false, 
-                    message: `Path is a directory. Use the full file path: ${expectedFile}` 
+                  res.end(JSON.stringify({
+                    success: false,
+                    exists: false,
+                    message: `Path is a directory. Use the full file path: ${expectedFile}`
                   }));
                 } else {
                   res.setHeader('Content-Type', 'application/json');
-                  res.end(JSON.stringify({ 
-                    success: false, 
-                    exists: false, 
-                    message: 'Path is a directory. Please provide the full path to mongo_crypt_v1.dylib' 
+                  res.end(JSON.stringify({
+                    success: false,
+                    exists: false,
+                    message: 'Path is a directory. Please provide the full path to mongo_crypt_v1.dylib'
                   }));
                 }
               } else if (stats.isFile()) {
@@ -1156,28 +1242,28 @@ export default defineConfig(({ mode }) => ({
                   res.end(JSON.stringify({ success: true, exists: true, message: 'File found and verified' }));
                 } else {
                   res.setHeader('Content-Type', 'application/json');
-                  res.end(JSON.stringify({ 
-                    success: false, 
-                    exists: false, 
-                    message: `File exists but doesn't appear to be mongo_crypt_v1.dylib. Found: ${filename}` 
+                  res.end(JSON.stringify({
+                    success: false,
+                    exists: false,
+                    message: `File exists but doesn't appear to be mongo_crypt_v1.dylib. Found: ${filename}`
                   }));
                 }
               } else {
                 res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ 
-                  success: false, 
-                  exists: false, 
-                  message: 'Path exists but is not a regular file' 
+                res.end(JSON.stringify({
+                  success: false,
+                  exists: false,
+                  message: 'Path exists but is not a regular file'
                 }));
               }
             } catch (error: any) {
               console.error('Error in /api/check-file:', error);
               res.setHeader('Content-Type', 'application/json');
               res.statusCode = 500;
-              res.end(JSON.stringify({ 
-                success: false, 
-                exists: false, 
-                message: `Error checking file: ${error.message || String(error)}` 
+              res.end(JSON.stringify({
+                success: false,
+                exists: false,
+                message: `Error checking file: ${error.message || String(error)}`
               }));
             }
             return;
@@ -1187,15 +1273,15 @@ export default defineConfig(({ mode }) => ({
             const url = new URL(req.url, `http://${req.headers.host}`);
             const checkType = url.searchParams.get('type') || 'all';
             const uri = url.searchParams.get('uri') || '';
-            
+
             try {
               const packageJson = JSON.parse(readFileSync('./package.json', 'utf-8'));
               const expectedMongoDB = packageJson.dependencies?.mongodb || '7.0.0';
               const expectedMongoDBClientEncryption = packageJson.dependencies?.['mongodb-client-encryption'] || '7.0.0';
               const expectedAwsSdk = packageJson.dependencies?.['@aws-sdk/credential-providers'] || '^3.975.0';
-              
+
               const results: Record<string, any> = {};
-              
+
               // Check npm package versions from package.json (installed versions)
               if (checkType === 'all' || checkType === 'packages') {
                 // Read from package.json - these are the expected versions
@@ -1215,7 +1301,7 @@ export default defineConfig(({ mode }) => ({
                   verified: true
                 };
               }
-              
+
               // Check libmongocrypt availability
               const checkLibmongocrypt = () => {
                 if (checkType === 'all' || checkType === 'libmongocrypt') {
@@ -1229,7 +1315,7 @@ export default defineConfig(({ mode }) => ({
                           const hasLibmongocrypt = !libError && libStdout.includes('ok');
                           results.libmongocrypt = {
                             verified: hasLibmongocrypt,
-                            message: hasLibmongocrypt 
+                            message: hasLibmongocrypt
                               ? 'Automatic Encryption Shared Library (libmongocrypt) is available. Automatic encryption is enabled.'
                               : 'libmongocrypt not found. Automatic encryption requires libmongocrypt. Install: npm install mongodb-client-encryption',
                             path: libInfo.found ? libInfo.modulePath : undefined,
@@ -1258,13 +1344,13 @@ export default defineConfig(({ mode }) => ({
                   checkAtlasVersion();
                 }
               };
-              
+
               // Check MongoDB Atlas version
               const checkAtlasVersion = () => {
                 if ((checkType === 'all' || checkType === 'atlas') && uri) {
                   const script = `try { print(JSON.stringify({ version: db.version() })); } catch(e) { print(JSON.stringify({ error: e.message })); }`;
                   const cmd = `mongosh "${uri}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
-                  
+
                   exec(cmd, (atlasError, atlasStdout) => {
                     if (!atlasError && atlasStdout) {
                       try {
@@ -1287,7 +1373,7 @@ export default defineConfig(({ mode }) => ({
                         message: 'Could not connect to Atlas'
                       };
                     }
-                    
+
                     res.setHeader('Content-Type', 'application/json');
                     res.end(JSON.stringify({ success: true, results }));
                   });
@@ -1296,7 +1382,7 @@ export default defineConfig(({ mode }) => ({
                   res.end(JSON.stringify({ success: true, results }));
                 }
               };
-              
+
               // Start checks
               if (checkType === 'all' || checkType === 'packages') {
                 checkLibmongocrypt();

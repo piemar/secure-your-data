@@ -41,7 +41,7 @@ function saveLeaderboardEntries(entries: LeaderboardEntry[]): void {
 function getOrCreateEntry(email: string): LeaderboardEntry {
   const entries = getLeaderboardEntries();
   let entry = entries.find(e => e.email === email);
-  
+
   if (!entry) {
     entry = {
       email,
@@ -55,7 +55,7 @@ function getOrCreateEntry(email: string): LeaderboardEntry {
     entries.push(entry);
     saveLeaderboardEntries(entries);
   }
-  
+
   return entry;
 }
 
@@ -65,7 +65,7 @@ function getOrCreateEntry(email: string): LeaderboardEntry {
 function updateEntry(email: string, updates: Partial<LeaderboardEntry>): void {
   const entries = getLeaderboardEntries();
   const index = entries.findIndex(e => e.email === email);
-  
+
   if (index === -1) {
     // Create new entry
     const newEntry: LeaderboardEntry = {
@@ -87,85 +87,122 @@ function updateEntry(email: string, updates: Partial<LeaderboardEntry>): void {
       lastActive: Date.now()
     };
   }
-  
+
   saveLeaderboardEntries(entries);
 }
 
 /**
  * Add points to a user's score
  */
-export function addPoints(email: string, points: number, labNumber: number): void {
+export async function addPoints(email: string, points: number, labNumber: number, stepId: string = 'unknown', assisted: boolean = false): Promise<void> {
   if (!email) return;
-  
+
   const entry = getOrCreateEntry(email);
   const newScore = entry.score + points;
-  
+
   updateEntry(email, {
     score: newScore
   });
+
+  // Sync to Atlas
+  try {
+    await fetch('/api/leaderboard/add-points', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, stepId, labNumber, points, assisted })
+    });
+  } catch (error) {
+    console.warn('Failed to sync points to Atlas:', error);
+  }
 }
 
 /**
  * Mark a lab as completed
  */
-export function completeLab(email: string, labNumber: number, score: number): void {
+export async function completeLab(email: string, labNumber: number, score: number): Promise<void> {
   if (!email) return;
-  
+
   const entry = getOrCreateEntry(email);
   const completedLabs = entry.completedLabs.includes(labNumber)
     ? entry.completedLabs
     : [...entry.completedLabs, labNumber];
-  
+
   // Calculate lab time from LabContext's labStartTimes
   const labTimes = { ...entry.labTimes };
+  const timestamp = Date.now();
+
   try {
     const savedStartTimes = localStorage.getItem('labStartTimes');
     if (savedStartTimes) {
       const startTimes = JSON.parse(savedStartTimes);
       if (startTimes[labNumber]) {
         const start = startTimes[labNumber];
-        const end = Date.now();
-        const elapsed = end - start;
+        const elapsed = timestamp - start;
         labTimes[labNumber] = (labTimes[labNumber] || 0) + elapsed;
       }
     }
   } catch (error) {
     console.error('Failed to read lab start times:', error);
   }
-  
+
+  const finalScore = Math.max(entry.score, score);
   updateEntry(email, {
     completedLabs,
-    score: Math.max(entry.score, score), // Use the higher score
+    score: finalScore,
     labTimes
   });
+
+  // Sync to Atlas
+  try {
+    await fetch('/api/leaderboard/complete-lab', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, labNumber, score: finalScore, timestamp })
+    });
+  } catch (error) {
+    console.warn('Failed to sync lab completion to Atlas:', error);
+  }
 }
 
 /**
  * Record when a lab is started
  */
-export function startLab(email: string, labNumber: number): void {
+export async function startLab(email: string, labNumber: number): Promise<void> {
   if (!email) return;
-  
+
   const entry = getOrCreateEntry(email);
+  const timestamp = Date.now();
+
   // Initialize lab time if not exists
   if (!entry.labTimes[labNumber]) {
     updateEntry(email, {
       labTimes: { ...entry.labTimes, [labNumber]: 0 }
     });
   }
+
+  // Sync to Atlas
+  try {
+    await fetch('/api/leaderboard/start-lab', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, labNumber, timestamp })
+    });
+  } catch (error) {
+    console.warn('Failed to sync lab start to Atlas:', error);
+  }
 }
 
 /**
  * Send heartbeat to update lastActive timestamp and track lab time
  */
-export function heartbeat(email: string, labNumber?: number): void {
+export async function heartbeat(email: string, labNumber?: number): Promise<void> {
   if (!email) return;
-  
+
   const entry = getOrCreateEntry(email);
   const updates: Partial<LeaderboardEntry> = {
     lastActive: Date.now()
   };
-  
+
   // If labNumber is provided, update the lab time
   if (labNumber !== undefined) {
     try {
@@ -186,34 +223,76 @@ export function heartbeat(email: string, labNumber?: number): void {
       console.error('Failed to update lab time:', error);
     }
   }
-  
+
   updateEntry(email, updates);
+
+  // Sync to Atlas
+  try {
+    await fetch('/api/leaderboard/heartbeat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, labNumber })
+    });
+  } catch (error) {
+    // Suppress heartbeat errors to avoid spamming console
+  }
+}
+
+/**
+ * Sync the entire leaderboard from Atlas
+ */
+export async function syncLeaderboard(): Promise<void> {
+  try {
+    const response = await fetch('/api/leaderboard');
+    const data = await response.json();
+    if (data.entries) {
+      saveLeaderboardEntries(data.entries);
+    }
+  } catch (error) {
+    console.warn('Failed to sync leaderboard from Atlas:', error);
+  }
 }
 
 /**
  * Track when a user reveals a hint
  */
-export function trackHintUsage(email: string, hintPenalty: number): void {
+export async function trackHintUsage(email: string, hintPenalty: number): Promise<void> {
   if (!email) return;
-  
+
   const entry = getOrCreateEntry(email);
+  const newHintsUsed = (entry.hintsUsed || 0) + 1;
+  const newScore = Math.max(0, entry.score - hintPenalty);
+
   updateEntry(email, {
-    hintsUsed: (entry.hintsUsed || 0) + 1,
-    score: Math.max(0, entry.score - hintPenalty)
+    hintsUsed: newHintsUsed,
+    score: newScore
   });
+
+  // Sync to Atlas (using general update for fields not having specific endpoints)
+  // Actually, we can use the score update if we want, or just let heartbeat/other calls eventually sync.
+  // But for immediate consistency, let's just make a heartbeat call that includes the state.
+  // Or better, let's assume we want a generic update endpoint eventually.
+  // For now, these fields will be synced via the next specific endpoint call or we add one.
+  // Let's just update the score via addPoints with negative points if we want it immediate.
+  await addPoints(email, -hintPenalty, 0, 'hint-usage');
 }
 
 /**
  * Track when a user reveals a solution early
  */
-export function trackSolutionReveal(email: string, solutionPenalty: number = 5): void {
+export async function trackSolutionReveal(email: string, solutionPenalty: number = 5): Promise<void> {
   if (!email) return;
-  
+
   const entry = getOrCreateEntry(email);
+  const newSolutionsRevealed = (entry.solutionsRevealed || 0) + 1;
+  const newScore = Math.max(0, entry.score - solutionPenalty);
+
   updateEntry(email, {
-    solutionsRevealed: (entry.solutionsRevealed || 0) + 1,
-    score: Math.max(0, entry.score - solutionPenalty)
+    solutionsRevealed: newSolutionsRevealed,
+    score: newScore
   });
+
+  await addPoints(email, -solutionPenalty, 0, 'solution-reveal');
 }
 
 /**

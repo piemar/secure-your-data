@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Trophy, Clock, Award, Users, TrendingUp, Medal } from 'lucide-react';
 import { useLab } from '@/context/LabContext';
-import { getSortedLeaderboard, heartbeat, type LeaderboardEntry } from '@/utils/leaderboardUtils';
+import { getSortedLeaderboard, heartbeat, syncLeaderboard, type LeaderboardEntry } from '@/utils/leaderboardUtils';
 
 export function Leaderboard() {
   const { userEmail } = useLab();
@@ -10,7 +10,8 @@ export function Leaderboard() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const updateLeaderboard = () => {
+    const updateLeaderboard = async () => {
+      await syncLeaderboard();
       const entries = getSortedLeaderboard();
       setLeaderboard(entries);
       setLoading(false);
@@ -24,13 +25,13 @@ export function Leaderboard() {
       heartbeat(userEmail);
     }
 
-    // Refresh every 2 seconds
-    const interval = setInterval(() => {
-      updateLeaderboard();
+    // Refresh every 5 seconds for Atlas sync
+    const interval = setInterval(async () => {
+      await updateLeaderboard();
       if (userEmail) {
-        heartbeat(userEmail);
+        await heartbeat(userEmail);
       }
-    }, 2000);
+    }, 5000);
 
     // Also listen for storage changes (in case another tab updates the leaderboard)
     const handleStorageChange = (e: StorageEvent) => {
@@ -136,17 +137,16 @@ export function Leaderboard() {
                 {sortedLeaderboard.map((entry, index) => {
                   const isCurrentUser = entry.email === userEmail;
                   const totalTime = getTotalTime(entry);
-                  
+
                   return (
                     <div
                       key={entry.email}
-                      className={`p-4 rounded-lg border transition-all ${
-                        isCurrentUser
+                      className={`p-4 rounded-lg border transition-all ${isCurrentUser
                           ? 'border-primary bg-primary/10 shadow-lg'
                           : index < 3
-                          ? 'border-border bg-card'
-                          : 'border-border bg-card/50'
-                      }`}
+                            ? 'border-border bg-card'
+                            : 'border-border bg-card/50'
+                        }`}
                     >
                       <div className="flex items-center gap-4">
                         <div className="w-12 flex items-center justify-center">
@@ -154,7 +154,7 @@ export function Leaderboard() {
                             <span className="text-lg font-bold text-muted-foreground">#{index + 1}</span>
                           )}
                         </div>
-                        
+
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <p className={`font-semibold ${isCurrentUser ? 'text-primary' : ''}`}>
@@ -185,19 +185,18 @@ export function Leaderboard() {
                           {[1, 2, 3].map((labNum) => (
                             <div
                               key={labNum}
-                              className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                                entry.completedLabs.includes(labNum)
+                              className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${entry.completedLabs.includes(labNum)
                                   ? 'bg-green-500 text-white'
                                   : entry.labTimes?.[labNum]
-                                  ? 'bg-yellow-500 text-white'
-                                  : 'bg-muted text-muted-foreground'
-                              }`}
+                                    ? 'bg-yellow-500 text-white'
+                                    : 'bg-muted text-muted-foreground'
+                                }`}
                               title={
                                 entry.completedLabs.includes(labNum)
                                   ? `Lab ${labNum} completed`
                                   : entry.labTimes?.[labNum]
-                                  ? `Lab ${labNum} in progress (${formatTime(entry.labTimes[labNum])})`
-                                  : `Lab ${labNum} not started`
+                                    ? `Lab ${labNum} in progress (${formatTime(entry.labTimes[labNum])})`
+                                    : `Lab ${labNum} not started`
                               }
                             >
                               {labNum}

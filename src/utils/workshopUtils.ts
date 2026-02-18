@@ -41,11 +41,18 @@ export function getWorkshopSession(): WorkshopSession | null {
 }
 
 /**
- * Save workshop session to localStorage
+ * Save workshop session to localStorage and sync to Atlas
  */
-function saveWorkshopSession(session: WorkshopSession): void {
+async function saveWorkshopSession(session: WorkshopSession): Promise<void> {
   try {
     localStorage.setItem(WORKSHOP_SESSION_KEY, JSON.stringify(session));
+
+    // Sync to Atlas backend
+    await fetch('/api/workshop-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(session)
+    });
   } catch (error) {
     console.error('Failed to save workshop session:', error);
   }
@@ -63,9 +70,9 @@ export function areLabsEnabled(): boolean {
 /**
  * Enable or disable labs for the current workshop
  */
-export function setLabsEnabled(enabled: boolean): void {
+export async function setLabsEnabled(enabled: boolean): Promise<void> {
   let session = getWorkshopSession();
-  
+
   if (!session) {
     // Create a default session if none exists
     session = {
@@ -79,21 +86,21 @@ export function setLabsEnabled(enabled: boolean): void {
   } else {
     session.labsEnabled = enabled;
   }
-  
-  saveWorkshopSession(session);
+
+  await saveWorkshopSession(session);
 }
 
 /**
  * Start a new workshop session
  * This archives the current leaderboard and creates a fresh session
  */
-export function startNewWorkshop(customerName: string, workshopDate: string): WorkshopSession {
+export async function startNewWorkshop(customerName: string, workshopDate: string): Promise<WorkshopSession> {
   const currentSession = getWorkshopSession();
   const currentLeaderboard = getLeaderboardEntries();
-  
+
   // Archive current session data if it exists
   const archivedLeaderboards: ArchivedLeaderboard[] = currentSession?.archivedLeaderboards || [];
-  
+
   if (currentSession && currentLeaderboard.length > 0) {
     archivedLeaderboards.push({
       sessionId: currentSession.id,
@@ -102,10 +109,10 @@ export function startNewWorkshop(customerName: string, workshopDate: string): Wo
       entries: currentLeaderboard
     });
   }
-  
-  // Clear current leaderboard
+
+  // Clear current leaderboard locally (will be cleared on Atlas too on next sync)
   localStorage.setItem(LEADERBOARD_KEY, JSON.stringify([]));
-  
+
   // Create new session
   const newSession: WorkshopSession = {
     id: generateSessionId(),
@@ -115,8 +122,8 @@ export function startNewWorkshop(customerName: string, workshopDate: string): Wo
     labsEnabled: true, // Enable labs when starting a new workshop
     archivedLeaderboards
   };
-  
-  saveWorkshopSession(newSession);
+
+  await saveWorkshopSession(newSession);
   return newSession;
 }
 
@@ -125,6 +132,7 @@ export function startNewWorkshop(customerName: string, workshopDate: string): Wo
  */
 export function resetLeaderboard(): void {
   localStorage.setItem(LEADERBOARD_KEY, JSON.stringify([]));
+  // Note: Atlas leaderboard reset handled via sync or direct leaderboardUtils
 }
 
 /**
@@ -145,12 +153,29 @@ export function getParticipantCount(): number {
 /**
  * Update the current workshop session details
  */
-export function updateWorkshopSession(updates: Partial<Pick<WorkshopSession, 'customerName' | 'workshopDate'>>): void {
+export async function updateWorkshopSession(updates: Partial<Pick<WorkshopSession, 'customerName' | 'workshopDate'>>): Promise<void> {
   const session = getWorkshopSession();
   if (session) {
-    saveWorkshopSession({
+    await saveWorkshopSession({
       ...session,
       ...updates
     });
+  }
+}
+
+/**
+ * Sync workshop session from Atlas backend
+ */
+export async function syncWorkshopSession(): Promise<void> {
+  try {
+    const response = await fetch('/api/workshop-session');
+    const data = await response.json();
+    if (data.session) {
+      // Merge logic: in a real app we'd compare startedAt or IDs
+      // For the lab, Atlas is the source of truth for the session
+      localStorage.setItem(WORKSHOP_SESSION_KEY, JSON.stringify(data.session));
+    }
+  } catch (error) {
+    console.warn('Background workshop sync failed:', error);
   }
 }

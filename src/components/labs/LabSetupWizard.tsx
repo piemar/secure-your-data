@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { ArchitectureDiagram } from '@/components/workshop/ArchitectureDiagram';
 import { LabEnvironmentDiagram } from './LabEnvironmentDiagram';
 import { PrerequisitesChecklist } from './PrerequisitesChecklist';
+import { setLabsEnabled } from '@/utils/workshopUtils';
 
 type SetupPhase = 'onboarding' | 'ready';
 
@@ -166,6 +167,8 @@ export const LabSetupWizard: React.FC = () => {
             keyArn: '',
             region: 'eu-central-1'
         });
+        setLabsEnabled(true);
+
         setPhase('ready');
         toast.success("Environment Activated! Ready for Lab 1.");
     };
@@ -230,7 +233,7 @@ export const LabSetupWizard: React.FC = () => {
 
             <CardContent className="space-y-4 px-6">
                 {/* Prerequisites Overview Checklist */}
-                <PrerequisitesChecklist 
+                <PrerequisitesChecklist
                     prerequisites={PREREQUISITES}
                     verifiedTools={verifiedTools}
                 />
@@ -273,8 +276,8 @@ export const LabSetupWizard: React.FC = () => {
                                         isVerified
                                             ? "bg-green-500/10 text-green-600 border-green-500/30"
                                             : prereqResults[prereq.id]
-                                            ? "bg-red-500/10 text-red-600 border-red-500/30"
-                                            : "bg-muted text-muted-foreground border-border"
+                                                ? "bg-red-500/10 text-red-600 border-red-500/30"
+                                                : "bg-muted text-muted-foreground border-border"
                                     )}
                                 >
                                     {isVerified ? (
@@ -304,8 +307,8 @@ export const LabSetupWizard: React.FC = () => {
                                     {PREREQUISITES.filter(p => !prereqResults[p.id]?.verified).map((prereq) => (
                                         <div key={prereq.id} className={cn(
                                             "p-3 rounded-lg border",
-                                            prereq.required 
-                                                ? "bg-red-500/5 border-red-500/20" 
+                                            prereq.required
+                                                ? "bg-red-500/5 border-red-500/20"
                                                 : "bg-amber-500/5 border-amber-500/20"
                                         )}>
                                             <div className="flex items-center justify-between mb-2">
@@ -353,7 +356,7 @@ export const LabSetupWizard: React.FC = () => {
                                             )}
                                         </div>
                                     ))}
-                                    
+
                                     {/* Continue anyway option */}
                                     {!requiredVerified && (
                                         <div className="mt-4 p-3 rounded-lg bg-muted/50 border border-dashed border-border">
