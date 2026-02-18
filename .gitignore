@@ -23,3 +23,16 @@ dist-ssr
 *.sln
 *.sw?
 scripts/venv/*
+
+# Lab runner scripts (attendees create these locally; do not commit)
+createKey.cjs
+testCSFLE.cjs
+createDeks.cjs
+createQECollection.cjs
+createQECollection.Cjs
+insertQEData.cjs
+queryQERange.cjs
+
+# IDE / AI tooling (local or generated)
+.lovable
+.agent
