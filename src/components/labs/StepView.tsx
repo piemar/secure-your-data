@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2, Info, BookOpen, Clock, Lock, Eye, Unlock } from 'lucide-react';
+import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2, Info, BookOpen, Clock, Lock, Eye, Unlock, XCircle } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -67,6 +67,15 @@ interface StepViewProps {
   labDescription: string;
   businessValue?: string;
   atlasCapability?: string;
+  /** Shared output (from parent) – when set, output is common across steps and persists on refresh */
+  lastOutput?: string;
+  outputSummary?: string;
+  outputSuccess?: boolean;
+  outputOpen?: boolean;
+  outputStepIndex?: number | null;
+  stepsCount?: number;
+  onOutputChange?: (result: { output: string; summary: string; success: boolean }, stepIndex: number) => void;
+  onOutputOpenChange?: (open: boolean) => void;
 }
 
 // Generate realistic MongoDB output based on code content with structured formatting
@@ -470,6 +479,8 @@ ${result.success ? `
   };
 }
 
+const LAB_STEP_STATE_KEY = (labNum: number) => `lab${labNum}-step-state`;
+
 export function StepView({
   steps,
   currentStepIndex,
@@ -481,21 +492,73 @@ export function StepView({
   labDescription,
   businessValue,
   atlasCapability,
+  lastOutput: parentLastOutput,
+  outputSummary: parentOutputSummary,
+  outputSuccess: parentOutputSuccess,
+  outputOpen: parentOutputOpen,
+  outputStepIndex: parentOutputStepIndex,
+  stepsCount = 0,
+  onOutputChange,
+  onOutputOpenChange,
 }: StepViewProps) {
   const { completeStep } = useLab();
   const [activeTab, setActiveTab] = useState<string>('code');
-  const [outputOpen, setOutputOpen] = useState(false);
-  const [lastOutput, setLastOutput] = useState<string>('');
-  const [outputSummary, setOutputSummary] = useState<string>('');
-  const [outputSuccess, setOutputSuccess] = useState<boolean>(true);
+  const [localOutputOpen, setLocalOutputOpen] = useState(false);
+  const [localLastOutput, setLocalLastOutput] = useState<string>('');
+  const [localOutputSummary, setLocalOutputSummary] = useState<string>('');
+  const [localOutputSuccess, setLocalOutputSuccess] = useState<boolean>(true);
   const [isRunning, setIsRunning] = useState(false);
   const [copied, setCopied] = useState(false);
   const [direction, setDirection] = useState(0);
 
-  // Challenge Mode State
-  const [showSolution, setShowSolution] = useState<Record<string, boolean>>({});
-  const [revealedHints, setRevealedHints] = useState<Record<string, number[]>>({});
-  const [revealedAnswers, setRevealedAnswers] = useState<Record<string, number[]>>({});
+  const useSharedOutput = onOutputChange != null && onOutputOpenChange != null;
+  const lastOutput = useSharedOutput ? (parentLastOutput ?? '') : localLastOutput;
+  const outputSummary = useSharedOutput ? (parentOutputSummary ?? '') : localOutputSummary;
+  const outputSuccess = useSharedOutput ? (parentOutputSuccess !== false) : localOutputSuccess;
+  const outputOpen = useSharedOutput ? (parentOutputOpen ?? false) : localOutputOpen;
+  const outputStepIndex = useSharedOutput ? (parentOutputStepIndex ?? null) : null;
+  const setOutputOpen = useSharedOutput ? (v: boolean) => onOutputOpenChange?.(v) : setLocalOutputOpen;
+  const setOutput = useSharedOutput
+    ? (result: { output: string; summary: string; success: boolean }) => { /* parent handles via onOutputChange */ }
+    : (result: { output: string; summary: string; success: boolean }) => {
+        setLocalLastOutput(result.output);
+        setLocalOutputSummary(result.summary);
+        setLocalOutputSuccess(result.success);
+        setLocalOutputOpen(true);
+      };
+
+  // Challenge Mode State – persisted per lab so hints/solutions survive refresh
+  const stepStateKey = LAB_STEP_STATE_KEY(labNumber);
+  const [showSolution, setShowSolution] = useState<Record<string, boolean>>(() => {
+    try {
+      const raw = localStorage.getItem(stepStateKey);
+      if (raw) {
+        const o = JSON.parse(raw);
+        return o?.showSolution ?? {};
+      }
+    } catch { /* ignore */ }
+    return {};
+  });
+  const [revealedHints, setRevealedHints] = useState<Record<string, number[]>>(() => {
+    try {
+      const raw = localStorage.getItem(stepStateKey);
+      if (raw) {
+        const o = JSON.parse(raw);
+        return o?.revealedHints ?? {};
+      }
+    } catch { /* ignore */ }
+    return {};
+  });
+  const [revealedAnswers, setRevealedAnswers] = useState<Record<string, number[]>>(() => {
+    try {
+      const raw = localStorage.getItem(stepStateKey);
+      if (raw) {
+        const o = JSON.parse(raw);
+        return o?.revealedAnswers ?? {};
+      }
+    } catch { /* ignore */ }
+    return {};
+  });
   const [alwaysShowSolutions, setAlwaysShowSolutions] = useState<boolean>(() => {
     const saved = localStorage.getItem('workshop_always_show_solutions');
     return saved === 'true';
@@ -503,6 +566,19 @@ export function StepView({
   const [pointsDeducted, setPointsDeducted] = useState<Record<string, number>>({});
   const [skeletonTier, setSkeletonTier] = useState<Record<string, SkeletonTier>>({});
   const [lineHeight, setLineHeight] = useState(19); // Monaco default line height
+
+  // Per-step verification result: true = passed, false = failed, undefined = not run yet. Used to enable Continue and show red step indicator.
+  const [verificationResultByStep, setVerificationResultByStep] = useState<Record<number, boolean>>({});
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(stepStateKey, JSON.stringify({
+        showSolution,
+        revealedHints,
+        revealedAnswers,
+      }));
+    } catch { /* ignore */ }
+  }, [stepStateKey, showSolution, revealedHints, revealedAnswers]);
 
   // Helper functions for tiered scoring
   const getMaxPoints = (tier: SkeletonTier): number => {
@@ -633,16 +709,14 @@ export function StepView({
     setTimeout(() => setCopied(false), 2000);
   }, [currentStep.codeBlocks, currentStepIndex, alwaysShowSolutions, showSolution, skeletonTier]);
 
-  const handleCheckProgress = async () => {
+  const handleCheckProgress = async (): Promise<{ success: boolean }> => {
     setIsRunning(true);
     const code = currentStep.codeBlocks?.[0]?.code || '';
 
-    // Execution delay (real OR simulated)
     await new Promise(r => setTimeout(r, 1000 + Math.random() * 800));
 
     let result;
     if (currentStep.onVerify) {
-      // Execute REAL backend verification
       try {
         const verifyResult = await currentStep.onVerify();
         result = formatRichValidationOutput(verifyResult, currentStep.title);
@@ -654,24 +728,28 @@ export function StepView({
         };
       }
     } else {
-      // Fallback to simulation
       result = generateSimulatedOutput(code, currentStep.title);
     }
 
-    setLastOutput(result.output);
-    setOutputSummary(result.summary);
-    setOutputSuccess(result.success);
-    setOutputOpen(true);
+    if (useSharedOutput && onOutputChange) {
+      onOutputChange({ output: result.output, summary: result.summary, success: result.success }, currentStepIndex);
+    } else {
+      setOutput({ output: result.output, summary: result.summary, success: result.success });
+    }
     setIsRunning(false);
 
-    // Award points on success
     if (result.success) {
       const blockKey = `${currentStepIndex}-0`;
       const hasSkeleton = currentStep.codeBlocks?.[0] ? hasAnySkeleton(currentStep.codeBlocks[0]) : false;
       const assisted = hasSkeleton && (showSolution[blockKey] || revealedHints[blockKey]?.length > 0 || revealedAnswers[blockKey]?.length > 0);
       completeStep(currentStep.id, !!assisted);
     }
+    setVerificationResultByStep(prev => ({ ...prev, [currentStepIndex]: result.success }));
+    return { success: result.success };
   };
+
+  const canContinue = !currentStep.codeBlocks?.length || verificationResultByStep[currentStepIndex] === true;
+  const isLastStep = currentStepIndex === steps.length - 1;
 
   const handleNextStep = () => {
     const isLastStep = currentStepIndex === steps.length - 1;
@@ -686,10 +764,7 @@ export function StepView({
       setDirection(1);
       onStepChange(currentStepIndex + 1);
     }
-    // When clicking "Complete Lab" on last step, always ensure parent has this step recorded (idempotent)
-    if (isLastStep) {
-      onComplete(currentStepIndex);
-    }
+    if (isLastStep) onComplete(currentStepIndex);
   };
 
   const handlePrevStep = () => {
@@ -780,7 +855,7 @@ export function StepView({
               ) : (
                 <CheckCircle2 className="w-3 h-3" />
               )}
-              <span className="hidden xs:inline">{isRunning ? 'Checking...' : 'Check'}</span>
+              <span className="hidden xs:inline">{isRunning ? 'Verifying...' : 'Verify only'}</span>
             </Button>
             <TooltipProvider>
               <Tooltip>
@@ -982,6 +1057,11 @@ export function StepView({
                     {outputOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                     <Terminal className="w-4 h-4 text-primary" />
                     <span>Output</span>
+                    {outputStepIndex != null && stepsCount > 0 && (
+                      <span className="text-xs text-muted-foreground ml-1">
+                        (from Step {outputStepIndex + 1})
+                      </span>
+                    )}
                     {outputSummary && (
                       <span className={cn(
                         "ml-2 px-2 py-0.5 rounded text-xs font-medium",
@@ -1000,7 +1080,7 @@ export function StepView({
                   </button>
                   <div className="flex-1 overflow-auto px-6 py-4 bg-[hsl(220,20%,6%)]">
                     <pre className="font-mono text-sm text-primary whitespace-pre-wrap leading-relaxed">
-                      {lastOutput || '// Run "Check My Progress" to see output'}
+                      {lastOutput || '// Click "Verify only" or "Verify & continue" to see output'}
                     </pre>
                   </div>
                 </div>
@@ -1037,14 +1117,20 @@ export function StepView({
                     className={cn(
                       'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all',
                       index === currentStepIndex
-                        ? 'bg-primary text-primary-foreground ring-2 ring-primary/30'
+                        ? verificationResultByStep[index] === false
+                          ? 'bg-red-500/20 text-red-500 ring-2 ring-red-500/50'
+                          : 'bg-primary text-primary-foreground ring-2 ring-primary/30'
                         : completedSteps.includes(index)
                           ? 'bg-primary/20 text-primary'
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          : verificationResultByStep[index] === false
+                            ? 'bg-red-500/20 text-red-500'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
                     )}
                   >
                     {completedSteps.includes(index) ? (
                       <CheckCircle2 className="w-4 h-4" />
+                    ) : verificationResultByStep[index] === false ? (
+                      <XCircle className="w-4 h-4" />
                     ) : (
                       index + 1
                     )}
@@ -1082,18 +1168,38 @@ export function StepView({
             Previous
           </Button>
           <Button
+            variant="outline"
             size="sm"
-            onClick={handleNextStep}
+            onClick={handleCheckProgress}
+            disabled={isRunning || !currentStep.codeBlocks?.length}
             className="gap-1"
           >
-            {currentStepIndex === steps.length - 1 ? (
+            {isRunning ? (
               <>
-                <CheckCircle2 className="w-4 h-4" />
-                Complete Lab
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Verifying...
               </>
             ) : (
               <>
-                Next Step
+                <CheckCircle2 className="w-4 h-4" />
+                Verify
+              </>
+            )}
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleNextStep}
+            disabled={!canContinue}
+            className="gap-1"
+          >
+            {isLastStep ? (
+              <>
+                <CheckCircle2 className="w-4 h-4" />
+                Complete lab
+              </>
+            ) : (
+              <>
+                Continue
                 <ChevronRight className="w-4 h-4" />
               </>
             )}

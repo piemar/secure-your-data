@@ -34,8 +34,20 @@ interface LabContextType extends LabState {
 
 const LabContext = createContext<LabContextType | undefined>(undefined);
 
+const MONGO_URI_STORAGE_KEY = 'lab_mongo_uri';
+
 export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [mongoUri, setMongoUri] = useState('');
+    const [mongoUri, setMongoUriState] = useState(() => {
+        if (typeof localStorage === 'undefined') return '';
+        return localStorage.getItem(MONGO_URI_STORAGE_KEY) || '';
+    });
+    const setMongoUri = useCallback((uri: string) => {
+        setMongoUriState(uri);
+        try {
+            if (uri) localStorage.setItem(MONGO_URI_STORAGE_KEY, uri);
+            else localStorage.removeItem(MONGO_URI_STORAGE_KEY);
+        } catch { /* ignore */ }
+    }, []);
     const [awsCreds, setAwsCreds] = useState({
         awsAccessKeyId: '',
         awsSecretAccessKey: '',

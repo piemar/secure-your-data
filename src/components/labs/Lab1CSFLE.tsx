@@ -780,6 +780,7 @@ db.getCollection("__keyVault").________________()`,
         description: 'Create and run a Node.js test script that demonstrates the difference between encrypted and non-encrypted connections. This proves that CSFLE is working by showing ciphertext vs plaintext side-by-side.',
         tips: [
           'RUN WITH NODE.JS: This is a Node.js script, NOT mongosh. Run it with: node testCSFLE.cjs',
+          'SAME URI: Use the same MongoDB URI in testCSFLE.cjs as in Lab Setup. Verification checks the cluster from Lab Setup.',
           'DEMO POWER: This side-by-side comparison is your most powerful SA tool for showing CSFLE in action.',
           'ARCHITECTURE: The encrypted client automatically encrypts on write and decrypts on read.',
           'BEST PRACTICE: Use keyAltNames instead of keyId for better maintainability and key rotation support.'

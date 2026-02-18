@@ -71,9 +71,12 @@ export const LabSetupWizard: React.FC = () => {
         }
     }, [attendeeName, setVerifiedTool]);
 
-    // Sync local verify state from context on mount
+    // Sync local URI and phase when context has saved URI (e.g. after reload)
     useEffect(() => {
-        if (mongoUri) setPhase('ready');
+        if (mongoUri) {
+            setLocalUri(mongoUri);
+            setPhase('ready');
+        }
     }, [mongoUri]);
 
     const copyToClipboard = async (text: string, id: string) => {

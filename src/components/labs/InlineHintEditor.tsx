@@ -112,8 +112,11 @@ export function InlineHintEditor({
         const lineIndex = hint.line - 1;
         if (lineIndex >= 0 && lineIndex < lines.length) {
           const lineText = lines[lineIndex];
-          // Replace the blank pattern with the answer
-          lines[lineIndex] = lineText.replace(/_{5,}/, hint.answer);
+          // Prefer exact blankText match (so short blanks like "___" get replaced)
+          const replaced = hint.blankText && lineText.includes(hint.blankText)
+            ? lineText.replace(hint.blankText, hint.answer)
+            : lineText.replace(/_{5,}/, hint.answer);
+          lines[lineIndex] = replaced;
         }
       }
     });

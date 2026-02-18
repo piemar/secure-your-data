@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
-import { exec } from "child_process";
+import { exec, execSync } from "child_process";
 import { writeFileSync, readFileSync, existsSync, statSync } from "fs";
 import { MongoClient } from "mongodb";
 
@@ -250,8 +250,6 @@ export default defineConfig(({ mode }) => ({
 
             // Special handler for mongoCryptShared - search for the library on disk
             if (tool === 'mongoCryptShared') {
-              const { execSync } = require('child_process');
-              const fs = require('fs');
               const searchPaths = [
                 '/usr/local/lib/mongo_crypt_v1.dylib',
                 '/usr/lib/mongo_crypt_v1.so',
@@ -262,7 +260,7 @@ export default defineConfig(({ mode }) => ({
               ];
               let foundPath = '';
               for (const p of searchPaths) {
-                if (fs.existsSync(p)) { foundPath = p; break; }
+                if (existsSync(p)) { foundPath = p; break; }
               }
               if (!foundPath) {
                 // Try a broader find in home directory (limit depth for speed)
@@ -900,42 +898,40 @@ export default defineConfig(({ mode }) => ({
               return;
             }
 
-            // Escape URI for safe use inside double-quoted shell string
-            const safeUri = mongoUri.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-
-            // Command to check if the field exists and is of type 5 (Binary) in any document
-            const script = `
-              var db = db.getSiblingDB("${dbName}");
-              var sample = db.getCollection("${collName}").findOne({ "${field}": { "$type": 5 } });
-              print(sample !== null);
-            `;
-
-            const cmd = `mongosh "${safeUri}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
-
-            exec(cmd, (error: any, stdout: any, stderr: any) => {
-              if (error) {
-                const errMsg = (stderr || stdout || error.message || '').toString().trim();
-                const hint = errMsg.toLowerCase().includes('command not found') || errMsg.toLowerCase().includes('mongosh')
-                  ? ' Ensure mongosh is installed and in PATH on the machine running the dev server.'
-                  : errMsg.toLowerCase().includes('authentication') || errMsg.toLowerCase().includes('connection')
+            // Use MongoDB Node driver (same as testCSFLE.cjs) so verification matches how data is stored
+            (async () => {
+              let client: MongoClient | null = null;
+              try {
+                client = new MongoClient(mongoUri);
+                await client.connect();
+                const coll = client.db(dbName).collection(collName);
+                // BSON type 5 = Binary (BinData). CSFLE stores encrypted fields as Binary.
+                const doc = await coll.findOne({ [field]: { $type: 5 } });
+                const isVerified = doc !== null;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({
+                  success: isVerified,
+                  message: isVerified
+                    ? `Verified: Field "${field}" in ${dbName}.${collName} is encrypted (stored as Binary).`
+                    : `Verification Failed: No document in ${dbName}.${collName} has "${field}" stored as encrypted (Binary).\n\n` +
+                      `• Use the same MongoDB URI in testCSFLE.cjs as in Lab Setup (verification checks the cluster you configured there).\n` +
+                      `• Run \`node testCSFLE.cjs\` from the project root and ensure it completes without errors. You should see "Inserted Bob Smith with CSFLE" and the "PROOF" section.\n` +
+                      `• If the script uses a different URI than Lab Setup, update the script to use your Lab Setup URI and run it again.`
+                }));
+              } catch (err: any) {
+                const errMsg = err?.message || String(err);
+                const hint = errMsg.toLowerCase().includes('authentication') || errMsg.toLowerCase().includes('connection') || errMsg.toLowerCase().includes('mongo')
                   ? ' Check your Atlas URI and network access.'
                   : '';
                 res.setHeader('Content-Type', 'application/json');
                 res.end(JSON.stringify({
                   success: false,
-                  message: `Verification failed: ${errMsg || error.message}${hint}`
+                  message: `Verification failed: ${errMsg}${hint}`
                 }));
-                return;
+              } finally {
+                if (client) await client.close().catch(() => {});
               }
-              const isVerified = (stdout || '').trim() === 'true';
-              res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({
-                success: isVerified,
-                message: isVerified
-                  ? `Verified: Field "${field}" in ${dbName}.${collName} is encrypted (stored as Binary).`
-                  : `Verification Failed: No document in ${dbName}.${collName} has "${field}" stored as encrypted (Binary). Run \`node testCSFLE.cjs\` to completion and ensure the CSFLE insert (e.g. Bob Smith) succeeded, then verify again.`
-              }));
-            });
+            })();
             return;
           }
 

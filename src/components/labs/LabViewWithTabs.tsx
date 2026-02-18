@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LabIntroTab } from './LabIntroTab';
 import { StepView } from './StepView';
@@ -79,14 +79,34 @@ export function LabViewWithTabs({
 }: LabViewWithTabsProps) {
   const { startLab, completeLab, userEmail } = useLab();
   const storageKey = `lab${labNumber}-progress`;
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  
+  const stepIndexKey = `lab${labNumber}-currentStep`;
+  const outputByStepKey = `lab${labNumber}-output-by-step`;
+
+  const [currentStepIndex, setCurrentStepIndex] = useState(() => {
+    const saved = localStorage.getItem(stepIndexKey);
+    const n = saved ? parseInt(saved, 10) : 0;
+    return Number.isFinite(n) ? n : 0;
+  });
+
   const [activeTab, setActiveTab] = useState<string>('overview');
 
   const [completedSteps, setCompletedSteps] = useState<number[]>(() => {
     const saved = localStorage.getItem(storageKey);
     return saved ? JSON.parse(saved) : [];
   });
+
+  // Output per step: each step keeps its own verification output (persists on refresh)
+  const [outputByStep, setOutputByStep] = useState<Record<number, { output: string; summary: string; success: boolean }>>(() => {
+    try {
+      const raw = localStorage.getItem(outputByStepKey);
+      if (raw) {
+        const o = JSON.parse(raw);
+        return o && typeof o === 'object' ? o : {};
+      }
+    } catch { /* ignore */ }
+    return {};
+  });
+  const [outputOpen, setOutputOpen] = useState<boolean>(false);
 
   const prevCompletedCountRef = useRef<number | undefined>(undefined);
 
@@ -118,11 +138,30 @@ export function LabViewWithTabs({
     }
   }, [completedSteps, storageKey, steps.length, labNumber, completeLab]);
 
+  useEffect(() => {
+    localStorage.setItem(stepIndexKey, String(currentStepIndex));
+  }, [currentStepIndex, stepIndexKey]);
+
   const handleStepComplete = (stepIndex: number) => {
     setCompletedSteps((prev) =>
       prev.includes(stepIndex) ? prev : [...prev, stepIndex]
     );
   };
+
+  const handleOutputChange = useCallback((result: { output: string; summary: string; success: boolean }, stepIndex: number) => {
+    setOutputByStep(prev => {
+      const next = { ...prev, [stepIndex]: result };
+      try {
+        localStorage.setItem(outputByStepKey, JSON.stringify(next));
+      } catch { /* ignore */ }
+      return next;
+    });
+    setOutputOpen(true);
+  }, [outputByStepKey]);
+
+  const handleOutputOpenChange = useCallback((open: boolean) => {
+    setOutputOpen(open);
+  }, []);
 
   const handleStartLab = () => {
     setActiveTab('steps');
@@ -226,6 +265,14 @@ export function LabViewWithTabs({
             labDescription={description}
             businessValue={businessValue}
             atlasCapability={atlasCapability}
+            lastOutput={outputByStep[currentStepIndex]?.output ?? ''}
+            outputSummary={outputByStep[currentStepIndex]?.summary ?? ''}
+            outputSuccess={outputByStep[currentStepIndex]?.success !== false}
+            outputOpen={outputOpen}
+            outputStepIndex={currentStepIndex}
+            stepsCount={steps.length}
+            onOutputChange={handleOutputChange}
+            onOutputOpenChange={handleOutputOpenChange}
           />
         </TabsContent>
 
