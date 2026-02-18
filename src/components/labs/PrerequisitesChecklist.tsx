@@ -23,9 +23,9 @@ const STORAGE_KEY = 'workshop_prereq_checklist';
 
 // Extended prerequisites with setup instructions
 const EXTENDED_PREREQUISITES: Prerequisite[] = [
-  { 
-    id: 'atlas', 
-    label: 'MongoDB Atlas Cluster (M10+)', 
+  {
+    id: 'atlas',
+    label: 'MongoDB Atlas Cluster (M10+)',
     description: 'A running MongoDB Atlas cluster with M10 tier or higher for encryption support',
     required: true,
     downloadUrl: 'https://cloud.mongodb.com/',
@@ -39,9 +39,9 @@ const EXTENDED_PREREQUISITES: Prerequisite[] = [
       '7. Copy your connection string from "Connect" → "Drivers"'
     ]
   },
-  { 
-    id: 'node', 
-    label: 'Node.js v18+', 
+  {
+    id: 'node',
+    label: 'Node.js v18+',
     description: 'JavaScript runtime for running lab scripts',
     required: true,
     downloadUrl: 'https://nodejs.org/',
@@ -52,9 +52,9 @@ const EXTENDED_PREREQUISITES: Prerequisite[] = [
       'Verify: node --version'
     ]
   },
-  { 
-    id: 'npm', 
-    label: 'npm', 
+  {
+    id: 'npm',
+    label: 'npm',
     description: 'Package manager (included with Node.js)',
     required: true,
     setupInstructions: [
@@ -62,9 +62,9 @@ const EXTENDED_PREREQUISITES: Prerequisite[] = [
       'Verify: npm --version'
     ]
   },
-  { 
-    id: 'awsCli', 
-    label: 'AWS CLI v2 + SSO', 
+  {
+    id: 'awsCli',
+    label: 'AWS CLI v2 + SSO',
     description: 'AWS Command Line Interface with SSO configured for KMS operations',
     required: true,
     downloadUrl: 'https://aws.amazon.com/cli/',
@@ -91,9 +91,9 @@ const EXTENDED_PREREQUISITES: Prerequisite[] = [
       '# Should show your account ID and role'
     ]
   },
-  { 
-    id: 'mongosh', 
-    label: 'mongosh', 
+  {
+    id: 'mongosh',
+    label: 'mongosh',
     description: 'MongoDB Shell for database operations',
     required: true,
     downloadUrl: 'https://www.mongodb.com/try/download/shell',
@@ -101,12 +101,15 @@ const EXTENDED_PREREQUISITES: Prerequisite[] = [
       'macOS: brew install mongosh',
       'Windows: Download from mongodb.com/try/download/shell',
       'Linux: See mongodb.com for package instructions',
-      'Verify: mongosh --version'
+      'Verify: mongosh --version',
+      '',
+      '── Multiline Tip ──',
+      'Use the ".editor" command to paste multiline scripts without syntax errors. Press Ctrl+D to execute.'
     ]
   },
-  { 
-    id: 'mongoCryptShared', 
-    label: 'mongo_crypt_shared', 
+  {
+    id: 'mongoCryptShared',
+    label: 'mongo_crypt_shared',
     description: 'Shared library for Queryable Encryption (Lab 2)',
     required: false,
     downloadUrl: 'https://www.mongodb.com/docs/manual/core/queryable-encryption/reference/shared-library/',
@@ -160,7 +163,7 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
     const isChecked = checkedItems[prereq.id] || isVerified;
     const isExpanded = expandedItems[prereq.id];
     const hasInstructions = prereq.setupInstructions && prereq.setupInstructions.length > 0;
-    
+
     return (
       <div key={prereq.id} className="py-2">
         <div className="flex items-start gap-3">
@@ -172,7 +175,7 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <label 
+              <label
                 htmlFor={prereq.id}
                 className={cn(
                   "font-medium text-sm cursor-pointer",
@@ -197,7 +200,7 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
               )}
             </div>
             <p className="text-xs text-muted-foreground">{prereq.description}</p>
-            
+
             {/* Setup Instructions Collapsible */}
             {hasInstructions && (
               <Collapsible open={isExpanded} onOpenChange={() => toggleExpanded(prereq.id)}>
@@ -210,16 +213,16 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
                 <CollapsibleContent>
                   <div className="mt-2 p-3 bg-muted/50 rounded-lg border border-border/50">
                     <div className="space-y-1">
-                        {prereq.setupInstructions!.map((instruction, idx) => (
+                      {prereq.setupInstructions!.map((instruction, idx) => (
                         <div key={idx} className={cn(
                           "text-xs font-mono",
-                          instruction.startsWith('──') 
-                            ? "font-semibold text-foreground mt-2 first:mt-0" 
-                            : instruction === '' 
-                            ? "h-1"
-                            : instruction.startsWith('#')
-                            ? "text-muted-foreground italic"
-                            : "text-muted-foreground"
+                          instruction.startsWith('──')
+                            ? "font-semibold text-foreground mt-2 first:mt-0"
+                            : instruction === ''
+                              ? "h-1"
+                              : instruction.startsWith('#')
+                                ? "text-muted-foreground italic"
+                                : "text-muted-foreground"
                         )}>
                           {instruction.startsWith('──') ? (
                             <span className="font-semibold">{instruction}</span>
@@ -254,7 +257,7 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
           </span>
           <span className={cn(
             "text-xs font-normal px-2 py-1 rounded-full",
-            completedRequired === totalRequired 
+            completedRequired === totalRequired
               ? "bg-green-500/10 text-green-600"
               : "bg-muted text-muted-foreground"
           )}>
@@ -266,7 +269,7 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
         <p className="text-sm text-muted-foreground mb-4">
           Check off each item as you complete the setup. Click "Show setup instructions" for detailed guidance.
         </p>
-        
+
         {/* Required */}
         <div className="mb-4">
           <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">

@@ -36,23 +36,23 @@ export function Lab3RightToErasure() {
       challengeSteps?: Array<{ instruction: string; hint?: string }>;
     }>;
   }> = [
-    {
-      id: 'l3s1',
-      title: 'Step 1: Explicit Encryption for Migration',
-      estimatedTime: '15 min',
-      description: 'When migrating existing plaintext data to CSFLE, you cannot use automatic encryption because the driver expects to find ciphertext. You must use the "Explicit Encryption" API to encrypt each field manually. This step demonstrates migrating data from a legacy collection to a secure, encrypted collection.',
-      tips: [
-        'ACTION REQUIRED: Run the Node.js script below to migrate plaintext data to encrypted format.',
-        'MIGRATION STRATEGY: Read from legacy collection → Encrypt each field explicitly → Write to secure collection.',
-        'EXPLICIT ENCRYPTION: Use `encryption.encrypt()` for each field that needs encryption during migration.',
-        'SA NUANCE: Deterministic encryption is critical during migration if you intend to maintain existing query capabilities on PII.',
-        'VERIFICATION: After migration, query the secure collection without CSFLE to see Binary ciphertext - proving encryption worked!'
-      ],
-      codeBlocks: [
-        {
-          filename: 'migrateToCSFLE.cjs (Node.js - Create this file)',
-          language: 'javascript',
-          code: `const { MongoClient, ClientEncryption } = require("mongodb");
+      {
+        id: 'l3s1',
+        title: 'Step 1: Explicit Encryption for Migration',
+        estimatedTime: '15 min',
+        description: 'When migrating existing plaintext data to CSFLE, you cannot use automatic encryption because the driver expects to find ciphertext. You must use the "Explicit Encryption" API to encrypt each field manually. This step demonstrates migrating data from a legacy collection to a secure, encrypted collection.',
+        tips: [
+          'ACTION REQUIRED: Run the Node.js script below to migrate plaintext data to encrypted format.',
+          'MIGRATION STRATEGY: Read from legacy collection → Encrypt each field explicitly → Write to secure collection.',
+          'EXPLICIT ENCRYPTION: Use `encryption.encrypt()` for each field that needs encryption during migration.',
+          'SA NUANCE: Deterministic encryption is critical during migration if you intend to maintain existing query capabilities on PII.',
+          'VERIFICATION: After migration, query the secure collection without CSFLE to see Binary ciphertext - proving encryption worked!'
+        ],
+        codeBlocks: [
+          {
+            filename: 'migrateToCSFLE.cjs (Node.js - Create this file)',
+            language: 'javascript',
+            code: `const { MongoClient, ClientEncryption } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
 const uri = "${mongoUri}";
@@ -148,8 +148,8 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Tier 1: Guided
-          skeleton: `// ══════════════════════════════════════════════════════════════
+            // Tier 1: Guided
+            skeleton: `// ══════════════════════════════════════════════════════════════
 // Migrate Plaintext Data to CSFLE Using Explicit Encryption
 // ══════════════════════════════════════════════════════════════
 // When migrating existing data, you cannot use automatic encryption
@@ -228,15 +228,15 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints - updated line numbers after expanding kmsProviders and adding sample data
-          inlineHints: [
-            { line: 28, blankText: '______', hint: 'Method to retrieve a single document', answer: 'findOne' },
-            { line: 38, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
-            { line: 63, blankText: '_________', hint: 'Method to encrypt a value manually', answer: 'encrypt' },
-            { line: 64, blankText: '____________', hint: 'Algorithm suffix for queryable encryption', answer: 'Deterministic' }
-          ],
-          // Tier 2: Challenge
-          challengeSkeleton: `// ══════════════════════════════════════════════════════════════
+            // Inline hints - updated line numbers after expanding kmsProviders and adding sample data
+            inlineHints: [
+              { line: 28, blankText: '______', hint: 'Method to retrieve a single document', answer: 'findOne' },
+              { line: 38, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
+              { line: 63, blankText: '_________', hint: 'Method to encrypt a value manually', answer: 'encrypt' },
+              { line: 64, blankText: '____________', hint: 'Algorithm suffix for queryable encryption', answer: 'Deterministic' }
+            ],
+            // Tier 2: Challenge
+            challengeSkeleton: `// ══════════════════════════════════════════════════════════════
 // CHALLENGE MODE - Data Migration with Explicit Encryption
 // ══════════════════════════════════════════════════════════════
 
@@ -264,8 +264,8 @@ run().catch(console.error);`,
 
 
 `,
-          // Tier 3: Expert
-          expertSkeleton: `// ══════════════════════════════════════════════════════════════
+            // Tier 3: Expert
+            expertSkeleton: `// ══════════════════════════════════════════════════════════════
 // EXPERT MODE - Legacy Data Migration to CSFLE
 // ══════════════════════════════════════════════════════════════
 //
@@ -294,11 +294,11 @@ run().catch(console.error);`,
 
 
 `
-        },
-        {
-          filename: 'Terminal - Run the script',
-          language: 'bash',
-          code: `# Run in your terminal:
+          },
+          {
+            filename: 'Terminal - Run the script',
+            language: 'bash',
+            code: `# Run in your terminal:
 node migrateToCSFLE.cjs
 
 # Expected Output:
@@ -315,33 +315,33 @@ node migrateToCSFLE.cjs
 # Name: John Doe
 # SSN (encrypted): Binary - Binary ciphertext
 # ✓ Data is encrypted in the database!`
-        }
-      ],
-      hints: [
-        'Blank 1: The method to find one document is "findOne".',
-        'Blank 2: The class for encryption operations is "ClientEncryption".',
-        'Blank 3: The method to encrypt a value explicitly is "encrypt".',
-        'Blank 4: Use "Deterministic" for fields you need to query on.'
-      ],
-      onVerify: async () => validatorUtils.checkMigration(mongoUri)
-    },
-    {
-      id: 'l3s2',
-      title: 'Step 2: Multi-Tenant Isolation with KeyAltNames',
-      estimatedTime: '12 min',
-      description: 'Implement a SaaS-safe architecture where each tenant has their own DEK. Use the KeyAltName field to programmatically retrieve the correct key for each tenant request. This ensures complete data isolation between tenants - a key compromise for one tenant does not affect others.',
-      tips: [
-        'ACTION REQUIRED: Run the Node.js script below to create tenant-specific DEKs and demonstrate multi-tenant data isolation.',
-        'TENANT ISOLATION: By using 1 DEK per Tenant, you ensure that a key compromise for one customer does not affect others.',
-        'KEY LOOKUP: Use keyAltNames like "tenant-{tenantId}" to dynamically retrieve the correct DEK for each tenant.',
-        'SCALABILITY: The __keyVault can store millions of keys. Ensure the unique index is present (Verified in Lab 1).',
-        'BEST PRACTICE: Use template literals in schemaMap to dynamically set keyAltName based on the current tenant context.'
-      ],
-      codeBlocks: [
-        {
-          filename: 'multiTenantIsolation.cjs (Node.js - Create this file)',
-          language: 'javascript',
-          code: `const { MongoClient, ClientEncryption } = require("mongodb");
+          }
+        ],
+        hints: [
+          'Blank 1: The method to find one document is "findOne".',
+          'Blank 2: The class for encryption operations is "ClientEncryption".',
+          'Blank 3: The method to encrypt a value explicitly is "encrypt".',
+          'Blank 4: Use "Deterministic" for fields you need to query on.'
+        ],
+        onVerify: async () => validatorUtils.checkMigration(mongoUri)
+      },
+      {
+        id: 'l3s2',
+        title: 'Step 2: Multi-Tenant Isolation with KeyAltNames',
+        estimatedTime: '12 min',
+        description: 'Implement a SaaS-safe architecture where each tenant has their own DEK. Use the KeyAltName field to programmatically retrieve the correct key for each tenant request. This ensures complete data isolation between tenants - a key compromise for one tenant does not affect others.',
+        tips: [
+          'ACTION REQUIRED: Run the Node.js script below to create tenant-specific DEKs and demonstrate multi-tenant data isolation.',
+          'TENANT ISOLATION: By using 1 DEK per Tenant, you ensure that a key compromise for one customer does not affect others.',
+          'KEY LOOKUP: Use keyAltNames like "tenant-{tenantId}" to dynamically retrieve the correct DEK for each tenant.',
+          'SCALABILITY: The __keyVault can store millions of keys. Ensure the unique index is present (Verified in Lab 1).',
+          'BEST PRACTICE: Use template literals in schemaMap to dynamically set keyAltName based on the current tenant context.'
+        ],
+        codeBlocks: [
+          {
+            filename: 'multiTenantIsolation.cjs (Node.js - Create this file)',
+            language: 'javascript',
+            code: `const { MongoClient, ClientEncryption } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
 const uri = "${mongoUri}";
@@ -401,7 +401,7 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          skeleton: `// ══════════════════════════════════════════════════════════════
+            skeleton: `// ══════════════════════════════════════════════════════════════
 // Multi-Tenant Isolation with Per-Tenant DEKs
 // ══════════════════════════════════════════════════════════════
 // Each tenant gets their own DEK. A key compromise for one tenant
@@ -463,17 +463,17 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints - updated line numbers after expanding kmsProviders
-          inlineHints: [
-            { line: 35, blankText: '_______', hint: 'Prefix for tenant-specific key names', answer: 'tenant' },
-            { line: 40, blankText: '___________', hint: 'Field to query for existing DEK names', answer: 'keyAltNames' },
-            { line: 47, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' }
-          ]
-        },
-        {
-          filename: 'Terminal - Run the script',
-          language: 'bash',
-          code: `# Run in your terminal:
+            // Inline hints - updated line numbers after expanding kmsProviders
+            inlineHints: [
+              { line: 35, blankText: '_______', hint: 'Prefix for tenant-specific key names', answer: 'tenant' },
+              { line: 40, blankText: '___________', hint: 'Field to query for existing DEK names', answer: 'keyAltNames' },
+              { line: 47, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' }
+            ]
+          },
+          {
+            filename: 'Terminal - Run the script',
+            language: 'bash',
+            code: `# Run in your terminal:
 node multiTenantIsolation.cjs
 
 # Expected Output:
@@ -490,33 +490,33 @@ node multiTenantIsolation.cjs
 # ✓ Tenant contoso: DEK exists (...)
 # ✓ Tenant fabrikam: DEK exists (...)
 # ✓ Multi-tenant isolation setup complete!`
-        }
-      ],
-      hints: [
-        'Blank 1: The keyAltName prefix should be "tenant" (e.g., tenant-acme).',
-        'Blank 2: Query by "keyAltNames" field to find existing DEKs.',
-        'Blank 3: The method to create a DEK is "createDataKey".'
-      ],
-      onVerify: async () => validatorUtils.checkTenantDEKs(mongoUri)
-    },
-    {
-      id: 'l3s3',
-      title: 'Step 3: Key Rotation (RewrapManyDataKey)',
-      estimatedTime: '15 min',
-      description: 'Rotate the Customer Master Key (CMK) without re-encrypting the actual data. This "Envelope Rotation" is a preferred compliance strategy for SAs. The rewrapManyDataKey() operation updates the DEK metadata to use a new CMK, but the encrypted data itself never changes - this is the power of envelope encryption!',
-      tips: [
-        'ACTION REQUIRED: Run the Node.js script below to rotate a DEK to use a new CMK.',
-        'SA TIP: Use rewrapManyDataKey() to update the DEKs with a new CMK. This is a metadata-only operation and is extremely fast.',
-        'COMPLIANCE: Regularly rotating the CMK is a standard requirement for SOC2 and PCI-DSS.',
-        'ENVELOPE ENCRYPTION: The actual encrypted data never changes - only the DEK\'s CMK reference is updated.',
-        'PREREQUISITE: Before rotation, ensure the NEW CMK exists and is accessible (see Step 4).',
-        'IMPORTANT: The old CMK must still be accessible during rotation (to decrypt the DEK for rewrapping).'
-      ],
-      codeBlocks: [
-        {
-          filename: 'rotateCMK.cjs (Node.js - Create this file)',
-          language: 'javascript',
-          code: `const { MongoClient, ClientEncryption } = require("mongodb");
+          }
+        ],
+        hints: [
+          'Blank 1: The keyAltName prefix should be "tenant" (e.g., tenant-acme).',
+          'Blank 2: Query by "keyAltNames" field to find existing DEKs.',
+          'Blank 3: The method to create a DEK is "createDataKey".'
+        ],
+        onVerify: async () => validatorUtils.checkTenantDEKs(mongoUri)
+      },
+      {
+        id: 'l3s3',
+        title: 'Step 3: Key Rotation (RewrapManyDataKey)',
+        estimatedTime: '15 min',
+        description: 'Rotate the Customer Master Key (CMK) without re-encrypting the actual data. This "Envelope Rotation" is a preferred compliance strategy for SAs. The rewrapManyDataKey() operation updates the DEK metadata to use a new CMK, but the encrypted data itself never changes - this is the power of envelope encryption!',
+        tips: [
+          'ACTION REQUIRED: Run the Node.js script below to rotate a DEK to use a new CMK.',
+          'SA TIP: Use rewrapManyDataKey() to update the DEKs with a new CMK. This is a metadata-only operation and is extremely fast.',
+          'COMPLIANCE: Regularly rotating the CMK is a standard requirement for SOC2 and PCI-DSS.',
+          'ENVELOPE ENCRYPTION: The actual encrypted data never changes - only the DEK\'s CMK reference is updated.',
+          'PREREQUISITE: Before rotation, ensure the NEW CMK exists and is accessible (see Step 4).',
+          'IMPORTANT: The old CMK must still be accessible during rotation (to decrypt the DEK for rewrapping).'
+        ],
+        codeBlocks: [
+          {
+            filename: 'rotateCMK.cjs (Node.js - Create this file)',
+            language: 'javascript',
+            code: `const { MongoClient, ClientEncryption } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
 const uri = "${mongoUri}";
@@ -605,7 +605,7 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          skeleton: `// ══════════════════════════════════════════════════════════════
+            skeleton: `// ══════════════════════════════════════════════════════════════
 // Key Rotation: RewrapManyDataKey
 // ══════════════════════════════════════════════════════════════
 // Rotate the CMK without re-encrypting data - envelope encryption power!
@@ -668,19 +668,19 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints - updated line numbers after expanding kmsProviders
-          inlineHints: [
-            { line: 24, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
-            { line: 30, blankText: '___', hint: 'The field name in keyAltName pattern', answer: 'ssn' },
-            { line: 34, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
-            { line: 48, blankText: '___________________', hint: 'Method to rotate DEKs to a new CMK', answer: 'rewrapManyDataKey' },
-            { line: 49, blankText: '___________', hint: 'Field to filter which DEKs to rotate', answer: 'keyAltNames' }
-          ]
-        },
-        {
-          filename: 'Terminal - Run the script',
-          language: 'bash',
-          code: `# Run in your terminal:
+            // Inline hints - updated line numbers after expanding kmsProviders
+            inlineHints: [
+              { line: 24, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
+              { line: 30, blankText: '___', hint: 'The field name in keyAltName pattern', answer: 'ssn' },
+              { line: 34, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
+              { line: 48, blankText: '___________________', hint: 'Method to rotate DEKs to a new CMK', answer: 'rewrapManyDataKey' },
+              { line: 49, blankText: '___________', hint: 'Field to filter which DEKs to rotate', answer: 'keyAltNames' }
+            ]
+          },
+          {
+            filename: 'Terminal - Run the script',
+            language: 'bash',
+            code: `# Run in your terminal:
 node rotateCMK.cjs
 
 # Expected Output:
@@ -693,28 +693,28 @@ node rotateCMK.cjs
 #   - Modified DEKs: 1
 # ✓ DEK successfully rewrapped with new CMK
 # ✓ No data re-encryption required - this is envelope encryption!`
-        }
-      ],
-      onVerify: async () => validatorUtils.checkKeyRotation(mongoUri, `user-${suffix}-ssn-key`)
-    },
-    {
-      id: 'l3s4',
-      title: 'Step 4: Infrastructure: Rotation Readiness Check',
-      estimatedTime: '8 min',
-      description: 'Before rotating keys in MongoDB, you must verify that the new CMK exists and is accessible. Use the AWS CLI to check infrastructure readiness. This step ensures that rotation will succeed and helps prevent production issues.',
-      tips: [
-        'ACTION REQUIRED: Run the AWS CLI commands below to verify the new CMK exists and is accessible.',
-        'SA NUANCE: Rotation will fail if the driver cannot "Decrypt" with the old key or "Encrypt" with the new one.',
-        'PREREQUISITE: Create a new CMK in AWS KMS before attempting rotation in production.',
-        'VERIFICATION: Check that the new CMK alias exists, is enabled, and your IAM user has access.',
-        'MONITORING: SAs should recommend checking CloudWatch logs for KMS usage during a rewrap operation.',
-        'BEST PRACTICE: Always verify infrastructure readiness before performing key rotation in production.'
-      ],
-      codeBlocks: [
-        {
-          filename: 'AWS CLI - Verify New CMK Exists',
-          language: 'bash',
-          code: `# 1. List all KMS aliases to find your new CMK
+          }
+        ],
+        onVerify: async () => validatorUtils.checkKeyRotation(mongoUri, `user-${suffix}-ssn-key`)
+      },
+      {
+        id: 'l3s4',
+        title: 'Step 4: Infrastructure: Rotation Readiness Check',
+        estimatedTime: '8 min',
+        description: 'Before rotating keys in MongoDB, you must verify that the new CMK exists and is accessible. Use the AWS CLI to check infrastructure readiness. This step ensures that rotation will succeed and helps prevent production issues.',
+        tips: [
+          'ACTION REQUIRED: Run the AWS CLI commands below to verify the new CMK exists and is accessible.',
+          'SA NUANCE: Rotation will fail if the driver cannot "Decrypt" with the old key or "Encrypt" with the new one.',
+          'PREREQUISITE: Create a new CMK in AWS KMS before attempting rotation in production.',
+          'VERIFICATION: Check that the new CMK alias exists, is enabled, and your IAM user has access.',
+          'MONITORING: SAs should recommend checking CloudWatch logs for KMS usage during a rewrap operation.',
+          'BEST PRACTICE: Always verify infrastructure readiness before performing key rotation in production.'
+        ],
+        codeBlocks: [
+          {
+            filename: 'AWS CLI - Verify New CMK Exists',
+            language: 'bash',
+            code: `# 1. List all KMS aliases to find your new CMK
 aws kms list-aliases --query "Aliases[?contains(AliasName, 'mongodb')].AliasName" --output table
 
 # 2. Verify the NEW key exists and is enabled
@@ -740,7 +740,7 @@ aws kms decrypt --ciphertext-blob <paste-ciphertext-from-step-4> --output text -
 # Expected Output: "dGVzdA==" (base64 for "test") - proves you can decrypt
 
 # ✓ If all steps succeed, your infrastructure is ready for rotation!`,
-          skeleton: `# ══════════════════════════════════════════════════════════════
+            skeleton: `# ══════════════════════════════════════════════════════════════
 # Rotation Readiness Check - Verify AWS KMS Infrastructure
 # ══════════════════════════════════════════════════════════════
 
@@ -770,21 +770,21 @@ aws kms _______ --ciphertext-blob <paste-ciphertext-from-step-4> --output text -
 # Expected Output: "dGVzdA==" (base64 for "test") - proves you can decrypt
 
 # ✓ If all steps succeed, your infrastructure is ready for rotation!`,
-          // Inline hints - line numbers match skeleton
-          // L6: list-aliases, L9: describe-key, L15: KeyId, L18: get-key-policy, L21: encrypt, L26: decrypt
-          inlineHints: [
-            { line: 6, blankText: '____________', hint: 'AWS KMS command to list all aliases', answer: 'list-aliases' },
-            { line: 9, blankText: '____________', hint: 'AWS KMS command to get key details', answer: 'describe-key' },
-            { line: 15, blankText: '_______', hint: 'JMESPath query to extract the key identifier', answer: 'KeyId' },
-            { line: 18, blankText: '______________', hint: 'AWS KMS command to retrieve the key policy', answer: 'get-key-policy' },
-            { line: 21, blankText: '_______', hint: 'AWS KMS command to encrypt data', answer: 'encrypt' },
-            { line: 26, blankText: '_______', hint: 'AWS KMS command to decrypt data', answer: 'decrypt' }
-          ]
-        },
-        {
-          filename: 'Note: Creating a New CMK for Rotation',
-          language: 'markdown',
-          code: `**For Production Rotation:**
+            // Inline hints - line numbers match skeleton
+            // L6: list-aliases, L9: describe-key, L15: KeyId, L18: get-key-policy, L21: encrypt, L26: decrypt
+            inlineHints: [
+              { line: 6, blankText: '____________', hint: 'AWS KMS command to list all aliases', answer: 'list-aliases' },
+              { line: 9, blankText: '____________', hint: 'AWS KMS command to get key details', answer: 'describe-key' },
+              { line: 15, blankText: '_______', hint: 'JMESPath query to extract the key identifier', answer: 'KeyId' },
+              { line: 18, blankText: '______________', hint: 'AWS KMS command to retrieve the key policy', answer: 'get-key-policy' },
+              { line: 21, blankText: '_______', hint: 'AWS KMS command to encrypt data', answer: 'encrypt' },
+              { line: 26, blankText: '_______', hint: 'AWS KMS command to decrypt data', answer: 'decrypt' }
+            ]
+          },
+          {
+            filename: 'Note: Creating a New CMK for Rotation',
+            language: 'markdown',
+            code: `**For Production Rotation:**
 
 Before running rotateCMK.cjs, create a NEW CMK in AWS:
 
@@ -799,11 +799,11 @@ aws kms create-alias --alias-name alias/mongodb-lab-key-v2 --target-key-id <KEY_
 \`\`\`
 
 For this lab demo, we use the same CMK to demonstrate the rewrap operation.`
-        }
-      ],
-      onVerify: async () => validatorUtils.checkKmsAlias(aliasName)
-    }
-  ];
+          }
+        ],
+        onVerify: async () => validatorUtils.checkKmsAlias(aliasName)
+      }
+    ];
 
   const introContent = {
     whatYouWillBuild: [

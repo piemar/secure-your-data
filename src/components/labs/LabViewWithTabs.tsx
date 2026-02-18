@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LabIntroTab } from './LabIntroTab';
 import { StepView } from './StepView';
@@ -7,6 +7,7 @@ import { heartbeat } from '@/utils/leaderboardUtils';
 import { DifficultyLevel } from './DifficultyBadge';
 import { Database, Lightbulb } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { toast } from 'sonner';
 
 interface Exercise {
   id: string;
@@ -87,6 +88,8 @@ export function LabViewWithTabs({
     return saved ? JSON.parse(saved) : [];
   });
 
+  const prevCompletedCountRef = useRef<number | undefined>(undefined);
+
   // Start lab tracking on mount and send heartbeat
   useEffect(() => {
     startLab(labNumber);
@@ -104,9 +107,14 @@ export function LabViewWithTabs({
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify(completedSteps));
     
-    // Check if all steps are completed
     if (completedSteps.length === steps.length) {
       completeLab(labNumber);
+      if (prevCompletedCountRef.current !== undefined && prevCompletedCountRef.current < steps.length) {
+        toast.success(`Lab ${labNumber} completed! You can move on to the next lab.`);
+      }
+      prevCompletedCountRef.current = completedSteps.length;
+    } else {
+      prevCompletedCountRef.current = completedSteps.length;
     }
   }, [completedSteps, storageKey, steps.length, labNumber, completeLab]);
 

@@ -37,27 +37,27 @@ export function Lab1CSFLE() {
     }>;
   }> = [
 
-    {
-      id: 'l1s1',
-      title: 'Create Customer Master Key (CMK)',
-      estimatedTime: '10 min',
-      difficulty: 'basic' as DifficultyLevel,
-      understandSection: 'The CMK is the root of trust in Envelope Encryption. It never leaves the KMS Hardware Security Module (HSM). This key will "wrap" (encrypt) the Data Encryption Keys (DEKs) that MongoDB stores.',
-      doThisSection: [
-        'Run the AWS CLI command to create a new symmetric key',
-        'Create an alias for easier reference',
-        'Save the Key ID for the next step'
-      ],
-      description: 'Create your Customer Master Key (CMK) in AWS KMS. This key is the root of trust that wraps all Data Encryption Keys.',
-      tips: [
-        'ROOT OF TRUST: The CMK never leaves the KMS Hardware Security Module (HSM).',
-        'SA TIP: Use aliases for keys to allow easier rotation without code changes.'
-      ],
-      codeBlocks: [
-        {
-          filename: 'Terminal - AWS CLI',
-          language: 'bash',
-          code: `# 1. Create the CMK
+      {
+        id: 'l1s1',
+        title: 'Create Customer Master Key (CMK)',
+        estimatedTime: '10 min',
+        difficulty: 'basic' as DifficultyLevel,
+        understandSection: 'The CMK is the root of trust in Envelope Encryption. It never leaves the KMS Hardware Security Module (HSM). This key will "wrap" (encrypt) the Data Encryption Keys (DEKs) that MongoDB stores.',
+        doThisSection: [
+          'Run the AWS CLI command to create a new symmetric key',
+          'Create an alias for easier reference',
+          'Save the Key ID for the next step'
+        ],
+        description: 'Create your Customer Master Key (CMK) in AWS KMS. This key is the root of trust that wraps all Data Encryption Keys.',
+        tips: [
+          'ROOT OF TRUST: The CMK never leaves the KMS Hardware Security Module (HSM).',
+          'SA TIP: Use aliases for keys to allow easier rotation without code changes.'
+        ],
+        codeBlocks: [
+          {
+            filename: 'Terminal - AWS CLI',
+            language: 'bash',
+            code: `# 1. Create the CMK
 KMS_KEY_ID=$(aws kms create-key --description "Lab 1 MongoDB Encryption Key" --query 'KeyMetadata.KeyId' --output text)
 
 # 2. Create a human-readable alias (Unique to you)
@@ -65,8 +65,8 @@ aws kms create-alias --alias-name "${aliasName}" --target-key-id $KMS_KEY_ID
 
 echo "CMK Created: $KMS_KEY_ID"
 echo "Alias Created: ${aliasName}"`,
-          // Tier 1: Guided - Shows structure with blanks
-          skeleton: `# ══════════════════════════════════════════════════════════════
+            // Tier 1: Guided - Shows structure with blanks
+            skeleton: `# ══════════════════════════════════════════════════════════════
 # STEP 1: Create a Customer Master Key (CMK)
 # ══════════════════════════════════════════════════════════════
 # The CMK is your "root of trust" - it wraps all your Data Encryption Keys.
@@ -93,8 +93,8 @@ aws kms _____________ \\
 
 echo "CMK Created: $KMS_KEY_ID"
 echo "Alias Created: ${aliasName}"`,
-          // Tier 2: Challenge - Task-based, minimal scaffolding
-          challengeSkeleton: `# ══════════════════════════════════════════════════════════════
+            // Tier 2: Challenge - Task-based, minimal scaffolding
+            challengeSkeleton: `# ══════════════════════════════════════════════════════════════
 # CHALLENGE MODE - AWS KMS Setup for MongoDB Encryption
 # ══════════════════════════════════════════════════════════════
 
@@ -125,8 +125,8 @@ echo "Alias Created: ${aliasName}"`,
 # Verification (run after completing above):
 echo "CMK Created: $KMS_KEY_ID"
 echo "Alias Created: ${aliasName}"`,
-          // Tier 3: Expert - Objective only
-          expertSkeleton: `# ══════════════════════════════════════════════════════════════
+            // Tier 3: Expert - Objective only
+            expertSkeleton: `# ══════════════════════════════════════════════════════════════
 # EXPERT MODE - AWS KMS Infrastructure
 # ══════════════════════════════════════════════════════════════
 #
@@ -146,67 +146,67 @@ echo "Alias Created: ${aliasName}"`,
 
 
 `,
-          // Inline hints for Guided mode - line numbers match skeleton
-          // L1-L7: comments, L8: empty, L9: KMS_KEY_ID line with _________ blank, L10: --description, L11: --query with _______ blank
-          // L12-L21: more lines, L22: aws kms _____________ blank
-          inlineHints: [
-            { 
-              line: 9, 
-              blankText: '_________', 
-              hint: 'The AWS KMS command to create a new symmetric key', 
-              answer: 'create-key' 
-            },
-            { 
-              line: 11, 
-              blankText: '_______', 
-              hint: 'JMESPath query to extract the key identifier', 
-              answer: 'KeyId' 
-            },
-            { 
-              line: 22, 
-              blankText: '_____________', 
-              hint: 'AWS KMS command to assign a friendly name to a key', 
-              answer: 'create-alias' 
-            }
-          ]
-        }
-      ],
-      hints: [
-        'Blank 1: The AWS KMS command to create a new key is "create-key" (no space). It creates a symmetric key by default.',
-        'Blank 2: The JMESPath query to extract just the KeyId is "KeyId" - this returns only the UUID.',
-        'Blank 3: The command to create an alias is "create-alias" (no space). It links a friendly name to your target key.'
-      ],
-      exercises: [
-        {
-          id: 'l1s1-quiz',
-          type: 'quiz' as const,
-          title: 'CMK Purpose',
-          points: 5,
-          question: 'What is the primary purpose of the Customer Master Key (CMK)?',
-          options: [
-            { id: 'a', label: 'Directly encrypt application data', isCorrect: false },
-            { id: 'b', label: 'Wrap (encrypt) Data Encryption Keys', isCorrect: true },
-            { id: 'c', label: 'Authenticate users to MongoDB', isCorrect: false },
-            { id: 'd', label: 'Generate TLS certificates', isCorrect: false },
-          ]
-        }
-      ],
-      onVerify: async () => validatorUtils.checkKmsAlias(aliasName)
-    },
-    {
-      id: 'l1s2',
-      title: 'Infrastructure: Apply KMS Key Policy',
-      estimatedTime: '5 min',
-      description: 'A Common Pitfall: Even if your IAM User has permissions, the Key itself must *trust* you. You must explicity attach a Key Policy to the CMK to allow your IAM User to administer and use it.',
-      tips: [
-        'RESOURCE-BASED POLICY: KMS Keys use resource policies similar to S3 buckets.',
-        'SA TIP: In production, separate "Key Admin" vs "Key User" permissions. For this lab, you are both.'
-      ],
-      codeBlocks: [
-        {
-          filename: 'AWS CLI - Put Key Policy',
-          language: 'bash',
-          code: `# Re-run to get ID if needed
+            // Inline hints for Guided mode - line numbers match skeleton
+            // L1-L7: comments, L8: empty, L9: KMS_KEY_ID line with _________ blank, L10: --description, L11: --query with _______ blank
+            // L12-L21: more lines, L22: aws kms _____________ blank
+            inlineHints: [
+              {
+                line: 9,
+                blankText: '_________',
+                hint: 'The AWS KMS command to create a new symmetric key',
+                answer: 'create-key'
+              },
+              {
+                line: 11,
+                blankText: '_______',
+                hint: 'JMESPath query to extract the key identifier',
+                answer: 'KeyId'
+              },
+              {
+                line: 22,
+                blankText: '_____________',
+                hint: 'AWS KMS command to assign a friendly name to a key',
+                answer: 'create-alias'
+              }
+            ]
+          }
+        ],
+        hints: [
+          'Blank 1: The AWS KMS command to create a new key is "create-key" (no space). It creates a symmetric key by default.',
+          'Blank 2: The JMESPath query to extract just the KeyId is "KeyId" - this returns only the UUID.',
+          'Blank 3: The command to create an alias is "create-alias" (no space). It links a friendly name to your target key.'
+        ],
+        exercises: [
+          {
+            id: 'l1s1-quiz',
+            type: 'quiz' as const,
+            title: 'CMK Purpose',
+            points: 5,
+            question: 'What is the primary purpose of the Customer Master Key (CMK)?',
+            options: [
+              { id: 'a', label: 'Directly encrypt application data', isCorrect: false },
+              { id: 'b', label: 'Wrap (encrypt) Data Encryption Keys', isCorrect: true },
+              { id: 'c', label: 'Authenticate users to MongoDB', isCorrect: false },
+              { id: 'd', label: 'Generate TLS certificates', isCorrect: false },
+            ]
+          }
+        ],
+        onVerify: async () => validatorUtils.checkKmsAlias(aliasName)
+      },
+      {
+        id: 'l1s2',
+        title: 'Infrastructure: Apply KMS Key Policy',
+        estimatedTime: '5 min',
+        description: 'A Common Pitfall: Even if your IAM User has permissions, the Key itself must *trust* you. You must explicity attach a Key Policy to the CMK to allow your IAM User to administer and use it.',
+        tips: [
+          'RESOURCE-BASED POLICY: KMS Keys use resource policies similar to S3 buckets.',
+          'SA TIP: In production, separate "Key Admin" vs "Key User" permissions. For this lab, you are both.'
+        ],
+        codeBlocks: [
+          {
+            filename: 'AWS CLI - Put Key Policy',
+            language: 'bash',
+            code: `# Re-run to get ID if needed
 KMS_KEY_ID=$(aws kms describe-key --key-id ${aliasName} --query 'KeyMetadata.KeyId' --output text)
 IAM_ARN=$(aws sts get-caller-identity --query 'Arn' --output text)
 ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text)
@@ -232,8 +232,8 @@ cat <<EOF > policy.json
 EOF
 
 aws kms put-key-policy --key-id $KMS_KEY_ID --policy-name default --policy file://policy.json`,
-          // Tier 1: Guided
-          skeleton: `# ══════════════════════════════════════════════════════════════
+            // Tier 1: Guided
+            skeleton: `# ══════════════════════════════════════════════════════════════
 # Apply a Key Policy to Allow Your IAM User
 # ══════════════════════════════════════════════════════════════
 # Even if your IAM User has permissions, the Key itself must *trust* you.
@@ -269,8 +269,8 @@ EOF
 
 # Apply the policy to your CMK
 aws kms ______________ --key-id $KMS_KEY_ID --policy-name default --policy file://policy.json`,
-          // Tier 2: Challenge
-          challengeSkeleton: `# ══════════════════════════════════════════════════════════════
+            // Tier 2: Challenge
+            challengeSkeleton: `# ══════════════════════════════════════════════════════════════
 # CHALLENGE MODE - Apply KMS Key Policy
 # ══════════════════════════════════════════════════════════════
 
@@ -301,8 +301,8 @@ aws kms ______________ --key-id $KMS_KEY_ID --policy-name default --policy file:
 # Write your command:
 
 `,
-          // Tier 3: Expert
-          expertSkeleton: `# ══════════════════════════════════════════════════════════════
+            // Tier 3: Expert
+            expertSkeleton: `# ══════════════════════════════════════════════════════════════
 # EXPERT MODE - Secure Your KMS Key
 # ══════════════════════════════════════════════════════════════
 #
@@ -325,68 +325,69 @@ aws kms ______________ --key-id $KMS_KEY_ID --policy-name default --policy file:
 
 
 `
-        ,
-          // Inline hints for Guided mode - line numbers match skeleton exactly
-          // L1-6: comments, L7: empty, L8: comment, L9: KMS_KEY_ID line with ____________ blank
-          // L10-11: more lines, L12: IAM_ARN with ___________________ blank, L13: ACCOUNT_ID with ________ blank
-          // L14-35: more lines, L36: aws kms ______________ blank
-          inlineHints: [
-            { 
-              line: 9, 
-              blankText: '____________', 
-              hint: 'AWS KMS command to get details about an existing key', 
-              answer: 'describe-key' 
-            },
-            { 
-              line: 12, 
-              blankText: '___________________', 
-              hint: 'AWS STS command to get information about your identity', 
-              answer: 'get-caller-identity' 
-            },
-            { 
-              line: 13, 
-              blankText: '________', 
-              hint: 'JMESPath query to extract your AWS Account ID', 
-              answer: 'Account' 
-            },
-            { 
-              line: 36, 
-              blankText: '______________', 
-              hint: 'AWS KMS command to attach a policy to a key', 
-              answer: 'put-key-policy' 
-            }
-          ]
-        }
-      ],
-      hints: [
-        'Blank 1: The command to get details about an existing key is "describe-key".',
-        'Blank 2: The STS command to get your identity is "get-caller-identity".',
-        'Blank 3: The query to extract your AWS Account ID is "Account".',
-        'Blank 4: The command to attach a policy to a KMS key is "put-key-policy".'
-      ],
-      onVerify: async () => validatorUtils.checkKeyPolicy(aliasName)
-    },
-    {
-      id: 'l1s3',
-      title: 'Initialize Key Vault with Unique Index',
-      estimatedTime: '5 min',
-      difficulty: 'basic' as DifficultyLevel,
-      understandSection: 'The Key Vault is a special MongoDB collection that stores encrypted DEKs. A unique partial index on keyAltNames prevents duplicate key names.',
-      doThisSection: [
-        'Connect to Atlas using mongosh',
-        'Switch to the encryption database',
-        'Create a unique partial index on the __keyVault collection'
-      ],
-      description: 'The Key Vault collection stores your encrypted DEKs. You MUST create a unique index manually. The driver does NOT do this for you.',
-      tips: [
-        'IMPORTANT: Run this command in your MONGODB SHELL (mongosh) connected to Atlas.',
-        'Architecture: Usually stored in a database named "encryption" and collection "__keyVault".'
-      ],
-      codeBlocks: [
-        {
-          filename: 'mongosh (MongoDB Shell - NOT Node.js)',
-          language: 'javascript',
-          code: `// Run this in mongosh (MongoDB Shell), NOT in Node.js
+            ,
+            // Inline hints for Guided mode - line numbers match skeleton exactly
+            // L1-6: comments, L7: empty, L8: comment, L9: KMS_KEY_ID line with ____________ blank
+            // L10-11: more lines, L12: IAM_ARN with ___________________ blank, L13: ACCOUNT_ID with ________ blank
+            // L14-35: more lines, L36: aws kms ______________ blank
+            inlineHints: [
+              {
+                line: 9,
+                blankText: '____________',
+                hint: 'AWS KMS command to get details about an existing key',
+                answer: 'describe-key'
+              },
+              {
+                line: 12,
+                blankText: '___________________',
+                hint: 'AWS STS command to get information about your identity',
+                answer: 'get-caller-identity'
+              },
+              {
+                line: 13,
+                blankText: '________',
+                hint: 'JMESPath query to extract your AWS Account ID',
+                answer: 'Account'
+              },
+              {
+                line: 36,
+                blankText: '______________',
+                hint: 'AWS KMS command to attach a policy to a key',
+                answer: 'put-key-policy'
+              }
+            ]
+          }
+        ],
+        hints: [
+          'Blank 1: The command to get details about an existing key is "describe-key".',
+          'Blank 2: The STS command to get your identity is "get-caller-identity".',
+          'Blank 3: The query to extract your AWS Account ID is "Account".',
+          'Blank 4: The command to attach a policy to a KMS key is "put-key-policy".'
+        ],
+        onVerify: async () => validatorUtils.checkKeyPolicy(aliasName)
+      },
+      {
+        id: 'l1s3',
+        title: 'Initialize Key Vault with Unique Index',
+        estimatedTime: '5 min',
+        difficulty: 'basic' as DifficultyLevel,
+        understandSection: 'The Key Vault is a special MongoDB collection that stores encrypted DEKs. A unique partial index on keyAltNames prevents duplicate key names.',
+        doThisSection: [
+          'Connect to Atlas using mongosh',
+          'Switch to the encryption database',
+          'Create a unique partial index on the __keyVault collection'
+        ],
+        description: 'The Key Vault collection stores your encrypted DEKs. You MUST create a unique index manually. The driver does NOT do this for you.',
+        tips: [
+          'IMPORTANT: Run this command in your MONGODB SHELL (mongosh) connected to Atlas.',
+          'Architecture: Usually stored in a database named "encryption" and collection "__keyVault".',
+          'TIP: When copying multiline scripts into mongosh, use the .editor command first to enter multiline mode. Paste your code, then press Ctrl+D to execute.'
+        ],
+        codeBlocks: [
+          {
+            filename: 'mongosh (MongoDB Shell - NOT Node.js)',
+            language: 'javascript',
+            code: `// Run this in mongosh (MongoDB Shell), NOT in Node.js
 
 // 1. Connect to your Atlas Cluster first:
 mongosh "${mongoUri}"
@@ -396,8 +397,8 @@ db.getCollection("__keyVault").createIndex(
   { keyAltNames: 1 },
   { unique: true, partialFilterExpression: { keyAltNames: { $exists: true } } }
 );`,
-          // Tier 1: Guided
-          skeleton: `// ══════════════════════════════════════════════════════════════
+            // Tier 1: Guided
+            skeleton: `// ══════════════════════════════════════════════════════════════
 // Initialize Key Vault with Unique Index
 // ══════════════════════════════════════════════════════════════
 // The Key Vault stores your encrypted DEKs. A unique partial index on
@@ -420,8 +421,8 @@ db.getCollection("__keyVault").____________(
     partialFilterExpression: { keyAltNames: { $_______: true } } 
   }
 );`,
-          // Tier 2: Challenge
-          challengeSkeleton: `// ══════════════════════════════════════════════════════════════
+            // Tier 2: Challenge
+            challengeSkeleton: `// ══════════════════════════════════════════════════════════════
 // CHALLENGE MODE - Initialize Key Vault Collection
 // ══════════════════════════════════════════════════════════════
 
@@ -444,8 +445,8 @@ mongosh "${mongoUri}"
 
 
 `,
-          // Tier 3: Expert  
-          expertSkeleton: `// ══════════════════════════════════════════════════════════════
+            // Tier 3: Expert  
+            expertSkeleton: `// ══════════════════════════════════════════════════════════════
 // EXPERT MODE - Configure Key Vault Storage
 // ══════════════════════════════════════════════════════════════
 //
@@ -466,69 +467,69 @@ mongosh "${mongoUri}"
 
 
 `
-        ,
-          // Inline hints for Guided mode - line numbers match skeleton exactly
-          // User confirmed: L13: use _________, L17: ____________, L18: ___________, L21: $_______
-          inlineHints: [
-            { 
-              line: 13, 
-              blankText: '_________', 
-              hint: 'The database name used by MongoDB encryption operations', 
-              answer: 'encryption' 
-            },
-            { 
-              line: 17, 
-              blankText: '____________', 
-              hint: 'MongoDB method to create an index on a collection', 
-              answer: 'createIndex' 
-            },
-            { 
-              line: 18, 
-              blankText: '___________', 
-              hint: 'The field that stores alternate names for DEKs', 
-              answer: 'keyAltNames' 
-            },
-            { 
-              line: 21, 
-              blankText: '$_______', 
-              hint: 'MongoDB operator to check if a field exists', 
-              answer: 'exists' 
-            }
-          ]
-        }
-      ],
-      hints: [
-        'Blank 1: The database name for encryption operations is "encryption".',
-        'Blank 2: The method to create an index in MongoDB is "createIndex".',
-        'Blank 3: The field to index is "keyAltNames" - this stores the human-readable key names.',
-        'Blank 4: The operator to check if a field exists is "$exists".'
-      ],
-      onVerify: async () => validatorUtils.checkKeyVault(mongoUri, 'encryption.__keyVault')
-    },
-    {
-      id: 'l1s5',
-      title: 'Generate Data Encryption Keys (DEKs)',
-      estimatedTime: '8 min',
-      difficulty: 'intermediate' as DifficultyLevel,
-      understandSection: 'The DEK (Data Encryption Key) is what actually encrypts your data. The CMK "wraps" the DEK, meaning the DEK is stored encrypted in MongoDB using the CMK from AWS KMS.',
-      doThisSection: [
-        'Create a Node.js script (createKey.cjs)',
-        'Configure KMS providers with AWS credentials',
-        'Use ClientEncryption.createDataKey() to generate and store the DEK',
-        'Run the script with Node.js'
-      ],
-      description: 'Generate the actual keys used to encrypt data using a Node.js script with the mongodb-client-encryption library.',
-      tips: [
-        'PREREQUISITE: First run: npm install mongodb mongodb-client-encryption @aws-sdk/credential-providers',
-        'RUN WITH NODE.JS: This is a Node.js script. Run with: node createKey.cjs',
-        'NOT MONGOSH: This is NOT a mongosh command - it must run in your terminal with Node.js.',
-        'MULTI-DEK: In production, create different keys for different sensitivity levels.'
-      ],
-      codeBlocks: [
-        {
-          filename: 'createKey.cjs (Node.js - Create this file)',
-          language: 'javascript',
-          code: `const { MongoClient, ClientEncryption } = require("mongodb");
+            ,
+            // Inline hints for Guided mode - line numbers match skeleton exactly
+            // User confirmed: L13: use _________, L17: ____________, L18: ___________, L21: $_______
+            inlineHints: [
+              {
+                line: 13,
+                blankText: '_________',
+                hint: 'The database name used by MongoDB encryption operations',
+                answer: 'encryption'
+              },
+              {
+                line: 17,
+                blankText: '____________',
+                hint: 'MongoDB method to create an index on a collection',
+                answer: 'createIndex'
+              },
+              {
+                line: 18,
+                blankText: '___________',
+                hint: 'The field that stores alternate names for DEKs',
+                answer: 'keyAltNames'
+              },
+              {
+                line: 21,
+                blankText: '$_______',
+                hint: 'MongoDB operator to check if a field exists',
+                answer: 'exists'
+              }
+            ]
+          }
+        ],
+        hints: [
+          'Blank 1: The database name for encryption operations is "encryption".',
+          'Blank 2: The method to create an index in MongoDB is "createIndex".',
+          'Blank 3: The field to index is "keyAltNames" - this stores the human-readable key names.',
+          'Blank 4: The operator to check if a field exists is "$exists".'
+        ],
+        onVerify: async () => validatorUtils.checkKeyVault(mongoUri, 'encryption.__keyVault')
+      },
+      {
+        id: 'l1s5',
+        title: 'Generate Data Encryption Keys (DEKs)',
+        estimatedTime: '8 min',
+        difficulty: 'intermediate' as DifficultyLevel,
+        understandSection: 'The DEK (Data Encryption Key) is what actually encrypts your data. The CMK "wraps" the DEK, meaning the DEK is stored encrypted in MongoDB using the CMK from AWS KMS.',
+        doThisSection: [
+          'Create a Node.js script (createKey.cjs)',
+          'Configure KMS providers with AWS credentials',
+          'Use ClientEncryption.createDataKey() to generate and store the DEK',
+          'Run the script with Node.js'
+        ],
+        description: 'Generate the actual keys used to encrypt data using a Node.js script with the mongodb-client-encryption library.',
+        tips: [
+          'PREREQUISITE: First run: npm install mongodb mongodb-client-encryption @aws-sdk/credential-providers',
+          'RUN WITH NODE.JS: This is a Node.js script. Run with: node createKey.cjs',
+          'NOT MONGOSH: This is NOT a mongosh command - it must run in your terminal with Node.js.',
+          'MULTI-DEK: In production, create different keys for different sensitivity levels.'
+        ],
+        codeBlocks: [
+          {
+            filename: 'createKey.cjs (Node.js - Create this file)',
+            language: 'javascript',
+            code: `const { MongoClient, ClientEncryption } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
 // 1. Configuration
@@ -583,7 +584,7 @@ async function run() {
 }
 
 run().catch(console.dir);`,
-          skeleton: `// ══════════════════════════════════════════════════════════════
+            skeleton: `// ══════════════════════════════════════════════════════════════
 // Generate Data Encryption Key (DEK) using Node.js
 // ══════════════════════════════════════════════════════════════
 // The DEK is what actually encrypts your data. The CMK "wraps" the DEK.
@@ -641,44 +642,44 @@ async function run() {
 }
 
 run().catch(console.dir);`,
-          // Inline hints for Guided mode - line numbers match skeleton exactly
-          // L1-6: comments, L7: empty, L8: require with ________________, L9: require fromSSO
-          // L10-27: more setup, L28: new ________________(client, L29-35: more code
-          // L36: encryption.________________("aws", L37: masterKey, L38: ___________: [keyAltName]
-          // Inline hints - updated line numbers after adding DEK existence check
-          // L8: ClientEncryption import, L28: ClientEncryption constructor
-          // L49: createDataKey method, L51: keyAltNames option
-          inlineHints: [
-            { 
-              line: 8, 
-              blankText: '________________', 
-              hint: 'The class from mongodb package that handles encryption operations', 
-              answer: 'ClientEncryption' 
-            },
-            { 
-              line: 28, 
-              blankText: '________________', 
-              hint: 'Constructor for the encryption helper class', 
-              answer: 'ClientEncryption' 
-            },
-            { 
-              line: 49, 
-              blankText: '________________', 
-              hint: 'Method to generate a new Data Encryption Key', 
-              answer: 'createDataKey' 
-            },
-            { 
-              line: 51, 
-              blankText: '___________', 
-              hint: 'Option to assign a human-readable name to the DEK', 
-              answer: 'keyAltNames' 
-            }
-          ]
-        },
-        {
-          filename: 'Terminal - Run the script',
-          language: 'bash',
-          code: `# First, install dependencies (if not already done):
+            // Inline hints for Guided mode - line numbers match skeleton exactly
+            // L1-6: comments, L7: empty, L8: require with ________________, L9: require fromSSO
+            // L10-27: more setup, L28: new ________________(client, L29-35: more code
+            // L36: encryption.________________("aws", L37: masterKey, L38: ___________: [keyAltName]
+            // Inline hints - updated line numbers after adding DEK existence check
+            // L8: ClientEncryption import, L28: ClientEncryption constructor
+            // L49: createDataKey method, L51: keyAltNames option
+            inlineHints: [
+              {
+                line: 8,
+                blankText: '________________',
+                hint: 'The class from mongodb package that handles encryption operations',
+                answer: 'ClientEncryption'
+              },
+              {
+                line: 28,
+                blankText: '________________',
+                hint: 'Constructor for the encryption helper class',
+                answer: 'ClientEncryption'
+              },
+              {
+                line: 49,
+                blankText: '________________',
+                hint: 'Method to generate a new Data Encryption Key',
+                answer: 'createDataKey'
+              },
+              {
+                line: 51,
+                blankText: '___________',
+                hint: 'Option to assign a human-readable name to the DEK',
+                answer: 'keyAltNames'
+              }
+            ]
+          },
+          {
+            filename: 'Terminal - Run the script',
+            language: 'bash',
+            code: `# First, install dependencies (if not already done):
 npm install mongodb mongodb-client-encryption @aws-sdk/credential-providers
 
 # Run the script in your terminal (NOT mongosh):
@@ -688,31 +689,32 @@ node createKey.cjs
 # ✓ Created new DEK UUID: 7274650f-1ea0-48e1-b47e-33d3bba95a21
 #   keyAltName: user-${suffix}-ssn-key
 # (Your UUID will be different - save it for the next step!)`
-        }
-      ],
-      hints: [
-        'Blank 1: Import "ClientEncryption" from the mongodb package.',
-        'Blank 2: The class to initialize for encryption operations is "ClientEncryption".',
-        'Blank 3: The method to create a new Data Encryption Key is "createDataKey".',
-        'Blank 4: The option to give your DEK a human-readable name is "keyAltNames".'
-      ],
-      onVerify: async () => validatorUtils.checkDataKey(mongoUri, `user-${suffix}-ssn-key`)
-    },
-    {
-      id: 'l1s5verify',
-      title: 'Verify DEK Creation in Key Vault',
-      estimatedTime: '5 min',
-      description: 'Connect to MongoDB Atlas using mongosh and query the key vault to verify that exactly one Data Encryption Key has been created. This is a critical verification step.',
-      tips: [
-        'VERIFICATION: This step confirms the DEK was successfully created and stored.',
-        'ARCHITECTURE: The key vault stores encrypted DEKs - the CMK encrypts these DEKs at rest.',
-        'DEBUGGING: If you see 0 keys, re-run the createKey.cjs script. If you see multiple keys, you may have run it more than once.'
-      ],
-      codeBlocks: [
-        {
-          filename: 'mongosh (MongoDB Shell - NOT Node.js)',
-          language: 'javascript',
-          code: `// Run this in mongosh (MongoDB Shell), NOT in Node.js
+          }
+        ],
+        hints: [
+          'Blank 1: Import "ClientEncryption" from the mongodb package.',
+          'Blank 2: The class to initialize for encryption operations is "ClientEncryption".',
+          'Blank 3: The method to create a new Data Encryption Key is "createDataKey".',
+          'Blank 4: The option to give your DEK a human-readable name is "keyAltNames".'
+        ],
+        onVerify: async () => validatorUtils.checkDataKey(mongoUri, `user-${suffix}-ssn-key`)
+      },
+      {
+        id: 'l1s5verify',
+        title: 'Verify DEK Creation in Key Vault',
+        estimatedTime: '5 min',
+        description: 'Connect to MongoDB Atlas using mongosh and query the key vault to verify that exactly one Data Encryption Key has been created. This is a critical verification step.',
+        tips: [
+          'VERIFICATION: This step confirms the DEK was successfully created and stored.',
+          'ARCHITECTURE: The key vault stores encrypted DEKs - the CMK encrypts these DEKs at rest.',
+          'DEBUGGING: If you see 0 keys, re-run the createKey.cjs script. If you see multiple keys, you may have run it more than once.',
+          'TIP: When copying multiline scripts into mongosh, use the .editor command first to enter multiline mode. Paste your code, then press Ctrl+D to execute.'
+        ],
+        codeBlocks: [
+          {
+            filename: 'mongosh (MongoDB Shell - NOT Node.js)',
+            language: 'javascript',
+            code: `// Run this in mongosh (MongoDB Shell), NOT in Node.js
 
 // 1. Connect to Atlas
 mongosh "${mongoUri}"
@@ -732,30 +734,61 @@ db.getCollection("__keyVault").find({}).pretty()
 
 // 4. Count total keys (should return 1)
 db.getCollection("__keyVault").countDocuments()`,
-          skeleton: `// Run these commands in mongosh (MongoDB Shell), NOT in Node.js
-use encryption
-db.getCollection("__keyVault").find({}).pretty()
-db.getCollection("__keyVault").countDocuments()`
-        }
-      ],
-      onVerify: async () => validatorUtils.checkKeyVaultCount(1)
-    },
-    {
-      id: 'l1s6',
-      title: 'Test CSFLE: Insert & Query with Encryption',
-      estimatedTime: '15 min',
-      description: 'Create and run a Node.js test script that demonstrates the difference between encrypted and non-encrypted connections. This proves that CSFLE is working by showing ciphertext vs plaintext side-by-side.',
-      tips: [
-        'RUN WITH NODE.JS: This is a Node.js script, NOT mongosh. Run it with: node testCSFLE.cjs',
-        'DEMO POWER: This side-by-side comparison is your most powerful SA tool for showing CSFLE in action.',
-        'ARCHITECTURE: The encrypted client automatically encrypts on write and decrypts on read.',
-        'BEST PRACTICE: Use keyAltNames instead of keyId for better maintainability and key rotation support.'
-      ],
-      codeBlocks: [
-        {
-          filename: '1. testCSFLE.cjs (Node.js - Create this file in your project root)',
-          language: 'javascript',
-          code: `const { MongoClient } = require("mongodb");
+            skeleton: `// ══════════════════════════════════════════════════════════════
+// Verify DEK Creation in Key Vault
+// ══════════════════════════════════════════════════════════════
+
+// 1. Connect to your Atlas Cluster:
+mongosh "${mongoUri}"
+
+// 2. Switch to the encryption database
+use _________
+
+// 3. Query the key vault to see your new DEK
+db.getCollection("__keyVault").______({}).pretty()
+
+// 4. Count the keys to verify existence
+db.getCollection("__keyVault").________________()`,
+            inlineHints: [
+              {
+                line: 9,
+                blankText: '_________',
+                hint: 'The database name for encryption operations',
+                answer: 'encryption'
+              },
+              {
+                line: 12,
+                blankText: '______',
+                hint: 'MongoDB method to read documents from a collection',
+                answer: 'find'
+              },
+              {
+                line: 15,
+                blankText: '________________',
+                hint: 'MongoDB method to count documents in a collection',
+                answer: 'countDocuments'
+              }
+            ]
+          }
+        ],
+        onVerify: async () => validatorUtils.checkKeyVaultCount(1, mongoUri)
+      },
+      {
+        id: 'l1s6',
+        title: 'Test CSFLE: Insert & Query with Encryption',
+        estimatedTime: '15 min',
+        description: 'Create and run a Node.js test script that demonstrates the difference between encrypted and non-encrypted connections. This proves that CSFLE is working by showing ciphertext vs plaintext side-by-side.',
+        tips: [
+          'RUN WITH NODE.JS: This is a Node.js script, NOT mongosh. Run it with: node testCSFLE.cjs',
+          'DEMO POWER: This side-by-side comparison is your most powerful SA tool for showing CSFLE in action.',
+          'ARCHITECTURE: The encrypted client automatically encrypts on write and decrypts on read.',
+          'BEST PRACTICE: Use keyAltNames instead of keyId for better maintainability and key rotation support.'
+        ],
+        codeBlocks: [
+          {
+            filename: '1. testCSFLE.cjs (Node.js - Create this file in your project root)',
+            language: 'javascript',
+            code: `const { MongoClient } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
 const uri = "${mongoUri}";
@@ -903,8 +936,8 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Skeleton with blanks for key CSFLE concepts
-          skeleton: `const { MongoClient } = require("mongodb");
+            // Skeleton with blanks for key CSFLE concepts
+            skeleton: `const { MongoClient } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
 const uri = "${mongoUri}";
@@ -996,38 +1029,38 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints for the skeleton - user confirmed: L21, L31, L33, L59
-          inlineHints: [
-            { 
-              line: 21, 
-              blankText: '_____________', 
-              hint: 'The field in __keyVault that stores human-readable key names', 
-              answer: 'keyAltNames' 
-            },
-            { 
-              line: 31, 
-              blankText: '_______', 
-              hint: 'Schema map keyword to specify field should be encrypted', 
-              answer: 'encrypt' 
-            },
-            { 
-              line: 33, 
-              blankText: '___________', 
-              hint: 'Algorithm suffix for fields that need equality queries', 
-              answer: 'Deterministic' 
-            },
-            { 
-              line: 59, 
-              blankText: '______________', 
-              hint: 'MongoClient option that enables automatic encryption', 
-              answer: 'autoEncryption' 
-            }
-          ]
-        },
-        {
-          filename: '2. Terminal (NOT mongosh) - Run with Node.js',
-          language: 'bash',
-          code: `# Run in your terminal (NOT in mongosh):
+            // Inline hints for the skeleton
+            inlineHints: [
+              {
+                line: 21,
+                blankText: '_____________',
+                hint: 'The field in __keyVault that stores human-readable key names',
+                answer: 'keyAltNames'
+              },
+              {
+                line: 31,
+                blankText: '_______',
+                hint: 'Schema map keyword to specify field should be encrypted',
+                answer: 'encrypt'
+              },
+              {
+                line: 33,
+                blankText: '___________',
+                hint: 'Algorithm suffix for fields that need equality queries',
+                answer: 'Deterministic'
+              },
+              {
+                line: cryptSharedLibPath ? 63 : 59,
+                blankText: '______________',
+                hint: 'MongoClient option that enables automatic encryption',
+                answer: 'autoEncryption'
+              }
+            ]
+          },
+          {
+            filename: '2. Terminal (NOT mongosh) - Run with Node.js',
+            language: 'bash',
+            code: `# Run in your terminal (NOT in mongosh):
 node testCSFLE.cjs
 
 # Expected Output:
@@ -1044,25 +1077,25 @@ node testCSFLE.cjs
 # Bob's data WITHOUT CSFLE client: { name: 'Bob Smith', ssn: Binary(...), ... }
 # SSN field type: Binary
 # This is ciphertext - unreadable without the DEK!`
-        }
-      ],
-      onVerify: async () => { return { success: true, message: 'CSFLE demonstration complete!' }; }
-    },
-    {
-      id: 'l1s7',
-      title: 'The Complete Application',
-      estimatedTime: '10 min',
-      description: 'Bringing it all together. Here is the full, clean code for a production-ready CSFLE application. Notice it is only ~50 lines of code!',
-      tips: [
-        'BEST PRACTICE: Use keyAltNames instead of keyId for easier key rotation and management.',
-        'SIMPLICITY: Once configured, the rest of your app code (Insert/Find) is unchanged.',
-        'PRODUCTION TIP: Keep your schemaMap external or generated dynamically.'
-      ],
-      codeBlocks: [
-        {
-          filename: 'app.js (The Final Product)',
-          language: 'javascript',
-          code: `import { MongoClient } from "mongodb";
+          }
+        ],
+        onVerify: async () => validatorUtils.checkFieldEncrypted(mongoUri, 'medical', 'patients', 'ssn')
+      },
+      {
+        id: 'l1s7',
+        title: 'The Complete Application',
+        estimatedTime: '10 min',
+        description: 'Bringing it all together. Here is the full, clean code for a production-ready CSFLE application. Notice it is only ~50 lines of code!',
+        tips: [
+          'BEST PRACTICE: Use keyAltNames instead of keyId for easier key rotation and management.',
+          'SIMPLICITY: Once configured, the rest of your app code (Insert/Find) is unchanged.',
+          'PRODUCTION TIP: Keep your schemaMap external or generated dynamically.'
+        ],
+        codeBlocks: [
+          {
+            filename: 'app.js (The Final Product)',
+            language: 'javascript',
+            code: `import { MongoClient } from "mongodb";
 
 // --- CONFIGURATION ---
 const uri = "${mongoUri}";
@@ -1129,8 +1162,8 @@ async function main() {
 }
 
 main().catch(console.error);`,
-          // Skeleton with blanks for production CSFLE patterns
-          skeleton: `import { MongoClient } from "mongodb";
+            // Skeleton with blanks for production CSFLE patterns
+            skeleton: `import { MongoClient } from "mongodb";
 
 // --- CONFIGURATION ---
 const uri = "${mongoUri}";
@@ -1194,38 +1227,38 @@ async function main() {
 }
 
 main().catch(console.error);`,
-          // Inline hints for the skeleton - user confirmed: L13, L15, L20, L36
-          inlineHints: [
-            { 
-              line: 13, 
-              blankText: '_____', 
-              hint: 'JavaScript string method to divide into array of substrings', 
-              answer: 'split' 
-            },
-            { 
-              line: 15, 
-              blankText: '_____', 
-              hint: 'MongoDB document field that stores the primary key', 
-              answer: '_id' 
-            },
-            { 
-              line: 20, 
-              blankText: '_______', 
-              hint: 'JSON Schema keyword to specify the BSON type', 
-              answer: 'bsonType' 
-            },
-            { 
-              line: 36, 
-              blankText: '_____________', 
-              hint: 'Object that contains AWS KMS credentials configuration', 
-              answer: 'kmsProviders' 
-            }
-          ]
-        },
-        {
-          filename: 'Terminal - Run the application',
-          language: 'bash',
-          code: `# Run the complete CSFLE application:
+            // Inline hints for the skeleton - user confirmed: L13, L15, L20, L36
+            inlineHints: [
+              {
+                line: 13,
+                blankText: '_____',
+                hint: 'JavaScript string method to divide into array of substrings',
+                answer: 'split'
+              },
+              {
+                line: 15,
+                blankText: '_____',
+                hint: 'MongoDB document field that stores the primary key',
+                answer: '_id'
+              },
+              {
+                line: 20,
+                blankText: '_______',
+                hint: 'JSON Schema keyword to specify the BSON type',
+                answer: 'bsonType'
+              },
+              {
+                line: 36,
+                blankText: '_____________',
+                hint: 'Object that contains AWS KMS credentials configuration',
+                answer: 'kmsProviders'
+              }
+            ]
+          },
+          {
+            filename: 'Terminal - Run the application',
+            language: 'bash',
+            code: `# Run the complete CSFLE application:
 node app.js
 
 # Expected Output:
@@ -1239,11 +1272,11 @@ node app.js
 # use medical
 # db.patients.findOne()
 # // SSN appears as Binary (Subtype 6) - encrypted ciphertext!`
-        }
-      ],
-      onVerify: async () => { return { success: true, message: 'Lab 1 Complete! You have built a secure app.' }; }
-    }
-  ];
+          }
+        ],
+        onVerify: async () => { return { success: true, message: 'Lab 1 Complete! You have built a secure app.' }; }
+      }
+    ];
 
   const introContent = {
     whatYouWillBuild: [

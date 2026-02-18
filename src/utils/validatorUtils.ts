@@ -50,17 +50,18 @@ export const validatorUtils = {
         if (!alias || alias.trim() === '') {
             return { success: false, message: 'KMS alias is required.' };
         }
-        
+
         if (!alias.startsWith('alias/')) {
             return { success: false, message: 'KMS alias must start with "alias/".' };
         }
 
         try {
-            const response = await fetch(`/api/verify-kms?alias=${encodeURIComponent(alias)}&profile=${encodeURIComponent(profile)}`);
+            const profileParam = profile ? `&profile=${encodeURIComponent(profile)}` : '';
+            const response = await fetch(`/api/verify-kms?alias=${encodeURIComponent(alias)}${profileParam}`);
             const data = await response.json();
             return { success: data.success, message: data.message };
         } catch (error) {
-            return { success: false, message: 'Connection to validation bridge failed. Ensure npm run dev is active and AWS CLI is configured.' };
+            return { success: false, message: 'Connection to validation bridge failed. Ensure npm run dev is active.' };
         }
     },
 
@@ -74,7 +75,8 @@ export const validatorUtils = {
         }
 
         try {
-            const response = await fetch(`/api/verify-policy?alias=${encodeURIComponent(alias)}&profile=${encodeURIComponent(profile)}`);
+            const profileParam = profile ? `&profile=${encodeURIComponent(profile)}` : '';
+            const response = await fetch(`/api/verify-policy?alias=${encodeURIComponent(alias)}${profileParam}`);
             const data = await response.json();
             return { success: data.success, message: data.message };
         } catch (error) {
@@ -140,7 +142,7 @@ export const validatorUtils = {
         if (!uri || uri.trim() === '') {
             return { success: false, message: 'MongoDB URI is required.' };
         }
-        
+
         if (!keyAltName || keyAltName.trim() === '') {
             return { success: false, message: 'Key Alt Name is required.' };
         }
@@ -161,7 +163,7 @@ export const validatorUtils = {
     checkKeyVaultCount: async (expectedCount: number = 1, uri?: string): Promise<ValidationResult> => {
         // Get URI from parameter or try localStorage
         const mongoUri = uri || localStorage.getItem('lab_mongo_uri') || '';
-        
+
         if (!mongoUri) {
             return { success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' };
         }
@@ -179,16 +181,13 @@ export const validatorUtils = {
      * Verifies that both QE-specific DEKs exist in the key vault (qe-salary-dek and qe-taxid-dek).
      * Uses the real /api/verify-qe-deks endpoint to check via mongosh.
      */
-    checkQEDEKs: async (uri?: string): Promise<ValidationResult> => {
-        // Get URI from parameter or try localStorage
-        const mongoUri = uri || localStorage.getItem('lab_mongo_uri') || '';
-        
-        if (!mongoUri) {
-            return { success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' };
+    checkQEDEKs: async (uri: string): Promise<ValidationResult> => {
+        if (!uri || uri.trim() === '') {
+            return { success: false, message: 'MongoDB URI is required. Please provide it for verification.' };
         }
 
         try {
-            const response = await fetch(`/api/verify-qe-deks?uri=${encodeURIComponent(mongoUri)}`);
+            const response = await fetch(`/api/verify-qe-deks?uri=${encodeURIComponent(uri)}`);
             const data = await response.json();
             return { success: data.success, message: data.message };
         } catch (error) {
@@ -200,20 +199,17 @@ export const validatorUtils = {
      * Verifies that Queryable Encryption metadata collections (.esc and .ecoc) exist.
      * Uses the real /api/verify-qe-metadata endpoint to check via mongosh.
      */
-    checkQEMetadata: async (db: string, coll: string, uri?: string): Promise<ValidationResult> => {
+    checkQEMetadata: async (db: string, coll: string, uri: string): Promise<ValidationResult> => {
         if (!db || !coll) {
             return { success: false, message: 'Database and collection names are required.' };
         }
 
-        // Get URI from parameter or try localStorage
-        const mongoUri = uri || localStorage.getItem('lab_mongo_uri') || '';
-        
-        if (!mongoUri) {
-            return { success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' };
+        if (!uri || uri.trim() === '') {
+            return { success: false, message: 'MongoDB URI is required. Please provide it for verification.' };
         }
 
         try {
-            const response = await fetch(`/api/verify-qe-metadata?uri=${encodeURIComponent(mongoUri)}&db=${encodeURIComponent(db)}&coll=${encodeURIComponent(coll)}`);
+            const response = await fetch(`/api/verify-qe-metadata?uri=${encodeURIComponent(uri)}&db=${encodeURIComponent(db)}&coll=${encodeURIComponent(coll)}`);
             const data = await response.json();
             return { success: data.success, message: data.message };
         } catch (error) {
@@ -225,20 +221,17 @@ export const validatorUtils = {
      * Verifies that a collection exists and has encryptedFields configuration.
      * Uses the real /api/verify-qe-collection endpoint to check via mongosh.
      */
-    checkQECollection: async (db: string, coll: string, uri?: string): Promise<ValidationResult> => {
+    checkQECollection: async (db: string, coll: string, uri: string): Promise<ValidationResult> => {
         if (!db || !coll) {
             return { success: false, message: 'Database and collection names are required.' };
         }
 
-        // Get URI from parameter or try localStorage
-        const mongoUri = uri || localStorage.getItem('lab_mongo_uri') || '';
-        
-        if (!mongoUri) {
-            return { success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' };
+        if (!uri || uri.trim() === '') {
+            return { success: false, message: 'MongoDB URI is required. Please provide it for verification.' };
         }
 
         try {
-            const response = await fetch(`/api/verify-qe-collection?uri=${encodeURIComponent(mongoUri)}&db=${encodeURIComponent(db)}&coll=${encodeURIComponent(coll)}`);
+            const response = await fetch(`/api/verify-qe-collection?uri=${encodeURIComponent(uri)}&db=${encodeURIComponent(db)}&coll=${encodeURIComponent(coll)}`);
             const data = await response.json();
             return { success: data.success, message: data.message };
         } catch (error) {
@@ -250,20 +243,17 @@ export const validatorUtils = {
      * Verifies that the collection has documents with encrypted fields for range query testing.
      * Uses the real /api/verify-qe-range-query endpoint to check via mongosh.
      */
-    checkQERangeQuery: async (db: string, coll: string, uri?: string): Promise<ValidationResult> => {
+    checkQERangeQuery: async (db: string, coll: string, uri: string): Promise<ValidationResult> => {
         if (!db || !coll) {
             return { success: false, message: 'Database and collection names are required.' };
         }
 
-        // Get URI from parameter or try localStorage
-        const mongoUri = uri || localStorage.getItem('lab_mongo_uri') || '';
-        
-        if (!mongoUri) {
-            return { success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' };
+        if (!uri || uri.trim() === '') {
+            return { success: false, message: 'MongoDB URI is required. Please provide it for verification.' };
         }
 
         try {
-            const response = await fetch(`/api/verify-qe-range-query?uri=${encodeURIComponent(mongoUri)}&db=${encodeURIComponent(db)}&coll=${encodeURIComponent(coll)}`);
+            const response = await fetch(`/api/verify-qe-range-query?uri=${encodeURIComponent(uri)}&db=${encodeURIComponent(db)}&coll=${encodeURIComponent(coll)}`);
             const data = await response.json();
             return { success: data.success, message: data.message };
         } catch (error) {
@@ -277,28 +267,46 @@ export const validatorUtils = {
      */
     checkDataKey: async (uri: string, keyAltName: string): Promise<ValidationResult> => {
         if (!uri || uri.trim() === '') {
-            return { 
-                success: false, 
-                message: 'MongoDB URI is required. Please configure it in Lab Setup.' 
+            return {
+                success: false,
+                message: 'MongoDB URI is required. Please configure it in Lab Setup.'
             };
         }
-        
+
         if (!uri.startsWith('mongodb+srv://') && !uri.startsWith('mongodb://')) {
-            return { 
-                success: false, 
-                message: 'Invalid MongoDB URI format. Must start with mongodb+srv:// or mongodb://' 
+            return {
+                success: false,
+                message: 'Invalid MongoDB URI format. Must start with mongodb+srv:// or mongodb://'
             };
         }
-        
+
         if (!keyAltName || keyAltName.trim() === '') {
-            return { 
-                success: false, 
-                message: 'Key Alt Name is required. Check your createKey.cjs script.' 
+            return {
+                success: false,
+                message: 'Key Alt Name is required. Check your createKey.cjs script.'
             };
         }
 
         try {
             const response = await fetch(`/api/verify-datakey?uri=${encodeURIComponent(uri)}&keyAltName=${encodeURIComponent(keyAltName)}`);
+            const data = await response.json();
+            return { success: data.success, message: data.message };
+        } catch (error) {
+            return { success: false, message: 'Connection to validation bridge failed. Ensure npm run dev is active.' };
+        }
+    },
+
+    /**
+     * Verifies that a field in a collection contains actual ciphertext (Binary data).
+     * This is the "Proof of Encryption" check.
+     */
+    checkFieldEncrypted: async (uri: string, db: string, coll: string, field: string): Promise<ValidationResult> => {
+        if (!uri || !db || !coll || !field) {
+            return { success: false, message: 'URI, DB, Collection, and Field are required.' };
+        }
+
+        try {
+            const response = await fetch(`/api/verify-encryption?uri=${encodeURIComponent(uri)}&db=${encodeURIComponent(db)}&coll=${encodeURIComponent(coll)}&field=${encodeURIComponent(field)}`);
             const data = await response.json();
             return { success: data.success, message: data.message };
         } catch (error) {
@@ -313,7 +321,7 @@ export const validatorUtils = {
     checkToolInstalled: async (toolName: string): Promise<ValidationResult> => {
         const toolLower = toolName.toLowerCase();
         let queryLabel: string;
-        
+
         if (toolLower.includes('aws')) {
             queryLabel = 'aws';
         } else if (toolLower.includes('mongosh')) {
@@ -322,6 +330,8 @@ export const validatorUtils = {
             queryLabel = 'node';
         } else if (toolLower.includes('npm')) {
             queryLabel = 'npm';
+        } else         if (toolLower.includes('crypt') || toolLower.includes('mongo_crypt')) {
+            queryLabel = 'mongoCryptShared';
         } else {
             queryLabel = 'atlas';
         }

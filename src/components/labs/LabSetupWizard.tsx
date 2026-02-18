@@ -27,10 +27,10 @@ interface Prerequisite {
 
 const PREREQUISITES: Prerequisite[] = [
     { id: 'awsCli', label: 'AWS CLI v2', description: 'Required for KMS operations', installCommand: 'brew install awscli', downloadUrl: 'https://aws.amazon.com/cli/', required: true },
-    { id: 'mongosh', label: 'mongosh', description: 'MongoDB Shell for database operations', installCommand: 'brew install mongodb-community-shell', downloadUrl: 'https://www.mongodb.com/try/download/shell', required: true },
+    { id: 'mongosh', label: 'mongosh', description: 'MongoDB Shell (Tip: Use .editor for multiline code)', installCommand: 'brew install mongodb-community-shell', downloadUrl: 'https://www.mongodb.com/try/download/shell', required: true },
     { id: 'node', label: 'Node.js v18+', description: 'JavaScript runtime', installCommand: 'brew install node', downloadUrl: 'https://nodejs.org/', required: true },
     { id: 'npm', label: 'npm', description: 'Package manager (comes with Node.js)', installCommand: 'Included with Node.js', required: true },
-    { id: 'mongoCryptShared', label: 'mongo_crypt_shared', description: 'Required for Lab 2 (Queryable Encryption)', installCommand: 'Download from MongoDB', downloadUrl: 'https://www.mongodb.com/docs/manual/core/queryable-encryption/reference/shared-library/', required: false },
+    { id: 'mongoCryptShared', label: 'mongo_crypt_shared', description: 'Required for Lab 1 (CSFLE) and Lab 2 (Queryable Encryption) — replaces mongocryptd for client-side encryption', installCommand: 'Download from MongoDB', downloadUrl: 'https://www.mongodb.com/try/download/crypt-shared', required: true },
 ];
 
 export const LabSetupWizard: React.FC = () => {

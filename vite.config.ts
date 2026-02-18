@@ -248,6 +248,42 @@ export default defineConfig(({ mode }) => ({
             const url = new URL(req.url, `http://${req.headers.host}`);
             const tool = url.searchParams.get('tool');
 
+            // Special handler for mongoCryptShared - search for the library on disk
+            if (tool === 'mongoCryptShared') {
+              const { execSync } = require('child_process');
+              const fs = require('fs');
+              const searchPaths = [
+                '/usr/local/lib/mongo_crypt_v1.dylib',
+                '/usr/lib/mongo_crypt_v1.so',
+                `${process.env.HOME}/mongo_crypt_v1.dylib`,
+                `${process.env.HOME}/mongo_crypt_v1.so`,
+                `${process.env.HOME}/Downloads/mongo_crypt_v1.dylib`,
+                `${process.env.HOME}/Downloads/mongo_crypt_v1.so`,
+              ];
+              let foundPath = '';
+              for (const p of searchPaths) {
+                if (fs.existsSync(p)) { foundPath = p; break; }
+              }
+              if (!foundPath) {
+                // Try a broader find in home directory (limit depth for speed)
+                try {
+                  const result = execSync(
+                    `find "${process.env.HOME}" -maxdepth 5 -name "mongo_crypt_v1*" 2>/dev/null | head -1`,
+                    { timeout: 5000 }
+                  ).toString().trim();
+                  if (result) foundPath = result;
+                } catch { /* ignore */ }
+              }
+              if (foundPath) {
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: true, version: 'Found', path: foundPath }));
+              } else {
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: false, message: 'mongo_crypt_v1 library not found. Download from MongoDB Download Center.' }));
+              }
+              return;
+            }
+
             // Allow only specific tools for security
             const allowedTools: Record<string, string> = {
               'aws': 'aws --version',
@@ -347,7 +383,8 @@ export default defineConfig(({ mode }) => ({
                 success: isVerified,
                 message: isVerified
                   ? `Verified Unique Index on ${dbName}.${collName}`
-                  : `Index Missing! Run the createIndex command above.`
+                  : `Index Missing! Run the createIndex command above.`,
+                details: isVerified ? { db: dbName, coll: collName, index: 'keyAltNames_1' } : null
               }));
             });
             return;
@@ -395,7 +432,11 @@ export default defineConfig(({ mode }) => ({
                   const hasKms = policyText.includes('kms:*');
 
                   if (hasAllow && hasKms) {
-                    res.end(JSON.stringify({ success: true, message: `Verified Policy on ${safeKeyId}` }));
+                    res.end(JSON.stringify({
+                      success: true,
+                      message: `Verified Policy on ${safeKeyId}`,
+                      details: { keyId: safeKeyId, hasKmsAll: hasKms }
+                    }));
                   } else {
                     res.end(JSON.stringify({ success: false, message: `Policy too restrictive on ${safeKeyId}` }));
                   }
@@ -842,6 +883,58 @@ export default defineConfig(({ mode }) => ({
                   message: `Failed to parse database response: ${e.message}`
                 }));
               }
+            });
+            return;
+          }
+
+          if (req.url && req.url.startsWith('/api/verify-encryption')) {
+            const url = new URL(req.url, `http://${req.headers.host}`);
+            const mongoUri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            const dbName = url.searchParams.get('db') || 'medical';
+            const collName = url.searchParams.get('coll') || 'patients';
+            const field = url.searchParams.get('field') || 'ssn';
+
+            if (!mongoUri) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required' }));
+              return;
+            }
+
+            // Escape URI for safe use inside double-quoted shell string
+            const safeUri = mongoUri.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+
+            // Command to check if the field exists and is of type 5 (Binary) in any document
+            const script = `
+              var db = db.getSiblingDB("${dbName}");
+              var sample = db.getCollection("${collName}").findOne({ "${field}": { "$type": 5 } });
+              print(sample !== null);
+            `;
+
+            const cmd = `mongosh "${safeUri}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
+
+            exec(cmd, (error: any, stdout: any, stderr: any) => {
+              if (error) {
+                const errMsg = (stderr || stdout || error.message || '').toString().trim();
+                const hint = errMsg.toLowerCase().includes('command not found') || errMsg.toLowerCase().includes('mongosh')
+                  ? ' Ensure mongosh is installed and in PATH on the machine running the dev server.'
+                  : errMsg.toLowerCase().includes('authentication') || errMsg.toLowerCase().includes('connection')
+                  ? ' Check your Atlas URI and network access.'
+                  : '';
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({
+                  success: false,
+                  message: `Verification failed: ${errMsg || error.message}${hint}`
+                }));
+                return;
+              }
+              const isVerified = (stdout || '').trim() === 'true';
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({
+                success: isVerified,
+                message: isVerified
+                  ? `Verified: Field "${field}" in ${dbName}.${collName} is encrypted (stored as Binary).`
+                  : `Verification Failed: No document in ${dbName}.${collName} has "${field}" stored as encrypted (Binary). Run \`node testCSFLE.cjs\` to completion and ensure the CSFLE insert (e.g. Bob Smith) succeeded, then verify again.`
+              }));
             });
             return;
           }

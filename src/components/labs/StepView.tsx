@@ -53,6 +53,7 @@ interface StepData {
   tips?: string[];
   documentationUrl?: string;
   exercises?: Exercise[];
+  onVerify?: () => Promise<{ success: boolean; message: string }>;
 }
 
 interface StepViewProps {
@@ -429,6 +430,46 @@ Permitted actions:
   };
 }
 
+// Helper to format real validator results into rich terminal output
+function formatRichValidationOutput(result: { success: boolean; message: string }, stepTitle: string): { output: string; success: boolean; summary: string } {
+  const timestamp = new Date().toISOString();
+  const status = result.success ? 'PASSED' : 'FAILED';
+  const icon = result.success ? '✅' : '❌';
+
+  return {
+    success: result.success,
+    summary: result.message,
+    output: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ${icon} STEP VALIDATION: ${status}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 SYSTEM SCAN & VALIDATION:
+Timestamp: ${timestamp}
+Result: ${result.message}
+
+${result.success ? `
+📊 VALIDATION DETAILS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✓ Backend check completed via Vite Bridge
+  ✓ Sub-system state verified in real-time
+  ✓ Configuration matches lab requirements
+` : `
+⚠️  TROUBLESHOOTING:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  1. Ensure your lab environment setup is correct
+  2. Check if you missed a required command
+  3. Verify your MongoDB Atlas IP Whitelist
+  4. Review the "Tips" section for the previous step
+`}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 SA ADVICE:
+   This is a real-time check against your environment.
+   ${result.success ? 'You are successfully applying the technical concepts.' : 'Technical validation failed. Review your implementation and try again.'}
+`
+  };
+}
+
 export function StepView({
   steps,
   currentStepIndex,
@@ -596,10 +637,27 @@ export function StepView({
     setIsRunning(true);
     const code = currentStep.codeBlocks?.[0]?.code || '';
 
-    // Simulate execution delay
-    await new Promise(r => setTimeout(r, 800 + Math.random() * 600));
+    // Execution delay (real OR simulated)
+    await new Promise(r => setTimeout(r, 1000 + Math.random() * 800));
 
-    const result = generateSimulatedOutput(code, currentStep.title);
+    let result;
+    if (currentStep.onVerify) {
+      // Execute REAL backend verification
+      try {
+        const verifyResult = await currentStep.onVerify();
+        result = formatRichValidationOutput(verifyResult, currentStep.title);
+      } catch (error) {
+        result = {
+          success: false,
+          summary: 'Verification bridge error',
+          output: `❌ Technical Error: Failed to connect to verification backend.\nEnsure 'npm run dev' is active.`
+        };
+      }
+    } else {
+      // Fallback to simulation
+      result = generateSimulatedOutput(code, currentStep.title);
+    }
+
     setLastOutput(result.output);
     setOutputSummary(result.summary);
     setOutputSuccess(result.success);
@@ -608,7 +666,7 @@ export function StepView({
 
     // Award points on success
     if (result.success) {
-      const blockKey = `${currentStepIndex}-0`; // Assume first block is the main one for simulation
+      const blockKey = `${currentStepIndex}-0`;
       const hasSkeleton = currentStep.codeBlocks?.[0] ? hasAnySkeleton(currentStep.codeBlocks[0]) : false;
       const assisted = hasSkeleton && (showSolution[blockKey] || revealedHints[blockKey]?.length > 0 || revealedAnswers[blockKey]?.length > 0);
       completeStep(currentStep.id, !!assisted);
@@ -616,6 +674,7 @@ export function StepView({
   };
 
   const handleNextStep = () => {
+    const isLastStep = currentStepIndex === steps.length - 1;
     if (!isCompleted) {
       const blockKey = `${currentStepIndex}-0`;
       const hasSkeleton = currentStep.codeBlocks?.[0] ? hasAnySkeleton(currentStep.codeBlocks[0]) : false;
@@ -626,6 +685,10 @@ export function StepView({
     if (currentStepIndex < steps.length - 1) {
       setDirection(1);
       onStepChange(currentStepIndex + 1);
+    }
+    // When clicking "Complete Lab" on last step, always ensure parent has this step recorded (idempotent)
+    if (isLastStep) {
+      onComplete(currentStepIndex);
     }
   };
 
