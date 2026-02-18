@@ -110,18 +110,47 @@ async function updateLeaderboardEntry(email: string, updates: Partial<Leaderboar
     const db = client.db(LEADERBOARD_DB);
     const collection = db.collection<LeaderboardEntry>(LEADERBOARD_COLLECTION);
 
+    // Build queries dynamically to avoid ConflictingUpdateOperators error
+    // (e.g., if 'score' is in updates, it shouldn't be in $setOnInsert)
+    const setQuery: any = { ...updates, lastActive: Date.now() };
+    const setOnInsertQuery: any = {
+      email,
+      completedLabs: [],
+      labTimes: {},
+      hintsUsed: 0,
+      solutionsRevealed: 0
+    };
+
+    // If a field is in setQuery, remove it from setOnInsertQuery to avoid conflict
+    if (updates.score !== undefined) delete setOnInsertQuery.score;
+    if (updates.completedLabs !== undefined) delete setOnInsertQuery.completedLabs;
+    if (updates.labTimes !== undefined) delete setOnInsertQuery.labTimes;
+    if (updates.hintsUsed !== undefined) delete setOnInsertQuery.hintsUsed;
+    if (updates.solutionsRevealed !== undefined) delete setOnInsertQuery.solutionsRevealed;
+
+    // However, if it's a new document, we NEED these fields initialized.
+    // The previous logic was failing because score: 0 was always in setOnInsert. 
+    // If we only add score: 0 to setOnInsert when it's NOT in updates, we fixed it.
+    const defaultInit: any = {
+      score: 0,
+      completedLabs: [],
+      labTimes: {},
+      hintsUsed: 0,
+      solutionsRevealed: 0
+    };
+
+    const finalSetOnInsert: any = { email };
+    Object.keys(defaultInit).forEach(key => {
+      if (updates[key as keyof LeaderboardEntry] === undefined) {
+        finalSetOnInsert[key] = defaultInit[key];
+      }
+    });
+
     const result = await collection.findOneAndUpdate(
       { email },
       {
-        $set: { ...updates, lastActive: Date.now() },
-        $setOnInsert: {
-          email,
-          score: 0,
-          completedLabs: [],
-          labTimes: {},
-          hintsUsed: 0,
-          solutionsRevealed: 0
-        }
+        $set: setQuery,
+        $setOnInsert: finalSetOnInsert
       },
       { upsert: true, returnDocument: 'after' }
     );

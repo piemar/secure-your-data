@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { addPoints, completeLab as updateLeaderboardLab, startLab as updateLeaderboardStart } from '@/utils/leaderboardUtils';
 
 interface LabState {
@@ -76,7 +76,7 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
     }, []);
 
-    const resetProgress = () => {
+    const resetProgress = useCallback(() => {
         setMongoUri('');
         setAwsCreds({ awsAccessKeyId: '', awsSecretAccessKey: '', awsKeyArn: '', awsRegion: 'eu-central-1' });
         setCurrentScore(0);
@@ -94,24 +94,24 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             libmongocrypt: { verified: false, path: '' },
             mongoCryptShared: { verified: false, path: '' }
         });
-        setUserSuffix('');
+        setUserSuffixState('');
         // Don't reset email - keep it persistent
-    };
+    }, []);
 
-    const setAwsCredentials = (creds: { accessKeyId: string; secretAccessKey: string; keyArn: string; region: string }) => {
+    const setAwsCredentials = useCallback((creds: { accessKeyId: string; secretAccessKey: string; keyArn: string; region: string }) => {
         setAwsCreds({
             awsAccessKeyId: creds.accessKeyId,
             awsSecretAccessKey: creds.secretAccessKey,
             awsKeyArn: creds.keyArn,
             awsRegion: creds.region
         });
-    };
+    }, []);
 
-    const setAwsKeyArn = (arn: string) => {
+    const setAwsKeyArn = useCallback((arn: string) => {
         setAwsCreds(prev => ({ ...prev, awsKeyArn: arn }));
-    };
+    }, []);
 
-    const completeStep = (stepId: string, assisted: boolean) => {
+    const completeStep = useCallback((stepId: string, assisted: boolean) => {
         if (completedSteps.includes(stepId)) return;
 
         setCompletedSteps(prev => [...prev, stepId]);
@@ -122,67 +122,67 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } else {
             setCurrentScore(prev => prev + points);
         }
-        
+
         // Update leaderboard with points
         const email = userEmail || localStorage.getItem('userEmail') || '';
         if (email) {
             // Determine lab number from stepId (e.g., "lab1-step1" -> 1)
             const labMatch = stepId.match(/lab(\d+)/i);
             const labNumber = labMatch ? parseInt(labMatch[1]) : 1;
-            
+
             addPoints(email, points, labNumber);
         }
-    };
+    }, [completedSteps, userEmail]);
 
-    const setVerifiedTool = (tool: string, verified: boolean, path: string) => {
+    const setVerifiedTool = useCallback((tool: string, verified: boolean, path: string) => {
         setVerifiedTools(prev => ({
             ...prev,
             [tool]: { verified, path }
         }));
-    };
+    }, []);
 
-    const setUserSuffix = (suffix: string) => {
+    const setUserSuffix = useCallback((suffix: string) => {
         setUserSuffixState(suffix);
-    };
+    }, []);
 
-    const setUserEmail = (email: string) => {
+    const setUserEmail = useCallback((email: string) => {
         setUserEmailState(email);
         localStorage.setItem('userEmail', email);
-    };
+    }, []);
 
-    const completeLab = (labNumber: number) => {
+    const completeLab = useCallback((labNumber: number) => {
         if (!completedLabs.includes(labNumber)) {
             const updated = [...completedLabs, labNumber];
             setCompletedLabs(updated);
             localStorage.setItem('completedLabs', JSON.stringify(updated));
-            
+
             // Update leaderboard
             const email = userEmail || localStorage.getItem('userEmail') || '';
             if (email) {
                 updateLeaderboardLab(email, labNumber, currentScore);
             }
         }
-    };
+    }, [completedLabs, userEmail, currentScore]);
 
-    const startLab = (labNumber: number) => {
+    const startLab = useCallback((labNumber: number) => {
         if (!labStartTimes[labNumber]) {
             const updated = { ...labStartTimes, [labNumber]: Date.now() };
             setLabStartTimes(updated);
             localStorage.setItem('labStartTimes', JSON.stringify(updated));
-            
+
             // Update leaderboard
             const email = userEmail || localStorage.getItem('userEmail') || '';
             if (email) {
                 updateLeaderboardStart(email, labNumber);
             }
         }
-    };
+    }, [labStartTimes, userEmail]);
 
-    const isLabCompleted = (labNumber: number) => {
+    const isLabCompleted = useCallback((labNumber: number) => {
         return completedLabs.includes(labNumber);
-    };
+    }, [completedLabs]);
 
-    const isLabAccessible = (labNumber: number) => {
+    const isLabAccessible = useCallback((labNumber: number) => {
         // Lab 1 is always accessible
         if (labNumber === 1) return true;
         // Lab 2 requires Lab 1
@@ -190,7 +190,7 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Lab 3 requires Lab 1
         if (labNumber === 3) return isLabCompleted(1);
         return false;
-    };
+    }, [isLabCompleted]);
 
     return (
         <LabContext.Provider value={{
