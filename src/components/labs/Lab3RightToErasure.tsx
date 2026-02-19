@@ -115,7 +115,9 @@ async function run() {
   // Migration: Read plaintext, encrypt explicitly, write to secure collection
   console.log("\\n=== Migrating data with Explicit Encryption ===");
   const legacyDocs = await legacyCollection.find({}).toArray();
-  
+  // Allow re-running: clear target so we don't get duplicate _id errors
+  await secureCollection.deleteMany({});
+
   let migratedCount = 0;
   for (const doc of legacyDocs) {
     // Explicit encryption: encrypt the SSN field
@@ -208,7 +210,9 @@ async function run() {
   }
 
   const legacyDocs = await legacyCollection.find({}).toArray();
-  
+  // Allow re-running: clear target so we don't get duplicate _id errors
+  await secureCollection.deleteMany({});
+
   for (const doc of legacyDocs) {
     // TASK: Encrypt the SSN field explicitly
     const encryptedSSN = await encryption._________(doc.ssn, {
@@ -232,8 +236,8 @@ run().catch(console.error);`,
             inlineHints: [
               { line: 28, blankText: '______', hint: 'Method to retrieve a single document', answer: 'findOne' },
               { line: 38, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
-              { line: 63, blankText: '_________', hint: 'Method to encrypt a value manually', answer: 'encrypt' },
-              { line: 64, blankText: '____________', hint: 'Algorithm suffix for queryable encryption', answer: 'Deterministic' }
+              { line: 65, blankText: '_________', hint: 'Method to encrypt a value manually', answer: 'encrypt' },
+              { line: 66, blankText: '____________', hint: 'Algorithm suffix for queryable encryption', answer: 'Deterministic' }
             ],
             // Tier 2: Challenge
             challengeSkeleton: `// ══════════════════════════════════════════════════════════════
@@ -730,12 +734,12 @@ KEY_ID=$(aws kms describe-key --key-id "${aliasName}" --region eu-central-1 --qu
 aws kms get-key-policy --key-id $KEY_ID --policy-name default --region eu-central-1
 
 # 4. Verify you can use the key (test encryption/decryption)
-aws kms encrypt --key-id "${aliasName}" --plaintext "test" --output text --query CiphertextBlob
+CIPHERTEXT=$(aws kms encrypt --key-id "${aliasName}" --plaintext "test" --output text --query CiphertextBlob)
 
 # Expected Output: Base64-encoded ciphertext (proves you can encrypt)
 
-# 5. Test decryption
-aws kms decrypt --ciphertext-blob <paste-ciphertext-from-step-4> --output text --query Plaintext
+# 5. Test decryption (uses ciphertext from step 4)
+aws kms decrypt --ciphertext-blob "$CIPHERTEXT" --output text --query Plaintext
 
 # Expected Output: "dGVzdA==" (base64 for "test") - proves you can decrypt
 
@@ -760,12 +764,12 @@ KEY_ID=$(aws kms describe-key --key-id "${aliasName}" --region eu-central-1 --qu
 aws kms ______________ --key-id $KEY_ID --policy-name default --region eu-central-1
 
 # 4. Verify you can use the key (test encryption/decryption)
-aws kms _______ --key-id "${aliasName}" --plaintext "test" --output text --query CiphertextBlob
+CIPHERTEXT=$(aws kms _______ --key-id "${aliasName}" --plaintext "test" --output text --query CiphertextBlob)
 
 # Expected Output: Base64-encoded ciphertext (proves you can encrypt)
 
-# 5. Test decryption
-aws kms _______ --ciphertext-blob <paste-ciphertext-from-step-4> --output text --query Plaintext
+# 5. Test decryption (uses ciphertext from step 4)
+aws kms _______ --ciphertext-blob "$CIPHERTEXT" --output text --query Plaintext
 
 # Expected Output: "dGVzdA==" (base64 for "test") - proves you can decrypt
 
