@@ -44,11 +44,12 @@ export function Lab1CSFLE() {
         difficulty: 'basic' as DifficultyLevel,
         understandSection: 'The CMK is the root of trust in Envelope Encryption. It never leaves the KMS Hardware Security Module (HSM). This key will "wrap" (encrypt) the Data Encryption Keys (DEKs) that MongoDB stores.',
         doThisSection: [
-          'Run the AWS CLI command to create a new symmetric key',
+          'Open your terminal and run the AWS CLI commands below (copy or type them).',
           'Create an alias for easier reference',
-          'Save the Key ID for the next step'
+          'Save the Key ID for the next step',
+          'Click Verify in this lab when done.'
         ],
-        description: 'Create your Customer Master Key (CMK) in AWS KMS. This key is the root of trust that wraps all Data Encryption Keys.',
+        description: 'Create your Customer Master Key (CMK) in AWS KMS. This key is the root of trust that wraps all Data Encryption Keys. Copy the commands below into your terminal (where AWS CLI is installed and configured), run them, then click Verify in this lab.',
         tips: [
           'ROOT OF TRUST: The CMK never leaves the KMS Hardware Security Module (HSM).',
           'SA TIP: Use aliases for keys to allow easier rotation without code changes.'
@@ -206,7 +207,8 @@ echo "Alias Created: ${aliasName}"`,
           {
             filename: 'AWS CLI - Put Key Policy',
             language: 'bash',
-            code: `# Re-run to get ID if needed
+            code: `# Run these commands in your terminal (AWS CLI must be configured).
+# Re-run to get ID if needed
 KMS_KEY_ID=$(aws kms describe-key --key-id ${aliasName} --query 'KeyMetadata.KeyId' --output text)
 IAM_ARN=$(aws sts get-caller-identity --query 'Arn' --output text)
 ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text)

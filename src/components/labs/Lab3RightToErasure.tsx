@@ -718,7 +718,8 @@ node rotateCMK.cjs
           {
             filename: 'AWS CLI - Verify New CMK Exists',
             language: 'bash',
-            code: `# 1. List all KMS aliases to find your new CMK
+            code: `# Run these in your terminal (AWS CLI with access to KMS).
+# 1. List all KMS aliases to find your new CMK
 aws kms list-aliases --query "Aliases[?contains(AliasName, 'mongodb')].AliasName" --output table
 
 # 2. Verify the NEW key exists and is enabled

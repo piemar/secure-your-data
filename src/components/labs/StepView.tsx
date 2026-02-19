@@ -889,9 +889,13 @@ export function StepView({
         {/* Read-only mode toggle removed - difficulty/solution controls are now per-block in header */}
 
         {/* Code Editor & Output - Resizable Split */}
-        <div className="flex-1 overflow-hidden min-h-0">
+        <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
           {currentStep.codeBlocks && currentStep.codeBlocks.length > 0 ? (
-            <ResizablePanelGroup direction="vertical" className="h-full">
+            <>
+              <div className="flex-shrink-0 px-3 py-2 text-xs text-muted-foreground bg-muted/50 border-b border-border">
+                Copy the code below into <strong>your</strong> terminal or mongosh (see each block title), run it there, then click <strong>Verify</strong> to check your progress.
+              </div>
+              <ResizablePanelGroup direction="vertical" className="flex-1 min-h-0">
               {/* Code Editor Panel */}
               <ResizablePanel defaultSize={outputOpen ? 50 : 85} minSize={30}>
                 <div className={cn(
@@ -1085,7 +1089,8 @@ export function StepView({
                   </div>
                 </div>
               </ResizablePanel>
-            </ResizablePanelGroup>
+              </ResizablePanelGroup>
+            </>
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground">
               <div className="text-center">

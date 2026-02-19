@@ -1,4 +1,4 @@
-import { Clock, Lightbulb, ArrowRight, BookOpen } from 'lucide-react';
+import { Clock, Lightbulb, ArrowRight, BookOpen, Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EncryptionFlowVisual } from '@/components/workshop/EncryptionFlowVisual';
 
@@ -43,6 +43,14 @@ export function LabIntroTab({
             <Clock className="w-3 h-3" />
             <span>{duration}</span>
           </div>
+        </div>
+
+        {/* How to use this lab */}
+        <div className="p-3 rounded-lg border border-border bg-muted/30 flex items-start gap-3">
+          <Terminal className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-muted-foreground">
+            Code in each step is for you to <strong>copy</strong> and run in <strong>your</strong> terminal or <strong>mongosh</strong> (as indicated). Nothing runs in the browser. After running, click <strong>Verify</strong> (and <strong>Continue</strong> when it passes).
+          </p>
         </div>
 
         {/* Two Column Layout: What You'll Build + Key Concepts */}

@@ -53,6 +53,7 @@ export const LabSetupWizard: React.FC = () => {
     const [showPrereqDetails, setShowPrereqDetails] = useState(false);
     const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
     const [bypassPrereqs, setBypassPrereqs] = useState(false);
+    const [howToUseOpen, setHowToUseOpen] = useState(false);
 
     // Get attendee name from localStorage (set during registration)
     const attendeeName = localStorage.getItem('workshop_attendee_name') || '';
@@ -203,9 +204,10 @@ export const LabSetupWizard: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="text-sm text-muted-foreground bg-muted/30 p-3 rounded border border-dashed">
+                    <div className="text-sm text-muted-foreground bg-muted/30 p-3 rounded border border-dashed space-y-1">
                         <p className="font-semibold flex items-center gap-1 mb-1"><HelpCircle className="w-3 h-3" /> Get Started:</p>
                         <p>Open <strong>Lab 1: CSFLE Fundamentals</strong> from the sidebar to create your first Customer Master Key (CMK).</p>
+                        <p>In each step you&apos;ll <strong>copy</strong> commands or scripts into <strong>your</strong> terminal or mongosh, run them, then use <strong>Verify</strong> in the lab.</p>
                     </div>
 
                     {/* Architecture Diagram */}
@@ -235,6 +237,42 @@ export const LabSetupWizard: React.FC = () => {
             </CardHeader>
 
             <CardContent className="space-y-4 px-6">
+                {/* How to use the labs - collapsible, collapsed by default */}
+                <Collapsible open={howToUseOpen} onOpenChange={setHowToUseOpen}>
+                    <CollapsibleTrigger asChild>
+                        <button
+                            type="button"
+                            className={cn(
+                                "w-full flex items-center justify-between gap-2 p-3 rounded-lg border border-primary/20 bg-primary/5 text-left",
+                                "hover:bg-primary/10 transition-colors"
+                            )}
+                        >
+                            <span className="font-semibold text-sm flex items-center gap-2">
+                                <HelpCircle className="w-4 h-4 text-primary" />
+                                How to use the labs
+                            </span>
+                            {howToUseOpen ? (
+                                <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                            ) : (
+                                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                            )}
+                        </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                        <div className="px-3 pb-3 pt-1 border border-t-0 border-primary/20 rounded-b-lg -mt-px bg-primary/5">
+                            <p className="text-sm text-muted-foreground leading-relaxed">
+                                Code here is reference only—copy or type it. Nothing runs in the browser.
+                            </p>
+                            <p className="text-sm text-muted-foreground leading-relaxed mt-2">
+                                Run everything on your machine: use your terminal for AWS CLI and Node.js, and mongosh when the step says so.
+                            </p>
+                            <p className="text-sm text-muted-foreground leading-relaxed mt-2">
+                                <span className="text-foreground/90 font-medium">Workflow:</span> Read the step · run the code in your terminal or mongosh · come back and click <strong className="text-foreground/90">Verify</strong> · then <strong className="text-foreground/90">Continue</strong> when it passes.
+                            </p>
+                        </div>
+                    </CollapsibleContent>
+                </Collapsible>
+
                 {/* Prerequisites Overview Checklist */}
                 <PrerequisitesChecklist
                     prerequisites={PREREQUISITES}
