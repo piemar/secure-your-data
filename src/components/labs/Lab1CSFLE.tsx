@@ -51,8 +51,8 @@ export function Lab1CSFLE() {
         ],
         description: 'Create your Customer Master Key (CMK) in AWS KMS. This key is the root of trust that wraps all Data Encryption Keys. Copy the commands below into your terminal (where AWS CLI is installed and configured), run them, then click Verify in this lab.',
         tips: [
-          'ROOT OF TRUST: The CMK never leaves the KMS Hardware Security Module (HSM).',
-          'SA TIP: Use aliases for keys to allow easier rotation without code changes.'
+          'The CMK never leaves the KMS Hardware Security Module (HSM). In customer conversations, you will explain that the CMK is the only key that never leaves the HSM.',
+          'Use aliases for keys to allow easier rotation without code changes.'
         ],
         codeBlocks: [
           {
@@ -200,8 +200,8 @@ echo "Alias Created: ${aliasName}"`,
         estimatedTime: '5 min',
         description: 'A Common Pitfall: Even if your IAM User has permissions, the Key itself must *trust* you. You must explicity attach a Key Policy to the CMK to allow your IAM User to administer and use it.',
         tips: [
-          'RESOURCE-BASED POLICY: KMS Keys use resource policies similar to S3 buckets.',
-          'SA TIP: In production, separate "Key Admin" vs "Key User" permissions. For this lab, you are both.'
+          'KMS keys use resource-based policies (like S3). The key must explicitly trust your IAM principal—this is a common cause of "access denied" in customer setups.',
+          'In production, separate "Key Admin" vs "Key User" permissions. For this lab, you are both.'
         ],
         codeBlocks: [
           {
@@ -373,17 +373,17 @@ aws kms ______________ --key-id $KMS_KEY_ID --policy-name default --policy file:
         title: 'Initialize Key Vault with Unique Index',
         estimatedTime: '5 min',
         difficulty: 'basic' as DifficultyLevel,
-        understandSection: 'The Key Vault is a special MongoDB collection that stores encrypted DEKs. A unique partial index on keyAltNames prevents duplicate key names.',
+        understandSection: 'The Key Vault is a special MongoDB collection that stores encrypted DEKs. A unique partial index on keyAltNames prevents duplicate key names. The collection name __keyVault is required by the MongoDB encryption driver. In mongosh, use db.getCollection(\'__keyVault\') because db.__keyVault is not valid.',
         doThisSection: [
           'Connect to Atlas using mongosh',
           'Switch to the encryption database',
           'Create a unique partial index on the __keyVault collection'
         ],
-        description: 'The Key Vault collection stores your encrypted DEKs. You MUST create a unique index manually. The driver does NOT do this for you.',
+        description: 'The Key Vault collection stores your encrypted DEKs. You MUST create a unique index manually. The driver does NOT do this for you. We use the database "encryption" and collection "__keyVault" because that is the namespace the CSFLE driver expects.',
         tips: [
-          'IMPORTANT: Run this command in your MONGODB SHELL (mongosh) connected to Atlas.',
-          'Architecture: Usually stored in a database named "encryption" and collection "__keyVault".',
-          'TIP: When copying multiline scripts into mongosh, use the .editor command first to enter multiline mode. Paste your code, then press Ctrl+D to execute.'
+          'Run this in your MongoDB Shell (mongosh) connected to Atlas, not in Node.js.',
+          'Best practice: The unique partial index on keyAltNames is required by CSFLE. Share with customers: https://www.mongodb.com/docs/manual/core/index-partial/',
+          'If paste fails in mongosh, use the one-liner below, or use .editor then paste and Ctrl+D.'
         ],
         codeBlocks: [
           {
@@ -395,10 +395,9 @@ aws kms ______________ --key-id $KMS_KEY_ID --policy-name default --policy file:
 mongosh "${mongoUri}"
 
 use encryption
-db.getCollection("__keyVault").createIndex(
-  { keyAltNames: 1 },
-  { unique: true, partialFilterExpression: { keyAltNames: { $exists: true } } }
-);`,
+
+// 2. Create the unique index (one-liner - copy this if multiline paste fails):
+db.getCollection("__keyVault").createIndex({ keyAltNames: 1 }, { unique: true, partialFilterExpression: { keyAltNames: { $exists: true } } });`,
             // Tier 1: Guided
             skeleton: `// ══════════════════════════════════════════════════════════════
 // Initialize Key Vault with Unique Index
@@ -520,12 +519,12 @@ mongosh "${mongoUri}"
           'Use ClientEncryption.createDataKey() to generate and store the DEK',
           'Run the script with Node.js'
         ],
-        description: 'Generate the actual keys used to encrypt data using a Node.js script with the mongodb-client-encryption library.',
+        description: 'Generate the actual keys used to encrypt data using a Node.js script with the mongodb-client-encryption library. Understanding createDataKey and keyAltNames helps you explain to customers how DEKs are created and stored. We create the DEK explicitly here so you see the key hierarchy (CMK → DEK); in production you can also let the driver create DEKs on first use (see CSFLE fundamentals in MongoDB docs).',
         tips: [
-          'PREREQUISITE: First run: npm install mongodb mongodb-client-encryption @aws-sdk/credential-providers',
-          'RUN WITH NODE.JS: This is a Node.js script. Run with: node createKey.cjs',
-          'NOT MONGOSH: This is NOT a mongosh command - it must run in your terminal with Node.js.',
-          'MULTI-DEK: In production, create different keys for different sensitivity levels.'
+          'Note: First run npm install mongodb mongodb-client-encryption @aws-sdk/credential-providers',
+          'Run this Node.js script in your terminal (not mongosh): node createKey.cjs',
+          'Region: The script uses the default region (eu-central-1). To use another region, change the region in the masterKey object to your AWS region (e.g. us-east-1).',
+          'In production, create different DEKs for different sensitivity levels.'
         ],
         codeBlocks: [
           {
@@ -539,8 +538,8 @@ const uri = "${mongoUri}";
 const keyVaultNamespace = "encryption.__keyVault";
 
 async function run() {
-  // Get credentials from SSO session - explicitly use SSO to avoid picking up IAM user credentials
-  const credentials = await fromSSO()();
+  // Replace YOUR_SSO_PROFILE with your AWS SSO profile name, or use fromSSO()() for default profile
+  const credentials = await fromSSO({ profile: 'YOUR_SSO_PROFILE' })();
 
   // MongoDB client encryption expects only: accessKeyId, secretAccessKey, sessionToken
   // Filter out expiration and other fields that AWS SDK includes
@@ -590,17 +589,17 @@ run().catch(console.dir);`,
 // Generate Data Encryption Key (DEK) using Node.js
 // ══════════════════════════════════════════════════════════════
 // The DEK is what actually encrypts your data. The CMK "wraps" the DEK.
-//
 // Create a file called "createKey.cjs" and run with: node createKey.cjs
 
-const { MongoClient, ________________ } = require("mongodb");
+const { MongoClient, ClientEncryption } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
 const uri = "${mongoUri}";
 const keyVaultNamespace = "encryption.__keyVault";
 
 async function run() {
-  const credentials = await fromSSO()();
+  // Replace YOUR_SSO_PROFILE with your AWS SSO profile name, or use fromSSO()() for default
+  const credentials = await fromSSO({ profile: 'YOUR_SSO_PROFILE' })();
 
   const kmsProviders = {
     aws: {
@@ -611,9 +610,7 @@ async function run() {
   };
 
   const client = await MongoClient.connect(uri);
-  
-  // TASK: Initialize ClientEncryption with the correct options
-  const encryption = new ________________(client, {
+  const encryption = new ClientEncryption(client, {
     keyVaultNamespace,
     kmsProviders,
   });
@@ -633,7 +630,7 @@ async function run() {
     return;
   }
 
-  // TASK: Create the Data Encryption Key using the correct method
+  // TASK: Create the Data Encryption Key (fill in the method and option name)
   const dekId = await encryption.________________("aws", {
     masterKey: { key: "${aliasName}", region: "${awsRegion}" },
     ___________: [keyAltName]
@@ -644,34 +641,16 @@ async function run() {
 }
 
 run().catch(console.dir);`,
-            // Inline hints for Guided mode - line numbers match skeleton exactly
-            // L1-6: comments, L7: empty, L8: require with ________________, L9: require fromSSO
-            // L10-27: more setup, L28: new ________________(client, L29-35: more code
-            // L36: encryption.________________("aws", L37: masterKey, L38: ___________: [keyAltName]
-            // Inline hints - updated line numbers after adding DEK existence check
-            // L8: ClientEncryption import, L28: ClientEncryption constructor
-            // L49: createDataKey method, L51: keyAltNames option
+            // Inline hints: focus on createDataKey and keyAltNames (line numbers match skeleton)
             inlineHints: [
               {
-                line: 8,
-                blankText: '________________',
-                hint: 'The class from mongodb package that handles encryption operations',
-                answer: 'ClientEncryption'
-              },
-              {
-                line: 28,
-                blankText: '________________',
-                hint: 'Constructor for the encryption helper class',
-                answer: 'ClientEncryption'
-              },
-              {
-                line: 49,
+                line: 44,
                 blankText: '________________',
                 hint: 'Method to generate a new Data Encryption Key',
                 answer: 'createDataKey'
               },
               {
-                line: 51,
+                line: 46,
                 blankText: '___________',
                 hint: 'Option to assign a human-readable name to the DEK',
                 answer: 'keyAltNames'
@@ -694,10 +673,8 @@ node createKey.cjs
           }
         ],
         hints: [
-          'Blank 1: Import "ClientEncryption" from the mongodb package.',
-          'Blank 2: The class to initialize for encryption operations is "ClientEncryption".',
-          'Blank 3: The method to create a new Data Encryption Key is "createDataKey".',
-          'Blank 4: The option to give your DEK a human-readable name is "keyAltNames".'
+          'The method to create a new Data Encryption Key is "createDataKey".',
+          'The option to give your DEK a human-readable name is "keyAltNames".'
         ],
         onVerify: async () => validatorUtils.checkDataKey(mongoUri, `user-${suffix}-ssn-key`)
       },
@@ -707,10 +684,10 @@ node createKey.cjs
         estimatedTime: '5 min',
         description: 'Connect to MongoDB Atlas using mongosh and query the key vault to verify that exactly one Data Encryption Key has been created. This is a critical verification step.',
         tips: [
-          'VERIFICATION: This step confirms the DEK was successfully created and stored.',
-          'ARCHITECTURE: The key vault stores encrypted DEKs - the CMK encrypts these DEKs at rest.',
-          'DEBUGGING: If you see 0 keys, re-run the createKey.cjs script. If you see multiple keys, you may have run it more than once.',
-          'TIP: When copying multiline scripts into mongosh, use the .editor command first to enter multiline mode. Paste your code, then press Ctrl+D to execute.'
+          'This step confirms the DEK was successfully created and stored in the key vault.',
+          'The key vault stores encrypted DEKs; the CMK encrypts these DEKs at rest.',
+          'If you see 0 keys, re-run createKey.cjs. If you see multiple keys, you may have run it more than once.',
+          'When copying multiline scripts into mongosh, use .editor first, paste your code, then press Ctrl+D.'
         ],
         codeBlocks: [
           {
@@ -781,11 +758,11 @@ db.getCollection("__keyVault").________________()`,
         estimatedTime: '15 min',
         description: 'Create and run a Node.js test script that demonstrates the difference between encrypted and non-encrypted connections. This proves that CSFLE is working by showing ciphertext vs plaintext side-by-side.',
         tips: [
-          'RUN WITH NODE.JS: This is a Node.js script, NOT mongosh. Run it with: node testCSFLE.cjs',
-          'SAME URI: Use the same MongoDB URI in testCSFLE.cjs as in Lab Setup. Verification checks the cluster from Lab Setup.',
-          'DEMO POWER: This side-by-side comparison is your most powerful SA tool for showing CSFLE in action.',
-          'ARCHITECTURE: The encrypted client automatically encrypts on write and decrypts on read.',
-          'BEST PRACTICE: Use keyAltNames instead of keyId for better maintainability and key rotation support.'
+          'Run this Node.js script in your terminal (not mongosh): node testCSFLE.cjs',
+          'Use the same MongoDB URI in testCSFLE.cjs as in Lab Setup. Verification checks the cluster from Lab Setup.',
+          'This side-by-side comparison is a strong SA demo for showing CSFLE in action.',
+          'The encrypted client automatically encrypts on write and decrypts on read.',
+          'Use keyAltNames instead of keyId for better maintainability and key rotation support.'
         ],
         codeBlocks: [
           {
@@ -798,11 +775,9 @@ const uri = "${mongoUri}";
 const keyAltName = "user-${suffix}-ssn-key";
 
 async function run() {
-  // Get credentials from SSO session - explicitly use SSO to avoid picking up IAM user credentials
-  const credentials = await fromSSO()();
+  // Replace YOUR_SSO_PROFILE with your AWS SSO profile name, or use fromSSO()() for default profile
+  const credentials = await fromSSO({ profile: 'YOUR_SSO_PROFILE' })();
 
-  // MongoDB client encryption expects only: accessKeyId, secretAccessKey, sessionToken
-  // Filter out expiration and other fields that AWS SDK includes
   const kmsProviders = {
     aws: {
       accessKeyId: credentials.accessKeyId,
@@ -947,7 +922,8 @@ const uri = "${mongoUri}";
 const keyAltName = "user-${suffix}-ssn-key";
 
 async function run() {
-  const credentials = await fromSSO()();
+  // Replace YOUR_SSO_PROFILE with your AWS SSO profile name, or use fromSSO()() for default
+  const credentials = await fromSSO({ profile: 'YOUR_SSO_PROFILE' })();
   const kmsProviders = {
     aws: {
       accessKeyId: credentials.accessKeyId,
