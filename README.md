@@ -67,6 +67,39 @@ Before running the application, ensure you have:
    - Choose **Presentation Mode** to review concepts
    - Or jump into **Lab 1** to start hands-on practice
 
+### Quick start with Docker
+
+Run the workshop in a container with all required tools (Node.js, AWS CLI, mongosh) pre-installed. Works on **Mac and Windows**; the image supports **arm64** (Apple Silicon) and **amd64** (Intel/AMD). You only need Docker Desktop installed.
+
+1. **Build the image** (from the repo root):
+   ```bash
+   docker build -t mongodb-workshop .
+   ```
+
+2. **Run the container** (mount your AWS config so the app can verify KMS):
+   ```bash
+   # Mac / Linux
+   docker run -it --rm -p 8080:8080 -v ~/.aws:/root/.aws:ro mongodb-workshop
+
+   # Windows (PowerShell) - use your AWS config path
+   docker run -it --rm -p 8080:8080 -v ${env:USERPROFILE}\.aws:/root/.aws:ro mongodb-workshop
+   ```
+
+3. **Open your browser** at `http://localhost:8080`.
+
+4. In **Lab Setup**, enter your **MongoDB Atlas connection string**. If you use **AWS SSO**, run `aws sso login` on your host first; the mounted `~/.aws` is used inside the container for verification.
+
+**Optional:** Pass a default MongoDB URI via env (the app can use it to pre-fill Lab Setup if you add support):
+   ```bash
+   docker run -it --rm -p 8080:8080 -v ~/.aws:/root/.aws:ro -e MONGODB_URI="mongodb+srv://..." mongodb-workshop
+   ```
+
+**Multi-arch build (for CI or to publish one tag for both arm64 and amd64):**
+   ```bash
+   docker buildx build --platform linux/amd64,linux/arm64 -t mongodb-workshop:latest --load .
+   ```
+   Docker Desktop will pull the matching architecture automatically when you run the image.
+
 ### Application Structure
 
 ```
