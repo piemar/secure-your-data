@@ -26,6 +26,9 @@ dist-ssr
 # Lab runner scripts (attendees create these at runtime; don't copy)
 createKey.cjs
 testCSFLE.cjs
+app.cjs
+keyvault-setup.cjs
+keyvault-verify.cjs
 createDeks.cjs
 createQECollection.cjs
 createQECollection.Cjs
@@ -34,6 +37,7 @@ queryQERange.cjs
 migrateToCSFLE.cjs
 multiTenantIsolation.cjs
 rotateCMK.cjs
+workshop-run-*.cjs
 
 # Test and CI
 coverage

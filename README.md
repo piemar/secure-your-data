@@ -101,6 +101,11 @@ Use this path if you prefer to run without Docker or need to build the image you
    ```bash
    docker build -t mongodb-workshop .
    ```
+   If the image doesn’t reflect your latest code (e.g. after a merge), build without cache:  
+   `docker build --no-cache -t mongodb-workshop .`  
+   Or use cache-busting so only the source layer is refreshed:  
+   `docker build --build-arg CACHEBUST=$(date +%s) -t mongodb-workshop .`
+
    Then use `mongodb-workshop` instead of `pierrepetersson/mongodb-workshop-sandbox:latest` in the `docker run` commands in [Quick start using container image](#quick-start-using-container-image).
 
 ### Central deployment (multiple attendees)
@@ -273,11 +278,12 @@ docker buildx inspect --bootstrap
 
 If `multiarch` already exists, run `docker buildx use multiarch` instead of the first line.
 
-Then build and push (example for Docker Hub user `pierrepetersson`). **You must be logged in** to Docker Hub as the user that owns the repository, and the repository must exist (create it at [hub.docker.com](https://hub.docker.com) if needed):
+Then build and push (example for Docker Hub user `pierrepetersson`). **You must be logged in** to Docker Hub as the user that owns the repository, and the repository must exist (create it at [hub.docker.com](https://hub.docker.com) if needed). To ensure the image includes the latest code, add `--no-cache` or `--build-arg CACHEBUST=$(date +%s)`:
 
 ```bash
 docker login
-docker buildx build --platform linux/amd64,linux/arm64 -t pierrepetersson/mongodb-workshop-sandbox:latest --push .
+docker buildx build --platform linux/amd64,linux/arm64 --build-arg CACHEBUST=$(date +%s) -t pierrepetersson/mongodb-workshop-sandbox:latest --push .
+# If you need the image to reflect latest code: add --no-cache or --build-arg CACHEBUST=$(date +%s)
 ```
 
 Use your own Docker Hub username instead of `pierrepetersson` if you're publishing under a different account (e.g. `youruser/mongodb-workshop:latest`). If you see *"push access denied"* or *"authorization failed"*, run `docker login` and ensure you're pushing to a repository you own.

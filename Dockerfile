@@ -60,7 +60,10 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci
 
-# Copy application source
+# Copy application source. To force image to include latest code, build with:
+#   docker build --build-arg CACHEBUST=$(date +%s) -t ...
+# or: docker build --no-cache -t ...
+ARG CACHEBUST
 COPY . .
 
 EXPOSE 8080
