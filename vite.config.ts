@@ -104,6 +104,13 @@ async function getLeaderboard(): Promise<LeaderboardEntry[]> {
   }
 }
 
+async function clearLeaderboard(): Promise<void> {
+  const client = await getLeaderboardMongoClient();
+  const db = client.db(LEADERBOARD_DB);
+  const collection = db.collection<LeaderboardEntry>(LEADERBOARD_COLLECTION);
+  await collection.deleteMany({});
+}
+
 async function updateLeaderboardEntry(email: string, updates: Partial<LeaderboardEntry>): Promise<LeaderboardEntry> {
   try {
     const client = await getLeaderboardMongoClient();
@@ -244,6 +251,160 @@ export default defineConfig(({ mode }) => ({
       name: 'tooling-proxy',
       configureServer(server: any) {
         server.middlewares.use((req: any, res: any, next: any) => {
+          // Workshop config: cloud provider and defaults (set via env at container start)
+          if (req.url && req.url.startsWith('/api/config')) {
+            const cloud = (process.env.WORKSHOP_CLOUD || 'aws').toLowerCase();
+            const validCloud = ['aws', 'azure', 'gcp'].includes(cloud) ? cloud : 'aws';
+            const deploymentMode = process.env.WORKSHOP_DEPLOYMENT === 'central' ? 'central' : 'local';
+            const config = {
+              cloud: validCloud,
+              deploymentMode,
+              runningInContainer: process.env.WORKSHOP_RUNNING_IN_CONTAINER === 'true',
+              awsDefaultRegion: process.env.WORKSHOP_AWS_DEFAULT_REGION || 'eu-central-1',
+              azureKeyVaultSuffix: process.env.WORKSHOP_AZURE_KEY_VAULT_SUFFIX || '.vault.azure.net',
+              gcpDefaultLocation: process.env.WORKSHOP_GCP_DEFAULT_LOCATION || 'global',
+            };
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(config));
+            return;
+          }
+
+          // Run bash command(s) from in-browser editor (Lab 1 step 1: AWS CLI). Allowlist only.
+          if (req.url && req.url.startsWith('/api/run-bash') && req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+            req.on('end', () => {
+              try {
+                const { command, commands: rawCommands } = JSON.parse(body || '{}');
+                const commands = Array.isArray(rawCommands)
+                  ? rawCommands
+                  : typeof command === 'string'
+                    ? command.split('\n').map((s: string) => s.trim()).filter(Boolean)
+                    : [];
+                const allowedPrefixes = ['aws ', 'echo ', 'env ', 'npm '];
+                const isAllowed = (line: string) => {
+                  const t = line.trim();
+                  if (!t || t.startsWith('#')) return false;
+                  if (allowedPrefixes.some(p => t.startsWith(p))) return true;
+                  if (/^[A-Za-z_][A-Za-z0-9_]*=\$\(aws\s/.test(t) || /^[A-Za-z_][A-Za-z0-9_]*=.*\$\(aws\s/.test(t)) return true;
+                  // Multi-line continuation: CLI options (--description, --query, --output) and closing )
+                  if (/^--[A-Za-z0-9-]+/.test(t)) return true;
+                  if (/^\)\s*;?\s*$/.test(t)) return true;
+                  // Lab 1 Step 2: allow heredoc that creates policy.json so put-key-policy finds the file
+                  if (/^cat\s+<<\w+(\s+>|\s*>>)\s*policy\.json\s*$/.test(t)) return true;
+                  if (t === 'EOF') return true;
+                  // JSON policy body lines (allow letters, numbers, quotes, braces, * for "Resource":"*", ${var})
+                  if (t.length <= 500 && /^\s*[\s"{}\[\]:,*A-Za-z0-9._$-]+$/.test(t)) return true;
+                  return false;
+                };
+                const toRun = commands.filter(isAllowed);
+                if (toRun.length === 0) {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: false, stdout: '', stderr: 'No allowed commands (aws, echo, env, npm, var=$(aws ...), or policy heredoc)', exitCode: 1 }));
+                  return;
+                }
+                const script = toRun.join('\n');
+                exec(script, { timeout: 30000, maxBuffer: 1024 * 1024 }, (error: any, stdout: string, stderr: string) => {
+                  const exitCode = error?.code ?? (error ? 1 : 0);
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({
+                    success: exitCode === 0,
+                    stdout: stdout || '',
+                    stderr: stderr || '',
+                    exitCode,
+                  }));
+                });
+              } catch (e: any) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: false, stdout: '', stderr: e.message || 'Invalid request', exitCode: 1 }));
+              }
+            });
+            return;
+          }
+
+          // Run Node.js code in browser (e.g. createKey.cjs snippet). Uses project cwd and MONGODB_URI.
+          if (req.url && req.url.startsWith('/api/run-node') && req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+            req.on('end', () => {
+              try {
+                const { code, uri } = JSON.parse(body || '{}');
+                if (typeof code !== 'string' || !code.trim()) {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: false, stdout: '', stderr: 'No code provided', message: 'No code provided' }));
+                  return;
+                }
+                const cwd = process.cwd();
+                const tmpFile = path.join(cwd, `workshop-run-${Date.now()}.cjs`);
+                writeFileSync(tmpFile, code, 'utf-8');
+                const env = { ...process.env, MONGODB_URI: uri || '' };
+                exec(`node "${tmpFile}"`, { timeout: 30000, maxBuffer: 1024 * 1024, env, cwd }, (error: any, stdout: string, stderr: string) => {
+                  try { require("fs").unlinkSync(tmpFile); } catch { /* ignore */ }
+                  const exitCode = error?.code ?? (error ? 1 : 0);
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({
+                    success: exitCode === 0,
+                    stdout: stdout || '',
+                    stderr: stderr || '',
+                    exitCode,
+                    error: exitCode !== 0,
+                    message: error?.message || (exitCode !== 0 ? stderr || stdout : ''),
+                  }));
+                });
+              } catch (e: any) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: false, stdout: '', stderr: e.message || 'Invalid request', error: true, message: e.message }));
+              }
+            });
+            return;
+          }
+
+          // Run mongosh eval in browser. Requires URI in body.
+          if (req.url && req.url.startsWith('/api/run-mongosh') && req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+            req.on('end', () => {
+              try {
+                const { code, uri } = JSON.parse(body || '{}');
+                if (typeof code !== 'string' || !code.trim()) {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: false, stdout: '', stderr: 'No code provided', message: 'No code provided' }));
+                  return;
+                }
+                if (!uri || typeof uri !== 'string') {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: false, stdout: '', stderr: 'MongoDB URI required', message: 'MongoDB URI required' }));
+                  return;
+                }
+                const escaped = code.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$');
+                const cmd = `mongosh "${uri}" --quiet --eval "${escaped}"`;
+                exec(cmd, { timeout: 15000, maxBuffer: 512 * 1024 }, (error: any, stdout: string, stderr: string) => {
+                  const exitCode = error?.code ?? (error ? 1 : 0);
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({
+                    success: exitCode === 0,
+                    stdout: stdout || '',
+                    stderr: stderr || '',
+                    exitCode,
+                    error: exitCode !== 0,
+                    message: error?.message || (exitCode !== 0 ? stderr || stdout : ''),
+                  }));
+                });
+              } catch (e: any) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: false, stdout: '', stderr: e.message || 'Invalid request', error: true, message: e.message }));
+              }
+            });
+            return;
+          }
+
           if (req.url && req.url.startsWith('/api/check-tool')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
             const tool = url.searchParams.get('tool');
@@ -282,9 +443,11 @@ export default defineConfig(({ mode }) => ({
               return;
             }
 
-            // Allow only specific tools for security
+            // Allow only specific tools for security (AWS, Azure, GCP CLIs for multi-cloud)
             const allowedTools: Record<string, string> = {
               'aws': 'aws --version',
+              'az': 'az --version',
+              'gcloud': 'gcloud --version',
               'mongosh': 'mongosh --version',
               'node': 'node --version',
               'npm': 'npm --version',
@@ -349,9 +512,66 @@ export default defineConfig(({ mode }) => ({
             return;
           }
 
+          if (req.url && req.url.startsWith('/api/verify-azure-keyvault')) {
+            const url = new URL(req.url, `http://${req.headers.host}`);
+            const vaultName = (url.searchParams.get('vaultName') || '').replace(/[^a-zA-Z0-9\-]/g, '');
+            const keyName = (url.searchParams.get('keyName') || '').replace(/[^a-zA-Z0-9\-]/g, '');
+            if (!vaultName || !keyName) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ success: false, message: 'vaultName and keyName are required' }));
+              return;
+            }
+            const cmd = `az keyvault key show --vault-name ${vaultName} --name ${keyName} --query name -o tsv 2>/dev/null`;
+            exec(cmd, (error: any, stdout: any, stderr: any) => {
+              if (error) {
+                res.statusCode = 500;
+                res.end(JSON.stringify({ success: false, message: `Azure Key Vault check failed: ${stderr || error.message}. Ensure 'az login' and key exists.` }));
+                return;
+              }
+              const found = stdout.trim() === keyName;
+              res.end(JSON.stringify({
+                success: found,
+                message: found ? `Verified Key: ${keyName} in ${vaultName}` : `Key ${keyName} not found in vault ${vaultName}.`
+              }));
+            });
+            return;
+          }
+
+          if (req.url && req.url.startsWith('/api/verify-gcp-kms')) {
+            const url = new URL(req.url, `http://${req.headers.host}`);
+            const project = (url.searchParams.get('project') || '').replace(/[^a-zA-Z0-9\-]/g, '');
+            const location = (url.searchParams.get('location') || 'global').replace(/[^a-zA-Z0-9\-]/g, '');
+            const keyRing = (url.searchParams.get('keyRing') || '').replace(/[^a-zA-Z0-9\-]/g, '');
+            const keyName = (url.searchParams.get('keyName') || '').replace(/[^a-zA-Z0-9\-]/g, '');
+            if (!project || !keyRing || !keyName) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ success: false, message: 'project, keyRing, and keyName are required' }));
+              return;
+            }
+            const cmd = `gcloud kms keys describe ${keyName} --keyring=${keyRing} --location=${location} --project=${project} --format="value(name)" 2>/dev/null`;
+            exec(cmd, (error: any, stdout: any, stderr: any) => {
+              if (error) {
+                res.statusCode = 500;
+                res.end(JSON.stringify({ success: false, message: `GCP KMS check failed: ${stderr || error.message}. Ensure gcloud auth and key exists.` }));
+                return;
+              }
+              const found = (stdout.trim() || '').includes(keyName);
+              res.end(JSON.stringify({
+                success: found,
+                message: found ? `Verified key: ${keyName}` : `Key ${keyName} not found.`
+              }));
+            });
+            return;
+          }
+
           if (req.url && req.url.startsWith('/api/verify-index')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
-            const uri = url.searchParams.get('uri') || '';
+            const uri = url.searchParams.get('uri')?.trim() || '';
+            if (!uri) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required. Set it in Lab Setup.' }));
+              return;
+            }
             const dbName = 'encryption';
             const collName = '__keyVault';
 
@@ -493,11 +713,11 @@ export default defineConfig(({ mode }) => ({
             const url = new URL(req.url, `http://${req.headers.host}`);
             const expectedCount = parseInt(url.searchParams.get('expectedCount') || '1', 10);
 
-            // User-provided URI for their lab cluster (required)
-            const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            // Use only Lab Setup URI from request; do not fall back to server env (may be leaderboard/demo cluster)
+            const uri = url.searchParams.get('uri')?.trim() || '';
             if (!uri) {
               res.statusCode = 400;
-              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required' }));
+              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required. Set it in Lab Setup.' }));
               return;
             }
             const dbName = 'encryption';
@@ -550,13 +770,126 @@ export default defineConfig(({ mode }) => ({
             return;
           }
 
+          // Clear key vault (delete all DEKs) so user can run createKey.cjs once and pass "expected 1" verification
+          if (req.url && req.url.startsWith('/api/cleanup-keyvault') && req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+            req.on('end', () => {
+              try {
+                const { uri } = JSON.parse(body || '{}');
+                const mongoUri = (uri && typeof uri === 'string' ? uri.trim() : '') || '';
+                if (!mongoUri) {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required. Set it in Lab Setup.' }));
+                  return;
+                }
+                const dbName = 'encryption';
+                const collName = '__keyVault';
+                const script = `db.getSiblingDB('${dbName}').getCollection('${collName}').deleteMany({});`;
+                const cmd = `mongosh "${mongoUri}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
+                exec(cmd, (error: any, stdout: any, stderr: any) => {
+                  if (error) {
+                    res.statusCode = 500;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({
+                      success: false,
+                      message: `Failed to clear key vault: ${stderr || error.message}. Ensure IP is whitelisted.`
+                    }));
+                    return;
+                  }
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({
+                    success: true,
+                    message: 'Key vault cleared. Run createKey.cjs once, then verify again.'
+                  }));
+                });
+              } catch (e: any) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: false, message: e?.message || 'Invalid request' }));
+              }
+            });
+            return;
+          }
+
+          // Clean up MongoDB resources created by a lab (or all labs) so reset progress/step allows re-running
+          if (req.url && req.url.startsWith('/api/cleanup-lab-resources') && req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+            req.on('end', () => {
+              try {
+                const { labId, uri } = JSON.parse(body || '{}');
+                const mongoUri = (uri && typeof uri === 'string' ? uri.trim() : '') || '';
+                if (!mongoUri) {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required. Set it in Lab Setup.' }));
+                  return;
+                }
+                const labsToRun: number[] = labId === 'all' ? [1, 2, 3] : [Number(labId)];
+                if (labsToRun.some((n) => isNaN(n) || n < 1 || n > 3)) {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: false, message: 'labId must be 1, 2, 3, or "all".' }));
+                  return;
+                }
+
+                const scripts: string[] = [];
+                if (labsToRun.includes(1)) {
+                  scripts.push(
+                    `db.getSiblingDB('encryption').getCollection('__keyVault').deleteMany({});`,
+                    `try { db.getSiblingDB('medical').getCollection('patients').drop(); } catch(e) {}`
+                  );
+                }
+                if (labsToRun.includes(2)) {
+                  scripts.push(
+                    `var hr = db.getSiblingDB('hr'); var names = hr.getCollectionNames(); names.forEach(function(n){ if(n.indexOf('enxcol_')===0) hr.getCollection(n).drop(); }); try { hr.getCollection('employees').drop(); } catch(e) {}`,
+                    `db.getSiblingDB('encryption').getCollection('__keyVault').deleteMany({ keyAltNames: { $in: ['qe-salary-dek', 'qe-taxid-dek'] } });`
+                  );
+                }
+                if (labsToRun.includes(3)) {
+                  scripts.push(
+                    `try { db.getSiblingDB('medical').getCollection('patients_secure').drop(); } catch(e) {}`,
+                    `db.getSiblingDB('encryption').getCollection('__keyVault').deleteMany({ keyAltNames: { $in: ['tenant-acme', 'tenant-contoso', 'tenant-fabrikam'] } });`
+                  );
+                }
+
+                const combined = scripts.join(' ');
+                const cmd = `mongosh "${mongoUri.replace(/"/g, '\\"')}" --quiet --eval "${combined.replace(/"/g, '\\"')}"`;
+                exec(cmd, (error: any, stdout: any, stderr: any) => {
+                  if (error) {
+                    res.statusCode = 500;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({
+                      success: false,
+                      message: `Cleanup failed: ${stderr || error.message}. Ensure IP is whitelisted.`
+                    }));
+                    return;
+                  }
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({
+                    success: true,
+                    message: labsToRun.length === 1
+                      ? `Lab ${labsToRun[0]} MongoDB resources cleaned. You can re-run the lab steps.`
+                      : 'All labs\' MongoDB resources cleaned. You can re-run from the start.'
+                  }));
+                });
+              } catch (e: any) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: false, message: e?.message || 'Invalid request' }));
+              }
+            });
+            return;
+          }
+
           if (req.url && req.url.startsWith('/api/verify-qe-deks')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
-            // User-provided URI for their lab cluster (required)
-            const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            const uri = url.searchParams.get('uri')?.trim() || '';
             if (!uri) {
               res.statusCode = 400;
-              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required' }));
+              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required. Set it in Lab Setup.' }));
               return;
             }
             const dbName = 'encryption';
@@ -623,11 +956,10 @@ export default defineConfig(({ mode }) => ({
             const url = new URL(req.url, `http://${req.headers.host}`);
             const dbName = url.searchParams.get('db') || 'hr';
             const collName = url.searchParams.get('coll') || 'employees';
-            // User-provided URI for their lab cluster (required)
-            const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            const uri = url.searchParams.get('uri')?.trim() || '';
             if (!uri) {
               res.statusCode = 400;
-              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required' }));
+              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required. Set it in Lab Setup.' }));
               return;
             }
 
@@ -680,11 +1012,10 @@ export default defineConfig(({ mode }) => ({
             const url = new URL(req.url, `http://${req.headers.host}`);
             const dbName = url.searchParams.get('db') || 'hr';
             const collName = url.searchParams.get('coll') || 'employees';
-            // User-provided URI for their lab cluster (required)
-            const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            const uri = url.searchParams.get('uri')?.trim() || '';
             if (!uri) {
               res.statusCode = 400;
-              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required' }));
+              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required. Set it in Lab Setup.' }));
               return;
             }
 
@@ -749,11 +1080,10 @@ export default defineConfig(({ mode }) => ({
             const url = new URL(req.url, `http://${req.headers.host}`);
             const dbName = url.searchParams.get('db') || 'hr';
             const collName = url.searchParams.get('coll') || 'employees';
-            // User-provided URI for their lab cluster (required)
-            const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            const uri = url.searchParams.get('uri')?.trim() || '';
             if (!uri) {
               res.statusCode = 400;
-              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required' }));
+              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required. Set it in Lab Setup.' }));
               return;
             }
 
@@ -813,11 +1143,10 @@ export default defineConfig(({ mode }) => ({
 
           if (req.url && req.url.startsWith('/api/verify-migration')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
-            // User-provided URI for their lab cluster (required)
-            const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            const uri = url.searchParams.get('uri')?.trim() || '';
             if (!uri) {
               res.statusCode = 400;
-              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required' }));
+              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required. Set it in Lab Setup.' }));
               return;
             }
             const dbName = 'medical';
@@ -887,14 +1216,14 @@ export default defineConfig(({ mode }) => ({
 
           if (req.url && req.url.startsWith('/api/verify-encryption')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
-            const mongoUri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            const mongoUri = url.searchParams.get('uri')?.trim() || '';
             const dbName = url.searchParams.get('db') || 'medical';
             const collName = url.searchParams.get('coll') || 'patients';
             const field = url.searchParams.get('field') || 'ssn';
 
             if (!mongoUri) {
               res.statusCode = 400;
-              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required' }));
+              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required. Set it in Lab Setup.' }));
               return;
             }
 
@@ -937,11 +1266,10 @@ export default defineConfig(({ mode }) => ({
 
           if (req.url && req.url.startsWith('/api/verify-tenant-deks')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
-            // User-provided URI for their lab cluster (required)
-            const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            const uri = url.searchParams.get('uri')?.trim() || '';
             if (!uri) {
               res.statusCode = 400;
-              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required' }));
+              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required. Set it in Lab Setup.' }));
               return;
             }
             const expectedTenants = ['acme', 'contoso', 'fabrikam'];
@@ -995,11 +1323,10 @@ export default defineConfig(({ mode }) => ({
 
           if (req.url && req.url.startsWith('/api/verify-key-rotation')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
-            // User-provided URI for their lab cluster (required)
-            const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            const uri = url.searchParams.get('uri')?.trim() || '';
             if (!uri) {
               res.statusCode = 400;
-              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required' }));
+              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required. Set it in Lab Setup.' }));
               return;
             }
             const keyAltName = url.searchParams.get('keyAltName') || 'user-pierre-petersson-ssn-key';
@@ -1057,12 +1384,12 @@ export default defineConfig(({ mode }) => ({
 
           if (req.url && req.url.startsWith('/api/verify-datakey')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
-            const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            const uri = url.searchParams.get('uri')?.trim() || '';
             const keyAltName = url.searchParams.get('keyAltName') || '';
 
             if (!uri) {
               res.statusCode = 400;
-              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' }));
+              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required. Set it in Lab Setup.' }));
               return;
             }
 
@@ -1164,7 +1491,14 @@ export default defineConfig(({ mode }) => ({
               req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
               req.on('end', async () => {
                 try {
-                  const data = JSON.parse(body);
+                  if (req.url?.includes('/reset')) {
+                    await clearLeaderboard();
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ success: true }));
+                    return;
+                  }
+
+                  const data = JSON.parse(body || '{}');
 
                   if (req.url?.includes('/start-lab')) {
                     const { email, labNumber, timestamp } = data;

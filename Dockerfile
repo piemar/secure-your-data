@@ -28,6 +28,32 @@ RUN curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | gpg -o /usr/s
     && apt-get install -y --no-install-recommends mongodb-mongosh \
     && rm -rf /var/lib/apt/lists/*
 
+# Install mongo_crypt_shared (required for Lab 1 CSFLE and Lab 2 Queryable Encryption)
+# Replaces mongocryptd; enables automatic encryption without a separate process.
+# amd64: debian12 tarball exists. arm64: only amazon2023 is published, use it (glibc-compatible with bookworm).
+ARG TARGETARCH
+ENV CRYPT_SHARED_VERSION=8.2.5
+RUN case "$TARGETARCH" in \
+    "amd64") CRYPT_ARCH="x86_64"; CRYPT_DISTRO="debian12" ;; \
+    "arm64") CRYPT_ARCH="aarch64"; CRYPT_DISTRO="amazon2023" ;; \
+    *) CRYPT_ARCH="x86_64"; CRYPT_DISTRO="debian12" ;; \
+    esac \
+    && curl -sSL "https://downloads.mongodb.com/linux/mongo_crypt_shared_v1-linux-${CRYPT_ARCH}-enterprise-${CRYPT_DISTRO}-${CRYPT_SHARED_VERSION}.tgz" -o /tmp/crypt_shared.tgz \
+    && tar -xzf /tmp/crypt_shared.tgz -C /tmp \
+    && cp "$(find /tmp -name 'mongo_crypt_v1.so' 2>/dev/null | head -1)" /usr/lib/ \
+    && rm -rf /tmp/crypt_shared.tgz /tmp/mongo_crypt_shared_v1-*
+
+# Optional: Azure CLI and Google Cloud SDK for multi-cloud verification (allow failure on low disk / I/O errors)
+RUN apt-get update && (apt-get install -y --no-install-recommends azure-cli || true) && rm -rf /var/lib/apt/lists/*
+RUN curl -sL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee /etc/apt/sources.list.d/google-cloud-sdk.list \
+    && (apt-get update && apt-get install -y --no-install-recommends google-cloud-cli || true) \
+    && rm -rf /var/lib/apt/lists/*
+
+# Workshop config: target cloud (aws | azure | gcp) and container mode
+ENV WORKSHOP_CLOUD=aws
+ENV WORKSHOP_RUNNING_IN_CONTAINER=true
+
 WORKDIR /app
 
 # Copy package files and install dependencies

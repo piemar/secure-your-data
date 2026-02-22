@@ -1110,6 +1110,8 @@ compactQE();
 **Difficulty**: Advanced  
 **Objective**: Implement data migration and multi-tenant encryption patterns
 
+In the **interactive webapp**, Lab 3 has **3 steps**: (1) Explicit encryption for migration, (2) Multi-tenant isolation, (3) CMK key rotation.
+
 > **Lab Guide**: See `Docs/Enablement/Lab_3_Patterns.md` for detailed step-by-step instructions.
 
 ### Prerequisites
@@ -1591,8 +1593,7 @@ Outcome:  Data becomes cryptographically indecipherable garbage
 - `Docs/Guides/Performance_Benchmarks_Guide.md` - Performance benchmarks & sizing
 - `Docs/Guides/Security_Best_Practices_Guide.md` - Security best practices & threat model
 
-**Presentation Materials**:
-- `Docs/PRESENTATION_CONTENT_PROMPT.md` - Full presentation content (21 slides)
+**Presentation**: Full presentation content is built into the webapp (Presentation section in the sidebar).
 
 ### Video Resources
 

@@ -1,11 +1,13 @@
 import { LabViewWithTabs } from './LabViewWithTabs';
 import { validatorUtils } from '@/utils/validatorUtils';
 import { useLab } from '@/context/LabContext';
+import { useCloudProvider } from '@/context/WorkshopConfigContext';
 import { DifficultyLevel } from './DifficultyBadge';
 import { QEArchitectureDiagram } from './LabArchitectureDiagrams';
 
 export function Lab2QueryableEncryption() {
   const { mongoUri, awsRegion, verifiedTools } = useLab();
+  const cloud = useCloudProvider();
   const suffix = verifiedTools['suffix']?.path || 'suffix';
   const aliasName = `alias/mongodb-lab-key-${suffix}`;
   const cryptSharedLibPath = verifiedTools['mongoCryptShared']?.path || '';
@@ -1023,7 +1025,7 @@ node queryQERange.cjs
       duration="30 min"
       prerequisites={[
         'MongoDB 8.0+ Atlas Cluster',
-        'AWS KMS CMK from Lab 1',
+        cloud === 'aws' ? 'AWS KMS CMK from Lab 1' : cloud === 'azure' ? 'Azure Key Vault key from Lab 1' : 'GCP Cloud KMS key from Lab 1',
         'Node.js 20+ with MongoDB driver >= 6.1.0',
         'mongodb-client-encryption >= 6.1.0+'
       ]}

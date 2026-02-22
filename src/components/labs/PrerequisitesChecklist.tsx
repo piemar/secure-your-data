@@ -5,7 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 
-interface Prerequisite {
+export interface Prerequisite {
   id: string;
   label: string;
   description: string;
@@ -153,8 +153,8 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
     setExpandedItems(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // Use extended prerequisites instead of passed ones
-  const allPrereqs = EXTENDED_PREREQUISITES;
+  // Use passed prerequisites (cloud-specific from LabSetupWizard)
+  const allPrereqs = prerequisites;
   const requiredPrereqs = allPrereqs.filter(p => p.required);
   const optionalPrereqs = allPrereqs.filter(p => !p.required);
 

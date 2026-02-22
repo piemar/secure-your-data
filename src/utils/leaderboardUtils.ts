@@ -104,6 +104,10 @@ export async function addPoints(email: string, points: number, labNumber: number
     score: newScore
   });
 
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('workshop-leaderboard-update'));
+  }
+
   // Sync to Atlas
   try {
     await fetch('/api/leaderboard/add-points', {
@@ -151,6 +155,10 @@ export async function completeLab(email: string, labNumber: number, score: numbe
     score: finalScore,
     labTimes
   });
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('workshop-leaderboard-update'));
+  }
 
   // Sync to Atlas
   try {

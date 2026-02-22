@@ -20,6 +20,8 @@ import { useRole } from '@/contexts/RoleContext';
 import { useLab } from '@/context/LabContext';
 import { getSortedLeaderboard } from '@/utils/leaderboardUtils';
 import { areLabsEnabled } from '@/utils/workshopUtils';
+import { clearAllWorkshopLabStorage } from '@/utils/workshopStorage';
+import { validatorUtils } from '@/utils/validatorUtils';
 import type { Section } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -80,7 +82,7 @@ const navItems: NavItem[] = [
 
 export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSidebarProps) {
   const { currentSection, setSection, sidebarOpen, toggleSidebar } = useNavigation();
-  const { isLabAccessible, userEmail, currentScore, completedLabs, resetProgress } = useLab();
+  const { isLabAccessible, userEmail, currentScore, completedLabs, resetProgress, verifiedTools } = useLab();
   const { isModerator, logout } = useRole();
   const [userRank, setUserRank] = useState<number>(0);
   const [totalParticipants, setTotalParticipants] = useState<number>(0);
@@ -95,20 +97,49 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
     window.location.reload();
   };
 
-  const handleResetProgress = () => {
-    if (window.confirm('Are you sure you want to reset all lab progress? This will clear completed steps, scores, and start fresh.')) {
-      resetProgress();
-      // Clear all lab-specific localStorage
-      localStorage.removeItem('lab1-progress');
-      localStorage.removeItem('lab2-progress');
-      localStorage.removeItem('lab3-progress');
-      localStorage.removeItem('completedLabs');
-      localStorage.removeItem('labStartTimes');
-      localStorage.removeItem('lab_mongo_uri');
-      localStorage.removeItem('lab_aws_profile');
-      localStorage.removeItem('lab_kms_alias');
-      window.location.reload();
+  const handleResetProgress = async () => {
+    const suffix = verifiedTools['suffix']?.path || '';
+    const aliasName = suffix ? `alias/mongodb-lab-key-${suffix}` : '';
+    const message = aliasName
+      ? 'Reset all labs? This will clear all progress, step state, solutions, and output. The page will reload for a fresh session.\n\nDo you also want to delete your AWS KMS key and alias so you can start from scratch? (Key will be scheduled for deletion in 7 days.)'
+      : 'Reset all labs? This will clear all progress, step state, solutions, and output. MongoDB and AWS resources created during the labs are not deleted automatically. The page will reload for a fresh session.';
+    if (!window.confirm(message)) return;
+
+    let deleteAws = false;
+    if (aliasName) {
+      deleteAws = window.confirm(`Delete AWS KMS alias "${aliasName}" and schedule the key for deletion (7 days)?`);
     }
+
+    // Clean up MongoDB resources (key vault, hr.employees, etc.) before clearing storage so re-runs work
+    const labMongoUri = localStorage.getItem('lab_mongo_uri') || '';
+    if (labMongoUri) {
+      try {
+        const result = await validatorUtils.cleanupLabResources('all', labMongoUri);
+        if (!result.success) {
+          console.warn('Lab resources cleanup:', result.message);
+        }
+      } catch (e) {
+        console.warn('Lab resources cleanup failed:', e);
+      }
+    }
+
+    clearAllWorkshopLabStorage();
+    resetProgress();
+
+    if (deleteAws && aliasName) {
+      try {
+        const result = await validatorUtils.cleanupAwsResources(aliasName);
+        if (result.success) {
+          window.alert(result.message || 'AWS resources cleanup started.');
+        } else {
+          window.alert('AWS cleanup failed: ' + (result.message || 'Unknown error'));
+        }
+      } catch (e) {
+        window.alert('AWS cleanup failed: ' + (e instanceof Error ? e.message : 'Unknown error'));
+      }
+    }
+
+    window.location.reload();
   };
 
   // Calculate user rank, progress, and check lab status

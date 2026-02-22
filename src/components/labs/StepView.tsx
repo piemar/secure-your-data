@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2, Info, BookOpen, Clock, Lock, Eye, Unlock, XCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2, BookOpen, Clock, Lock, Eye, Unlock, XCircle, Play, Square, FileCode } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -12,6 +12,8 @@ import { StepContextDrawer } from './StepContextDrawer';
 import { useLab } from '@/context/LabContext';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { trackHintUsage, trackSolutionReveal } from '@/utils/leaderboardUtils';
+import { validatorUtils } from '@/utils/validatorUtils';
+import { toast } from 'sonner';
 import { type InlineHint, type SkeletonTier } from './InlineHintMarker';
 import { InlineHintEditor } from './InlineHintEditor';
 
@@ -19,6 +21,8 @@ interface CodeBlock {
   filename: string;
   language: string;
   code: string;
+  /** editor-window = edit code/commands only (no Run); terminal-window = shell, supports Run line/selection/all + terminal input */
+  blockType?: 'editor-window' | 'terminal-window';
   skeleton?: string;           // Tier 1: Guided (blanks with structure)
   challengeSkeleton?: string;  // Tier 2: Challenge (tasks only)
   expertSkeleton?: string;     // Tier 3: Expert (objective only)
@@ -69,13 +73,24 @@ interface StepViewProps {
   atlasCapability?: string;
   /** Shared output (from parent) – when set, output is common across steps and persists on refresh */
   lastOutput?: string;
+  /** Verification result (Verify button) – shown in "Verify result" tab */
+  lastVerifyOutput?: string;
   outputSummary?: string;
   outputSuccess?: boolean;
   outputOpen?: boolean;
   outputStepIndex?: number | null;
   stepsCount?: number;
-  onOutputChange?: (result: { output: string; summary: string; success: boolean }, stepIndex: number) => void;
+  onOutputChange?: (result: { output: string; summary?: string; success?: boolean; source?: 'console' | 'verify' }, stepIndex: number) => void;
   onOutputOpenChange?: (open: boolean) => void;
+  /** Called when user resets the current step; parent should clear step output and completion */
+  onResetStep?: (stepIndex: number) => void;
+  /** Controlled help drawer (opened from top bar) */
+  helpDrawerOpen?: boolean;
+  onHelpDrawerOpenChange?: (open: boolean) => void;
+  /** When this changes, clear verification state for current step (after top bar Reset step) */
+  resetStepTrigger?: number;
+  /** Register a function to clear step state (hints/solutions) for a given step index. Parent calls this when Reset step is clicked so UI updates in the same tick. */
+  registerResetStepClearer?: (clear: (stepIndex: number) => void) => void;
 }
 
 // Generate realistic MongoDB output based on code content with structured formatting
@@ -493,6 +508,7 @@ export function StepView({
   businessValue,
   atlasCapability,
   lastOutput: parentLastOutput,
+  lastVerifyOutput: parentLastVerifyOutput,
   outputSummary: parentOutputSummary,
   outputSuccess: parentOutputSuccess,
   outputOpen: parentOutputOpen,
@@ -500,33 +516,41 @@ export function StepView({
   stepsCount = 0,
   onOutputChange,
   onOutputOpenChange,
+  onResetStep,
+  helpDrawerOpen,
+  onHelpDrawerOpenChange,
+  resetStepTrigger = 0,
+  registerResetStepClearer,
 }: StepViewProps) {
-  const { completeStep } = useLab();
+  const { completeStep, mongoUri: labMongoUri } = useLab();
   const [activeTab, setActiveTab] = useState<string>('code');
   const [localOutputOpen, setLocalOutputOpen] = useState(false);
   const [localLastOutput, setLocalLastOutput] = useState<string>('');
+  const [localVerifyOutput, setLocalVerifyOutput] = useState<string>('');
   const [localOutputSummary, setLocalOutputSummary] = useState<string>('');
   const [localOutputSuccess, setLocalOutputSuccess] = useState<boolean>(true);
+  const [outputPanelTab, setOutputPanelTab] = useState<'verify' | 'console'>('console');
   const [isRunning, setIsRunning] = useState(false);
   const [copied, setCopied] = useState(false);
   const [direction, setDirection] = useState(0);
 
+  const safeStepIndex = Math.min(currentStepIndex, Math.max(0, steps.length - 1));
   const useSharedOutput = onOutputChange != null && onOutputOpenChange != null;
   const lastOutput = useSharedOutput ? (parentLastOutput ?? '') : localLastOutput;
+  const lastVerifyOutput = useSharedOutput ? (parentLastVerifyOutput ?? '') : localVerifyOutput;
   const outputSummary = useSharedOutput ? (parentOutputSummary ?? '') : localOutputSummary;
   const outputSuccess = useSharedOutput ? (parentOutputSuccess !== false) : localOutputSuccess;
   const outputOpen = useSharedOutput ? (parentOutputOpen ?? false) : localOutputOpen;
   const outputStepIndex = useSharedOutput ? (parentOutputStepIndex ?? null) : null;
   const setOutputOpen = useSharedOutput ? (v: boolean) => onOutputOpenChange?.(v) : setLocalOutputOpen;
   const setOutput = useSharedOutput
-    ? (result: { output: string; summary: string; success: boolean }) => { /* parent handles via onOutputChange */ }
-    : (result: { output: string; summary: string; success: boolean }) => {
+    ? (result: { output: string; summary?: string; success?: boolean }) => { /* parent handles via onOutputChange */ }
+    : (result: { output: string; summary?: string; success?: boolean }) => {
         setLocalLastOutput(result.output);
-        setLocalOutputSummary(result.summary);
-        setLocalOutputSuccess(result.success);
+        if (result.summary != null) setLocalOutputSummary(result.summary);
+        if (result.success !== undefined) setLocalOutputSuccess(result.success);
         setLocalOutputOpen(true);
       };
-
   // Challenge Mode State – persisted per lab so hints/solutions survive refresh
   const stepStateKey = LAB_STEP_STATE_KEY(labNumber);
   const [showSolution, setShowSolution] = useState<Record<string, boolean>>(() => {
@@ -569,6 +593,310 @@ export function StepView({
 
   // Per-step verification result: true = passed, false = failed, undefined = not run yet. Used to enable Continue and show red step indicator.
   const [verificationResultByStep, setVerificationResultByStep] = useState<Record<number, boolean>>({});
+  const editorRefsByBlock = useRef<Record<string, any>>({});
+  const outputScrollRef = useRef<HTMLDivElement>(null);
+  const [isRunBashLoading, setIsRunBashLoading] = useState(false);
+
+  // Keep output panel scrolled to bottom when new run/verify output is appended
+  useEffect(() => {
+    const el = outputScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [lastOutput, lastVerifyOutput]);
+
+  // When parent triggers reset from top bar, clear verification and step state (hints/solutions) for current step
+  useEffect(() => {
+    const safeIdx = Math.min(currentStepIndex, Math.max(0, steps.length - 1));
+    if (resetStepTrigger > 0 && steps[safeIdx]) {
+      const step = steps[safeIdx];
+      const blockKeys = (step.codeBlocks ?? []).map((_, i) => `${safeIdx}-${i}`);
+      setVerificationResultByStep(prev => {
+        const next = { ...prev };
+        delete next[safeIdx];
+        return next;
+      });
+      setShowSolution(prev => {
+        const next = { ...prev };
+        blockKeys.forEach(k => { delete next[k]; });
+        return next;
+      });
+      setRevealedHints(prev => {
+        const next = { ...prev };
+        blockKeys.forEach(k => { delete next[k]; });
+        return next;
+      });
+      setRevealedAnswers(prev => {
+        const next = { ...prev };
+        blockKeys.forEach(k => { delete next[k]; });
+        return next;
+      });
+      setPointsDeducted(prev => {
+        const next = { ...prev };
+        blockKeys.forEach(k => { delete next[k]; });
+        return next;
+      });
+      setSkeletonTier(prev => {
+        const next = { ...prev };
+        blockKeys.forEach(k => { delete next[k]; });
+        return next;
+      });
+    }
+  }, [resetStepTrigger, currentStepIndex, steps.length, steps]);
+
+  // Register clearer so parent can clear step state synchronously when Reset step is clicked (so editor remounts with skeleton in same tick)
+  useEffect(() => {
+    if (!registerResetStepClearer) return;
+    registerResetStepClearer((stepIndex: number) => {
+      const step = steps[stepIndex];
+      if (!step?.codeBlocks?.length) return;
+      const blockKeys = step.codeBlocks.map((_, i) => `${stepIndex}-${i}`);
+      setVerificationResultByStep(prev => { const n = { ...prev }; delete n[stepIndex]; return n; });
+      setShowSolution(prev => { const n = { ...prev }; blockKeys.forEach(k => { delete n[k]; }); return n; });
+      setRevealedHints(prev => { const n = { ...prev }; blockKeys.forEach(k => { delete n[k]; }); return n; });
+      setRevealedAnswers(prev => { const n = { ...prev }; blockKeys.forEach(k => { delete n[k]; }); return n; });
+      setPointsDeducted(prev => { const n = { ...prev }; blockKeys.forEach(k => { delete n[k]; }); return n; });
+      setSkeletonTier(prev => { const n = { ...prev }; blockKeys.forEach(k => { delete n[k]; }); return n; });
+    });
+  }, [registerResetStepClearer, steps]);
+
+  // Compact run log: timestamp, single $ for the command block, then output. One $ only (not per line).
+  const appendRunLog = useCallback((
+    commands: string[],
+    stdout: string,
+    stderr: string,
+    success: boolean,
+    errorMsg?: string
+  ) => {
+    const ts = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    const compact = (s: string) => s.replace(/\n{3,}/g, '\n\n').trim();
+    const out = compact(stdout || '');
+    const err = compact(stderr || '');
+    const cmdBlock = commands.length === 0
+      ? ''
+      : commands.length === 1
+        ? `$ ${commands[0]}`
+        : `$ ${commands[0]}\n${commands.slice(1).join('\n')}`;
+    const lines = [
+      `[${ts}]`,
+      ...(cmdBlock ? [cmdBlock] : []),
+      ...(errorMsg ? [errorMsg] : []),
+      ...(out ? [out] : []),
+      ...(err ? [err] : []),
+    ].filter(Boolean);
+    const snippet = '\n' + lines.join('\n') + '\n—\n';
+    const newOutput = (lastOutput || '').trimEnd() + snippet;
+    if (useSharedOutput && onOutputChange) {
+      onOutputChange({ output: newOutput, summary: success ? 'OK' : 'Failed', success, source: 'console' }, safeStepIndex);
+    } else {
+      setLocalLastOutput(newOutput);
+      setLocalOutputOpen(true);
+    }
+    setOutputOpen(true);
+    setOutputPanelTab('console');
+  }, [safeStepIndex, useSharedOutput, onOutputChange, lastOutput]);
+
+  // Run in browser: shell, node, or mongosh. Only for terminal-window blocks. Optional: resolve node <file> from editor-window content.
+  const runInBrowser = useCallback(async (
+    block: CodeBlock,
+    commands: string[],
+    options?: { getEditorWindowContent?: (filename: string) => string | undefined }
+  ) => {
+    if (commands.length === 0) return;
+    setIsRunBashLoading(true);
+    try {
+      const filename = (block.filename || '').toLowerCase();
+      const isMongosh = filename.includes('mongosh');
+      const isNode = block.language === 'javascript' && (filename.includes('.cjs') || filename.includes('node'));
+      const isBash = block.language === 'bash' || block.language === 'shell';
+
+      // When running from terminal: "node createKey.cjs" → run editor-window content as Node
+      const nodeFileMatch = commands.length === 1 && commands[0].trim().match(/^node\s+(\S+)/);
+      const nodeFileContent = nodeFileMatch && options?.getEditorWindowContent
+        ? options.getEditorWindowContent(nodeFileMatch[1].trim())
+        : undefined;
+      if (nodeFileContent !== undefined && nodeFileContent !== '') {
+        const res = await fetch('/api/run-node', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: nodeFileContent, uri: labMongoUri || '' }),
+        });
+        const data = await res.json();
+        appendRunLog(commands, data.stdout || '', data.stderr || '', data.success === true, data.error ? data.message : undefined);
+        return;
+      }
+      if (nodeFileMatch) {
+        appendRunLog(commands, '', '', false, 'No matching editor-window file. Edit the file in the first pane and ensure its name matches.');
+        return;
+      }
+
+      // When "Run all" has multiple lines and one is "node <file>", run that via run-node with editor content and the rest via run-bash
+      if (isBash && commands.length > 1 && options?.getEditorWindowContent) {
+        const bashCommands: string[] = [];
+        const nodeRuns: { cmd: string; filename: string }[] = [];
+        for (const line of commands) {
+          const t = line.trim();
+          if (!t || t.startsWith('#')) continue;
+          const m = t.match(/^node\s+(\S+)/);
+          if (m && options.getEditorWindowContent(m[1].trim())) {
+            nodeRuns.push({ cmd: t, filename: m[1].trim() });
+          } else {
+            bashCommands.push(line);
+          }
+        }
+        if (bashCommands.length > 0) {
+          const resBash = await fetch('/api/run-bash', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ commands: bashCommands }),
+          });
+          const dataBash = await resBash.json();
+          appendRunLog(bashCommands, dataBash.stdout || '', dataBash.stderr || '', dataBash.exitCode === 0);
+        }
+        for (const { cmd, filename } of nodeRuns) {
+          const code = options.getEditorWindowContent(filename);
+          if (!code) continue;
+          const resNode = await fetch('/api/run-node', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, uri: labMongoUri || '' }),
+          });
+          const dataNode = await resNode.json();
+          appendRunLog([cmd], dataNode.stdout || '', dataNode.stderr || '', dataNode.success === true, dataNode.message);
+        }
+        if (bashCommands.length > 0 || nodeRuns.length > 0) {
+          return;
+        }
+      }
+
+      // When running from terminal: "bash script.sh" or "sh script.sh" → run editor-window file content via run-bash
+      const bashShMatch = commands.length === 1 && commands[0].trim().match(/^(?:bash|sh)\s+(\S+)/);
+      const bashShFilename = bashShMatch?.[1]?.trim();
+      const bashShContent = bashShFilename && options?.getEditorWindowContent
+        ? options.getEditorWindowContent(bashShFilename)
+        : undefined;
+      if (bashShContent !== undefined && bashShContent !== '') {
+        const scriptLines = bashShContent.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        if (scriptLines.length > 0) {
+          const res = await fetch('/api/run-bash', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ commands: scriptLines }),
+          });
+          const data = await res.json();
+          appendRunLog(commands, data.stdout || '', data.stderr || '', data.success === true);
+          return;
+        }
+      }
+      if (bashShMatch) {
+        appendRunLog(commands, '', '', false, 'No matching file. Edit the file in the first pane and ensure its name matches.');
+        return;
+      }
+
+      // When running from terminal: "mongosh keyvault-setup.js" → run editor-window file content via run-mongosh
+      const mongoshFileMatch = commands.length === 1 && commands[0].trim().match(/^mongosh\s+(\S+)/);
+      const mongoshFile = mongoshFileMatch?.[1]?.trim();
+      const mongoshFileContent = mongoshFile && options?.getEditorWindowContent
+        ? options.getEditorWindowContent(mongoshFile)
+        : undefined;
+      if (mongoshFileContent !== undefined && mongoshFileContent !== '' && labMongoUri) {
+        const scriptLines = mongoshFileContent.split(/\r?\n/).filter(c => !/^\s*mongosh\s+['"]/.test(c));
+        const scriptCode = scriptLines.join('\n').trim();
+        if (scriptCode) {
+          const res = await fetch('/api/run-mongosh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: scriptCode, uri: labMongoUri }),
+          });
+          const data = await res.json();
+          appendRunLog(commands, data.stdout || '', data.stderr || '', data.success === true, data.error ? data.message : undefined);
+          return;
+        }
+      }
+      if (mongoshFileMatch) {
+        if (!labMongoUri) {
+          appendRunLog(commands, '', '', false, 'Error: No MongoDB URI. Set it in Lab Setup.');
+        } else {
+          appendRunLog(commands, '', '', false, 'No matching file. Edit the file in the first pane and ensure its name matches.');
+        }
+        return;
+      }
+
+      // mongosh "uri" starts an interactive shell and never returns — don't run it in-browser
+      const looksLikeShellMongosh = commands.length > 0 && commands.every(c => /^\s*mongosh\s+['"]/.test(c));
+      if (isMongosh && looksLikeShellMongosh) {
+        appendRunLog(commands, '', '', false, 'This starts an interactive mongosh session. Run it in your terminal, or use Run all to execute the script part in-browser.');
+        return;
+      }
+      if (isBash) {
+        const res = await fetch('/api/run-bash', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commands }),
+        });
+        const data = await res.json();
+        appendRunLog(commands, data.stdout || '', data.stderr || '', data.success === true);
+        return;
+      }
+      if (isMongosh) {
+        if (!labMongoUri) {
+          appendRunLog(commands, '', '', false, 'Error: No MongoDB URI. Set it in Lab Setup.');
+          return;
+        }
+        // Strip connection lines (mongosh "uri") so we only run the script via --eval; connection uses lab URI
+        const scriptLines = commands.filter(c => !/^\s*mongosh\s+['"]/.test(c));
+        const scriptCode = scriptLines.join('\n').trim();
+        if (!scriptCode) {
+          appendRunLog(commands, '', '', false, 'No script to run. Run all to execute the full block (script runs in-browser); run the connection command in your terminal for interactive mode.');
+          return;
+        }
+        const res = await fetch('/api/run-mongosh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: scriptCode, uri: labMongoUri }),
+        });
+        const data = await res.json();
+        appendRunLog(commands, data.stdout || '', data.stderr || '', data.success === true, data.error ? data.message : undefined);
+        return;
+      }
+      if (isNode) {
+        const res = await fetch('/api/run-node', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: commands.join('\n'), uri: labMongoUri || '' }),
+        });
+        const data = await res.json();
+        appendRunLog(commands, data.stdout || '', data.stderr || '', data.success === true, data.error ? data.message : undefined);
+        return;
+      }
+      appendRunLog(commands, '', '', false, 'Run in terminal for this block type.');
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      appendRunLog(commands, '', '', false, errMsg);
+    } finally {
+      setIsRunBashLoading(false);
+    }
+  }, [appendRunLog, labMongoUri]);
+
+  // Resolve block type: explicit blockType, or first block = editor-window, second = terminal-window, else terminal-window
+  const getBlockType = useCallback((block: CodeBlock, blockIdx: number, codeBlocks: CodeBlock[]): 'editor-window' | 'terminal-window' => {
+    if (block.blockType) return block.blockType;
+    if (codeBlocks.length === 2) return blockIdx === 0 ? 'editor-window' : 'terminal-window';
+    return 'terminal-window';
+  }, []);
+
+  // Resolve "node createKey.cjs" from terminal: return content of editor-window block whose filename matches
+  const getEditorWindowContent = useCallback((filenameHint: string): string | undefined => {
+    const safeIdx = Math.min(currentStepIndex, Math.max(0, steps.length - 1));
+    const blocks = steps[safeIdx]?.codeBlocks ?? [];
+    const hint = filenameHint.toLowerCase().trim();
+    for (let i = 0; i < blocks.length; i++) {
+      if (getBlockType(blocks[i], i, blocks) !== 'editor-window') continue;
+      const f = (blocks[i].filename || '').toLowerCase();
+      if (!f.includes(hint)) continue;
+      const key = `${safeIdx}-${i}`;
+      return editorRefsByBlock.current[key]?.getModel()?.getValue() ?? undefined;
+    }
+    return undefined;
+  }, [steps, currentStepIndex, steps.length, getBlockType]);
 
   useEffect(() => {
     try {
@@ -622,13 +950,13 @@ export function StepView({
     return !!(block.skeleton || block.challengeSkeleton || block.expertSkeleton);
   };
 
-  const currentStep = steps[currentStepIndex];
-  const isCompleted = completedSteps.includes(currentStepIndex);
+  const currentStep = steps[safeStepIndex];
+  const isCompleted = completedSteps.includes(safeStepIndex);
 
   // Check if any code block has a skeleton
   const hasSkeletons = useMemo(() => {
-    return currentStep.codeBlocks?.some(block => hasAnySkeleton(block)) ?? false;
-  }, [currentStep.codeBlocks]);
+    return currentStep?.codeBlocks?.some(block => hasAnySkeleton(block)) ?? false;
+  }, [currentStep?.codeBlocks]);
 
   // Persist read-only mode preference
   useEffect(() => {
@@ -697,7 +1025,7 @@ export function StepView({
   // Copy button should always copy full solution (even if skeleton shown)
   const handleCopyCode = useCallback(async (blockIdx: number = 0) => {
     const block = currentStep.codeBlocks?.[blockIdx];
-    const blockKey = `${currentStepIndex}-${blockIdx}`;
+    const blockKey = `${safeStepIndex}-${blockIdx}`;
     const hasSkeleton = block ? hasAnySkeleton(block) : false;
     const isSolutionRevealed = alwaysShowSolutions || showSolution[blockKey] || !hasSkeleton;
     const tier = skeletonTier[blockKey] || 'guided';
@@ -707,7 +1035,7 @@ export function StepView({
     await navigator.clipboard.writeText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [currentStep.codeBlocks, currentStepIndex, alwaysShowSolutions, showSolution, skeletonTier]);
+  }, [currentStep?.codeBlocks, safeStepIndex, alwaysShowSolutions, showSolution, skeletonTier]);
 
   const handleCheckProgress = async (): Promise<{ success: boolean }> => {
     setIsRunning(true);
@@ -732,45 +1060,50 @@ export function StepView({
     }
 
     if (useSharedOutput && onOutputChange) {
-      onOutputChange({ output: result.output, summary: result.summary, success: result.success }, currentStepIndex);
+      onOutputChange({ output: result.output, summary: result.summary, success: result.success, source: 'verify' }, safeStepIndex);
     } else {
-      setOutput({ output: result.output, summary: result.summary, success: result.success });
+      setLocalVerifyOutput(result.output);
+      setLocalOutputSummary(result.summary ?? '');
+      setLocalOutputSuccess(result.success ?? false);
+      setLocalOutputOpen(true);
     }
+    setOutputOpen(true);
+    setOutputPanelTab('verify');
     setIsRunning(false);
 
     if (result.success) {
-      const blockKey = `${currentStepIndex}-0`;
+      const blockKey = `${safeStepIndex}-0`;
       const hasSkeleton = currentStep.codeBlocks?.[0] ? hasAnySkeleton(currentStep.codeBlocks[0]) : false;
       const assisted = hasSkeleton && (showSolution[blockKey] || revealedHints[blockKey]?.length > 0 || revealedAnswers[blockKey]?.length > 0);
       completeStep(currentStep.id, !!assisted);
     }
-    setVerificationResultByStep(prev => ({ ...prev, [currentStepIndex]: result.success }));
+    setVerificationResultByStep(prev => ({ ...prev, [safeStepIndex]: result.success }));
     return { success: result.success };
   };
 
-  const canContinue = !currentStep.codeBlocks?.length || verificationResultByStep[currentStepIndex] === true;
-  const isLastStep = currentStepIndex === steps.length - 1;
+  const canContinue = !currentStep?.codeBlocks?.length || verificationResultByStep[safeStepIndex] === true;
+  const isLastStep = safeStepIndex === steps.length - 1;
 
   const handleNextStep = () => {
-    const isLastStep = currentStepIndex === steps.length - 1;
+    const isLastStep = safeStepIndex === steps.length - 1;
     if (!isCompleted) {
-      const blockKey = `${currentStepIndex}-0`;
+      const blockKey = `${safeStepIndex}-0`;
       const hasSkeleton = currentStep.codeBlocks?.[0] ? hasAnySkeleton(currentStep.codeBlocks[0]) : false;
       const assisted = hasSkeleton && (showSolution[blockKey] || revealedHints[blockKey]?.length > 0 || revealedAnswers[blockKey]?.length > 0);
       completeStep(currentStep.id, !!assisted);
-      onComplete(currentStepIndex);
+      onComplete(safeStepIndex);
     }
-    if (currentStepIndex < steps.length - 1) {
+    if (safeStepIndex < steps.length - 1) {
       setDirection(1);
-      onStepChange(currentStepIndex + 1);
+      onStepChange(safeStepIndex + 1);
     }
-    if (isLastStep) onComplete(currentStepIndex);
+    if (isLastStep) onComplete(safeStepIndex);
   };
 
   const handlePrevStep = () => {
-    if (currentStepIndex > 0) {
+    if (safeStepIndex > 0) {
       setDirection(-1);
-      onStepChange(currentStepIndex - 1);
+      onStepChange(safeStepIndex - 1);
     }
   };
 
@@ -796,8 +1129,11 @@ export function StepView({
         <div className="flex items-center justify-between gap-2">
           {/* Left: Lab info + Step info */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-            <span className="flex-shrink-0 text-[10px] sm:text-xs font-mono text-muted-foreground border border-border px-1.5 py-0.5 rounded">
+            <span className="flex-shrink-0 text-xs font-medium text-primary border border-primary/30 bg-primary/5 px-2 py-1 rounded">
               Lab {String(labNumber).padStart(2, '0')}
+            </span>
+            <span className="text-muted-foreground/80 text-xs flex-shrink-0">
+              {safeStepIndex + 1}/{steps.length}
             </span>
             {currentStep.difficulty && (
               <DifficultyBadge level={currentStep.difficulty} size="sm" className="hidden xs:flex" />
@@ -805,7 +1141,7 @@ export function StepView({
             <div className="min-w-0 flex-1">
               <AnimatePresence mode="wait" custom={direction}>
                 <motion.div
-                  key={currentStepIndex}
+                  key={safeStepIndex}
                   custom={direction}
                   variants={slideVariants}
                   initial="enter"
@@ -814,13 +1150,10 @@ export function StepView({
                   transition={{ duration: 0.15, ease: 'easeOut' }}
                   className="flex items-center gap-1.5 sm:gap-2"
                 >
-                  <span className="text-xs text-muted-foreground flex-shrink-0">
-                    Step {currentStepIndex + 1}/{steps.length}:
-                  </span>
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <span className="text-xs sm:text-sm font-medium truncate cursor-help">
+                        <span className="text-sm font-medium truncate cursor-help">
                           {currentStep.title}
                         </span>
                       </TooltipTrigger>
@@ -842,7 +1175,7 @@ export function StepView({
             </div>
           </div>
 
-          {/* Right: Actions */}
+          {/* Right: Verify only (Reset step + Help are in top bar) */}
           <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             <Button
               size="sm"
@@ -855,34 +1188,26 @@ export function StepView({
               ) : (
                 <CheckCircle2 className="w-3 h-3" />
               )}
-              <span className="hidden xs:inline">{isRunning ? 'Verifying...' : 'Verify only'}</span>
+              <span className="hidden xs:inline">{isRunning ? 'Verifying...' : 'Verify'}</span>
             </Button>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="p-1 rounded-md bg-amber-500/10 text-amber-600 cursor-help">
-                    <Info className="w-3 h-3" />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-xs">
-                  <p className="text-sm">
-                    <strong>Local execution required:</strong> Run <code className="bg-muted px-1 rounded">npm run dev</code> locally with AWS CLI and mongosh.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <StepContextDrawer
-              understandSection={currentStep.understandSection}
-              doThisSection={currentStep.doThisSection}
-              hints={currentStep.hints}
-              tips={currentStep.tips}
-              troubleshooting={currentStep.troubleshooting}
-              businessValue={businessValue}
-              atlasCapability={atlasCapability}
-            />
           </div>
         </div>
       </div>
+
+      {/* Help drawer (controlled from top bar) */}
+      {helpDrawerOpen !== undefined && onHelpDrawerOpenChange && (
+        <StepContextDrawer
+          understandSection={currentStep.understandSection}
+          doThisSection={currentStep.doThisSection}
+          hints={currentStep.hints}
+          tips={currentStep.tips}
+          troubleshooting={currentStep.troubleshooting}
+          businessValue={businessValue}
+          atlasCapability={atlasCapability}
+          open={helpDrawerOpen}
+          onOpenChange={onHelpDrawerOpenChange}
+        />
+      )}
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
@@ -892,18 +1217,15 @@ export function StepView({
         <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
           {currentStep.codeBlocks && currentStep.codeBlocks.length > 0 ? (
             <>
-              <div className="flex-shrink-0 px-3 py-2 text-xs text-muted-foreground bg-muted/50 border-b border-border">
-                Copy the code below into <strong>your</strong> terminal or mongosh (see each block title), run it there, then click <strong>Verify</strong> to check your progress.
-              </div>
               <ResizablePanelGroup direction="vertical" className="flex-1 min-h-0">
               {/* Code Editor Panel */}
-              <ResizablePanel defaultSize={outputOpen ? 50 : 85} minSize={30}>
+              <ResizablePanel defaultSize={outputOpen ? 50 : 85} minSize={30} className="min-h-0">
                 <div className={cn(
-                  "h-full flex flex-col overflow-auto justify-start",
+                  "h-full min-h-0 flex flex-col overflow-auto justify-start",
                   currentStep.codeBlocks.length === 2 && "gap-1"
                 )}>
                   {currentStep.codeBlocks.map((block, idx) => {
-                    const blockKey = `${currentStepIndex}-${idx}`;
+                    const blockKey = `${safeStepIndex}-${idx}`;
                     const hasSkeleton = hasAnySkeleton(block);
                     const tier = skeletonTier[blockKey] || 'guided';
                     const isSolutionRevealed = alwaysShowSolutions || showSolution[blockKey] || !hasSkeleton;
@@ -911,82 +1233,111 @@ export function StepView({
                     const maxPoints = getMaxPoints(tier);
                     const solutionPenalty = getSolutionPenalty(tier);
                     const isTwoBlockPattern = currentStep.codeBlocks.length === 2;
+                    const isTerminalWindow = getBlockType(block, idx, currentStep.codeBlocks) === 'terminal-window';
+                    const runOptions = isTerminalWindow ? { getEditorWindowContent } : undefined;
 
                     return (
                       <div
                         key={idx}
                         className={cn(
-                          "flex flex-col flex-shrink-0",
-                          isTwoBlockPattern && "flex-1 min-h-0"
+                          "flex flex-col min-h-0",
+                          (currentStep.codeBlocks.length === 1 || currentStep.codeBlocks.length === 2)
+                            ? "flex-1 overflow-hidden"
+                            : "flex-shrink-0"
                         )}
                       >
-                        {/* Editor Header - Merged Toolbar (Filename + Difficulty + Score + Actions) */}
-                        <div className="flex-shrink-0 px-2 sm:px-4 py-1.5 sm:py-2 bg-muted/50 border-b border-border">
-                          <div className="flex items-center justify-between gap-2">
-                            {/* Left: Filename + Difficulty selector + Score */}
+                        {/* Editor Header - GitHub-style path for file; Terminal with clear height */}
+                        <div className={cn(
+                          "flex-shrink-0 min-h-[36px] px-3 sm:px-4 py-2 border-b flex items-center",
+                          isTerminalWindow
+                            ? "bg-[hsl(220,18%,7%)] border-[hsl(142,70%,25%)] border-l-4 border-l-green-600/80"
+                            : "bg-muted/50 border-border"
+                        )}>
+                          <div className="flex items-center justify-between gap-2 w-full">
+                            {/* Left: path/file like GitHub (lab / filename) or Terminal */}
                             <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 flex-wrap">
-                              <span className="text-[10px] sm:text-xs font-mono text-muted-foreground truncate max-w-[80px] sm:max-w-none">{block.filename}</span>
-
-                              {/* Inline difficulty selector (only for skeleton blocks that aren't revealed) */}
-                              {hasSkeleton && !isSolutionRevealed && (
+                              {isTerminalWindow ? (
                                 <>
-                                  <div className="flex gap-0.5 bg-background rounded p-0.5 border border-border">
-                                    <button
-                                      onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'guided' }))}
-                                      className={cn(
-                                        "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors",
-                                        tier === 'guided'
-                                          ? "bg-primary text-primary-foreground"
-                                          : "hover:bg-muted"
-                                      )}
-                                    >
-                                      Guided
-                                    </button>
-                                    <button
-                                      onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'challenge' }))}
-                                      disabled={!block.challengeSkeleton && !block.expertSkeleton}
-                                      className={cn(
-                                        "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors",
-                                        tier === 'challenge'
-                                          ? "bg-primary text-primary-foreground"
-                                          : "hover:bg-muted",
-                                        !block.challengeSkeleton && !block.expertSkeleton && "opacity-40 cursor-not-allowed"
-                                      )}
-                                    >
-                                      Challenge
-                                    </button>
-                                    <button
-                                      onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'expert' }))}
-                                      disabled={!block.expertSkeleton}
-                                      className={cn(
-                                        "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors",
-                                        tier === 'expert'
-                                          ? "bg-primary text-primary-foreground"
-                                          : "hover:bg-muted",
-                                        !block.expertSkeleton && "opacity-40 cursor-not-allowed"
-                                      )}
-                                    >
-                                      Expert
-                                    </button>
-                                  </div>
-
-                                  {/* Score display */}
-                                  <div className="flex items-center gap-1 text-[10px] sm:text-xs">
-                                    <span className={cn(
-                                      "font-mono font-medium",
-                                      (pointsDeducted[blockKey] || 0) > 0 ? "text-amber-600" : "text-foreground"
-                                    )}>
-                                      {Math.max(0, maxPoints - (pointsDeducted[blockKey] || 0))}
-                                    </span>
-                                    <span className="text-muted-foreground">/ {maxPoints}pts</span>
-                                  </div>
+                                  <Terminal className="w-4 h-4 text-green-500/90 shrink-0" aria-hidden />
+                                  <span className="text-sm font-medium text-green-400/95 truncate">
+                                    Terminal Pane
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <FileCode className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden />
+                                  <span className="text-xs sm:text-sm font-medium text-foreground truncate">
+                                    {(() => {
+                                      const raw = (block.filename || '').trim();
+                                      const beforeParen = raw.split(/\s+\(/)[0].trim();
+                                      const short = beforeParen.replace(/^\d+\.\s*/, '').trim() || beforeParen || raw || 'file';
+                                      return short;
+                                    })()}
+                                  </span>
+                                  {/* Points for skeleton blocks */}
+                                  {hasSkeleton && !isSolutionRevealed && (
+                                    <div className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground">
+                                      <span className={cn(
+                                        "font-mono font-medium",
+                                        (pointsDeducted[blockKey] || 0) > 0 ? "text-amber-600" : "text-foreground"
+                                      )}>
+                                        {Math.max(0, maxPoints - (pointsDeducted[blockKey] || 0))}
+                                      </span>
+                                      <span>/ {maxPoints}pts</span>
+                                    </div>
+                                  )}
                                 </>
                               )}
+
                             </div>
 
-                            {/* Right: Solution + Copy buttons */}
+                            {/* Right: Terminal = Run selection/all; then Solution + Copy */}
                             <div className="flex items-center gap-1 flex-shrink-0">
-                              {hasSkeleton && !isSolutionRevealed && (
+                              {isTerminalWindow && (block.language === 'bash' || block.language === 'shell' || block.language === 'javascript') && (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isRunBashLoading}
+                                    onClick={() => {
+                                      const editor = editorRefsByBlock.current[blockKey];
+                                      if (!editor) return;
+                                      const model = editor.getModel();
+                                      const sel = editor.getSelection();
+                                      if (!model || !sel) return;
+                                      const text = model.getValueInRange(sel).trim();
+                                      if (!text) return;
+                                      const lines = text.split('\n').map(s => s.trim()).filter(s => s && !s.startsWith('#'));
+                                      if (lines.length) runInBrowser(block, lines, runOptions);
+                                    }}
+                                    className="gap-1 h-6 text-[10px] px-1.5 sm:px-2"
+                                    title="Run selection"
+                                  >
+                                    <Square className="w-3 h-3" />
+                                    <span className="hidden sm:inline">Run selection</span>
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isRunBashLoading}
+                                    onClick={() => {
+                                      const editor = editorRefsByBlock.current[blockKey];
+                                      if (!editor) return;
+                                      const model = editor.getModel();
+                                      if (!model) return;
+                                      const full = model.getValue();
+                                      const lines = full.split('\n').map(s => s.trim()).filter(s => s && !s.startsWith('#'));
+                                      if (lines.length) runInBrowser(block, lines, runOptions);
+                                    }}
+                                    className="gap-1 h-6 text-[10px] px-1.5 sm:px-2"
+                                    title="Run all"
+                                  >
+                                    <Play className="w-3 h-3" />
+                                    <span className="hidden sm:inline">Run all</span>
+                                  </Button>
+                                </>
+                              )}
+                              {(hasSkeleton || block.code) && !(alwaysShowSolutions || showSolution[blockKey]) && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -1012,36 +1363,31 @@ export function StepView({
                         </div>
 
                         {/* Monaco Editor with Inline Hint Widgets */}
-                        <InlineHintEditor
-                          key={`editor-${currentStepIndex}-${idx}-${isSolutionRevealed}`}
-                          code={displayCode}
-                          language={block.language}
-                          lineHeight={lineHeight}
-                          setLineHeight={setLineHeight}
-                          hasSkeleton={hasSkeleton}
-                          isSolutionRevealed={isSolutionRevealed}
-                          inlineHints={block.inlineHints}
-                          tier={tier}
-                          revealedHints={revealedHints[blockKey] || []}
-                          revealedAnswers={revealedAnswers[blockKey] || []}
-                          onRevealHint={(hintIdx) => revealInlineHint(blockKey, hintIdx, tier)}
-                          onRevealAnswer={(hintIdx) => revealInlineAnswer(blockKey, hintIdx, tier)}
-                          equalHeightSplit={isTwoBlockPattern}
-                        />
+                        <div className={cn(
+                          "min-h-0 flex-1 flex flex-col overflow-auto",
+                          isTerminalWindow && "bg-[hsl(220,18%,6%)] rounded-b border border-t-0 border-green-900/50 ring-inset"
+                        )}>
+                          <InlineHintEditor
+                            key={`editor-${safeStepIndex}-${idx}-${isSolutionRevealed}-${resetStepTrigger}`}
+                            code={displayCode}
+                            language={block.language}
+                            lineHeight={lineHeight}
+                            setLineHeight={setLineHeight}
+                            hasSkeleton={hasSkeleton}
+                            isSolutionRevealed={isSolutionRevealed}
+                            inlineHints={block.inlineHints}
+                            tier={tier}
+                            revealedHints={revealedHints[blockKey] || []}
+                            revealedAnswers={revealedAnswers[blockKey] || []}
+                            onRevealHint={(hintIdx) => revealInlineHint(blockKey, hintIdx, tier)}
+                            onRevealAnswer={(hintIdx) => revealInlineAnswer(blockKey, hintIdx, tier)}
+                            equalHeightSplit={currentStep.codeBlocks.length === 1 || isTwoBlockPattern}
+                            onEditorMount={(editor) => { editorRefsByBlock.current[blockKey] = editor; }}
+                            editable={block.language === 'bash' || block.language === 'shell' || block.language === 'javascript'}
+                            showLineNumbers={!isTerminalWindow}
+                          />
+                        </div>
 
-                        {/* Footer removed - controls now in header */}
-
-                        {/* Solution Revealed Banner */}
-                        {hasAnySkeleton(block) && isSolutionRevealed && !alwaysShowSolutions && showSolution[blockKey] && (
-                          <div className="flex-shrink-0 px-4 py-2 bg-green-500/10 border-t border-green-500/30">
-                            <div className="flex items-center gap-2">
-                              <CheckCircle2 className="w-4 h-4 text-green-600" />
-                              <span className="text-sm text-green-700 dark:text-green-500">
-                                Solution revealed • Copy the code and run it in your terminal
-                              </span>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     );
                   })}
@@ -1051,41 +1397,94 @@ export function StepView({
               {/* Resizable Handle */}
               <ResizableHandle withHandle className="bg-border hover:bg-primary/50 transition-colors" />
 
-              {/* Output Panel */}
-              <ResizablePanel defaultSize={outputOpen ? 50 : 15} minSize={10} collapsible>
-                <div className="h-full flex flex-col bg-background/95">
-                  <button
-                    onClick={() => setOutputOpen(!outputOpen)}
-                    className="flex-shrink-0 flex items-center gap-2 px-6 py-2 border-t border-border bg-muted/50 hover:bg-muted transition-colors text-sm"
-                  >
-                    {outputOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-                    <Terminal className="w-4 h-4 text-primary" />
-                    <span>Output</span>
+              {/* Log panes: Output (verify) | Terminal (console) - tabs only */}
+              <ResizablePanel defaultSize={outputOpen ? 50 : 15} minSize={10} collapsible className="min-h-0 flex flex-col">
+                <div className="h-full min-h-0 flex flex-col bg-background/95">
+                  <div className="flex-shrink-0 flex items-center border-t border-border bg-muted/40">
+                    <button
+                      onClick={() => setOutputOpen(!outputOpen)}
+                      className="p-2 text-muted-foreground hover:text-foreground"
+                      title={outputOpen ? 'Collapse' : 'Expand'}
+                    >
+                      {outputOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                    </button>
+                    <div className="flex flex-1">
+                      <button
+                        onClick={() => setOutputPanelTab('verify')}
+                        className={cn(
+                          "px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px",
+                          outputPanelTab === 'verify'
+                            ? "text-primary border-primary bg-background/80"
+                            : "border-transparent text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        Output
+                      </button>
+                      <button
+                        onClick={() => setOutputPanelTab('console')}
+                        className={cn(
+                          "px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px",
+                          outputPanelTab === 'console'
+                            ? "text-primary border-primary bg-background/80"
+                            : "border-transparent text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        Terminal
+                      </button>
+                    </div>
                     {outputStepIndex != null && stepsCount > 0 && (
-                      <span className="text-xs text-muted-foreground ml-1">
-                        (from Step {outputStepIndex + 1})
-                      </span>
+                      <span className="text-[10px] text-muted-foreground px-2">Step {outputStepIndex + 1}</span>
                     )}
                     {outputSummary && (
                       <span className={cn(
-                        "ml-2 px-2 py-0.5 rounded text-xs font-medium",
-                        outputSuccess
-                          ? "bg-green-500/10 text-green-500"
-                          : "bg-red-500/10 text-red-500"
+                        "mr-2 px-2 py-0.5 rounded text-[10px] font-medium",
+                        outputSuccess ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
                       )}>
                         {outputSuccess ? '✓' : '✗'} {outputSummary}
                       </span>
                     )}
-                    {lastOutput && !outputOpen && !outputSummary && (
-                      <span className="text-xs text-muted-foreground ml-2">
-                        (Drag handle or click to expand)
-                      </span>
+                  </div>
+                  <div ref={outputScrollRef} className="flex-1 min-h-0 overflow-auto px-4 py-3 bg-[hsl(220,20%,6%)]">
+                    {outputPanelTab === 'verify' ? (
+                      <>
+                        {/* Show "Clear key vault" when verification failed due to too many DEKs */}
+                        {lastVerifyOutput && (lastVerifyOutput.includes('Found') && lastVerifyOutput.includes('DEK') && lastVerifyOutput.includes('expected 1')) && (
+                          <div className="mb-3 p-3 rounded-md border border-amber-500/30 bg-amber-500/5 flex flex-col gap-2">
+                            <p className="text-xs text-foreground font-medium">Too many DEKs in key vault — clear them to pass this step:</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs border-amber-500/50 hover:bg-amber-500/10"
+                                onClick={async () => {
+                                  if (!labMongoUri?.trim()) {
+                                    toast.error('MongoDB URI is required. Set it in Lab Setup.');
+                                    return;
+                                  }
+                                  const result = await validatorUtils.cleanupKeyVault(labMongoUri);
+                                  if (result.success) {
+                                    toast.success(result.message);
+                                    toast.info('Go to Step 4, run createKey.cjs once, then return here and click Verify.');
+                                  } else {
+                                    toast.error(result.message);
+                                  }
+                                }}
+                              >
+                                Clear key vault (remove all DEKs)
+                              </Button>
+                              <span className="text-[11px] text-muted-foreground">Then run createKey.cjs once in Step 4 and verify again.</span>
+                            </div>
+                          </div>
+                        )}
+                        <pre className="font-mono text-xs text-foreground/90 whitespace-pre-wrap leading-snug">
+                          {lastVerifyOutput || 'Click Verify to run the step check. Result appears here.'}
+                        </pre>
+                      </>
+                    ) : (
+                      <pre className="font-mono text-xs text-foreground/90 whitespace-pre-wrap leading-snug">
+                        {lastOutput || 'Run a command to see output here.'}
+                      </pre>
                     )}
-                  </button>
-                  <div className="flex-1 overflow-auto px-6 py-4 bg-[hsl(220,20%,6%)]">
-                    <pre className="font-mono text-sm text-primary whitespace-pre-wrap leading-relaxed">
-                      {lastOutput || '// Click "Verify only" or "Verify & continue" to see output'}
-                    </pre>
                   </div>
                 </div>
               </ResizablePanel>
@@ -1114,14 +1513,14 @@ export function StepView({
                 <TooltipTrigger asChild>
                   <motion.button
                     onClick={() => {
-                      setDirection(index > currentStepIndex ? 1 : -1);
+                      setDirection(index > safeStepIndex ? 1 : -1);
                       onStepChange(index);
                     }}
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.95 }}
                     className={cn(
                       'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all',
-                      index === currentStepIndex
+                      index === safeStepIndex
                         ? verificationResultByStep[index] === false
                           ? 'bg-red-500/20 text-red-500 ring-2 ring-red-500/50'
                           : 'bg-primary text-primary-foreground ring-2 ring-primary/30'
@@ -1166,7 +1565,7 @@ export function StepView({
             variant="outline"
             size="sm"
             onClick={handlePrevStep}
-            disabled={currentStepIndex === 0}
+            disabled={safeStepIndex === 0}
             className="gap-1"
           >
             <ChevronLeft className="w-4 h-4" />

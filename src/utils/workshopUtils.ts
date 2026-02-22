@@ -128,11 +128,19 @@ export async function startNewWorkshop(customerName: string, workshopDate: strin
 }
 
 /**
- * Reset the current leaderboard without starting a new session
+ * Reset the current leaderboard without starting a new session.
+ * Clears the shared Atlas leaderboard via API, then clears local storage.
  */
-export function resetLeaderboard(): void {
+export async function resetLeaderboard(): Promise<void> {
+  try {
+    const response = await fetch('/api/leaderboard/reset', { method: 'POST' });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+  } catch (error) {
+    console.warn('Leaderboard API reset failed (clearing local only):', error);
+  }
   localStorage.setItem(LEADERBOARD_KEY, JSON.stringify([]));
-  // Note: Atlas leaderboard reset handled via sync or direct leaderboardUtils
 }
 
 /**

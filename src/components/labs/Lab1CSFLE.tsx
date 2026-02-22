@@ -1,11 +1,15 @@
 import { LabViewWithTabs } from './LabViewWithTabs';
 import { validatorUtils } from '@/utils/validatorUtils';
 import { useLab } from '@/context/LabContext';
+import { useCloudProvider, useWorkshopConfig } from '@/context/WorkshopConfigContext';
+import { getCreateKeyCodeBlock, getCreateKeyTerminalBlock } from '@/utils/cloudSnippets';
 import { DifficultyLevel } from './DifficultyBadge';
 import { CSFLEArchitectureDiagram } from './LabArchitectureDiagrams';
 
 export function Lab1CSFLE() {
   const { mongoUri, awsAccessKeyId, awsSecretAccessKey, awsRegion, verifiedTools } = useLab();
+  const cloud = useCloudProvider();
+  const { awsDefaultRegion } = useWorkshopConfig();
   const suffix = verifiedTools['suffix']?.path || 'suffix';
   const aliasName = `alias/mongodb-lab-key-${suffix}`;
   const cryptSharedLibPath = verifiedTools['mongoCryptShared']?.path || '';
@@ -56,7 +60,8 @@ export function Lab1CSFLE() {
         ],
         codeBlocks: [
           {
-            filename: 'Terminal - AWS CLI',
+            filename: 'Terminal',
+            blockType: 'terminal-window',
             language: 'bash',
             code: `# 1. Create the CMK
 KMS_KEY_ID=$(aws kms create-key --description "Lab 1 MongoDB Encryption Key" --query 'KeyMetadata.KeyId' --output text)
@@ -373,130 +378,85 @@ aws kms ______________ --key-id $KMS_KEY_ID --policy-name default --policy file:
         title: 'Initialize Key Vault with Unique Index',
         estimatedTime: '5 min',
         difficulty: 'basic' as DifficultyLevel,
-        understandSection: 'The Key Vault is a special MongoDB collection that stores encrypted DEKs. A unique partial index on keyAltNames prevents duplicate key names. The collection name __keyVault is required by the MongoDB encryption driver. In mongosh, use db.getCollection(\'__keyVault\') because db.__keyVault is not valid.',
+        understandSection: 'The Key Vault is a special MongoDB collection that stores encrypted DEKs. A unique partial index on keyAltNames prevents duplicate key names. The collection name __keyVault is required by the MongoDB encryption driver.',
         doThisSection: [
-          'Connect to Atlas using mongosh',
-          'Switch to the encryption database',
-          'Create a unique partial index on the __keyVault collection'
+          'Edit keyvault-setup.cjs (uses the Node.js driver)',
+          'Run it from the Terminal with: node keyvault-setup.cjs'
         ],
         description: 'The Key Vault collection stores your encrypted DEKs. You MUST create a unique index manually. The driver does NOT do this for you. We use the database "encryption" and collection "__keyVault" because that is the namespace the CSFLE driver expects.',
         tips: [
-          'Run this in your MongoDB Shell (mongosh) connected to Atlas, not in Node.js.',
           'Best practice: The unique partial index on keyAltNames is required by CSFLE. Share with customers: https://www.mongodb.com/docs/manual/core/index-partial/',
-          'If paste fails in mongosh, use the one-liner below, or use .editor then paste and Ctrl+D.'
+          'This step uses the MongoDB Node.js driver instead of mongosh; same result, run with node.'
         ],
         codeBlocks: [
           {
-            filename: 'mongosh (MongoDB Shell - NOT Node.js)',
+            filename: 'keyvault-setup.cjs',
+            blockType: 'editor-window',
             language: 'javascript',
-            code: `// Run this in mongosh (MongoDB Shell), NOT in Node.js
+            code: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
 
-// 1. Connect to your Atlas Cluster first:
-mongosh "${mongoUri}"
-
-use encryption
-
-// 2. Create the unique index (one-liner - copy this if multiline paste fails):
-db.getCollection("__keyVault").createIndex({ keyAltNames: 1 }, { unique: true, partialFilterExpression: { keyAltNames: { $exists: true } } });`,
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("encryption");
+  await db.collection("__keyVault").createIndex(
+    { keyAltNames: 1 },
+    { unique: true, partialFilterExpression: { keyAltNames: { $exists: true } } }
+  );
+  console.log("Key Vault index created.");
+  await client.close();
+}
+run().catch(console.dir);`,
             // Tier 1: Guided
-            skeleton: `// ══════════════════════════════════════════════════════════════
-// Initialize Key Vault with Unique Index
-// ══════════════════════════════════════════════════════════════
-// The Key Vault stores your encrypted DEKs. A unique partial index on
-// keyAltNames prevents duplicate key names.
-//
-// TASK: Connect to Atlas and create the required unique index.
+            skeleton: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
 
-// 1. Connect to your Atlas Cluster:
-mongosh "${mongoUri}"
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("_________");
+  await db.collection("__keyVault").____________(
+    { ___________: 1 },
+    { unique: true, partialFilterExpression: { keyAltNames: { $_______: true } } }
+  );
+  console.log("Key Vault index created.");
+  await client.close();
+}
+run().catch(console.dir);`,
+            challengeSkeleton: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
 
-// 2. Switch to the encryption database
-use _________
-
-// 3. Create the unique index on the __keyVault collection
-// TASK: Fill in the index key and the partialFilterExpression
-db.getCollection("__keyVault").____________(
-  { ___________: 1 },
-  { 
-    unique: true, 
-    partialFilterExpression: { keyAltNames: { $_______: true } } 
-  }
-);`,
-            // Tier 2: Challenge
-            challengeSkeleton: `// ══════════════════════════════════════════════════════════════
-// CHALLENGE MODE - Initialize Key Vault Collection
-// ══════════════════════════════════════════════════════════════
-
-// TASK 1: Connect to MongoDB Atlas
-// ────────────────────────────────
-// Use mongosh to connect to your cluster
-mongosh "${mongoUri}"
-
-// TASK 2: Create the Key Vault Index
-// ──────────────────────────────────
-// Requirements:
-//   • Switch to the "encryption" database
-//   • Create a unique partial index on "__keyVault" collection
-//   • Index field: keyAltNames
-//   • Make it unique only when keyAltNames exists
-//
-// Docs: https://www.mongodb.com/docs/manual/core/index-partial/
-
-// Write your commands:
-
-
-`,
-            // Tier 3: Expert  
-            expertSkeleton: `// ══════════════════════════════════════════════════════════════
-// EXPERT MODE - Configure Key Vault Storage
-// ══════════════════════════════════════════════════════════════
-//
-// OBJECTIVE: Prepare MongoDB to store encrypted Data Encryption Keys
-//
-// Your solution must:
-//   1. Connect to the cluster using mongosh
-//   2. Create a key vault collection in the "encryption" database
-//   3. Add a unique partial index that prevents duplicate key names
-//
-// Hint: The collection name should be "__keyVault"
-// Reference: MongoDB Key Vault documentation
-// Points available: 25 (if no hints used)
-//
-// ══════════════════════════════════════════════════════════════
-
-// YOUR SOLUTION:
-
-
-`
-            ,
-            // Inline hints for Guided mode - line numbers match skeleton exactly
-            // User confirmed: L13: use _________, L17: ____________, L18: ___________, L21: $_______
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("encryption");
+  // TASK: Create unique partial index on __keyVault for keyAltNames
+  await db.collection("__keyVault").createIndex(/* ... */);
+  console.log("Key Vault index created.");
+  await client.close();
+}
+run().catch(console.dir);`,
+            expertSkeleton: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+async function run() {
+  const client = await MongoClient.connect(uri);
+  // TASK: Create unique partial index on encryption.__keyVault (keyAltNames)
+  await client.close();
+}
+run().catch(console.dir);`,
             inlineHints: [
-              {
-                line: 13,
-                blankText: '_________',
-                hint: 'The database name used by MongoDB encryption operations',
-                answer: 'encryption'
-              },
-              {
-                line: 17,
-                blankText: '____________',
-                hint: 'MongoDB method to create an index on a collection',
-                answer: 'createIndex'
-              },
-              {
-                line: 18,
-                blankText: '___________',
-                hint: 'The field that stores alternate names for DEKs',
-                answer: 'keyAltNames'
-              },
-              {
-                line: 21,
-                blankText: '$_______',
-                hint: 'MongoDB operator to check if a field exists',
-                answer: 'exists'
-              }
+              { line: 7, blankText: '_________', hint: 'Database name for encryption key vault', answer: 'encryption' },
+              { line: 8, blankText: '____________', hint: 'Method to create an index on a collection', answer: 'createIndex' },
+              { line: 9, blankText: '___________', hint: 'Field that stores alternate names for DEKs', answer: 'keyAltNames' },
+              { line: 10, blankText: '$_______', hint: 'Operator to check if a field exists', answer: 'exists' }
             ]
+          },
+          {
+            filename: 'Terminal',
+            blockType: 'terminal-window',
+            language: 'bash',
+            code: `node keyvault-setup.cjs`
           }
         ],
         hints: [
@@ -528,7 +488,8 @@ mongosh "${mongoUri}"
         ],
         codeBlocks: [
           {
-            filename: 'createKey.cjs (Node.js - Create this file)',
+            filename: 'createKey.cjs',
+            blockType: 'editor-window',
             language: 'javascript',
             code: `const { MongoClient, ClientEncryption } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
@@ -538,8 +499,8 @@ const uri = "${mongoUri}";
 const keyVaultNamespace = "encryption.__keyVault";
 
 async function run() {
-  // Replace YOUR_SSO_PROFILE with your AWS SSO profile name, or use fromSSO()() for default profile
-  const credentials = await fromSSO({ profile: 'YOUR_SSO_PROFILE' })();
+  // Use default AWS SSO profile (or use fromSSO({ profile: 'your-profile' })() for a specific profile)
+  const credentials = await fromSSO()();
 
   // MongoDB client encryption expects only: accessKeyId, secretAccessKey, sessionToken
   // Filter out expiration and other fields that AWS SDK includes
@@ -598,8 +559,8 @@ const uri = "${mongoUri}";
 const keyVaultNamespace = "encryption.__keyVault";
 
 async function run() {
-  // Replace YOUR_SSO_PROFILE with your AWS SSO profile name, or use fromSSO()() for default
-  const credentials = await fromSSO({ profile: 'YOUR_SSO_PROFILE' })();
+  // Use default AWS SSO profile (or use fromSSO({ profile: 'your-profile' })() for a specific profile)
+  const credentials = await fromSSO()();
 
   const kmsProviders = {
     aws: {
@@ -658,12 +619,13 @@ run().catch(console.dir);`,
             ]
           },
           {
-            filename: 'Terminal - Run the script',
+            filename: 'Terminal',
+            blockType: 'terminal-window',
             language: 'bash',
             code: `# First, install dependencies (if not already done):
 npm install mongodb mongodb-client-encryption @aws-sdk/credential-providers
 
-# Run the script in your terminal (NOT mongosh):
+# Run the script from the file above:
 node createKey.cjs
 
 # Expected Output:
@@ -682,72 +644,58 @@ node createKey.cjs
         id: 'l1s5verify',
         title: 'Verify DEK Creation in Key Vault',
         estimatedTime: '5 min',
-        description: 'Connect to MongoDB Atlas using mongosh and query the key vault to verify that exactly one Data Encryption Key has been created. This is a critical verification step.',
+        description: 'Run a Node.js script that uses the MongoDB driver to query the key vault and verify that exactly one Data Encryption Key has been created. This is a critical verification step.',
         tips: [
           'This step confirms the DEK was successfully created and stored in the key vault.',
           'The key vault stores encrypted DEKs; the CMK encrypts these DEKs at rest.',
-          'If you see 0 keys, re-run createKey.cjs. If you see multiple keys, you may have run it more than once.',
-          'When copying multiline scripts into mongosh, use .editor first, paste your code, then press Ctrl+D.'
+          'If you see 0 keys, re-run createKey.cjs. If you see multiple keys, you may have run it more than once.'
         ],
         codeBlocks: [
           {
-            filename: 'mongosh (MongoDB Shell - NOT Node.js)',
+            filename: 'keyvault-verify.cjs',
+            blockType: 'editor-window',
             language: 'javascript',
-            code: `// Run this in mongosh (MongoDB Shell), NOT in Node.js
+            code: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
 
-// 1. Connect to Atlas
-mongosh "${mongoUri}"
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("encryption");
+  const docs = await db.collection("__keyVault").find({}).toArray();
+  console.log("Key Vault documents:", docs.length);
+  docs.forEach((d) => console.log(JSON.stringify(d, null, 2)));
+  const count = await db.collection("__keyVault").countDocuments();
+  console.log("Total keys:", count);
+  await client.close();
+}
+run().catch(console.dir);`,
+            skeleton: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
 
-// 2. Switch to encryption database
-use encryption
-
-// 3. Query the key vault collection
-db.getCollection("__keyVault").find({}).pretty()
-
-// Expected Output:
-// You should see exactly 1 document with:
-// - _id: Binary UUID
-// - keyAltNames: ["user-${suffix}-ssn-key"]
-// - masterKey: { provider: "aws", key: "${aliasName}", region: "${awsRegion}" }
-// - creationDate and updateDate timestamps
-
-// 4. Count total keys (should return 1)
-db.getCollection("__keyVault").countDocuments()`,
-            skeleton: `// ══════════════════════════════════════════════════════════════
-// Verify DEK Creation in Key Vault
-// ══════════════════════════════════════════════════════════════
-
-// 1. Connect to your Atlas Cluster:
-mongosh "${mongoUri}"
-
-// 2. Switch to the encryption database
-use _________
-
-// 3. Query the key vault to see your new DEK
-db.getCollection("__keyVault").______({}).pretty()
-
-// 4. Count the keys to verify existence
-db.getCollection("__keyVault").________________()`,
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("_________");
+  const docs = await db.collection("__keyVault").______({}).toArray();
+  console.log("Key Vault documents:", docs.length);
+  docs.forEach((d) => console.log(JSON.stringify(d, null, 2)));
+  const count = await db.collection("__keyVault").________________();
+  console.log("Total keys:", count);
+  await client.close();
+}
+run().catch(console.dir);`,
             inlineHints: [
-              {
-                line: 9,
-                blankText: '_________',
-                hint: 'The database name for encryption operations',
-                answer: 'encryption'
-              },
-              {
-                line: 12,
-                blankText: '______',
-                hint: 'MongoDB method to read documents from a collection',
-                answer: 'find'
-              },
-              {
-                line: 15,
-                blankText: '________________',
-                hint: 'MongoDB method to count documents in a collection',
-                answer: 'countDocuments'
-              }
+              { line: 7, blankText: '_________', hint: 'Database name for encryption key vault', answer: 'encryption' },
+              { line: 8, blankText: '______', hint: 'Method to read documents from a collection', answer: 'find' },
+              { line: 11, blankText: '________________', hint: 'Method to count documents in a collection', answer: 'countDocuments' }
             ]
+          },
+          {
+            filename: 'Terminal',
+            blockType: 'terminal-window',
+            language: 'bash',
+            code: `node keyvault-verify.cjs`
           }
         ],
         onVerify: async () => validatorUtils.checkKeyVaultCount(1, mongoUri)
@@ -775,8 +723,8 @@ const uri = "${mongoUri}";
 const keyAltName = "user-${suffix}-ssn-key";
 
 async function run() {
-  // Replace YOUR_SSO_PROFILE with your AWS SSO profile name, or use fromSSO()() for default profile
-  const credentials = await fromSSO({ profile: 'YOUR_SSO_PROFILE' })();
+  // Use default AWS SSO profile (or use fromSSO({ profile: 'your-profile' })() for a specific profile)
+  const credentials = await fromSSO()();
 
   const kmsProviders = {
     aws: {
@@ -922,8 +870,8 @@ const uri = "${mongoUri}";
 const keyAltName = "user-${suffix}-ssn-key";
 
 async function run() {
-  // Replace YOUR_SSO_PROFILE with your AWS SSO profile name, or use fromSSO()() for default
-  const credentials = await fromSSO({ profile: 'YOUR_SSO_PROFILE' })();
+  // Use default AWS SSO profile (or use fromSSO({ profile: 'your-profile' })() for a specific profile)
+  const credentials = await fromSSO()();
   const kmsProviders = {
     aws: {
       accessKeyId: credentials.accessKeyId,
@@ -1037,7 +985,7 @@ run().catch(console.error);`,
             ]
           },
           {
-            filename: '2. Terminal (NOT mongosh) - Run with Node.js',
+            filename: 'Terminal',
             language: 'bash',
             code: `# Run in your terminal (NOT in mongosh):
 node testCSFLE.cjs
@@ -1072,17 +1020,27 @@ node testCSFLE.cjs
         ],
         codeBlocks: [
           {
-            filename: 'app.js (The Final Product)',
+            filename: 'app.cjs (The Final Product)',
             language: 'javascript',
-            code: `import { MongoClient } from "mongodb";
+            code: `const { MongoClient } = require("mongodb");
+const { fromSSO } = require("@aws-sdk/credential-providers");
 
 // --- CONFIGURATION ---
 const uri = "${mongoUri}";
 const keyVaultNamespace = "encryption.__keyVault";
-const kmsProviders = { aws: {} }; // Use implicit AWS credentials
 const keyAltName = "user-${suffix}-ssn-key";
 
 async function main() {
+  // Use default AWS SSO profile (same as Step 6 / testCSFLE.cjs)
+  const credentials = await fromSSO()();
+  const kmsProviders = {
+    aws: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
+  };
+
   // BEST PRACTICE: Look up DEK by alternative name
   const keyVaultClient = new MongoClient(uri);
   await keyVaultClient.connect();
@@ -1142,15 +1100,24 @@ async function main() {
 
 main().catch(console.error);`,
             // Skeleton with blanks for production CSFLE patterns
-            skeleton: `import { MongoClient } from "mongodb";
+            skeleton: `const { MongoClient } = require("mongodb");
+const { fromSSO } = require("@aws-sdk/credential-providers");
 
 // --- CONFIGURATION ---
 const uri = "${mongoUri}";
 const keyVaultNamespace = "encryption.__keyVault";
-const kmsProviders = { aws: {} }; // Use implicit AWS credentials
 const keyAltName = "user-${suffix}-ssn-key";
 
 async function main() {
+  const credentials = await fromSSO()();
+  const kmsProviders = {
+    aws: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
+  };
+
   // BEST PRACTICE: Look up DEK by alternative name
   const keyVaultClient = new MongoClient(uri);
   await keyVaultClient.connect();
@@ -1206,28 +1173,28 @@ async function main() {
 }
 
 main().catch(console.error);`,
-            // Inline hints for the skeleton - user confirmed: L13, L15, L20, L36
+            // Inline hints for the skeleton (line numbers after adding fromSSO/kmsProviders block)
             inlineHints: [
               {
-                line: 13,
+                line: 22,
                 blankText: '_____',
                 hint: 'JavaScript string method to divide into array of substrings',
                 answer: 'split'
               },
               {
-                line: 15,
+                line: 24,
                 blankText: '_____',
                 hint: 'MongoDB document field that stores the primary key',
                 answer: '_id'
               },
               {
-                line: 20,
+                line: 29,
                 blankText: '_______',
                 hint: 'JSON Schema keyword to specify the BSON type',
                 answer: 'bsonType'
               },
               {
-                line: 36,
+                line: cryptSharedLibPath ? 54 : 50,
                 blankText: '_____________',
                 hint: 'Object that contains AWS KMS credentials configuration',
                 answer: 'kmsProviders'
@@ -1235,10 +1202,10 @@ main().catch(console.error);`,
             ]
           },
           {
-            filename: 'Terminal - Run the application',
+            filename: 'Terminal',
             language: 'bash',
             code: `# Run the complete CSFLE application:
-node app.js
+node app.cjs
 
 # Expected Output:
 # ✓ Connected to MongoDB with CSFLE enabled
@@ -1354,24 +1321,54 @@ node app.js
     }
   ];
 
+  // Per-cloud code blocks for create DEK step (l1s5): AWS uses full step; Azure/GCP use cloud snippets
+  const stepsToUse = cloud === 'aws'
+    ? lab1Steps
+    : lab1Steps.map((step) => {
+        if (step.id !== 'l1s5') return step;
+        const opts = {
+          mongoUri,
+          suffix,
+          aliasName,
+          awsRegion: awsDefaultRegion || awsRegion,
+        };
+        return {
+          ...step,
+          codeBlocks: [
+            {
+              filename: 'createKey.cjs',
+              blockType: 'editor-window',
+              language: 'javascript',
+              code: getCreateKeyCodeBlock(cloud, opts),
+            },
+            {
+              filename: 'Terminal',
+              blockType: 'terminal-window',
+              language: 'bash',
+              code: getCreateKeyTerminalBlock(cloud),
+            },
+          ],
+        };
+      });
+
   return (
     <LabViewWithTabs
       labNumber={1}
-      title="CSFLE Fundamentals with AWS KMS"
+      title={cloud === 'aws' ? 'CSFLE Fundamentals with AWS KMS' : `CSFLE Fundamentals with ${cloud === 'azure' ? 'Azure Key Vault' : 'GCP Cloud KMS'}`}
       description="Master the rollout of KMS infrastructure and Client-Side Field Level Encryption"
       duration="35 min"
       prerequisites={[
         'MongoDB Atlas M10+ running MongoDB 7.0+',
-        'AWS IAM User with KMS Management Permissions',
-        'Working Terminal with AWS CLI access'
+        cloud === 'aws' ? 'AWS IAM User with KMS Management Permissions' : cloud === 'azure' ? 'Azure Key Vault and app registration' : 'GCP Cloud KMS and service account',
+        'Working Terminal with CLI access'
       ]}
       objectives={[
-        'Automate Key creation via AWS CLI',
-        'Audit IAM policies for Decrypt & GenerateDataKey permissions',
+        cloud === 'aws' ? 'Automate Key creation via AWS CLI' : 'Create Customer Master Key in your cloud KMS',
+        'Audit IAM/key policies for Decrypt & GenerateDataKey permissions',
         'Initialize Key Vault namespaces with high-availability indexes',
         'Map PII fields to unique compliance-bound DEKs'
       ]}
-      steps={lab1Steps}
+      steps={stepsToUse}
       introContent={introContent}
       businessValue="Protect PII at the application layer before it reaches the database"
       atlasCapability="Client-Side Field Level Encryption"

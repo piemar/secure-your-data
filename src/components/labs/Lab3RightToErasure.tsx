@@ -1,11 +1,13 @@
 import { LabViewWithTabs } from './LabViewWithTabs';
 import { validatorUtils } from '@/utils/validatorUtils';
 import { useLab } from '@/context/LabContext';
+import { useCloudProvider } from '@/context/WorkshopConfigContext';
 import { DifficultyLevel } from './DifficultyBadge';
 import { CryptoShreddingDiagram } from './LabArchitectureDiagrams';
 
 export function Lab3RightToErasure() {
   const { mongoUri, awsRegion, verifiedTools } = useLab();
+  const cloud = useCloudProvider();
   const suffix = verifiedTools['suffix']?.path || 'suffix';
   const aliasName = `alias/mongodb-lab-key-${suffix}`;
   const cryptSharedLibPath = verifiedTools['mongoCryptShared']?.path || '';
@@ -513,7 +515,7 @@ node multiTenantIsolation.cjs
           'SA TIP: Use rewrapManyDataKey() to update the DEKs with a new CMK. This is a metadata-only operation and is extremely fast.',
           'COMPLIANCE: Regularly rotating the CMK is a standard requirement for SOC2 and PCI-DSS.',
           'ENVELOPE ENCRYPTION: The actual encrypted data never changes - only the DEK\'s CMK reference is updated.',
-          'PREREQUISITE: Before rotation, ensure the NEW CMK exists and is accessible (see Step 4).',
+          'PREREQUISITE: Before rotation, ensure the NEW CMK exists and is accessible.',
           'IMPORTANT: The old CMK must still be accessible during rotation (to decrypt the DEK for rewrapping).'
         ],
         codeBlocks: [
@@ -700,113 +702,6 @@ node rotateCMK.cjs
           }
         ],
         onVerify: async () => validatorUtils.checkKeyRotation(mongoUri, `user-${suffix}-ssn-key`)
-      },
-      {
-        id: 'l3s4',
-        title: 'Step 4: Infrastructure: Rotation Readiness Check',
-        estimatedTime: '8 min',
-        description: 'Before rotating keys in MongoDB, you must verify that the new CMK exists and is accessible. Use the AWS CLI to check infrastructure readiness. This step ensures that rotation will succeed and helps prevent production issues.',
-        tips: [
-          'ACTION REQUIRED: Run the AWS CLI commands below to verify the new CMK exists and is accessible.',
-          'SA NUANCE: Rotation will fail if the driver cannot "Decrypt" with the old key or "Encrypt" with the new one.',
-          'PREREQUISITE: Create a new CMK in AWS KMS before attempting rotation in production.',
-          'VERIFICATION: Check that the new CMK alias exists, is enabled, and your IAM user has access.',
-          'MONITORING: SAs should recommend checking CloudWatch logs for KMS usage during a rewrap operation.',
-          'BEST PRACTICE: Always verify infrastructure readiness before performing key rotation in production.'
-        ],
-        codeBlocks: [
-          {
-            filename: 'AWS CLI - Verify New CMK Exists',
-            language: 'bash',
-            code: `# Run these in your terminal (AWS CLI with access to KMS).
-# 1. List all KMS aliases to find your new CMK
-aws kms list-aliases --query "Aliases[?contains(AliasName, 'mongodb')].AliasName" --output table
-
-# 2. Verify the NEW key exists and is enabled
-aws kms describe-key --key-id "${aliasName}"
-
-# Expected Output: Should show KeyState: "Enabled"
-
-# 3. Check key policy to ensure your IAM user has access
-# First, get the key ID from the alias:
-KEY_ID=$(aws kms describe-key --key-id "${aliasName}" --region eu-central-1 --query 'KeyMetadata.KeyId' --output text)
-
-# Then use the key ID to get the policy:
-aws kms get-key-policy --key-id $KEY_ID --policy-name default --region eu-central-1
-
-# 4. Verify you can use the key (test encryption/decryption)
-CIPHERTEXT=$(aws kms encrypt --key-id "${aliasName}" --plaintext "test" --output text --query CiphertextBlob)
-
-# Expected Output: Base64-encoded ciphertext (proves you can encrypt)
-
-# 5. Test decryption (uses ciphertext from step 4)
-aws kms decrypt --ciphertext-blob "$CIPHERTEXT" --output text --query Plaintext
-
-# Expected Output: "dGVzdA==" (base64 for "test") - proves you can decrypt
-
-# ✓ If all steps succeed, your infrastructure is ready for rotation!`,
-            skeleton: `# ══════════════════════════════════════════════════════════════
-# Rotation Readiness Check - Verify AWS KMS Infrastructure
-# ══════════════════════════════════════════════════════════════
-
-# 1. List all KMS aliases to find your new CMK
-aws kms ____________ --query "Aliases[?contains(AliasName, 'mongodb')].AliasName" --output table
-
-# 2. Verify the NEW key exists and is enabled
-aws kms ____________ --key-id "${aliasName}"
-
-# Expected Output: Should show KeyState: "Enabled"
-
-# 3. Check key policy to ensure your IAM user has access
-# First, get the key ID from the alias:
-KEY_ID=$(aws kms describe-key --key-id "${aliasName}" --region eu-central-1 --query 'KeyMetadata._______' --output text)
-
-# Then use the key ID to get the policy:
-aws kms ______________ --key-id $KEY_ID --policy-name default --region eu-central-1
-
-# 4. Verify you can use the key (test encryption/decryption)
-CIPHERTEXT=$(aws kms _______ --key-id "${aliasName}" --plaintext "test" --output text --query CiphertextBlob)
-
-# Expected Output: Base64-encoded ciphertext (proves you can encrypt)
-
-# 5. Test decryption (uses ciphertext from step 4)
-aws kms _______ --ciphertext-blob "$CIPHERTEXT" --output text --query Plaintext
-
-# Expected Output: "dGVzdA==" (base64 for "test") - proves you can decrypt
-
-# ✓ If all steps succeed, your infrastructure is ready for rotation!`,
-            // Inline hints - line numbers match skeleton
-            // L6: list-aliases, L9: describe-key, L15: KeyId, L18: get-key-policy, L21: encrypt, L26: decrypt
-            inlineHints: [
-              { line: 6, blankText: '____________', hint: 'AWS KMS command to list all aliases', answer: 'list-aliases' },
-              { line: 9, blankText: '____________', hint: 'AWS KMS command to get key details', answer: 'describe-key' },
-              { line: 15, blankText: '_______', hint: 'JMESPath query to extract the key identifier', answer: 'KeyId' },
-              { line: 18, blankText: '______________', hint: 'AWS KMS command to retrieve the key policy', answer: 'get-key-policy' },
-              { line: 21, blankText: '_______', hint: 'AWS KMS command to encrypt data', answer: 'encrypt' },
-              { line: 26, blankText: '_______', hint: 'AWS KMS command to decrypt data', answer: 'decrypt' }
-            ]
-          },
-          {
-            filename: 'Note: Creating a New CMK for Rotation',
-            language: 'markdown',
-            code: `**For Production Rotation:**
-
-Before running rotateCMK.cjs, create a NEW CMK in AWS:
-
-\`\`\`bash
-# Create a new CMK for rotation
-aws kms create-key --description "MongoDB Lab Key V2" --region eu-central-1
-
-# Create an alias for the new key
-aws kms create-alias --alias-name alias/mongodb-lab-key-v2 --target-key-id <KEY_ID>
-
-# Update rotateCMK.cjs to use: alias/mongodb-lab-key-v2
-\`\`\`
-
-For this lab demo, we use the same CMK to demonstrate the rewrap operation.`
-          }
-        ],
-        onVerify: async () => validatorUtils.checkKmsAlias(aliasName)
       }
     ];
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Trophy, Clock, Award, Users, TrendingUp, Medal } from 'lucide-react';
+import { Trophy, Award, Users, TrendingUp, Medal } from 'lucide-react';
 import { useLab } from '@/context/LabContext';
 import { getSortedLeaderboard, heartbeat, syncLeaderboard, type LeaderboardEntry } from '@/utils/leaderboardUtils';
 
@@ -25,15 +25,15 @@ export function Leaderboard() {
       heartbeat(userEmail);
     }
 
-    // Refresh every 5 seconds for Atlas sync
+    // Refresh every 2 seconds so other participants' progress appears quickly
     const interval = setInterval(async () => {
       await updateLeaderboard();
       if (userEmail) {
         await heartbeat(userEmail);
       }
-    }, 5000);
+    }, 2000);
 
-    // Also listen for storage changes (in case another tab updates the leaderboard)
+    // Listen for storage changes (another tab updated the leaderboard)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'workshop_leaderboard') {
         updateLeaderboard();
@@ -41,9 +41,16 @@ export function Leaderboard() {
     };
     window.addEventListener('storage', handleStorageChange);
 
+    // Listen for immediate refresh when current user completes a step (same tab)
+    const handleLeaderboardUpdate = () => {
+      updateLeaderboard();
+    };
+    window.addEventListener('workshop-leaderboard-update', handleLeaderboardUpdate);
+
     return () => {
       clearInterval(interval);
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('workshop-leaderboard-update', handleLeaderboardUpdate);
     };
   }, [userEmail]);
 
@@ -52,10 +59,6 @@ export function Leaderboard() {
     const minutes = Math.floor((ms % 3600000) / 60000);
     if (hours > 0) return `${hours}h ${minutes}m`;
     return `${minutes}m`;
-  };
-
-  const getTotalTime = (entry: LeaderboardEntry) => {
-    return Object.values(entry.labTimes || {}).reduce((sum, time) => sum + time, 0);
   };
 
   const getMedalIcon = (index: number) => {
@@ -93,7 +96,7 @@ export function Leaderboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Score</p>
                   <p className="text-2xl font-bold">{sortedLeaderboard[userRank - 1]?.score || 0}</p>
@@ -101,12 +104,6 @@ export function Leaderboard() {
                 <div>
                   <p className="text-sm text-muted-foreground">Completed Labs</p>
                   <p className="text-2xl font-bold">{sortedLeaderboard[userRank - 1]?.completedLabs.length || 0}/3</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Time</p>
-                  <p className="text-2xl font-bold">
-                    {formatTime(getTotalTime(sortedLeaderboard[userRank - 1] as LeaderboardEntry))}
-                  </p>
                 </div>
               </div>
             </CardContent>
@@ -136,7 +133,6 @@ export function Leaderboard() {
               <div className="space-y-2">
                 {sortedLeaderboard.map((entry, index) => {
                   const isCurrentUser = entry.email === userEmail;
-                  const totalTime = getTotalTime(entry);
 
                   return (
                     <div
@@ -172,10 +168,6 @@ export function Leaderboard() {
                             <span className="flex items-center gap-1">
                               <Award className="w-4 h-4" />
                               {entry.completedLabs.length}/3 labs
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-4 h-4" />
-                              {formatTime(totalTime)}
                             </span>
                           </div>
                         </div>

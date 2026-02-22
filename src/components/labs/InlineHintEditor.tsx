@@ -18,6 +18,12 @@ interface InlineHintEditorProps {
   onRevealHint: (hintIdx: number) => void;
   onRevealAnswer: (hintIdx: number) => void;
   equalHeightSplit?: boolean;
+  /** Called when the Monaco editor is mounted so parent can run code (e.g. getValue, getSelection). */
+  onEditorMount?: (editor: any) => void;
+  /** When true, editor is editable and uncontrolled so user can type in placeholders and run in browser. Reveal answer inserts into the buffer. */
+  editable?: boolean;
+  /** When false, hide line numbers (e.g. for terminal-style blocks). Default true. */
+  showLineNumbers?: boolean;
 }
 
 interface BlankPosition {
@@ -43,6 +49,9 @@ export function InlineHintEditor({
   onRevealHint,
   onRevealAnswer,
   equalHeightSplit,
+  onEditorMount,
+  editable = false,
+  showLineNumbers = true,
 }: InlineHintEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [editorInstance, setEditorInstance] = useState<any>(null);
@@ -51,6 +60,7 @@ export function InlineHintEditor({
   const [scrollTop, setScrollTop] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [isEditorReady, setIsEditorReady] = useState(false);
+  const insertedAnswersRef = useRef<Set<number>>(new Set());
 
   // Find all blank positions in the code by matching each hint's blankText
   const findBlankPositions = useCallback((codeText: string, hints: InlineHint[]): BlankPosition[] => {
@@ -126,19 +136,19 @@ export function InlineHintEditor({
 
   // Update blank positions when code or hints change
   useEffect(() => {
-    console.log('[InlineHintEditor] Effect triggered:', {
-      hasInlineHints: !!inlineHints,
-      inlineHintsLength: inlineHints?.length,
-      hasSkeleton,
-      isSolutionRevealed,
-      tier,
-      codePreview: code?.substring(0, 100)
-    });
-    
     if (inlineHints && inlineHints.length > 0 && hasSkeleton && !isSolutionRevealed) {
       const positions = findBlankPositions(code, inlineHints);
-      console.log('[InlineHintEditor] Found blank positions:', positions);
       setBlankPositions(positions);
+      // Temporary debug: remove when hint markers are verified across all labs
+      if (import.meta.env.DEV && (positions.length !== inlineHints.length)) {
+        const lines = code.split('\n');
+        console.log('[InlineHintEditor] Hint mismatch:', {
+          expectedHints: inlineHints.length,
+          foundPositions: positions.length,
+          codeLines: lines.length,
+          hints: inlineHints.map(h => ({ line: h.line, blankLen: h.blankText?.length, linePreview: lines[h.line - 1]?.slice(0, 80) })),
+        });
+      }
     } else {
       setBlankPositions([]);
     }
@@ -148,7 +158,8 @@ export function InlineHintEditor({
   const handleEditorMount = useCallback((editor: any, monaco: Monaco) => {
     setEditorInstance(editor);
     setMonacoInstance(monaco);
-    
+    onEditorMount?.(editor);
+
     // Get actual line height from Monaco
     const options = editor.getOptions();
     const actualLineHeight = options.get(66) || 19; // 66 = EditorOption.lineHeight
@@ -165,7 +176,7 @@ export function InlineHintEditor({
     requestAnimationFrame(() => {
       setIsEditorReady(true);
     });
-  }, [setLineHeight]);
+  }, [setLineHeight, onEditorMount]);
 
   // Apply decorations for revealed answers (green highlight)
   useEffect(() => {
@@ -209,6 +220,63 @@ export function InlineHintEditor({
     };
   }, [editorInstance, monacoInstance, inlineHints, revealedAnswers, displayCode]);
 
+  // When editable + run-in-browser: insert revealed answers into the editor buffer so Run uses them
+  // If the user deleted the blank (e.g. _______), insert at the intended position from the skeleton
+  useEffect(() => {
+    if (!editable || !editorInstance || !inlineHints?.length) return;
+    const model = editorInstance.getModel();
+    if (!model) return;
+    const lineCount = model.getLineCount();
+    const skeletonLines = code.split('\n');
+    revealedAnswers.forEach((hintIdx) => {
+      if (insertedAnswersRef.current.has(hintIdx)) return;
+      const hint = inlineHints[hintIdx];
+      if (!hint) return;
+      const lineNumber = hint.line;
+      if (lineNumber < 1 || lineNumber > lineCount) return;
+      const lineContent = model.getLineContent(lineNumber);
+      const blankPattern = hint.blankText || '_______';
+      const idx = lineContent.indexOf(blankPattern);
+      const fallbackMatch = lineContent.match(/_{3,}/);
+
+      let startColumn: number;
+      let endColumn: number;
+
+      if (idx >= 0) {
+        startColumn = idx + 1;
+        endColumn = startColumn + blankPattern.length;
+      } else if (fallbackMatch && fallbackMatch.index !== undefined) {
+        startColumn = fallbackMatch.index + 1;
+        endColumn = startColumn + fallbackMatch[0].length;
+      } else {
+        // User deleted the blank: find insert position using text before the blank from skeleton
+        const pos = blankPositions.find(p => p.hintIdx === hintIdx);
+        if (!pos) return;
+        const skeletonLine = skeletonLines[lineNumber - 1] ?? '';
+        const prefixBeforeBlank = skeletonLine.substring(0, pos.blankStart);
+        const prefixIndex = lineContent.indexOf(prefixBeforeBlank);
+        if (prefixIndex >= 0) {
+          startColumn = prefixIndex + prefixBeforeBlank.length + 1;
+          endColumn = startColumn;
+        } else {
+          startColumn = pos.blankStart + 1;
+          endColumn = startColumn;
+        }
+      }
+
+      const startOffset = model.getOffsetAt({ lineNumber, column: startColumn });
+      const endOffset = model.getOffsetAt({ lineNumber, column: endColumn });
+      const startPos = model.getPositionAt(startOffset);
+      const endPos = model.getPositionAt(endOffset);
+      if (!startPos || !endPos) return;
+      editorInstance.executeEdits('reveal-answer', [{
+        range: { startLineNumber: startPos.lineNumber, startColumn: startPos.column, endLineNumber: endPos.lineNumber, endColumn: endPos.column },
+        text: hint.answer,
+      }]);
+      insertedAnswersRef.current.add(hintIdx);
+    });
+  }, [editable, editorInstance, inlineHints, revealedAnswers, blankPositions, code]);
+
   // Calculate pixel position for a line/column in the editor
   const getPositionPixels = useCallback((lineNumber: number, column: number) => {
     if (!editorInstance) return { top: 0, left: 0 };
@@ -240,10 +308,8 @@ export function InlineHintEditor({
     };
   }, [editorInstance, lineHeight, scrollTop, scrollLeft]);
 
-  // Show hint markers only in guided mode with unrevealed solution
-  // Only show markers for blanks that haven't been answered yet
-  // Also requires editor to be ready (so positions are calculated correctly)
-  const showMarkers = hasSkeleton && !isSolutionRevealed && tier === 'guided' && blankPositions.length > 0 && isEditorReady;
+  // Show hint markers when we have skeleton, unrevealed solution, and blanks (no tier filter)
+  const showMarkers = hasSkeleton && !isSolutionRevealed && blankPositions.length > 0 && isEditorReady;
 
   // Filter out positions where answer is already revealed
   const visiblePositions = blankPositions.filter(pos => !revealedAnswers.includes(pos.hintIdx));
@@ -284,13 +350,13 @@ export function InlineHintEditor({
       <Editor
         height={equalHeightSplit ? "100%" : `${calculatedHeight}px`}
         language={language === 'bash' ? 'shell' : language}
-        value={displayCode}
+        {...(editable ? { defaultValue: displayCode } : { value: displayCode })}
         theme="vs-dark"
         options={{
-          readOnly: true,
+          readOnly: !editable,
           minimap: { enabled: false },
           fontSize: 11,
-          lineNumbers: 'on',
+          lineNumbers: showLineNumbers ? 'on' : 'off',
           scrollBeyondLastLine: false,
           wordWrap: 'on',
           automaticLayout: true,
@@ -298,8 +364,8 @@ export function InlineHintEditor({
           padding: { top: 8, bottom: 8 },
           lineHeight: lineHeight,
           folding: false,
-          lineDecorationsWidth: 0,
-          lineNumbersMinChars: 3,
+          lineDecorationsWidth: showLineNumbers ? undefined : 0,
+          lineNumbersMinChars: showLineNumbers ? 3 : 0,
         }}
         beforeMount={handleBeforeMount}
         onMount={handleEditorMount}
@@ -336,6 +402,7 @@ export function InlineHintEditor({
                   onRevealHint={() => onRevealHint(hintIdx)}
                   onRevealAnswer={() => onRevealAnswer(hintIdx)}
                   tier={tier}
+                  insertIntoEditor={editable}
                 />
               </motion.div>
             );

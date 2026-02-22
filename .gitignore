@@ -36,3 +36,4 @@ queryQERange.cjs
 # IDE / AI tooling (local or generated)
 .lovable
 .agent
+workshop-run-*cjs

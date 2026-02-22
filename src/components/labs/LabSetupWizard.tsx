@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLab } from '@/context/LabContext';
+import { useWorkshopConfig } from '@/context/WorkshopConfigContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -13,25 +14,9 @@ import { ArchitectureDiagram } from '@/components/workshop/ArchitectureDiagram';
 import { LabEnvironmentDiagram } from './LabEnvironmentDiagram';
 import { PrerequisitesChecklist } from './PrerequisitesChecklist';
 import { setLabsEnabled } from '@/utils/workshopUtils';
+import { getPrerequisitesForCloud, getRequiredToolIdsForCloud } from '@/utils/cloudPrerequisites';
 
 type SetupPhase = 'onboarding' | 'ready';
-
-interface Prerequisite {
-    id: string;
-    label: string;
-    description: string;
-    installCommand?: string;
-    downloadUrl?: string;
-    required: boolean;
-}
-
-const PREREQUISITES: Prerequisite[] = [
-    { id: 'awsCli', label: 'AWS CLI v2', description: 'Required for KMS operations', installCommand: 'brew install awscli', downloadUrl: 'https://aws.amazon.com/cli/', required: true },
-    { id: 'mongosh', label: 'mongosh', description: 'MongoDB Shell (Tip: Use .editor for multiline code)', installCommand: 'brew install mongodb-community-shell', downloadUrl: 'https://www.mongodb.com/try/download/shell', required: true },
-    { id: 'node', label: 'Node.js v18+', description: 'JavaScript runtime', installCommand: 'brew install node', downloadUrl: 'https://nodejs.org/', required: true },
-    { id: 'npm', label: 'npm', description: 'Package manager (comes with Node.js)', installCommand: 'Included with Node.js', required: true },
-    { id: 'mongoCryptShared', label: 'mongo_crypt_shared', description: 'Required for Lab 1 (CSFLE) and Lab 2 (Queryable Encryption) — replaces mongocryptd for client-side encryption', installCommand: 'Download from MongoDB', downloadUrl: 'https://www.mongodb.com/try/download/crypt-shared', required: true },
-];
 
 export const LabSetupWizard: React.FC = () => {
     const {
@@ -45,6 +30,10 @@ export const LabSetupWizard: React.FC = () => {
         userEmail,
         resetProgress
     } = useLab();
+    const { cloud, runningInContainer, deploymentMode } = useWorkshopConfig();
+    const isCentralDeployment = deploymentMode === 'central';
+    const PREREQUISITES = getPrerequisitesForCloud(cloud);
+    const requiredToolIds = getRequiredToolIdsForCloud(cloud);
 
     const [phase, setPhase] = useState<SetupPhase>(mongoUri ? 'ready' : 'onboarding');
     const [localUri, setLocalUri] = useState(mongoUri);
@@ -54,6 +43,7 @@ export const LabSetupWizard: React.FC = () => {
     const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
     const [bypassPrereqs, setBypassPrereqs] = useState(false);
     const [howToUseOpen, setHowToUseOpen] = useState(false);
+    const [whyToolsOpen, setWhyToolsOpen] = useState(false);
 
     // Get attendee name from localStorage (set during registration)
     const attendeeName = localStorage.getItem('workshop_attendee_name') || '';
@@ -91,22 +81,38 @@ export const LabSetupWizard: React.FC = () => {
         setShowPrereqDetails(true);
         const results: Record<string, { verified: boolean; message: string; path?: string }> = {};
 
-        for (const prereq of PREREQUISITES) {
-            try {
-                const result = await validatorUtils.checkToolInstalled(prereq.label.replace(' v2', '').replace(' v18+', ''));
-                if (result.success) {
-                    const version = result.message?.replace('System Scan: ', '') || result.path || '';
-                    results[prereq.id] = { verified: true, message: version, path: result.path };
-                    setVerifiedTool(prereq.id, true, result.path || version);
-                } else {
-                    results[prereq.id] = { verified: false, message: result.message || 'Not found' };
-                    setVerifiedTool(prereq.id, false, '');
-                }
-            } catch (e) {
-                results[prereq.id] = { verified: false, message: 'Verification failed' };
+        if (runningInContainer) {
+            for (const prereq of PREREQUISITES) {
+                results[prereq.id] = { verified: true, message: 'Pre-installed in container' };
+                setVerifiedTool(prereq.id, true, 'container');
+            }
+            setPrereqResults(results);
+        } else if (isCentralDeployment) {
+            // Central mode: server cannot verify attendee's machine; show checklist only
+            for (const prereq of PREREQUISITES) {
+                results[prereq.id] = { verified: false, message: 'Central mode: complete the checklist on your machine' };
                 setVerifiedTool(prereq.id, false, '');
             }
-            setPrereqResults({ ...results });
+            setPrereqResults(results);
+        } else {
+            for (const prereq of PREREQUISITES) {
+                try {
+                    const label = prereq.checkToolLabel ?? prereq.label.replace(' v2', '').replace(' v18+', '');
+                    const result = await validatorUtils.checkToolInstalled(label);
+                    if (result.success) {
+                        const version = result.message?.replace('System Scan: ', '') || result.path || '';
+                        results[prereq.id] = { verified: true, message: version, path: result.path };
+                        setVerifiedTool(prereq.id, true, result.path || version);
+                    } else {
+                        results[prereq.id] = { verified: false, message: result.message || 'Not found' };
+                        setVerifiedTool(prereq.id, false, '');
+                    }
+                } catch (e) {
+                    results[prereq.id] = { verified: false, message: 'Verification failed' };
+                    setVerifiedTool(prereq.id, false, '');
+                }
+                setPrereqResults({ ...results });
+            }
         }
 
         // Check Atlas connection if URI is provided
@@ -130,7 +136,7 @@ export const LabSetupWizard: React.FC = () => {
         setPrereqResults(results);
         setIsCheckingPrereqs(false);
 
-        const requiredPassed = PREREQUISITES.filter(p => p.required).every(p => results[p.id]?.verified);
+        const requiredPassed = requiredToolIds.every((id) => results[id]?.verified);
         if (requiredPassed) {
             toast.success('All required prerequisites verified!');
         } else {
@@ -140,6 +146,21 @@ export const LabSetupWizard: React.FC = () => {
 
     const handleReset = async () => {
         if (!window.confirm('Are you sure? This will reset your progress and locally verified paths.')) return;
+
+        const uri = mongoUri || localStorage.getItem('lab_mongo_uri') || '';
+        if (uri) {
+            const toastId = toast.loading('Cleaning up MongoDB lab resources...');
+            try {
+                const result = await validatorUtils.cleanupLabResources('all', uri);
+                toast.dismiss(toastId);
+                if (result.success && !result.message.includes('nothing to clean')) {
+                    toast.success(result.message);
+                }
+            } catch (e) {
+                toast.dismiss(toastId);
+                toast.error('Failed to clean lab resources');
+            }
+        }
 
         const suffix = verifiedTools['suffix']?.path;
         if (suffix && window.confirm(`Do you also want to delete the AWS KMS Key & Alias (alias/mongodb-lab-key-${suffix})? \n\nThis will apply a 7-day deletion window.`)) {
@@ -177,7 +198,11 @@ export const LabSetupWizard: React.FC = () => {
         toast.success("Environment Activated! Ready for Lab 1.");
     };
 
-    const requiredVerified = verifiedTools.awsCli.verified && verifiedTools.mongosh.verified && verifiedTools.node.verified && verifiedTools.npm.verified;
+    const requiredVerified = runningInContainer
+        ? true
+        : isCentralDeployment
+          ? bypassPrereqs // In central mode, tool checks don't run on attendee's machine; allow "Continue anyway"
+          : requiredToolIds.every((id) => verifiedTools[id]?.verified);
     const allVerified = requiredVerified || bypassPrereqs;
     const hasAtlasConnection = verifiedTools.atlas.verified || prereqResults['atlas']?.verified;
     const hasCheckedPrereqs = Object.keys(prereqResults).length > 0;
@@ -237,6 +262,28 @@ export const LabSetupWizard: React.FC = () => {
             </CardHeader>
 
             <CardContent className="space-y-4 px-6">
+                {runningInContainer && (
+                    <div className="flex items-start gap-3 p-4 rounded-lg border border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400">
+                        <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
+                        <div className="text-sm">
+                            <p className="font-semibold">Using the workshop container</p>
+                            <p className="mt-1 text-muted-foreground">
+                                Node, mongosh, {cloud === 'aws' ? 'AWS CLI' : cloud === 'azure' ? 'Azure CLI' : 'gcloud'}, and mongo_crypt_shared are pre-installed. Set your MongoDB URI below and configure {cloud === 'aws' ? 'AWS (e.g. mount ~/.aws and run <code className="px-1 rounded bg-background/80">aws sso login</code> inside the container)' : cloud === 'azure' ? 'Azure credentials' : 'GCP credentials'} to run the labs.
+                            </p>
+                        </div>
+                    </div>
+                )}
+                {isCentralDeployment && !runningInContainer && (
+                    <div className="flex items-start gap-3 p-4 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200">
+                        <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                        <div className="text-sm">
+                            <p className="font-semibold">Central workshop mode</p>
+                            <p className="mt-1 text-muted-foreground">
+                                We can&apos;t verify your laptop from here. Please complete the checklist below and run the lab scripts on your machine. Verification of Atlas (and anything that only needs your URI) will use the connection string you provide.
+                            </p>
+                        </div>
+                    </div>
+                )}
                 {/* How to use the labs - collapsible, collapsed by default */}
                 <Collapsible open={howToUseOpen} onOpenChange={setHowToUseOpen}>
                     <CollapsibleTrigger asChild>
@@ -269,6 +316,40 @@ export const LabSetupWizard: React.FC = () => {
                             <p className="text-sm text-muted-foreground leading-relaxed mt-2">
                                 <span className="text-foreground/90 font-medium">Workflow:</span> Read the step · run the code in your terminal or mongosh · come back and click <strong className="text-foreground/90">Verify</strong> · then <strong className="text-foreground/90">Continue</strong> when it passes.
                             </p>
+                        </div>
+                    </CollapsibleContent>
+                </Collapsible>
+
+                {/* Why these tools? - understanding your environment */}
+                <Collapsible open={whyToolsOpen} onOpenChange={setWhyToolsOpen}>
+                    <CollapsibleTrigger asChild>
+                        <button
+                            type="button"
+                            className={cn(
+                                "w-full flex items-center justify-between gap-2 p-3 rounded-lg border border-primary/20 bg-primary/5 text-left",
+                                "hover:bg-primary/10 transition-colors"
+                            )}
+                        >
+                            <span className="font-semibold text-sm flex items-center gap-2">
+                                <HelpCircle className="w-4 h-4 text-primary" />
+                                Why these tools?
+                            </span>
+                            {whyToolsOpen ? (
+                                <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                            ) : (
+                                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                            )}
+                        </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                        <div className="px-3 pb-3 pt-1 border border-t-0 border-primary/20 rounded-b-lg -mt-px bg-primary/5 space-y-3 text-sm text-muted-foreground">
+                            <p className="font-medium text-foreground/90">Understanding your environment</p>
+                            <ul className="list-disc list-inside space-y-1.5">
+                                <li><strong className="text-foreground/80">MongoDB Atlas (M10+):</strong> Where your encrypted data and the key vault live; needed for CSFLE and Queryable Encryption.</li>
+                                <li><strong className="text-foreground/80">Node.js + npm:</strong> Used to run the driver and lab scripts (createKey, testCSFLE, etc.).</li>
+                                <li><strong className="text-foreground/80">{cloud === 'aws' ? 'AWS CLI + SSO:' : cloud === 'azure' ? 'Azure CLI:' : 'Google Cloud SDK (gcloud):'}</strong> {cloud === 'aws' ? 'Used to create and use a KMS key and to run scripts that need KMS provider credentials.' : cloud === 'azure' ? 'Used to create and use a Key Vault key and to authenticate scripts with Azure.' : 'Used to create and use a Cloud KMS key and to authenticate scripts with GCP.'}</li>
+                                <li><strong className="text-foreground/80">mongo_crypt_shared:</strong> Shared library used by the driver for client-side encryption (replaces mongocryptd); required for Labs 1 and 2.</li>
+                            </ul>
                         </div>
                     </CollapsibleContent>
                 </Collapsible>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Calendar, Users, Power, AlertTriangle, Trash2, Archive } from 'lucide-react';
+import { Settings, Calendar, Users, Power, AlertTriangle, Trash2, Archive, Trophy } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +31,7 @@ export const WorkshopSettings: React.FC = () => {
   const [customerName, setCustomerName] = useState('');
   const [workshopDate, setWorkshopDate] = useState<Date | undefined>(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isResettingLeaderboard, setIsResettingLeaderboard] = useState(false);
 
   // Load session data
   useEffect(() => {
@@ -84,9 +85,16 @@ export const WorkshopSettings: React.FC = () => {
       return;
     }
 
-    resetLeaderboard();
-    setParticipantCount(0);
-    toast.success('Leaderboard has been reset');
+    setIsResettingLeaderboard(true);
+    try {
+      await resetLeaderboard();
+      setParticipantCount(0);
+      toast.success('Leaderboard has been reset. All participants will see an empty leaderboard on next refresh.');
+    } catch (e) {
+      toast.error('Failed to reset leaderboard');
+    } finally {
+      setIsResettingLeaderboard(false);
+    }
   };
 
   return (
@@ -155,6 +163,36 @@ export const WorkshopSettings: React.FC = () => {
               No active workshop session. Start a new workshop below.
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Leaderboard – moderator reset */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Trophy className="w-5 h-5" />
+            Leaderboard
+          </CardTitle>
+          <CardDescription>
+            Reset scores for all participants. The workshop session stays active; only leaderboard data is cleared.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border">
+            <div>
+              <p className="font-medium">Reset leaderboard</p>
+              <p className="text-sm text-muted-foreground">
+                Clear all participant scores and lab completion. Participants will see an empty leaderboard after their next refresh.
+              </p>
+            </div>
+            <Button
+              variant="destructive"
+              onClick={handleResetLeaderboard}
+              disabled={isResettingLeaderboard}
+            >
+              {isResettingLeaderboard ? 'Resetting…' : 'Reset Leaderboard'}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

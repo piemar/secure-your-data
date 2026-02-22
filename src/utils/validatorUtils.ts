@@ -178,6 +178,50 @@ export const validatorUtils = {
     },
 
     /**
+     * Clears the key vault (deletes all DEKs in encryption.__keyVault).
+     * Use when "Found X DEKs, expected 1" to reset and run createKey.cjs once.
+     */
+    cleanupKeyVault: async (uri?: string): Promise<ValidationResult> => {
+        const mongoUri = uri || localStorage.getItem('lab_mongo_uri') || '';
+        if (!mongoUri) {
+            return { success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' };
+        }
+        try {
+            const response = await fetch('/api/cleanup-keyvault', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uri: mongoUri }),
+            });
+            const data = await response.json();
+            return { success: data.success === true, message: data.message || (data.success ? 'Key vault cleared.' : 'Cleanup failed.') };
+        } catch (error) {
+            return { success: false, message: 'Connection to validation bridge failed. Ensure npm run dev is active.' };
+        }
+    },
+
+    /**
+     * Cleans up MongoDB resources created by a lab (or all labs) so Reset progress / Reset step allows re-running.
+     * Lab 1: key vault + medical.patients. Lab 2: hr.employees + enxcol_* + QE DEKs. Lab 3: patients_secure + tenant DEKs.
+     */
+    cleanupLabResources: async (labId: number | 'all', uri?: string): Promise<ValidationResult> => {
+        const mongoUri = uri || localStorage.getItem('lab_mongo_uri') || '';
+        if (!mongoUri) {
+            return { success: true, message: 'No MongoDB URI set; nothing to clean.' };
+        }
+        try {
+            const response = await fetch('/api/cleanup-lab-resources', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ labId, uri: mongoUri }),
+            });
+            const data = await response.json();
+            return { success: data.success === true, message: data.message || (data.success ? 'Lab resources cleaned.' : 'Cleanup failed.') };
+        } catch (error) {
+            return { success: false, message: 'Connection to validation bridge failed. Ensure npm run dev is active.' };
+        }
+    },
+
+    /**
      * Verifies that both QE-specific DEKs exist in the key vault (qe-salary-dek and qe-taxid-dek).
      * Uses the real /api/verify-qe-deks endpoint to check via mongosh.
      */
@@ -324,13 +368,17 @@ export const validatorUtils = {
 
         if (toolLower.includes('aws')) {
             queryLabel = 'aws';
+        } else if (toolLower.includes('az') || toolLower.includes('azure')) {
+            queryLabel = 'az';
+        } else if (toolLower.includes('gcloud') || toolLower.includes('gcp')) {
+            queryLabel = 'gcloud';
         } else if (toolLower.includes('mongosh')) {
             queryLabel = 'mongosh';
         } else if (toolLower.includes('node')) {
             queryLabel = 'node';
         } else if (toolLower.includes('npm')) {
             queryLabel = 'npm';
-        } else         if (toolLower.includes('crypt') || toolLower.includes('mongo_crypt')) {
+        } else if (toolLower.includes('crypt') || toolLower.includes('mongo_crypt')) {
             queryLabel = 'mongoCryptShared';
         } else {
             queryLabel = 'atlas';

@@ -59,6 +59,8 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [assistedSteps, setAssistedSteps] = useState<string[]>([]);
     const [verifiedTools, setVerifiedTools] = useState<Record<string, { verified: boolean; path: string }>>({
         awsCli: { verified: false, path: '' },
+        azureCli: { verified: false, path: '' },
+        gcloud: { verified: false, path: '' },
         mongosh: { verified: false, path: '' },
         atlas: { verified: false, path: '' },
         node: { verified: false, path: '' },
@@ -96,6 +98,8 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAssistedSteps([]);
         setVerifiedTools({
             awsCli: { verified: false, path: '' },
+            azureCli: { verified: false, path: '' },
+            gcloud: { verified: false, path: '' },
             mongosh: { verified: false, path: '' },
             atlas: { verified: false, path: '' },
             node: { verified: false, path: '' },

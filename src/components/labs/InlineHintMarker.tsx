@@ -20,6 +20,8 @@ interface InlineHintMarkerProps {
   onRevealHint: () => void;
   onRevealAnswer: () => void;
   tier: SkeletonTier;
+  /** When true (run-in-browser), answer is inserted into the editor; button label reflects that. */
+  insertIntoEditor?: boolean;
 }
 
 export function InlineHintMarker({ 
@@ -28,7 +30,8 @@ export function InlineHintMarker({
   answerRevealed,
   onRevealHint,
   onRevealAnswer,
-  tier 
+  tier,
+  insertIntoEditor = false,
 }: InlineHintMarkerProps) {
   const hintPenalty = tier === 'expert' ? 3 : tier === 'challenge' ? 2 : 1;
   const answerPenalty = tier === 'expert' ? 5 : tier === 'challenge' ? 3 : 2;
@@ -132,7 +135,7 @@ export function InlineHintMarker({
                   className="flex-1 gap-1 h-8 text-xs"
                 >
                   <Eye className="w-3 h-3" />
-                  Show Answer
+                  {insertIntoEditor ? 'Insert into editor' : 'Show Answer'}
                   <span className={hintRevealed ? "text-primary-foreground/70" : "text-muted-foreground"}>(-{answerPenalty}pt)</span>
                 </Button>
               )}
@@ -140,7 +143,9 @@ export function InlineHintMarker({
             
             {answerRevealed && (
               <p className="text-[10px] text-muted-foreground text-center pt-1">
-                Type <code className="bg-muted px-1 rounded text-foreground">{hint.answer}</code> in place of the blank
+                {insertIntoEditor
+                  ? <>Inserted. Use <strong>Run line</strong> / <strong>Run all</strong> to execute.</>
+                  : <>Type <code className="bg-muted px-1 rounded text-foreground">{hint.answer}</code> in place of the blank</>}
               </p>
             )}
           </div>

@@ -14,6 +14,9 @@ interface StepContextDrawerProps {
   businessValue?: string;
   atlasCapability?: string;
   trigger?: React.ReactNode;
+  /** When provided with onOpenChange, drawer is controlled (no trigger rendered) */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function StepContextDrawer({
@@ -25,6 +28,8 @@ export function StepContextDrawer({
   businessValue,
   atlasCapability,
   trigger,
+  open: controlledOpen,
+  onOpenChange,
 }: StepContextDrawerProps) {
   const [revealedHints, setRevealedHints] = useState<number[]>([]);
 
@@ -38,17 +43,21 @@ export function StepContextDrawer({
     }
   };
 
+  const isControlled = controlledOpen !== undefined && onOpenChange != null;
+
   return (
-    <Sheet>
-      <SheetTrigger asChild>
-        {trigger || (
-          <Button variant="outline" size="sm" className="gap-1.5 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3">
-            <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" />
-            <span className="hidden xs:inline">Help & Tips</span>
-            <span className="xs:hidden">Help</span>
-          </Button>
-        )}
-      </SheetTrigger>
+    <Sheet open={isControlled ? controlledOpen : undefined} onOpenChange={isControlled ? onOpenChange : undefined}>
+      {!isControlled && (
+        <SheetTrigger asChild>
+          {trigger || (
+            <Button variant="outline" size="sm" className="gap-1.5 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3">
+              <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden xs:inline">Help & Tips</span>
+              <span className="xs:hidden">Help</span>
+            </Button>
+          )}
+        </SheetTrigger>
+      )}
       <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
