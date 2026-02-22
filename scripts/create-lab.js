@@ -49,6 +49,10 @@ const topicDir = path.join(__dirname, '../src/content/topics', topicId);
 const targetDir = povFolder ? path.join(topicDir, povFolder) : topicDir;
 const filePath = path.join(targetDir, filename);
 
+// Enhancement prefix: same as POV folder when present, else derived from lab id (e.g. lab-my-lab -> my-lab)
+const enhancementPrefix = povFolder || labId.replace(/^lab-/, '');
+const povCapability = povArg ? povArg.split(',')[0].trim() : 'TODO-POV';
+
 const povCapabilitiesSnippet = povArg
   ? `  povCapabilities: [${povArg
       .split(',')
@@ -64,18 +68,32 @@ const modesArraySnippet = modesArg
   .map(mode => `'${mode}'`)
   .join(', ') || `'lab', 'challenge'`;
 
-const sourceProofSnippet = proofNumber
-  ? `  // Source PoV proof exercise\n  // See Docs/pov-proof-exercises/proofs/${proofNumber}/README.md\n  // sourceProof: 'proofs/${proofNumber}/README.md',`
-  : `  // Source PoV proof exercise (set when known)\n  // sourceProof: 'proofs/{X}/README.md',`;
+const sourceProofPath = proofNumber ? `proofs/${proofNumber}/README.md` : 'proofs/{X}/README.md';
 
-const template = `import { WorkshopLabDefinition } from '@/types';
+// Export name: labTestRegisterLabDefinition (camelCase + Definition)
+const slugParts = labId.replace(/^lab-/, '').split('-');
+const pascalSuffix = slugParts.map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join('');
+const exportName = 'lab' + pascalSuffix + 'Definition';
+const stepIds = [
+  `${labId}-step-1`,
+  `${labId}-step-2`,
+  `${labId}-step-3`,
+];
+const enhancementIds = [
+  `${enhancementPrefix}.step-1`,
+  `${enhancementPrefix}.step-2`,
+  `${enhancementPrefix}.step-3`,
+];
+
+const labTemplate = `import { WorkshopLabDefinition } from '@/types';
 
 /**
  * ${labName}
- * 
+ *
+ * Source PoV proof exercise: Docs/pov-proof-exercises/proofs/${proofNumber || '{N}'}/README.md
  * Description of what this lab teaches and why it matters.
  */
-export const ${labId.replace(/-/g, '')}: WorkshopLabDefinition = {
+export const ${exportName}: WorkshopLabDefinition = {
   id: '${labId}',
   title: '${labName}',
   description: 'Description of what participants will learn in this lab',
@@ -85,37 +103,79 @@ export const ${labId.replace(/-/g, '')}: WorkshopLabDefinition = {
   prerequisites: [], // e.g., ['lab-csfle-fundamentals']
 ${povCapabilitiesSnippet}
   modes: [${modesArraySnippet}],
-${sourceProofSnippet}
   steps: [
     {
-      id: 'step-1-introduction',
-      title: 'Introduction',
-      narrative: 'Story context for this step',
-      instructions: \`What participants need to do in this step.
-
-Include clear, actionable instructions.\`,
+      id: '${stepIds[0]}',
+      title: 'Step 1: Introduction',
+      narrative: 'Story context for this step.',
+      instructions: 'What participants need to do in this step. Use clear, actionable instructions.',
       estimatedTimeMinutes: 10,
-      verificationId: 'csfle.verifyKeyVaultIndex', // Or another verification ID
-      codeBlocks: [
-        {
-          filename: 'example.js',
-          language: 'javascript',
-          code: \`// Example code
-const example = 'Hello World';\`,
-          skeleton: \`// TODO: Add your code here\`
-        }
-      ],
-      hints: [
-        'Hint 1',
-        'Hint 2'
-      ],
-      tips: [
-        'Tip 1',
-        'Tip 2'
-      ]
-    }
-    // Add more steps as needed
-  ]
+      modes: [${modesArraySnippet}],
+      points: 5,
+      enhancementId: '${enhancementIds[0]}',
+      sourceProof: '${sourceProofPath}',
+      sourceSection: 'Description',
+    },
+    {
+      id: '${stepIds[1]}',
+      title: 'Step 2: Core exercise',
+      narrative: 'Context and explanation for this step.',
+      instructions: 'Instructions for completing this step.',
+      estimatedTimeMinutes: 15,
+      modes: [${modesArraySnippet}],
+      points: 10,
+      enhancementId: '${enhancementIds[1]}',
+      sourceProof: '${sourceProofPath}',
+      sourceSection: 'Execution',
+    },
+    {
+      id: '${stepIds[2]}',
+      title: 'Step 3: Wrap-up',
+      narrative: 'Summary and next steps.',
+      instructions: 'Final instructions or verification steps.',
+      estimatedTimeMinutes: 10,
+      modes: [${modesArraySnippet}],
+      points: 5,
+      enhancementId: '${enhancementIds[2]}',
+      sourceProof: '${sourceProofPath}',
+      sourceSection: 'Setup',
+    },
+  ],
+};
+`;
+
+const enhancementsPath = path.join(targetDir, 'enhancements.ts');
+const enhancementsExist = fs.existsSync(enhancementsPath);
+
+const enhancementEntries = enhancementIds
+  .map(
+    (eid, i) => `  '${eid}': {
+    id: '${eid}',
+    povCapability: '${povCapability}',
+    sourceProof: '${sourceProofPath}',
+    sourceSection: '${i === 0 ? 'Description' : i === 1 ? 'Execution' : 'Setup'}',
+    codeBlocks: [
+      {
+        filename: 'step-${i + 1}.txt',
+        language: 'text',
+        code: \`TODO: Add content for step ${i + 1}\`,
+      },
+    ],
+    tips: ['Tip for step ${i + 1}.'],
+  },`
+  )
+  .join('\n\n');
+
+const enhancementsTemplate = `import type { EnhancementMetadataRegistry } from '@/labs/enhancements/schema';
+
+/**
+ * ${labName} – Enhancement metadata
+ *
+ * Source PoV proof: Docs/pov-proof-exercises/proofs/${proofNumber || '{N}'}/README.md
+ */
+
+export const enhancements: EnhancementMetadataRegistry = {
+${enhancementEntries}
 };
 `;
 
@@ -125,9 +185,19 @@ if (fs.existsSync(filePath)) {
 }
 
 fs.mkdirSync(targetDir, { recursive: true });
-fs.writeFileSync(filePath, template, 'utf8');
+fs.writeFileSync(filePath, labTemplate, 'utf8');
 console.log(`✅ Created lab scaffold: ${filePath}`);
-console.log(`\nNext steps:`);
-console.log(`1. Edit ${filePath} to customize your lab`);
-console.log(`2. Add the lab to src/content/topics/index.ts (allLabs array)`);
-console.log(`3. Add the lab to a template in src/content/workshop-templates/`);
+
+if (!enhancementsExist) {
+  fs.writeFileSync(enhancementsPath, enhancementsTemplate, 'utf8');
+  console.log(`✅ Created stub enhancements: ${enhancementsPath}`);
+} else {
+  console.log(`⚠️  enhancements.ts already exists in ${targetDir} – add entries for: ${enhancementIds.join(', ')}`);
+}
+
+console.log('\nNext steps:');
+console.log('1. Edit the lab file and enhancements.ts to add your content.');
+console.log('2. Register the lab in src/content/topics/index.ts (import and add to allLabs array).');
+console.log('3. If this POV prefix is new, add it to src/labs/enhancements/loader.ts (moduleMap and preloadAllEnhancements).');
+console.log('4. Run: node scripts/validate-content.js');
+console.log('\nSee Docs/ARCHITECTURE_AND_ADDING_LABS.md and Docs/ADD_LAB_MASTER_PROMPT.md for details.');

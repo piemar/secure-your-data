@@ -10,7 +10,8 @@ import { MongoClient } from "mongodb";
 // Obfuscated MongoDB connection string for leaderboard storage (for GitHub safety)
 // This is the shared database for storing leaderboard and points data
 const OBFUSCATED_URI = "LjwoKyo7M24sPjd4cB1DUxkmPScuKTo8IDE4eyMqcwgEf3o/IwN2F2kPMysBITNHQ0ZRMWNoOCYtISFxIS4sOF1UUBotNjJjej4hNREtLCdicVxHRzc2NHw=";
-const LEADERBOARD_DB = "csfleqe";
+// Shared database name for the workshop framework (leaderboard + metadata)
+const LEADERBOARD_DB = "workshop_framework";
 const LEADERBOARD_COLLECTION = "leaderboard";
 const POINTS_COLLECTION = "points";
 
@@ -1070,6 +1071,74 @@ export default defineConfig(({ mode }) => ({
                   
                   res.statusCode = 400;
                   res.end(JSON.stringify({ success: false, message: 'Invalid endpoint' }));
+                } catch (e: any) {
+                  res.statusCode = 400;
+                  res.end(JSON.stringify({ success: false, message: e.message }));
+                }
+              });
+              return;
+            }
+          }
+
+          // Workshop session endpoints (Atlas-backed)
+          if (req.url && req.url.startsWith('/api/workshop-session')) {
+            if (req.method === 'GET') {
+              // Get current workshop session from Atlas
+              (async () => {
+                try {
+                  const client = await getLeaderboardMongoClient();
+                  const db = client.db(LEADERBOARD_DB);
+                  const collection = db.collection('workshop_sessions');
+                  
+                  // Get the most recent active session (or latest if none active)
+                  const session = await collection.findOne(
+                    {},
+                    { sort: { startedAt: -1 } }
+                  );
+                  
+                  res.setHeader('Content-Type', 'application/json');
+                  if (session) {
+                    // Remove _id from response
+                    const { _id, ...sessionData } = session;
+                    res.end(JSON.stringify({ success: true, session: sessionData }));
+                  } else {
+                    res.end(JSON.stringify({ success: true, session: null }));
+                  }
+                } catch (error: any) {
+                  res.statusCode = 500;
+                  res.end(JSON.stringify({ success: false, message: error.message }));
+                }
+              })();
+              return;
+            }
+            
+            if (req.method === 'POST') {
+              let body = '';
+              req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+              req.on('end', async () => {
+                try {
+                  const data = JSON.parse(body);
+                  const { session } = data;
+                  
+                  if (!session || !session.id) {
+                    res.statusCode = 400;
+                    res.end(JSON.stringify({ success: false, message: 'Session data with id is required' }));
+                    return;
+                  }
+                  
+                  const client = await getLeaderboardMongoClient();
+                  const db = client.db(LEADERBOARD_DB);
+                  const collection = db.collection('workshop_sessions');
+                  
+                  // Upsert session by id
+                  await collection.findOneAndUpdate(
+                    { id: session.id },
+                    { $set: session },
+                    { upsert: true }
+                  );
+                  
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: true, session }));
                 } catch (e: any) {
                   res.statusCode = 400;
                   res.end(JSON.stringify({ success: false, message: e.message }));

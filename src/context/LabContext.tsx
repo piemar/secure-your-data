@@ -1,5 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { addPoints, completeLab as updateLeaderboardLab, startLab as updateLeaderboardStart } from '@/utils/leaderboardUtils';
+import { createGamificationService, GamificationEvent } from '@/services/gamificationService';
+import { useWorkshopSession } from '@/contexts/WorkshopSessionContext';
+import { getWorkshopSession } from '@/utils/workshopUtils';
+import { getMetricsService } from '@/services/metricsService';
 
 interface LabState {
     mongoUri: string;
@@ -35,6 +39,12 @@ interface LabContextType extends LabState {
 const LabContext = createContext<LabContextType | undefined>(undefined);
 
 export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { activeTemplate } = useWorkshopSession();
+    const gamificationService = React.useMemo(() => {
+        const config = activeTemplate?.gamification || { enabled: true, basePointsPerStep: 10 };
+        return createGamificationService(config);
+    }, [activeTemplate]);
+
     const [mongoUri, setMongoUri] = useState('');
     const [awsCreds, setAwsCreds] = useState({
         awsAccessKeyId: '',
@@ -76,6 +86,23 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
     }, []);
 
+    // Initialize MongoDB URI from workshop session if available
+    useEffect(() => {
+        const session = getWorkshopSession();
+        if (session && !mongoUri) {
+            if (session.mongodbSource === 'local') {
+                // Use local Docker MongoDB (for Docker Compose, use mongo:27017)
+                // For browser access, this would be localhost:27017, but in Docker it's mongo:27017
+                // We'll use mongo:27017 as the default for Docker Compose setup
+                const localUri = 'mongodb://mongo:27017';
+                setMongoUri(localUri);
+            } else if (session.mongodbSource === 'atlas' && session.atlasConnectionString) {
+                // Use Atlas connection string from session
+                setMongoUri(session.atlasConnectionString);
+            }
+        }
+    }, [mongoUri]);
+
     const resetProgress = () => {
         setMongoUri('');
         setAwsCreds({ awsAccessKeyId: '', awsSecretAccessKey: '', awsKeyArn: '', awsRegion: 'eu-central-1' });
@@ -111,26 +138,61 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAwsCreds(prev => ({ ...prev, awsKeyArn: arn }));
     };
 
-    const completeStep = (stepId: string, assisted: boolean) => {
+    const completeStep = async (stepId: string, assisted: boolean) => {
         if (completedSteps.includes(stepId)) return;
 
         setCompletedSteps(prev => [...prev, stepId]);
-        const points = assisted ? 5 : 10;
-        if (assisted) {
-            setAssistedSteps(prev => [...prev, stepId]);
-            setCurrentScore(prev => prev + points);
-        } else {
-            setCurrentScore(prev => prev + points);
-        }
         
-        // Update leaderboard with points
         const email = userEmail || localStorage.getItem('userEmail') || '';
-        if (email) {
-            // Determine lab number from stepId (e.g., "lab1-step1" -> 1)
-            const labMatch = stepId.match(/lab(\d+)/i);
-            const labNumber = labMatch ? parseInt(labMatch[1]) : 1;
+        const session = getWorkshopSession();
+        
+        // Record metrics
+        const metricsService = getMetricsService();
+        metricsService.recordEvent({
+            type: 'step_completed',
+            participantId: email,
+            stepId,
+            metadata: {
+                workshopId: session?.id,
+                assisted
+            }
+        });
+        
+        // Use GamificationService if enabled
+        if (gamificationService.isEnabled() && email) {
+            const labMatch = stepId.match(/lab-?(\d+)/i) || stepId.match(/lab(\d+)/i);
+            const labId = labMatch ? `lab-${labMatch[1]}` : 'lab-unknown';
             
-            addPoints(email, points, labNumber);
+            const event: GamificationEvent = {
+                type: 'step_completed',
+                participantId: email,
+                labId,
+                stepId,
+                assisted,
+                timestamp: new Date(),
+            };
+            
+            const points = await gamificationService.recordEvent(event);
+            setCurrentScore(prev => prev + points);
+            
+            if (assisted) {
+                setAssistedSteps(prev => [...prev, stepId]);
+            }
+        } else {
+            // Fallback to old system
+            const points = assisted ? 5 : 10;
+            if (assisted) {
+                setAssistedSteps(prev => [...prev, stepId]);
+                setCurrentScore(prev => prev + points);
+            } else {
+                setCurrentScore(prev => prev + points);
+            }
+            
+            if (email) {
+                const labMatch = stepId.match(/lab(\d+)/i);
+                const labNumber = labMatch ? parseInt(labMatch[1]) : 1;
+                addPoints(email, points, labNumber);
+            }
         }
     };
 

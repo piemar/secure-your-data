@@ -20,6 +20,7 @@ export const operationsTopic: WorkshopTopic = {
     'FULL-RECOVERY-RTO',
     'PARTIAL-RECOVERY',
     'ROLLING-UPDATES',
+    'AUTO-HA',
     'TRIGGER-ALERT'
   ]
 };

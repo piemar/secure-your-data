@@ -64,6 +64,19 @@ export interface CodeBlockMetadata {
   
   /** Inline hints for skeleton blanks */
   inlineHints?: InlineHintMetadata[];
+
+  /**
+   * Optional competitor equivalents for demo side-by-side view.
+   * Key = competitor product id (e.g. postgresql, cosmosdb-vcore, dynamodb).
+   */
+  competitorEquivalents?: Record<
+    string,
+    {
+      language: string;
+      code: string;
+      workaroundNote?: string;
+    }
+  >;
 }
 
 export interface InlineHintMetadata {

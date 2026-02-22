@@ -36,6 +36,25 @@ db.customers.find({
     }
   }
 });`,
+        competitorEquivalents: {
+          postgresql: {
+            language: 'sql',
+            code: `-- PostgreSQL: Same filter as MongoDB compound query
+-- Female, born in 1990, state UT, at least one life policy with smoker insured
+
+SELECT c.*
+FROM customers c
+WHERE c.gender = 'Female'
+  AND c.dob >= '1990-01-01' AND c.dob <= '1990-12-31'
+  AND c.address->>'state' = 'UT'
+  AND EXISTS (
+    SELECT 1 FROM jsonb_array_elements(c.policies) AS pol
+    WHERE pol->>'policyType' = 'life'
+      AND (pol->'insured_person'->>'smoking')::boolean = true
+  );`,
+            workaroundNote: 'Requires JSONB and jsonb_array_elements for array subdocuments; no native nested document query like MongoDB $elemMatch.',
+          },
+        },
         skeleton: `// Find customers who are:
 // - Female
 // - Born in 1990

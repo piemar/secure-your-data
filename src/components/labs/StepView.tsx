@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2, Info, BookOpen, Clock, Lock, Eye, Unlock } from 'lucide-react';
+import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2, Info, BookOpen, Clock, Lock, Eye, Unlock, GitCompare } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -13,6 +13,14 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/componen
 import { trackHintUsage, trackSolutionReveal } from '@/utils/leaderboardUtils';
 import { type InlineHint, type SkeletonTier } from './InlineHintMarker';
 import { InlineHintEditor } from './InlineHintEditor';
+import { getCompetitorProductLabel } from '@/content/competitor-products';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface CodeBlock {
   filename: string;
@@ -22,6 +30,7 @@ interface CodeBlock {
   challengeSkeleton?: string;  // Tier 2: Challenge (tasks only)
   expertSkeleton?: string;     // Tier 3: Expert (objective only)
   inlineHints?: InlineHint[];  // Line-specific hints for skeleton blanks
+  competitorEquivalents?: Record<string, { language: string; code: string; workaroundNote?: string }>;
 }
 
 interface Exercise {
@@ -65,6 +74,11 @@ interface StepViewProps {
   labDescription: string;
   businessValue?: string;
   atlasCapability?: string;
+  /** When true and step has competitorEquivalents, show side-by-side competitor panel (demo + moderator only) */
+  currentMode?: 'demo' | 'lab' | 'challenge';
+  isModerator?: boolean;
+  defaultCompetitorId?: string;
+  competitorIds?: string[];
 }
 
 // Generate realistic MongoDB output based on code content with structured formatting
@@ -439,9 +453,15 @@ export function StepView({
   labDescription,
   businessValue,
   atlasCapability,
+  currentMode,
+  isModerator,
+  defaultCompetitorId,
+  competitorIds,
 }: StepViewProps) {
   const [activeTab, setActiveTab] = useState<string>('code');
   const [outputOpen, setOutputOpen] = useState(false);
+  const [competitorPanelCollapsed, setCompetitorPanelCollapsed] = useState(false);
+  const [selectedCompetitorId, setSelectedCompetitorId] = useState<string | null>(null);
   const [lastOutput, setLastOutput] = useState<string>('');
   const [outputSummary, setOutputSummary] = useState<string>('');
   const [outputSuccess, setOutputSuccess] = useState<boolean>(true);
@@ -506,6 +526,44 @@ export function StepView({
   const currentStep = steps[currentStepIndex];
   const isCompleted = completedSteps.includes(currentStepIndex);
 
+  // Competitor side-by-side: only in demo mode for moderator when step has competitor equivalents
+  const stepCompetitorIds = useMemo(() => {
+    const ids = new Set<string>();
+    currentStep.codeBlocks?.forEach((block) => {
+      Object.keys(block.competitorEquivalents || {}).forEach((id) => ids.add(id));
+    });
+    return Array.from(ids);
+  }, [currentStep.codeBlocks]);
+  const showCompetitorPanel =
+    currentMode === 'demo' &&
+    !!isModerator &&
+    stepCompetitorIds.length > 0;
+  const effectiveCompetitorId =
+    selectedCompetitorId && stepCompetitorIds.includes(selectedCompetitorId)
+      ? selectedCompetitorId
+      : defaultCompetitorId && stepCompetitorIds.includes(defaultCompetitorId)
+        ? defaultCompetitorId
+        : stepCompetitorIds[0] ?? null;
+  useEffect(() => {
+    if (!showCompetitorPanel || stepCompetitorIds.length === 0) return;
+    const defaultId = defaultCompetitorId && stepCompetitorIds.includes(defaultCompetitorId)
+      ? defaultCompetitorId
+      : stepCompetitorIds[0];
+    setSelectedCompetitorId((prev) =>
+      prev && stepCompetitorIds.includes(prev) ? prev : defaultId
+    );
+  }, [currentStepIndex, showCompetitorPanel, stepCompetitorIds, defaultCompetitorId]);
+
+  // Competitor code for first block that has equivalent for effectiveCompetitorId
+  const competitorBlockForSelected = useMemo(() => {
+    if (!effectiveCompetitorId || !currentStep.codeBlocks) return null;
+    for (const block of currentStep.codeBlocks) {
+      const equiv = block.competitorEquivalents?.[effectiveCompetitorId];
+      if (equiv) return { block, equiv };
+    }
+    return null;
+  }, [currentStep.codeBlocks, effectiveCompetitorId]);
+
   // Check if any code block has a skeleton
   const hasSkeletons = useMemo(() => {
     return currentStep.codeBlocks?.some(block => hasAnySkeleton(block)) ?? false;
@@ -557,6 +615,7 @@ export function StepView({
       trackHintUsage(email, answerPenalty);
     }
   }, []);
+
 
   // Helper to reveal full solution
   const revealSolution = useCallback((blockKey: string, tier: SkeletonTier) => {
@@ -743,9 +802,14 @@ export function StepView({
               {/* Code Editor Panel */}
               <ResizablePanel defaultSize={outputOpen ? 50 : 85} minSize={30}>
                 <div className={cn(
-                  "h-full flex flex-col overflow-auto justify-start",
-                  currentStep.codeBlocks.length === 2 && "gap-1"
+                  "h-full flex",
+                  showCompetitorPanel && "flex-row"
                 )}>
+                  <div className={cn(
+                    "flex flex-col overflow-auto justify-start min-h-0",
+                    showCompetitorPanel && "flex-1 min-w-0 basis-0",
+                    currentStep.codeBlocks.length === 2 && !showCompetitorPanel && "gap-1"
+                  )}>
                   {currentStep.codeBlocks.map((block, idx) => {
                     const blockKey = `${currentStepIndex}-${idx}`;
                     const hasSkeleton = hasAnySkeleton(block);
@@ -889,6 +953,66 @@ export function StepView({
                       </div>
                     );
                   })}
+                  </div>
+                  {/* Competitor side-by-side panel (demo + moderator only): 50% width when expanded */}
+                  {showCompetitorPanel && effectiveCompetitorId && (
+                    <div className={cn(
+                      "flex flex-col border-l border-border bg-muted/30 min-h-0",
+                      competitorPanelCollapsed ? "w-10 shrink-0" : "flex-1 min-w-0 basis-0"
+                    )}>
+                      <div className="flex-shrink-0 flex items-center justify-between gap-2 px-2 py-1.5 border-b border-border bg-muted/50">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <GitCompare className="w-4 h-4 text-amber-500 shrink-0" />
+                          <Select
+                            value={effectiveCompetitorId}
+                            onValueChange={(v) => setSelectedCompetitorId(v)}
+                          >
+                            <SelectTrigger className="h-7 text-xs border-0 bg-transparent shadow-none focus:ring-0 w-auto min-w-[120px]">
+                              <SelectValue placeholder="Compare with…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {stepCompetitorIds.map((id) => (
+                                <SelectItem key={id} value={id}>
+                                  {getCompetitorProductLabel(id)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={() => setCompetitorPanelCollapsed(!competitorPanelCollapsed)}
+                        >
+                          {competitorPanelCollapsed ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                      {!competitorPanelCollapsed && competitorBlockForSelected && (
+                        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                          {competitorBlockForSelected.equiv.workaroundNote && (
+                            <div className="flex-shrink-0 px-2 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-700 dark:text-amber-400">
+                              {competitorBlockForSelected.equiv.workaroundNote}
+                            </div>
+                          )}
+                          <div className="flex-1 min-h-0 overflow-auto">
+                            <Editor
+                              height="100%"
+                              language={competitorBlockForSelected.equiv.language}
+                              value={competitorBlockForSelected.equiv.code}
+                              options={{
+                                readOnly: true,
+                                minimap: { enabled: false },
+                                lineNumbers: 'on',
+                                scrollBeyondLastLine: false,
+                                wordWrap: 'on',
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </ResizablePanel>
 

@@ -1,8 +1,10 @@
-import { LabViewWithTabs } from './LabViewWithTabs';
+import { LabRunner } from '@/labs/LabRunner';
 import { validatorUtils } from '@/utils/validatorUtils';
 import { useLab } from '@/context/LabContext';
 import { DifficultyLevel } from './DifficultyBadge';
 import { CSFLEArchitectureDiagram } from './LabArchitectureDiagrams';
+import { createStepEnhancements } from '@/utils/labStepEnhancements';
+import { LabIntroContent } from '@/components/labs/LabViewWithTabs';
 
 export function Lab1CSFLE() {
   const { mongoUri, awsAccessKeyId, awsSecretAccessKey, awsRegion, verifiedTools } = useLab();
@@ -38,7 +40,7 @@ export function Lab1CSFLE() {
   }> = [
 
     {
-      id: 'l1s1',
+      id: 'lab-csfle-fundamentals-step-create-cmk',
       title: 'Create Customer Master Key (CMK)',
       estimatedTime: '10 min',
       difficulty: 'basic' as DifficultyLevel,
@@ -194,7 +196,7 @@ echo "Alias Created: ${aliasName}"`,
       onVerify: async () => validatorUtils.checkKmsAlias(aliasName)
     },
     {
-      id: 'l1s2',
+      id: 'lab-csfle-fundamentals-step-apply-key-policy',
       title: 'Infrastructure: Apply KMS Key Policy',
       estimatedTime: '5 min',
       description: 'A Common Pitfall: Even if your IAM User has permissions, the Key itself must *trust* you. You must explicity attach a Key Policy to the CMK to allow your IAM User to administer and use it.',
@@ -367,7 +369,7 @@ aws kms ______________ --key-id $KMS_KEY_ID --policy-name default --policy file:
       onVerify: async () => validatorUtils.checkKeyPolicy(aliasName)
     },
     {
-      id: 'l1s3',
+      id: 'lab-csfle-fundamentals-step-init-keyvault',
       title: 'Initialize Key Vault with Unique Index',
       estimatedTime: '5 min',
       difficulty: 'basic' as DifficultyLevel,
@@ -506,7 +508,7 @@ mongosh "${mongoUri}"
       onVerify: async () => validatorUtils.checkKeyVault(mongoUri, 'encryption.__keyVault')
     },
     {
-      id: 'l1s5',
+      id: 'lab-csfle-fundamentals-step-create-deks',
       title: 'Generate Data Encryption Keys (DEKs)',
       estimatedTime: '8 min',
       difficulty: 'intermediate' as DifficultyLevel,
@@ -699,7 +701,7 @@ node createKey.cjs
       onVerify: async () => validatorUtils.checkDataKey(mongoUri, `user-${suffix}-ssn-key`)
     },
     {
-      id: 'l1s5verify',
+      id: 'lab-csfle-fundamentals-step-verify-dek',
       title: 'Verify DEK Creation in Key Vault',
       estimatedTime: '5 min',
       description: 'Connect to MongoDB Atlas using mongosh and query the key vault to verify that exactly one Data Encryption Key has been created. This is a critical verification step.',
@@ -741,7 +743,7 @@ db.getCollection("__keyVault").countDocuments()`
       onVerify: async () => validatorUtils.checkKeyVaultCount(1)
     },
     {
-      id: 'l1s6',
+      id: 'lab-csfle-fundamentals-step-test-csfle',
       title: 'Test CSFLE: Insert & Query with Encryption',
       estimatedTime: '15 min',
       description: 'Create and run a Node.js test script that demonstrates the difference between encrypted and non-encrypted connections. This proves that CSFLE is working by showing ciphertext vs plaintext side-by-side.',
@@ -1049,7 +1051,7 @@ node testCSFLE.cjs
       onVerify: async () => { return { success: true, message: 'CSFLE demonstration complete!' }; }
     },
     {
-      id: 'l1s7',
+      id: 'lab-csfle-fundamentals-step-complete-application',
       title: 'The Complete Application',
       estimatedTime: '10 min',
       description: 'Bringing it all together. Here is the full, clean code for a production-ready CSFLE application. Notice it is only ~50 lines of code!',
@@ -1342,24 +1344,14 @@ node app.js
     }
   ];
 
+  // Create stepEnhancements Map to preserve all rich content (code blocks, skeletons, hints, exercises, verification)
+  const stepEnhancements = createStepEnhancements(lab1Steps);
+
   return (
-    <LabViewWithTabs
+    <LabRunner
       labNumber={1}
-      title="CSFLE Fundamentals with AWS KMS"
-      description="Master the rollout of KMS infrastructure and Client-Side Field Level Encryption"
-      duration="35 min"
-      prerequisites={[
-        'MongoDB Atlas M10+ running MongoDB 7.0+',
-        'AWS IAM User with KMS Management Permissions',
-        'Working Terminal with AWS CLI access'
-      ]}
-      objectives={[
-        'Automate Key creation via AWS CLI',
-        'Audit IAM policies for Decrypt & GenerateDataKey permissions',
-        'Initialize Key Vault namespaces with high-availability indexes',
-        'Map PII fields to unique compliance-bound DEKs'
-      ]}
-      steps={lab1Steps}
+      labId="lab-csfle-fundamentals"
+      stepEnhancements={stepEnhancements}
       introContent={introContent}
       businessValue="Protect PII at the application layer before it reaches the database"
       atlasCapability="Client-Side Field Level Encryption"

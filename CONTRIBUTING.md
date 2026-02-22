@@ -29,179 +29,27 @@ src/content/
 
 ## Creating a New Lab
 
-### Step 1: Define the Lab Content
+Labs live under **topic-centric paths**: `src/content/topics/<topic>/<pov>/lab-*.ts`. Each step uses an **enhancementId**; code blocks and tips live in **enhancements.ts** in the same folder. Registration is in **src/content/topics/index.ts** and (for new POVs) **src/labs/enhancements/loader.ts**.
 
-Create a new file in `src/content/labs/`:
+**Recommended path:**
 
-```typescript
-// src/content/labs/my-new-lab.ts
-import { WorkshopLabDefinition } from '@/types';
+1. **[Docs/ARCHITECTURE_AND_ADDING_LABS.md](Docs/ARCHITECTURE_AND_ADDING_LABS.md)** – Architecture diagrams and a checklist for what’s required to add a lab.
+2. **[Docs/ADD_LAB_MASTER_PROMPT.md](Docs/ADD_LAB_MASTER_PROMPT.md)** – A single prompt (with user inputs) to generate the lab file, enhancements file, and registration edits.
+3. **Scripts** – `node scripts/create-lab.js` (scaffold) and `node scripts/register-lab.js --file=...` (register in index + loader). See **[Docs/CONTENT_CREATOR_QUICK_START.md](Docs/CONTENT_CREATOR_QUICK_START.md)** for the full workflow and CLI caveats.
 
-export const myNewLab: WorkshopLabDefinition = {
-  id: 'lab-my-new-lab',
-  title: 'My New Lab',
-  description: 'Description of what this lab teaches',
-  topicId: 'encryption', // or another topic
-  difficulty: 'intermediate',
-  estimatedTotalTimeMinutes: 45,
-  prerequisites: ['lab-csfle-fundamentals'],
-  steps: [
-    {
-      id: 'lab-my-new-lab-step-intro',  // Use consistent ID format: lab-{lab-name}-step-{step-name}
-      title: 'Introduction',
-      narrative: 'Story context for this step',
-      instructions: 'What to do in this step',
-      estimatedTimeMinutes: 10,
-      verificationId: 'csfle.verifyKeyVaultIndex',
-      points: 10,
-      hints: [
-        'Hint 1: Helpful guidance',
-        'Hint 2: More specific help'
-      ]
-      // Note: Rich content (code blocks, skeletons, exercises, verification functions)
-      // goes in stepEnhancements in the component, not here
-    }
-  ],
-  modes: ['lab', 'demo'],  // Which modes this lab supports
-  audience: 'all'  // or 'moderator', 'attendee'
-};
-```
+### Manual steps (if not using the master prompt or scripts)
 
-**Important**: The content definition contains **structure and basic metadata**. Rich content (code blocks, skeletons, hints, exercises, verification functions) is preserved via `stepEnhancements` in the component (see Step 3).
+1. Create the lab file in `src/content/topics/<topic>/<pov>/lab-<name>.ts` with steps that use **enhancementId** (no inline codeBlocks).
+2. Create or update `enhancements.ts` in the same folder with one entry per enhancementId.
+3. Add the import and the lab export to the **allLabs** array in `src/content/topics/index.ts`.
+4. If the POV prefix is new, add it to the **moduleMap** and **preloadAllEnhancements** array in `src/labs/enhancements/loader.ts`.
+5. Run `node scripts/validate-content.js`.
 
-### Step 2: Register in ContentService
+See [Docs/ARCHITECTURE_AND_ADDING_LABS.md](Docs/ARCHITECTURE_AND_ADDING_LABS.md) for a diagram and checklist, and [Docs/CONTENT_CREATOR_QUICK_START.md](Docs/CONTENT_CREATOR_QUICK_START.md) for the full workflow.
 
-Add your lab to `src/services/contentService.ts`:
+### Legacy: Register Component in Router (content-driven labs do not require this)
 
-```typescript
-import { myNewLab } from '../content/labs/my-new-lab';
-
-class InMemoryContentService {
-  private labs: WorkshopLabDefinition[] = [
-    lab1Definition,
-    lab2Definition,
-    lab3Definition,
-    myNewLab  // Add here
-  ];
-}
-```
-
-### Step 3: Create the Lab Component
-
-Create a component file in `src/components/labs/`:
-
-```typescript
-// src/components/labs/MyNewLab.tsx
-import { LabRunner } from '@/labs/LabRunner';
-import { useLab } from '@/context/LabContext';
-import { createStepEnhancements } from '@/utils/labStepEnhancements';
-import { Step } from '@/components/labs/LabViewWithTabs';
-
-export function MyNewLab() {
-  const { mongoUri, awsRegion, verifiedTools } = useLab();
-  
-  // Define steps with rich content (code blocks, skeletons, hints, exercises, verification)
-  const labSteps: Step[] = [
-    {
-      id: 'lab-my-new-lab-step-intro',  // Must match step ID in content definition!
-      title: 'Introduction',
-      estimatedTime: '10 min',
-      description: 'Step description',
-      difficulty: 'basic',
-      understandSection: 'What you need to understand...',
-      doThisSection: [
-        'Task 1: Do this',
-        'Task 2: Do that'
-      ],
-      tips: [
-        'TIP: Helpful guidance',
-        'BEST PRACTICE: Recommended approach'
-      ],
-      codeBlocks: [
-        {
-          filename: 'script.js',
-          language: 'javascript',
-          code: `// Full code example
-const example = "code";`,
-          skeleton: `// Guided mode skeleton with blanks
-const example = "_____";`,
-          challengeSkeleton: `// Challenge mode skeleton`,
-          expertSkeleton: `// Expert mode skeleton`,
-          inlineHints: [
-            {
-              line: 1,
-              blankText: '_____',
-              hint: 'What should go here?',
-              answer: 'code'
-            }
-          ]
-        }
-      ],
-      hints: [
-        'Hint 1: General guidance',
-        'Hint 2: More specific help'
-      ],
-      onVerify: async () => {
-        // Verification logic
-        return { success: true, message: 'Verified!' };
-      },
-      exercises: [
-        {
-          id: 'quiz-1',
-          type: 'quiz',
-          title: 'Quiz Question',
-          question: 'What is the answer?',
-          options: [
-            { id: 'a', label: 'Option A', isCorrect: false },
-            { id: 'b', label: 'Option B', isCorrect: true }
-          ],
-          points: 10
-        }
-      ]
-    }
-  ];
-
-  // Create stepEnhancements Map to preserve rich content
-  const stepEnhancements = createStepEnhancements(labSteps);
-
-  // Optional: Custom intro content (with architecture diagrams, etc.)
-  const introContent = {
-    whatYouWillBuild: [
-      'Feature 1',
-      'Feature 2'
-    ],
-    keyConcepts: [
-      {
-        term: 'Concept 1',
-        explanation: 'Explanation...'
-      }
-    ],
-    keyInsight: 'Key insight about this lab...',
-    // Optional: architectureDiagram: <MyArchitectureDiagram />
-  };
-
-  return (
-    <LabRunner
-      labNumber={4}  // Next available lab number
-      labId="lab-my-new-lab"  // Must match content definition ID!
-      stepEnhancements={stepEnhancements}
-      introContent={introContent}
-      businessValue="Business value proposition"
-      atlasCapability="MongoDB capability demonstrated"
-    />
-  );
-}
-```
-
-**Key Points**:
-- Step IDs in component **must match** step IDs in content definition
-- Use `createStepEnhancements()` to extract rich content into a Map
-- Pass `stepEnhancements` to `LabRunner` to preserve code blocks, skeletons, hints, exercises, verification
-- Custom `introContent` is optional (defaults to content definition)
-
-### Step 4: Register Component in Router
-
-Add your lab component to `src/pages/Index.tsx`:
+Labs defined under `src/content/topics/` are loaded by the framework via the topic index; no per-lab component or router registration is needed. If you are extending an older lab that still has a dedicated component, add it to `src/pages/Index.tsx`:
 
 ```typescript
 import { MyNewLab } from '@/components/labs/MyNewLab';

@@ -21,6 +21,7 @@ export const labTextSearchExperienceDefinition: WorkshopLabDefinition = {
       instructions:
         '- Identify 2–3 fields to use as structured filters (e.g., category, price band).\n- Extend your queries to accept structured filter parameters.\n- Return both hits and facet counts to drive a UI.',
       estimatedTimeMinutes: 12,
+      enhancementId: 'text-search.facetedSearch',
       verificationId: 'text-search.verifyFacetedSearch',
       points: 10,
     },
@@ -32,6 +33,7 @@ export const labTextSearchExperienceDefinition: WorkshopLabDefinition = {
       instructions:
         '- Enable highlighting in your search queries.\n- Return highlight snippets alongside documents.\n- Discuss how this increases user trust in the results.',
       estimatedTimeMinutes: 10,
+      enhancementId: 'text-search.highlighting',
       verificationId: 'text-search.verifyHighlighting',
       points: 10,
     },
@@ -43,6 +45,7 @@ export const labTextSearchExperienceDefinition: WorkshopLabDefinition = {
       instructions:
         '- Experiment with boosting fields or using compound scoring.\n- Compare search output before and after tuning.\n- Capture recommended defaults for the SA playbook.',
       estimatedTimeMinutes: 13,
+      enhancementId: 'text-search.relevanceTuning',
       verificationId: 'text-search.verifyRelevanceTuning',
       points: 10,
     },

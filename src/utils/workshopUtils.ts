@@ -1,4 +1,5 @@
 import { getLeaderboardEntries, type LeaderboardEntry } from './leaderboardUtils';
+import { getMetricsService } from '@/services/metricsService';
 
 export interface ArchivedLeaderboard {
   sessionId: string;
@@ -7,6 +8,9 @@ export interface ArchivedLeaderboard {
   entries: LeaderboardEntry[];
 }
 
+export type ProgrammingLanguage = 'python' | 'node' | 'java';
+export type WorkshopSessionMode = 'demo' | 'lab' | 'challenge';
+
 export interface WorkshopSession {
   id: string;
   customerName: string;
@@ -14,6 +18,17 @@ export interface WorkshopSession {
   startedAt: number;
   labsEnabled: boolean;
   archivedLeaderboards: ArchivedLeaderboard[];
+  mongodbSource: 'local' | 'atlas';
+  atlasConnectionString?: string; // Only set if mongodbSource is 'atlas'
+  /** Wizard fields (optional for backward compatibility) */
+  salesforceWorkloadName?: string;
+  technicalChampionName?: string;
+  technicalChampionEmail?: string;
+  currentDatabase?: string;
+  mode?: WorkshopSessionMode;
+  programmingLanguage?: ProgrammingLanguage;
+  templateId?: string;
+  labIds?: string[];
 }
 
 const WORKSHOP_SESSION_KEY = 'workshop_session';
@@ -27,12 +42,18 @@ function generateSessionId(): string {
 }
 
 /**
- * Get the current workshop session from localStorage
+ * Get the current workshop session from localStorage (with Atlas sync on first load)
  */
 export function getWorkshopSession(): WorkshopSession | null {
   try {
     const stored = localStorage.getItem(WORKSHOP_SESSION_KEY);
-    if (!stored) return null;
+    if (!stored) {
+      // Try to load from Atlas on first access (async, non-blocking)
+      loadWorkshopSessionFromAtlas().catch(() => {
+        // Already logged in loadWorkshopSessionFromAtlas
+      });
+      return null;
+    }
     return JSON.parse(stored);
   } catch (error) {
     console.error('Failed to read workshop session:', error);
@@ -41,11 +62,59 @@ export function getWorkshopSession(): WorkshopSession | null {
 }
 
 /**
- * Save workshop session to localStorage
+ * Sync workshop session to Atlas (via API)
  */
-function saveWorkshopSession(session: WorkshopSession): void {
+async function syncWorkshopSessionToAtlas(session: WorkshopSession): Promise<void> {
+  try {
+    const response = await fetch('/api/workshop-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session })
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.message || 'Failed to sync session to Atlas');
+    }
+  } catch (error) {
+    // Log but don't throw - localStorage fallback is acceptable
+    console.warn('Failed to sync workshop session to Atlas:', error);
+  }
+}
+
+/**
+ * Load workshop session from Atlas (with localStorage fallback)
+ */
+async function loadWorkshopSessionFromAtlas(): Promise<WorkshopSession | null> {
+  try {
+    const response = await fetch('/api/workshop-session');
+    if (!response.ok) {
+      return null;
+    }
+    
+    const data = await response.json();
+    if (data.success && data.session) {
+      // Also cache in localStorage for fast reads
+      localStorage.setItem(WORKSHOP_SESSION_KEY, JSON.stringify(data.session));
+      return data.session;
+    }
+  } catch (error) {
+    console.warn('Failed to load workshop session from Atlas:', error);
+  }
+  
+  return null;
+}
+
+/**
+ * Save workshop session to localStorage and sync to Atlas
+ */
+async function saveWorkshopSession(session: WorkshopSession): Promise<void> {
   try {
     localStorage.setItem(WORKSHOP_SESSION_KEY, JSON.stringify(session));
+    // Sync to Atlas in background (don't block on this)
+    syncWorkshopSessionToAtlas(session).catch(() => {
+      // Already logged in syncWorkshopSessionToAtlas
+    });
   } catch (error) {
     console.error('Failed to save workshop session:', error);
   }
@@ -63,7 +132,7 @@ export function areLabsEnabled(): boolean {
 /**
  * Enable or disable labs for the current workshop
  */
-export function setLabsEnabled(enabled: boolean): void {
+export async function setLabsEnabled(enabled: boolean): Promise<void> {
   let session = getWorkshopSession();
   
   if (!session) {
@@ -74,26 +143,72 @@ export function setLabsEnabled(enabled: boolean): void {
       workshopDate: new Date().toISOString().split('T')[0],
       startedAt: Date.now(),
       labsEnabled: enabled,
-      archivedLeaderboards: []
+      archivedLeaderboards: [],
+      mongodbSource: 'local'
     };
   } else {
     session.labsEnabled = enabled;
   }
   
-  saveWorkshopSession(session);
+  await saveWorkshopSession(session);
+}
+
+export interface StartNewWorkshopOptions {
+  customerName: string;
+  workshopDate: string;
+  mongodbSource?: 'local' | 'atlas';
+  atlasConnectionString?: string;
+  salesforceWorkloadName?: string;
+  technicalChampionName?: string;
+  technicalChampionEmail?: string;
+  currentDatabase?: string;
+  mode?: WorkshopSessionMode;
+  programmingLanguage?: ProgrammingLanguage;
+  templateId?: string;
+  labIds?: string[];
 }
 
 /**
  * Start a new workshop session
  * This archives the current leaderboard and creates a fresh session
  */
-export function startNewWorkshop(customerName: string, workshopDate: string): WorkshopSession {
+export async function startNewWorkshop(
+  customerNameOrOptions: string | StartNewWorkshopOptions,
+  workshopDate?: string,
+  mongodbSource: 'local' | 'atlas' = 'local',
+  atlasConnectionString?: string
+): Promise<WorkshopSession> {
+  const options: StartNewWorkshopOptions =
+    typeof customerNameOrOptions === 'object'
+      ? customerNameOrOptions
+      : {
+          customerName: customerNameOrOptions,
+          workshopDate: workshopDate!,
+          mongodbSource,
+          atlasConnectionString,
+        };
+
+  const {
+    customerName,
+    workshopDate: dateStr,
+    mongodbSource: source = 'local',
+    atlasConnectionString: atlasUri,
+    salesforceWorkloadName,
+    technicalChampionName,
+    technicalChampionEmail,
+    currentDatabase,
+    mode,
+    programmingLanguage,
+    templateId,
+    labIds,
+  } = options;
+
   const currentSession = getWorkshopSession();
   const currentLeaderboard = getLeaderboardEntries();
-  
+
   // Archive current session data if it exists
   const archivedLeaderboards: ArchivedLeaderboard[] = currentSession?.archivedLeaderboards || [];
-  
+
   if (currentSession && currentLeaderboard.length > 0) {
     archivedLeaderboards.push({
       sessionId: currentSession.id,
@@ -102,22 +217,65 @@ export function startNewWorkshop(customerName: string, workshopDate: string): Wo
       entries: currentLeaderboard
     });
   }
-  
+
   // Clear current leaderboard
   localStorage.setItem(LEADERBOARD_KEY, JSON.stringify([]));
-  
+
   // Create new session
   const newSession: WorkshopSession = {
     id: generateSessionId(),
     customerName,
-    workshopDate,
+    workshopDate: dateStr,
     startedAt: Date.now(),
-    labsEnabled: true, // Enable labs when starting a new workshop
-    archivedLeaderboards
+    labsEnabled: true,
+    archivedLeaderboards,
+    mongodbSource: source,
+    ...(source === 'atlas' && atlasUri ? { atlasConnectionString: atlasUri } : {}),
+    ...(salesforceWorkloadName !== undefined && { salesforceWorkloadName }),
+    ...(technicalChampionName !== undefined && { technicalChampionName }),
+    ...(technicalChampionEmail !== undefined && { technicalChampionEmail }),
+    ...(currentDatabase !== undefined && { currentDatabase }),
+    ...(mode !== undefined && { mode }),
+    ...(programmingLanguage !== undefined && { programmingLanguage }),
+    ...(templateId !== undefined && { templateId }),
+    ...(labIds !== undefined && { labIds }),
   };
-  
-  saveWorkshopSession(newSession);
+
+  await saveWorkshopSession(newSession);
+
+  const metricsService = getMetricsService();
+  metricsService.recordEvent({
+    type: 'workshop_started',
+    metadata: {
+      workshopId: newSession.id,
+      customerName: newSession.customerName,
+      workshopDate: newSession.workshopDate,
+      mode: newSession.mode,
+    }
+  });
+
   return newSession;
+}
+
+/**
+ * Clone the current workshop session: create a new session with a new ID,
+ * copying wizard fields from the current session. Does not archive leaderboard;
+ * the new session starts with empty leaderboard and same archivedLeaderboards history.
+ * Use when moderator wants to change mode or reconfigure (run wizard after clone).
+ */
+export async function cloneWorkshopSession(): Promise<WorkshopSession | null> {
+  const current = getWorkshopSession();
+  if (!current) return null;
+
+  const cloned: WorkshopSession = {
+    ...current,
+    id: generateSessionId(),
+    startedAt: Date.now(),
+    labsEnabled: current.labsEnabled,
+    archivedLeaderboards: current.archivedLeaderboards,
+  };
+  await saveWorkshopSession(cloned);
+  return cloned;
 }
 
 /**
@@ -145,12 +303,24 @@ export function getParticipantCount(): number {
 /**
  * Update the current workshop session details
  */
-export function updateWorkshopSession(updates: Partial<Pick<WorkshopSession, 'customerName' | 'workshopDate'>>): void {
+export async function updateWorkshopSession(
+  updates: Partial<Pick<WorkshopSession, 'customerName' | 'workshopDate' | 'mongodbSource' | 'atlasConnectionString' | 'salesforceWorkloadName' | 'technicalChampionName' | 'technicalChampionEmail' | 'currentDatabase' | 'mode' | 'programmingLanguage' | 'templateId' | 'labIds'>>
+): Promise<void> {
   const session = getWorkshopSession();
   if (session) {
-    saveWorkshopSession({
+    const updatedSession = {
       ...session,
-      ...updates
-    });
+      ...updates,
+      ...(updates.mongodbSource === 'local' ? { atlasConnectionString: undefined } : {})
+    };
+    await saveWorkshopSession(updatedSession);
   }
+}
+
+/**
+ * Delete a workshop session (moderator only). Clears current session from storage.
+ * Call when moderator wants to remove the current session; does not touch archived leaderboards in other sessions.
+ */
+export async function deleteCurrentWorkshopSession(): Promise<void> {
+  localStorage.removeItem(WORKSHOP_SESSION_KEY);
 }

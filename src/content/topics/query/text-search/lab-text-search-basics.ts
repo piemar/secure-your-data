@@ -21,6 +21,7 @@ export const labTextSearchBasicsDefinition: WorkshopLabDefinition = {
       instructions:
         '- Identify a collection with text fields (e.g., product name and description).\n- Create a basic Atlas Search index on the main text fields.\n- Verify the index is built and ready for queries.',
       estimatedTimeMinutes: 8,
+      enhancementId: 'text-search.indexCreated',
       verificationId: 'text-search.verifyIndexCreated',
       points: 10,
     },
@@ -32,6 +33,7 @@ export const labTextSearchBasicsDefinition: WorkshopLabDefinition = {
       instructions:
         '- Use the $search stage with a simple text operator.\n- Compare results for different search terms.\n- Inspect score metadata to understand relevance.',
       estimatedTimeMinutes: 9,
+      enhancementId: 'text-search.queries',
       verificationId: 'text-search.verifyQueries',
       points: 10,
     },
@@ -43,6 +45,7 @@ export const labTextSearchBasicsDefinition: WorkshopLabDefinition = {
       instructions:
         '- Use $project to include name, description, and score.\n- Sort by score descending.\n- Discuss how this differs from simple regex matches on indexes.',
       estimatedTimeMinutes: 8,
+      enhancementId: 'text-search.projectionSort',
       verificationId: 'text-search.verifyProjectionAndSort',
       points: 10,
     },

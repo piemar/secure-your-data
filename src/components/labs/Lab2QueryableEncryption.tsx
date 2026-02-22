@@ -1,8 +1,9 @@
-import { LabViewWithTabs } from './LabViewWithTabs';
+import { LabRunner } from '@/labs/LabRunner';
 import { validatorUtils } from '@/utils/validatorUtils';
 import { useLab } from '@/context/LabContext';
 import { DifficultyLevel } from './DifficultyBadge';
 import { QEArchitectureDiagram } from './LabArchitectureDiagrams';
+import { createStepEnhancements } from '@/utils/labStepEnhancements';
 
 export function Lab2QueryableEncryption() {
   const { mongoUri, awsRegion, verifiedTools } = useLab();
@@ -37,7 +38,7 @@ export function Lab2QueryableEncryption() {
     }>;
   }> = [
     {
-      id: 'l2s1',
+      id: 'lab-queryable-encryption-step-create-deks',
       title: 'Step 1: Create Data Encryption Keys (DEKs) for QE',
       estimatedTime: '10 min',
       description: 'Before defining encrypted fields, you need to create Data Encryption Keys (DEKs) for each field you want to encrypt. Unlike CSFLE, QE requires a separate DEK for each encrypted field. Create DEKs for both salary (range queries) and taxId (equality queries). We will use keyAltNames to reference them, making the code more maintainable.',
@@ -264,7 +265,7 @@ node createQEDeks.cjs
       onVerify: async () => validatorUtils.checkQEDEKs(mongoUri)
     },
     {
-      id: 'l2s2',
+      id: 'lab-queryable-encryption-step-create-collection',
       title: 'Step 2: Create QE Collection with Encrypted Fields',
       estimatedTime: '15 min',
       description: 'Create the collection with the encryptedFields configuration. This single step defines which fields to encrypt AND creates the collection. MongoDB will automatically create the system catalog (.esc) and context cache (.ecoc) collections. We use keyAltNames to look up the DEKs, making the code cleaner and more maintainable.',
@@ -419,7 +420,7 @@ node createQECollection.cjs
       onVerify: async () => validatorUtils.checkQECollection('hr', 'employees', mongoUri)
     },
     {
-      id: 'l2s3',
+      id: 'lab-queryable-encryption-step-test-queries',
       title: 'Step 3: Insert Test Data with Encrypted Fields',
       estimatedTime: '8 min',
       description: 'Before you can test queries, you need to insert documents with encrypted fields. Use a QE-enabled client connection to insert data. The fields defined in encryptedFields will be automatically encrypted. You can use either Node.js or mongosh.',
@@ -626,7 +627,7 @@ node insertQEData.cjs
       onVerify: async () => validatorUtils.checkQERangeQuery('hr', 'employees', mongoUri)
     },
     {
-      id: 'l2s4',
+      id: 'lab-queryable-encryption-step-metadata',
       title: 'Step 4: Query Encrypted Data - QE vs Non-QE Client Comparison',
       estimatedTime: '15 min',
       description: 'Demonstrate the power of Queryable Encryption by comparing queries with a QE-enabled client vs a standard client. This side-by-side comparison shows how QE allows you to query encrypted data while a standard client only sees Binary ciphertext. Test various query types: equality, range, prefix, and suffix.',
@@ -1014,25 +1015,14 @@ node queryQERange.cjs
     }
   ];
 
+  // Create stepEnhancements Map to preserve all rich content
+  const stepEnhancements = createStepEnhancements(lab2Steps);
+
   return (
-    <LabViewWithTabs
+    <LabRunner
       labNumber={2}
-      title="Queryable Encryption & Range Queries"
-      description="Query encrypted data without decrypting on the server"
-      duration="30 min"
-      prerequisites={[
-        'MongoDB 8.0+ Atlas Cluster',
-        'AWS KMS CMK from Lab 1',
-        'Node.js 20+ with MongoDB driver >= 6.1.0',
-        'mongodb-client-encryption >= 6.1.0+'
-      ]}
-      objectives={[
-        'Configure QE with field-level DEK binding',
-        'Compare QE-enabled vs standard client behavior',
-        'Execute Range queries on encrypted data',
-        'Understand QE metadata collections'
-      ]}
-      steps={lab2Steps}
+      labId="lab-queryable-encryption"
+      stepEnhancements={stepEnhancements}
       introContent={introContent}
       businessValue="Query encrypted data without exposing plaintext to the database"
       atlasCapability="Queryable Encryption + Range Queries"

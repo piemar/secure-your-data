@@ -209,6 +209,11 @@ export interface WorkshopLabDefinition {
   labFolderPath?: string;
   /** Optional: key concepts for the lab overview/intro tab */
   keyConcepts?: Array<{ term: string; explanation: string }>;
+
+  /** Default competitor product id to show in demo side-by-side (e.g. postgresql) */
+  defaultCompetitorId?: string;
+  /** Competitor product ids this lab has equivalent code for */
+  competitorIds?: string[];
 }
 
 export interface WorkshopGamificationConfig {
@@ -274,6 +279,8 @@ export interface WorkshopTemplate {
   // Lab context overlays at template level (applies to all quests in this template)
   labContextOverlays?: LabContextOverlay[];
   includeCompetitorComparisons?: boolean;
+  /** Default competitor product id in demo side-by-side when template is used */
+  defaultCompetitorId?: string;
   industry?: string; // e.g. 'retail', 'financial-services'
   storyIntro?: string;
   storyOutro?: string;

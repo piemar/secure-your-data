@@ -4,6 +4,7 @@ import { getContentService } from '@/services/contentService';
 import { mapLabDefinitionToSteps, mapLabDefinitionToIntroContent } from './labContentMapper';
 import { WorkshopLabDefinition, LabContextOverlay, WorkshopMode } from '@/types';
 import { useWorkshopSession } from '@/contexts/WorkshopSessionContext';
+import { useRole } from '@/contexts/RoleContext';
 import { buildStepEnhancementsAsync } from './stepEnhancementRegistry';
 import { labIntroComponents } from './labIntroComponents';
 
@@ -94,7 +95,8 @@ function applyLabContextOverlay(
 
 export function LabRunner(props: LabRunnerProps) {
   const { labId, labNumber, stepEnhancements, labContextOverlay } = props;
-  const { currentMode } = useWorkshopSession();
+  const { currentMode, activeTemplate } = useWorkshopSession();
+  const { isModerator } = useRole();
   const [labDef, setLabDef] = useState<WorkshopLabDefinition | null>(null);
   const [enhancements, setEnhancements] = useState<Map<string, Partial<Step>>>(new Map());
   const [loading, setLoading] = useState(false);
@@ -217,6 +219,12 @@ export function LabRunner(props: LabRunnerProps) {
       ? `${filteredLabDef.estimatedTotalTimeMinutes} min`
       : 'N/A';
 
+    const defaultCompetitorId =
+      activeTemplate?.defaultCompetitorId ??
+      filteredLabDef.defaultCompetitorId ??
+      filteredLabDef.competitorIds?.[0];
+    const competitorIds = filteredLabDef.competitorIds;
+
     return (
       <LabViewWithTabs
         labNumber={labNumber}
@@ -229,6 +237,10 @@ export function LabRunner(props: LabRunnerProps) {
         introContent={introContent}
         businessValue={props.businessValue}
         atlasCapability={props.atlasCapability}
+        currentMode={currentMode}
+        isModerator={isModerator}
+        defaultCompetitorId={defaultCompetitorId}
+        competitorIds={competitorIds}
       />
     );
   }

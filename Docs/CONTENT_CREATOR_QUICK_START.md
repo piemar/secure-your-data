@@ -10,63 +10,65 @@ Welcome! This guide will help you quickly create new labs, quests, and demo scri
 
 ## Quick Start: Creating a Lab
 
-### Step 1: Use the Creation Script
+Labs live under **topic-centric paths**: `src/content/topics/<topic>/<pov>/lab-*.ts`. Each step uses an **enhancementId** (e.g. `full-recovery-rpo.concepts`); code blocks and tips live in **enhancements.ts** in the same folder. Registration is in **src/content/topics/index.ts** (and, for new POVs, **src/labs/enhancements/loader.ts**).
 
-The easiest way to create a new lab is using the provided script:
+**Recommended:** Use the [Master Template Prompt](ADD_LAB_MASTER_PROMPT.md) to generate a full lab plus enhancements and registration in one go. For architecture and a step-by-step checklist, see [ARCHITECTURE_AND_ADDING_LABS.md](ARCHITECTURE_AND_ADDING_LABS.md).
+
+### Step 1: Use the Creation Script (scaffold only)
+
+The script creates the correct **path** and a lab scaffold. Use `--pov-folder` when the topic has POV subfolders (e.g. operations, query):
 
 ```bash
 node scripts/create-lab.js \
   --name="My New Lab" \
-  --topic=encryption \
-  --pov=ENCRYPT-FIELDS,ENCRYPTION \
+  --topic=operations \
+  --pov-folder=full-recovery-rpo \
+  --pov=FULL-RECOVERY-RPO \
   --modes=demo,lab,challenge \
-  --proof=46
+  --proof=13
 ```
 
-This will create a new lab file at `src/content/labs/lab-my-new-lab.ts` with the correct structure.
+This creates a lab file at **src/content/topics/operations/full-recovery-rpo/lab-my-new-lab.ts** (topic + pov-folder). The generated steps use **enhancementId**; you must add matching entries in **enhancements.ts** in the same folder.
 
-### Step 2: Fill in Lab Content
+### Step 2: Add or update enhancements
 
-Open the generated file and:
+In the **same folder** as the lab, create or edit `enhancements.ts`. Each step’s `enhancementId` (e.g. `full-recovery-rpo.concepts`) must have a corresponding entry with `id`, `povCapability`, `sourceProof`, `sourceSection`, `codeBlocks`, and `tips`. See `src/content/topics/operations/full-recovery-rpo/enhancements.ts` for the shape.
 
-1. **Update the description** - Make it clear and compelling (20-200 characters)
-2. **Add prerequisites** - List what users need before starting
-3. **Define steps** - Minimum 3 steps, each with:
-   - Clear title
-   - Narrative (context and explanation)
-   - Instructions (what to do)
-   - Estimated time
-   - Modes (which modes this step applies to)
-   - Verification ID (if you have a verification function)
+### Step 3: Fill in lab content
 
-### Step 3: Reference Proof Exercise
+In the generated lab file:
 
-Add a comment referencing the proof exercise:
+1. **Update the description** – Clear and compelling (20–200 characters).
+2. **Add prerequisites** – What users need before starting.
+3. **Steps** – Each step already references an `enhancementId`. Ensure titles, narrative, instructions, estimated time, and points are correct. Add `keyConcepts` and `tags` if needed.
 
-```typescript
-// Source PoV proof exercise
-// See Docs/pov-proof-exercises/proofs/46/README.md
-```
+### Step 4: Register your lab
 
-### Step 4: Validate Your Lab
+Labs are registered in **src/content/topics/index.ts** (not contentService.ts):
 
-Run the validation script to check for errors:
+1. Add an import: `import { labMyNewLabDefinition } from './operations/full-recovery-rpo/lab-my-new-lab';`
+2. Add the export to the **allLabs** array: `labMyNewLabDefinition,`
+
+If the POV prefix (e.g. `full-recovery-rpo`) is **new**, also update **src/labs/enhancements/loader.ts**:
+
+- In **moduleMap**, add: `'full-recovery-rpo': () => import('@/content/topics/operations/full-recovery-rpo/enhancements'),`
+- In **preloadAllEnhancements**, add `'full-recovery-rpo'` to the prefixes array.
+
+You can use `node scripts/register-lab.js --file=src/content/topics/operations/full-recovery-rpo/lab-my-new-lab.ts` to add the lab to index and loader automatically (if that script is available).
+
+### Step 5: Validate and test
 
 ```bash
 node scripts/validate-content.js
 ```
 
-Fix any errors before proceeding.
+Then run the app and confirm the new lab appears and steps load enhancement content.
 
-### Step 5: Register Your Lab
+### CLI caveats
 
-Register your lab in `contentService.ts`:
-
-```bash
-node scripts/register-content.js --file=src/content/labs/lab-my-new-lab.ts --type=lab
-```
-
-Or manually add the import and add it to the labs array in `src/services/contentService.ts`.
+- **create-lab.js** – Creates the correct path and a lab with enhancementId-based steps. You still must add/update **enhancements.ts**, register in **index.ts**, and (for new POVs) **loader.ts**.
+- **create-enhancement.js** – Writes to `src/labs/enhancements/metadata/`, which the runtime **does not use**. Enhancements for labs are defined in **src/content/topics/.../enhancements.ts**. Prefer the master prompt or copying from an existing POV’s enhancements file.
+- **register-content.js** – Targets contentService and old paths. For labs, registration is done in **src/content/topics/index.ts** and **src/labs/enhancements/loader.ts** (see above).
 
 ## Quick Start: Creating a Quest
 
@@ -143,11 +145,11 @@ Demo scripts are automatically loaded in Demo Mode when a template includes the 
 
 ### Adding a Lab to an Existing Topic
 
-1. Create the lab using the creation script
-2. Ensure `topicId` matches the existing topic
-3. Add POV capabilities that the topic covers
-4. Register the lab
-5. The lab will automatically appear in topic-based navigation
+1. Create the lab using the creation script (use `--pov-folder` if the topic has POV subfolders).
+2. Ensure `topicId` matches the existing topic.
+3. Add or update `enhancements.ts` in the same folder with entries for each step’s `enhancementId`.
+4. Register the lab in `src/content/topics/index.ts` (import + allLabs). If the POV prefix is new, add it to `src/labs/enhancements/loader.ts` (moduleMap + preloadAllEnhancements).
+5. The lab will then appear in topic-based navigation.
 
 ## Validation & Quality Checks
 
@@ -181,10 +183,13 @@ This checks for:
 
 ## Getting Help
 
+- **Architecture and adding labs**: See [ARCHITECTURE_AND_ADDING_LABS.md](ARCHITECTURE_AND_ADDING_LABS.md)
+- **Master prompt (add a lab in one go)**: See [ADD_LAB_MASTER_PROMPT.md](ADD_LAB_MASTER_PROMPT.md)
 - **Content Standards**: See `Docs/CONTENT_STANDARDS.md`
 - **Templates**: See `Docs/CONTENT_TEMPLATES.md`
-- **POV Capabilities**: See `src/content/pov-capabilities.ts`
-- **Existing Examples**: Check `src/content/labs/lab-csfle-fundamentals.ts`
+- **Folder structure**: See `Docs/LAB_FOLDER_STRUCTURE_GUIDELINE.md`
+- **Existing lab example**: `src/content/topics/operations/full-recovery-rpo/lab-full-recovery-rpo-overview.ts`
+- **Existing enhancements example**: `src/content/topics/operations/full-recovery-rpo/enhancements.ts`
 
 ## Next Steps
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLab } from '@/context/LabContext';
+import { getWorkshopSession } from '@/utils/workshopUtils';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,7 @@ export const LabSetupWizard: React.FC = () => {
 
     const [phase, setPhase] = useState<SetupPhase>(mongoUri ? 'ready' : 'onboarding');
     const [localUri, setLocalUri] = useState(mongoUri);
+    const [uriFromWorkshop, setUriFromWorkshop] = useState(false);
     const [isCheckingPrereqs, setIsCheckingPrereqs] = useState(false);
     const [prereqResults, setPrereqResults] = useState<Record<string, { verified: boolean; message: string; path?: string }>>({});
     const [showPrereqDetails, setShowPrereqDetails] = useState(false);
@@ -74,6 +76,21 @@ export const LabSetupWizard: React.FC = () => {
     useEffect(() => {
         if (mongoUri) setPhase('ready');
     }, [mongoUri]);
+
+    // Initialize URI from workshop session if available
+    useEffect(() => {
+        const session = getWorkshopSession();
+        if (session && !localUri) {
+            if (session.mongodbSource === 'local') {
+                const localMongoUri = 'mongodb://mongo:27017';
+                setLocalUri(localMongoUri);
+                setUriFromWorkshop(true);
+            } else if (session.mongodbSource === 'atlas' && session.atlasConnectionString) {
+                setLocalUri(session.atlasConnectionString);
+                setUriFromWorkshop(true);
+            }
+        }
+    }, [localUri]);
 
     const copyToClipboard = async (text: string, id: string) => {
         await navigator.clipboard.writeText(text);
@@ -405,12 +422,21 @@ export const LabSetupWizard: React.FC = () => {
                     <div className="space-y-2">
                         <Input
                             id="uri"
-                            placeholder="mongodb+srv://user:pass@cluster.mongodb.net/"
+                            placeholder="mongodb+srv://user:pass@cluster.mongodb.net/ or mongodb://mongo:27017"
                             value={localUri}
-                            onChange={(e) => setLocalUri(e.target.value)}
+                            onChange={(e) => {
+                                setLocalUri(e.target.value);
+                                setUriFromWorkshop(false);
+                            }}
                             disabled={hasAtlasConnection}
                             className="font-mono text-xs"
                         />
+                        {uriFromWorkshop && (
+                            <div className="flex items-center gap-2 text-xs text-blue-600">
+                                <Database className="w-3 h-3" />
+                                <span>Pre-configured from workshop session ({getWorkshopSession()?.mongodbSource === 'local' ? 'Local Docker' : 'Atlas'})</span>
+                            </div>
+                        )}
                         {hasAtlasConnection && (
                             <div className="flex items-center gap-2 text-xs text-green-600">
                                 <CheckCircle2 className="w-3 h-3" />

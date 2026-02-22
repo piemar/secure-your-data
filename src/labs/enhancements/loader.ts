@@ -64,6 +64,7 @@ async function loadEnhancementModule(
   // This will be populated as we migrate enhancements
   const moduleMap: Record<string, () => Promise<EnhancementModule>> = {
     'rich-query': () => import('@/content/topics/query/rich-query/enhancements'),
+    'text-search': () => import('@/content/topics/query/text-search/enhancements'),
     'flexible': () => import('@/content/topics/data-management/flexible/enhancements'),
     'ingest-rate': () => import('@/content/topics/scalability/ingest-rate/enhancements'),
     'in-place-analytics': () => import('@/content/topics/analytics/in-place-analytics/enhancements'),
@@ -80,6 +81,10 @@ async function loadEnhancementModule(
     'rolling-updates': () => import('@/content/topics/operations/rolling-updates/enhancements'),
     'full-recovery-rpo': () => import('@/content/topics/operations/full-recovery-rpo/enhancements'),
     'full-recovery-rto': () => import('@/content/topics/operations/full-recovery-rto/enhancements'),
+    'partial-recovery-rpo': () => import('@/content/topics/operations/partial-recovery-rpo/enhancements'),
+    'partial-recovery': () => import('@/content/topics/operations/partial-recovery/enhancements'),
+    'reporting': () => import('@/content/topics/integration/reporting/enhancements'),
+    'auto-ha': () => import('@/content/topics/operations/auto-ha/enhancements'),
   };
 
   const loader = moduleMap[prefix];
@@ -104,7 +109,7 @@ async function loadEnhancementModule(
  * Useful for initializing the cache
  */
 export async function preloadAllEnhancements(): Promise<void> {
-  const prefixes = ['rich-query', 'flexible', 'ingest-rate', 'in-place-analytics', 'workload-isolation', 'consistency', 'scale-out', 'scale-up', 'right-to-erasure', 'csfle', 'queryable-encryption', 'migratable', 'portable', 'auto-deploy', 'rolling-updates', 'full-recovery-rpo', 'full-recovery-rto'];
+  const prefixes = ['rich-query', 'text-search', 'flexible', 'ingest-rate', 'in-place-analytics', 'workload-isolation', 'consistency', 'scale-out', 'scale-up', 'right-to-erasure', 'csfle', 'queryable-encryption', 'migratable', 'portable', 'auto-deploy', 'rolling-updates', 'full-recovery-rpo', 'full-recovery-rto', 'partial-recovery-rpo', 'partial-recovery', 'reporting', 'auto-ha'];
   
   for (const prefix of prefixes) {
     try {

@@ -80,6 +80,41 @@ async function run() {
   await client.close();
 }
 run().catch(console.error);`,
+        competitorEquivalents: {
+          postgresql: {
+            language: 'sql',
+            code: `-- PostgreSQL: No client-side field encryption. Application must encrypt before insert.
+-- Using pgcrypto extension for deterministic encryption (allows equality search only).
+
+-- Enable extension once: CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- Application code (Node.js) would:
+-- 1. Encrypt SSN before insert: encrypt(doc.ssn, 'key', 'aes')
+-- 2. Store ciphertext in column ssn_encrypted
+-- 3. To query: decrypt in application or use deterministic encryption for equality
+
+INSERT INTO patients_secure (name, ssn_encrypted, dob)
+SELECT name, encrypt(ssn::bytea, 'key'::bytea, 'aes'), dob
+FROM patients_legacy;
+
+-- No built-in key vault; key management is application responsibility.
+-- No queryable encryption: range/prefix queries on encrypted data not supported.`,
+            workaroundNote: 'PostgreSQL has no client-side field encryption. Use pgcrypto or application-level encryption; key vault and queryable encryption are not built-in.',
+          },
+          'cosmosdb-vcore': {
+            language: 'javascript',
+            code: `// Cosmos DB (MongoDB vCore API): Encryption at rest only.
+// No client-side field-level encryption. Application must encrypt sensitive fields.
+
+const legacyDocs = await legacyCollection.find({}).toArray();
+for (const doc of legacyDocs) {
+  const ssnEncrypted = encryptInApp(doc.ssn); // Manual implementation
+  await secureCollection.insertOne({ ...doc, ssn: ssnEncrypted });
+}
+// No DEK/key vault abstraction; no queryable encryption on encrypted fields.`,
+            workaroundNote: 'Cosmos DB for MongoDB vCore offers encryption at rest, not client-side field encryption. Manual app-level encryption required; no queryable encryption.',
+          },
+        },
         skeleton: `const { MongoClient, ClientEncryption } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
@@ -197,6 +232,26 @@ async function run() {
   await client.close();
 }
 run().catch(console.error);`,
+        competitorEquivalents: {
+          postgresql: {
+            language: 'sql',
+            code: `-- PostgreSQL: No built-in key vault or per-tenant DEKs.
+-- Isolation is via separate schemas or row-level security (RLS).
+
+-- Option 1: One schema per tenant (strong isolation)
+CREATE SCHEMA IF NOT EXISTS tenant_acme;
+CREATE SCHEMA IF NOT EXISTS tenant_contoso;
+CREATE SCHEMA IF NOT EXISTS tenant_fabrikam;
+
+-- Option 2: Single table with tenant_id + RLS
+ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON patients
+  USING (tenant_id = current_setting('app.tenant_id'));
+
+-- Key management is application-level; no DEK per tenant like MongoDB CSFLE.`,
+            workaroundNote: 'RDBMS uses schemas or RLS for tenant isolation; no per-tenant encryption keys. Key rotation and crypto-shredding require application-managed keys.',
+          },
+        },
         skeleton: `const tenants = ["acme", "contoso", "fabrikam"];
 for (const tenantId of tenants) {
   const keyAltName = \`_______-\${tenantId}\`;

@@ -8,7 +8,7 @@ import { DifficultyLevel } from './DifficultyBadge';
 import { Database, Lightbulb } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-interface Exercise {
+export interface Exercise {
   id: string;
   type: 'quiz' | 'fill_blank' | 'challenge';
   title: string;
@@ -21,7 +21,7 @@ interface Exercise {
   challengeSteps?: Array<{ instruction: string; hint?: string }>;
 }
 
-interface Step {
+export interface Step {
   id: string;
   title: string;
   estimatedTime: string;
@@ -35,6 +35,10 @@ interface Step {
     language: string;
     code: string;
     skeleton?: string;
+    challengeSkeleton?: string;
+    expertSkeleton?: string;
+    inlineHints?: Array<{ line: number; blankText: string; hint: string; answer: string }>;
+    competitorEquivalents?: Record<string, { language: string; code: string; workaroundNote?: string }>;
   }>;
   expectedOutput?: string;
   troubleshooting?: string[];
@@ -44,7 +48,7 @@ interface Step {
   exercises?: Exercise[];
 }
 
-interface LabIntroContent {
+export interface LabIntroContent {
   whatYouWillBuild: string[];
   keyConcepts: Array<{ term: string; explanation: string }>;
   keyInsight: string;
@@ -64,6 +68,10 @@ interface LabViewWithTabsProps {
   introContent: LabIntroContent;
   businessValue?: string;
   atlasCapability?: string;
+  currentMode?: 'demo' | 'lab' | 'challenge';
+  isModerator?: boolean;
+  defaultCompetitorId?: string;
+  competitorIds?: string[];
 }
 
 export function LabViewWithTabs({
@@ -75,6 +83,10 @@ export function LabViewWithTabs({
   introContent,
   businessValue,
   atlasCapability,
+  currentMode,
+  isModerator,
+  defaultCompetitorId,
+  competitorIds,
 }: LabViewWithTabsProps) {
   const { startLab, completeLab, userEmail } = useLab();
   const storageKey = `lab${labNumber}-progress`;
@@ -218,6 +230,10 @@ export function LabViewWithTabs({
             labDescription={description}
             businessValue={businessValue}
             atlasCapability={atlasCapability}
+            currentMode={currentMode}
+            isModerator={isModerator}
+            defaultCompetitorId={defaultCompetitorId}
+            competitorIds={competitorIds}
           />
         </TabsContent>
 

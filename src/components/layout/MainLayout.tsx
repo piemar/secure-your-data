@@ -6,6 +6,7 @@ import { useRole } from '@/contexts/RoleContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ModeIndicator } from './ModeIndicator';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -49,6 +50,9 @@ function LayoutContent({ children }: MainLayoutProps) {
         )}
       >
         <ModeratorBadge />
+        <div className="fixed top-3 left-4 z-50">
+          <ModeIndicator />
+        </div>
         {children}
       </main>
     </div>

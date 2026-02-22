@@ -13,11 +13,14 @@ import {
   TrendingUp,
   RotateCcw,
   Settings,
+  Target,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { useRole } from '@/contexts/RoleContext';
 import { useLab } from '@/context/LabContext';
+import { useWorkshopSession } from '@/contexts/WorkshopSessionContext';
 import { getSortedLeaderboard } from '@/utils/leaderboardUtils';
 import { areLabsEnabled } from '@/utils/workshopUtils';
 import type { Section } from '@/types';
@@ -31,6 +34,11 @@ interface NavItem {
   icon: React.ElementType;
   subLabel?: string;
   moderatorOnly?: boolean;
+  /**
+   * Optional labId for template-driven lab navigation. When present, clicking
+   * the nav item will select this lab and route to the generic 'lab' section.
+   */
+  labId?: string;
 }
 
 interface AppSidebarProps {
@@ -53,22 +61,10 @@ const navItems: NavItem[] = [
     subLabel: 'Environment Config',
   },
   {
-    id: 'lab1',
-    label: 'Lab 1: CSFLE',
+    id: 'lab',
+    label: 'Labs',
     icon: Database,
-    subLabel: '35 min • AWS KMS',
-  },
-  {
-    id: 'lab2',
-    label: 'Lab 2: Queryable Encryption',
-    icon: Shield,
-    subLabel: '30 min • Range Queries',
-  },
-  {
-    id: 'lab3',
-    label: 'Lab 3: Right to Erasure',
-    icon: Key,
-    subLabel: '15 min • GDPR Pattern',
+    subLabel: 'Labs & Exercises',
   },
   {
     id: 'leaderboard',
@@ -76,12 +72,26 @@ const navItems: NavItem[] = [
     icon: Trophy,
     subLabel: 'Rankings & Scores',
   },
+  {
+    id: 'challenge',
+    label: 'Challenge Mode',
+    icon: Target,
+    subLabel: 'Quests & Flags',
+  },
+  {
+    id: 'metrics',
+    label: 'Metrics',
+    icon: BarChart3,
+    subLabel: 'Analytics & Insights',
+    moderatorOnly: true,
+  },
 ];
 
 export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSidebarProps) {
   const { currentSection, setSection, sidebarOpen, toggleSidebar } = useNavigation();
   const { isLabAccessible, userEmail, currentScore, completedLabs, resetProgress } = useLab();
   const { isModerator, logout } = useRole();
+  const { currentMode, activeTemplate } = useWorkshopSession();
   const [userRank, setUserRank] = useState<number>(0);
   const [totalParticipants, setTotalParticipants] = useState<number>(0);
   const [labsEnabled, setLabsEnabled] = useState<boolean>(areLabsEnabled());
@@ -126,8 +136,15 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
     return () => clearInterval(interval);
   }, [userEmail]);
 
-  // Filter nav items based on role
-  const visibleNavItems = navItems.filter(item => !item.moderatorOnly || isModerator);
+  // Filter nav items based on role and mode
+  const visibleNavItems = navItems.filter(item => {
+    if (item.moderatorOnly && !isModerator) return false;
+    // Show challenge mode only if challenge mode is active or template has quests
+    if (item.id === 'challenge') {
+      return currentMode === 'challenge' || (activeTemplate?.questIds && activeTemplate.questIds.length > 0);
+    }
+    return true;
+  });
 
   // Calculate overall progress
   const totalLabs = 3;
@@ -215,16 +232,29 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto mt-2">
         {visibleNavItems.map((item) => {
           const Icon = item.icon;
-          const isActive = currentSection === item.id;
-          const labNumber = item.id.startsWith('lab') ? parseInt(item.id.replace('lab', '')) : null;
-          // For attendees: labs are locked if workshop hasn't started OR if progression requirements not met
+          const isLabItem = !!item.labId;
+          const labNumber = !isLabItem && item.id.startsWith('lab') ? parseInt(item.id.replace('lab', '')) : null;
+          const isActive = isLabItem
+            ? currentSection === 'lab' && currentLabId === item.labId
+            : currentSection === item.id;
+          // For attendees: legacy labs are locked if workshop hasn't started OR if progression requirements not met
           const isWorkshopLocked = !isModerator && labNumber !== null && !labsEnabled;
-          const isProgressionLocked = !isModerator && labNumber !== null && labNumber > 1 && !isLabAccessible(labNumber);
+          const isProgressionLocked =
+            !isModerator && labNumber !== null && labNumber > 1 && !isLabAccessible(labNumber);
           const isLocked = isWorkshopLocked || isProgressionLocked;
           const isLabComplete = labNumber !== null && completedLabs.includes(labNumber);
 
           const handleClick = () => {
             if (isLocked) return;
+            if (isLabItem && item.labId) {
+              setCurrentLabId(item.labId);
+              if (isMobileOverlay && onMobileNavigate) {
+                onMobileNavigate('lab');
+              } else {
+                setSection('lab');
+              }
+              return;
+            }
             if (isMobileOverlay && onMobileNavigate) {
               onMobileNavigate(item.id);
             } else {

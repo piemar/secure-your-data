@@ -21,6 +21,7 @@ export const labTextSearchWithAutocompleteDefinition: WorkshopLabDefinition = {
       instructions:
         '- Choose a text field (e.g., product name) where suggestions make sense.\n- Add an auto-complete analyzer for that field in the search index definition.\n- Confirm the index deploys successfully.',
       estimatedTimeMinutes: 10,
+      enhancementId: 'text-search.autocompleteIndex',
       verificationId: 'text-search.verifyAutocompleteIndex',
       points: 10,
     },
@@ -32,6 +33,7 @@ export const labTextSearchWithAutocompleteDefinition: WorkshopLabDefinition = {
       instructions:
         '- Use the auto-complete operator in a $search stage.\n- Parameterize the prefix value to simulate user input.\n- Return top N suggestions with labels and IDs.',
       estimatedTimeMinutes: 10,
+      enhancementId: 'text-search.typeaheadQuery',
       verificationId: 'text-search.verifyTypeahead',
       points: 10,
     },
@@ -43,6 +45,7 @@ export const labTextSearchWithAutocompleteDefinition: WorkshopLabDefinition = {
       instructions:
         '- Define an API schema for /search/suggest.\n- Show sample JSON responses from your query.\n- Discuss UX considerations (debounce, minimum length, fallback).',
       estimatedTimeMinutes: 10,
+      enhancementId: 'text-search.typeaheadDesign',
       verificationId: 'text-search.verifyTypeaheadDesign',
       points: 10,
     },

@@ -48,6 +48,8 @@ export const lab3Definition: WorkshopLabDefinition = {
     'DEK created (from Lab 1)',
     'Node.js and npm installed'
   ],
+  defaultCompetitorId: 'postgresql',
+  competitorIds: ['postgresql', 'cosmosdb-vcore'],
   // Source PoV proof exercise
   // See Docs/pov-proof-exercises/proofs/46/README.md, CSFLE section (advanced patterns: migration, multi-tenant, key rotation)
   steps: [

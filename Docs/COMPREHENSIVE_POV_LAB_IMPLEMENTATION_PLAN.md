@@ -80,8 +80,11 @@ Run `npm test -- --run` before marking each phase complete.
 | **12** | **ROLLING-UPDATES (PoV #12)** | **Done** | 3 labs, 9 enhancements, tests |
 | **13** | **FULL-RECOVERY-RPO (PoV #13)** | **Done** | 3 labs, 9 enhancements, tests |
 | **14** | **FULL-RECOVERY-RTO (PoV #14)** | **Done** | 3 labs, 10 enhancements, tests |
-| **15** | **PARTIAL-RECOVERY (PoV #15)** | **Next** | In numeric order per POV.txt |
-| 16–57 | Remaining PoV capabilities | Backlog | In numeric order per POV.txt |
+| **15** | **PARTIAL-RECOVERY (PoV #15)** | **Done** | 3 labs, 9 enhancements, tests |
+| **16** | **REPORTING (PoV #16)** | **Done** | 3 labs, 9 enhancements, tests |
+| **17** | **AUTO-HA (PoV #17)** | **Done** | 3 labs, 9 enhancements, tests |
+| **18** | **MULTI-REGION-HA (PoV #18)** | **Next** | In numeric order per POV.txt |
+| 19–57 | Remaining PoV capabilities | Backlog | In numeric order per POV.txt |
 
 ---
 
@@ -103,7 +106,10 @@ Run `npm test -- --run` before marking each phase complete.
 | 12 | ROLLING-UPDATES | Apply patches without scheduled downtime | Done | lab-rolling-updates-overview, lab-rolling-updates-setup, lab-rolling-updates-execute |
 | 13 | FULL-RECOVERY-RPO | Point-in-time recovery, RPO=0 | Done | lab-full-recovery-rpo-overview, lab-full-recovery-rpo-setup, lab-full-recovery-rpo-execute |
 | 14 | FULL-RECOVERY-RTO | Restore within X min for Y GB (RTO) | Done | lab-full-recovery-rto-overview, lab-full-recovery-rto-setup, lab-full-recovery-rto-execute |
-| 15–57 | (see POV.txt) | Various | Backlog | To be added in numeric order |
+| 15 | PARTIAL-RECOVERY | Recover subset to live DB without downtime | Done | lab-partial-recovery-overview, lab-partial-recovery-setup, lab-partial-recovery-execute |
+| 16 | REPORTING | SQL/ODBC BI tools, BI Connector | Done | lab-reporting-overview, lab-reporting-setup, lab-reporting-execute |
+| 17 | AUTO-HA | Single-region automatic failover, under 4 s recovery | Done | lab-auto-ha-overview, lab-auto-ha-setup, lab-auto-ha-execute |
+| 18–57 | (see POV.txt) | Various | Backlog | To be added in numeric order |
 
 **Additional implemented labs (not yet in formal phase tracking):**
 
@@ -139,17 +145,18 @@ Run `npm test -- --run` before marking each phase complete.
 - **When in demo mode:** The **full solution** for each step must be shown (no skeleton/placeholders). **No hint markers ("?")** are displayed in demo mode.
 - **Rationale:** Presenters walk through complete examples; attendees follow along without fill-in-the-blank interaction.
 
-### 5.2 Side-by-Side MongoDB vs PostgreSQL (Demo Presenter Mode Only)
+### 5.2 Side-by-Side MongoDB vs Competitor (Demo Presenter Mode Only)
 
-**Requirement:** A side-by-side code view comparing MongoDB with a relational database (PostgreSQL) equivalent.
+**Requirement:** A side-by-side code view comparing MongoDB with a selected competitor (e.g. PostgreSQL, Cosmos DB VCore, DynamoDB).
 
-- **Visibility:** Shown **only** when in **demo mode** and user is a **moderator/presenter**.
-- **Layout:** MongoDB code on the left; PostgreSQL (or equivalent relational) code on the right.
-- **Content:** For each step, show how the same operation would be done in PostgreSQL. When there is no direct feature parity, show the workaround required (e.g. JSONB, application-level joins, materialized views) with a short explanation.
-- **Metadata:** Enhancement metadata should support optional `relationalEquivalent` (or similar) per code block: `{ language: 'sql', code: string, workaroundNote?: string }`.
-- **Implementation:** Add to `StepView` / `InlineHintEditor` area when `currentMode === 'demo' && isModerator`; can be a collapsible panel or split view.
+- **Visibility:** Shown **only** when in **demo mode** and user is a **moderator/presenter**, and the step has competitor equivalent code.
+- **Layout:** MongoDB code on the left; competitor code on the right. A **dropdown** lets the presenter switch which competitor product is shown (e.g. PostgreSQL, Cosmos DB VCore, DynamoDB). The right-hand panel is **collapsible**.
+- **Default product:** Lab or template can set `defaultCompetitorId` (e.g. `postgresql`). Lab can declare `competitorIds` for which it has equivalent code.
+- **Content:** For each step, show how the same operation would be done in the selected competitor. When there is no direct feature parity, show the workaround with an optional `workaroundNote`.
+- **Metadata:** Enhancement metadata supports optional **competitorEquivalents** per code block: `Record<productId, { language, code, workaroundNote? }>` (product ids: e.g. `postgresql`, `cosmosdb-vcore`, `dynamodb`). See `Docs/COMPETITOR_SIDE_BY_SIDE_IMPLEMENTATION_PLAN.md`.
+- **Implementation:** Implemented in `StepView` when `currentMode === 'demo' && isModerator`; competitor panel with dropdown and read-only code display. Lab creation via ADD_LAB_MASTER_PROMPT supports optional "Competitor products" and "Default competitor" to generate competitor code.
 
-**PostgreSQL local environment:**
+**PostgreSQL local environment (optional):**
 
 - **PostgreSQL can be spun up locally** (e.g. via Docker container) so presenters can run the PostgreSQL parts live.
 - **pgAdmin** (or similar) can connect to the local PostgreSQL Docker container to execute queries and demonstrate the relational equivalent.

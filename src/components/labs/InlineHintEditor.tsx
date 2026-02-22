@@ -52,23 +52,26 @@ export function InlineHintEditor({
   const [scrollLeft, setScrollLeft] = useState(0);
   const [isEditorReady, setIsEditorReady] = useState(false);
 
-  // Find all blank positions in the code by matching each hint's blankText
+  // Find all blank positions by matching each hint's blankText; supports multiple blanks per line.
   const findBlankPositions = useCallback((codeText: string, hints: InlineHint[]): BlankPosition[] => {
     const positions: BlankPosition[] = [];
     const lines = codeText.split('\n');
-    
+    const hintsByLine = new Map<number, number[]>();
+    hints.forEach((_, hintIdx) => {
+      const lineNum = hints[hintIdx].line;
+      if (!hintsByLine.has(lineNum)) hintsByLine.set(lineNum, []);
+      hintsByLine.get(lineNum)!.push(hintIdx);
+    });
+
     hints.forEach((hint, hintIdx) => {
-      // Look for the blank pattern on the specified line
       const lineIndex = hint.line - 1;
-      if (lineIndex >= 0 && lineIndex < lines.length) {
-        const lineText = lines[lineIndex];
+      if (lineIndex < 0 || lineIndex >= lines.length) return;
+      const lineText = lines[lineIndex];
+      const blankText = hint.blankText;
 
-        // Prefer exact match of the provided blankText so shorter blanks like "___" also work.
-        // This also avoids accidental matches against underscores in identifiers.
-        const blankText = hint.blankText;
-        const explicitIndex = blankText ? lineText.indexOf(blankText) : -1;
-
-        if (explicitIndex !== -1 && blankText) {
+      if (blankText) {
+        const explicitIndex = lineText.indexOf(blankText);
+        if (explicitIndex !== -1) {
           positions.push({
             hintIdx,
             line: hint.line,
@@ -79,24 +82,29 @@ export function InlineHintEditor({
           });
           return;
         }
+      }
 
-        // Fallback: find blank pattern (5+ underscores) to avoid matching variable names like KMS_KEY_ID
-        const blankMatch = lineText.match(/_{5,}/);
-        if (blankMatch && blankMatch.index !== undefined) {
-          positions.push({
-            hintIdx,
-            line: hint.line,
-            // Monaco uses 1-indexed columns, regex index is 0-indexed
-            // Position at the middle of the blank
-            column: blankMatch.index + Math.floor(blankMatch[0].length / 2) + 1,
-            blankStart: blankMatch.index,
-            blankLength: blankMatch[0].length,
-            hint,
-          });
-        }
+      const underscoreRuns: { index: number; length: number }[] = [];
+      const re = /_{2,}/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(lineText)) !== null) {
+        underscoreRuns.push({ index: m.index, length: m[0].length });
+      }
+      const lineHintIndices = hintsByLine.get(hint.line) ?? [];
+      const positionOnLine = lineHintIndices.indexOf(hintIdx);
+      if (positionOnLine >= 0 && positionOnLine < underscoreRuns.length) {
+        const run = underscoreRuns[positionOnLine];
+        positions.push({
+          hintIdx,
+          line: hint.line,
+          column: run.index + Math.floor(run.length / 2) + 1,
+          blankStart: run.index,
+          blankLength: run.length,
+          hint,
+        });
       }
     });
-    
+
     return positions;
   }, []);
 
@@ -123,23 +131,13 @@ export function InlineHintEditor({
 
   // Update blank positions when code or hints change
   useEffect(() => {
-    console.log('[InlineHintEditor] Effect triggered:', {
-      hasInlineHints: !!inlineHints,
-      inlineHintsLength: inlineHints?.length,
-      hasSkeleton,
-      isSolutionRevealed,
-      tier,
-      codePreview: code?.substring(0, 100)
-    });
-    
     if (inlineHints && inlineHints.length > 0 && hasSkeleton && !isSolutionRevealed) {
       const positions = findBlankPositions(code, inlineHints);
-      console.log('[InlineHintEditor] Found blank positions:', positions);
       setBlankPositions(positions);
     } else {
       setBlankPositions([]);
     }
-  }, [code, inlineHints, hasSkeleton, isSolutionRevealed, findBlankPositions, tier]);
+  }, [code, inlineHints, hasSkeleton, isSolutionRevealed, findBlankPositions]);
 
   // Handle editor mount
   const handleEditorMount = useCallback((editor: any, monaco: Monaco) => {
@@ -237,10 +235,14 @@ export function InlineHintEditor({
     };
   }, [editorInstance, lineHeight, scrollTop, scrollLeft]);
 
-  // Show hint markers only in guided mode with unrevealed solution
-  // Only show markers for blanks that haven't been answered yet
-  // Also requires editor to be ready (so positions are calculated correctly)
-  const showMarkers = hasSkeleton && !isSolutionRevealed && tier === 'guided' && blankPositions.length > 0 && isEditorReady;
+  // Show "?" hint markers whenever we have skeleton + inline hints + blanks found (any tier).
+  // This ensures placeholders always get a hint marker for guided learning.
+  const showMarkers =
+    hasSkeleton &&
+    !isSolutionRevealed &&
+    (inlineHints?.length ?? 0) > 0 &&
+    blankPositions.length > 0 &&
+    isEditorReady;
 
   // Filter out positions where answer is already revealed
   const visiblePositions = blankPositions.filter(pos => !revealedAnswers.includes(pos.hintIdx));

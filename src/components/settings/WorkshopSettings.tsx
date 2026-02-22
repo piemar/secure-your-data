@@ -18,7 +18,8 @@ import {
   getWorkshopSession,
   areLabsEnabled,
   setLabsEnabled,
-  startNewWorkshop,
+  cloneWorkshopSession,
+  deleteCurrentWorkshopSession,
   resetLeaderboard,
   getParticipantCount,
   updateWorkshopSession,
@@ -29,6 +30,7 @@ import type { WorkshopTemplate } from '@/types';
 import { TemplateSelectionWizard } from './TemplateSelectionWizard';
 import { DynamicTemplateBuilder } from './DynamicTemplateBuilder';
 import { ContentBrowser } from './ContentBrowser';
+import { WorkshopSessionWizard } from './WorkshopSessionWizard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export const WorkshopSettings: React.FC = () => {
@@ -38,6 +40,9 @@ export const WorkshopSettings: React.FC = () => {
   const [participantCount, setParticipantCount] = useState(0);
   const [showTemplateWizard, setShowTemplateWizard] = useState(false);
   const [showDynamicBuilder, setShowDynamicBuilder] = useState(false);
+  const [showSessionWizard, setShowSessionWizard] = useState(false);
+  /** When set, wizard opens in "clone" mode with this session as initial values */
+  const [sessionWizardInitialSession, setSessionWizardInitialSession] = useState<WorkshopSession | null>(null);
   const importInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleExportTemplate = () => {
@@ -74,12 +79,6 @@ export const WorkshopSettings: React.FC = () => {
     e.target.value = '';
   };
 
-  // New workshop form state
-  const [customerName, setCustomerName] = useState('');
-  const [workshopDate, setWorkshopDate] = useState<Date | undefined>(new Date());
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [mongodbSource, setMongodbSource] = useState<'local' | 'atlas'>('local');
-  const [atlasConnectionString, setAtlasConnectionString] = useState('');
 
   // Load session data
   useEffect(() => {
@@ -101,41 +100,29 @@ export const WorkshopSettings: React.FC = () => {
     toast.success(enabled ? 'Labs enabled for all participants' : 'Labs disabled');
   };
 
-  const handleStartNewWorkshop = async () => {
-    if (!customerName.trim()) {
-      toast.error('Please enter a customer name');
-      return;
-    }
-    if (!workshopDate) {
-      toast.error('Please select a workshop date');
-      return;
-    }
-    if (mongodbSource === 'atlas' && !atlasConnectionString.trim()) {
-      toast.error('Please enter an Atlas connection string');
-      return;
-    }
-
-    const confirmMessage = session 
-      ? 'Starting a new workshop will archive the current leaderboard and reset all scores. Continue?'
-      : 'Start a new workshop session?';
-    
-    if (!window.confirm(confirmMessage)) return;
-
-    const dateStr = format(workshopDate, 'yyyy-MM-dd');
-    const newSession = await startNewWorkshop(
-      customerName.trim(), 
-      dateStr,
-      mongodbSource,
-      mongodbSource === 'atlas' ? atlasConnectionString.trim() : undefined
-    );
+  const handleSessionWizardSuccess = (newSession: WorkshopSession) => {
     setSession(newSession);
     setLabsEnabledState(true);
-    setCustomerName('');
-    setMongodbSource('local');
-    setAtlasConnectionString('');
     setParticipantCount(0);
-    
-    toast.success(`Workshop "${customerName}" started! Labs are now enabled.`);
+    setSessionWizardInitialSession(null);
+    toast.success(
+      sessionWizardInitialSession
+        ? 'Workshop cloned and started. Reconfigure as needed.'
+        : `Workshop "${newSession.customerName}" started! Labs are now enabled.`
+    );
+  };
+
+  const handleCloneSession = async () => {
+    const current = getWorkshopSession();
+    if (!current) return;
+    if (!window.confirm('Clone this workshop session? You can then change mode or template in the wizard. The new session will have a new ID and keep archived history.')) return;
+    const cloned = await cloneWorkshopSession();
+    if (cloned) {
+      setSession(cloned);
+      setSessionWizardInitialSession(cloned);
+      setShowSessionWizard(true);
+      toast.success('Session cloned. Reconfigure in the wizard if needed.');
+    }
   };
 
   const handleResetLeaderboard = () => {
@@ -333,110 +320,40 @@ export const WorkshopSettings: React.FC = () => {
         </Card>
       )}
 
-      {/* Start New Workshop */}
+      {/* Start New Workshop / Clone Session */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Calendar className="w-5 h-5" />
-            Start New Workshop
+            Workshop sessions
           </CardTitle>
           <CardDescription>
-            Create a new workshop session for a customer
+            Start a new session with the step-by-step wizard, or clone the current session to change mode or template
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="customerName">Customer Name</Label>
-            <Input
-              id="customerName"
-              placeholder="e.g., Acme Corp"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-            />
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => { setSessionWizardInitialSession(null); setShowSessionWizard(true); }}>
+              Start new workshop session
+            </Button>
+            {session && (
+              <Button variant="outline" onClick={handleCloneSession}>
+                Clone session (change mode or template)
+              </Button>
+            )}
           </div>
-          
-          <div className="space-y-2">
-            <Label>Workshop Date</Label>
-            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !workshopDate && "text-muted-foreground"
-                  )}
-                >
-                  <Calendar className="mr-2 h-4 w-4" />
-                  {workshopDate ? format(workshopDate, 'PPP') : 'Select date'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <CalendarComponent
-                  mode="single"
-                  selected={workshopDate}
-                  onSelect={(date) => {
-                    setWorkshopDate(date);
-                    setIsCalendarOpen(false);
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <div className="space-y-2">
-            <Label>MongoDB Source</Label>
-            <Select value={mongodbSource} onValueChange={(value) => setMongodbSource(value as 'local' | 'atlas')}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="local">Local Docker (mongodb://mongo:27017)</SelectItem>
-                <SelectItem value="atlas">Atlas (Connection String Required)</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              {mongodbSource === 'local' 
-                ? 'Uses MongoDB running in Docker Compose. All participants will use the same local database.'
-                : 'Uses MongoDB Atlas. Participants will use the provided connection string.'}
-            </p>
-          </div>
-
-          {mongodbSource === 'atlas' && (
-            <div className="space-y-2">
-              <Label htmlFor="atlasConnectionString">Atlas Connection String</Label>
-              <Input
-                id="atlasConnectionString"
-                type="password"
-                placeholder="mongodb+srv://user:password@cluster.mongodb.net/"
-                value={atlasConnectionString}
-                onChange={(e) => setAtlasConnectionString(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                This connection string will be used by all participants for lab exercises.
-              </p>
-            </div>
-          )}
-
-          {session && (
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                Starting a new workshop will:
-                <ul className="list-disc list-inside mt-1 text-sm">
-                  <li>Archive the current leaderboard</li>
-                  <li>Reset all participant scores</li>
-                  <li>Enable labs for all participants</li>
-                </ul>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <Button onClick={handleStartNewWorkshop} className="w-full">
-            Start New Workshop
-          </Button>
+          <p className="text-xs text-muted-foreground">
+            The wizard collects customer name, Salesforce workload, technical champion, mode (Demo/Lab/Challenge), programming language, MongoDB source, and template. Sessions store all stats and metrics; you can delete older sessions in Danger Zone.
+          </p>
         </CardContent>
       </Card>
+
+      <WorkshopSessionWizard
+        open={showSessionWizard}
+        onOpenChange={setShowSessionWizard}
+        initialSession={sessionWizardInitialSession ?? undefined}
+        onSuccess={handleSessionWizardSuccess}
+      />
 
       {/* Danger Zone */}
       <Card className="border-destructive/30">
@@ -446,7 +363,7 @@ export const WorkshopSettings: React.FC = () => {
             Danger Zone
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="p-4 bg-destructive/5 rounded-lg border border-destructive/20">
             <p className="font-medium text-sm mb-2">Reset Leaderboard Only</p>
             <p className="text-sm text-muted-foreground mb-4">
@@ -461,6 +378,30 @@ export const WorkshopSettings: React.FC = () => {
               Reset Leaderboard
             </Button>
           </div>
+          {session && (
+            <div className="p-4 bg-destructive/5 rounded-lg border border-destructive/20">
+              <p className="font-medium text-sm mb-2">Delete current workshop session</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Remove the current session from storage. Stats and metrics for this session will no longer be available. You can start a new session anytime.
+              </p>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={async () => {
+                  if (!window.confirm('Delete the current workshop session? This cannot be undone.')) return;
+                  await deleteCurrentWorkshopSession();
+                  setSession(null);
+                  setLabsEnabledState(false);
+                  setParticipantCount(0);
+                  setActiveTemplate(null);
+                  setWorkshopInstance(null);
+                  toast.success('Current session deleted');
+                }}
+              >
+                Delete current session
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
         </TabsContent>

@@ -87,6 +87,16 @@ import { labFullRecoveryRpoExecuteDefinition } from './operations/full-recovery-
 import { labFullRecoveryRtoOverviewDefinition } from './operations/full-recovery-rto/lab-full-recovery-rto-overview';
 import { labFullRecoveryRtoSetupDefinition } from './operations/full-recovery-rto/lab-full-recovery-rto-setup';
 import { labFullRecoveryRtoExecuteDefinition } from './operations/full-recovery-rto/lab-full-recovery-rto-execute';
+import { labTestRegisterLabDefinition } from './operations/partial-recovery-rpo/lab-test-register-lab';
+import { labPartialRecoveryOverviewDefinition } from './operations/partial-recovery/lab-partial-recovery-overview';
+import { labPartialRecoverySetupDefinition } from './operations/partial-recovery/lab-partial-recovery-setup';
+import { labPartialRecoveryExecuteDefinition } from './operations/partial-recovery/lab-partial-recovery-execute';
+import { labReportingOverviewDefinition } from './integration/reporting/lab-reporting-overview';
+import { labReportingSetupDefinition } from './integration/reporting/lab-reporting-setup';
+import { labReportingExecuteDefinition } from './integration/reporting/lab-reporting-execute';
+import { labAutoHaOverviewDefinition } from './operations/auto-ha/lab-auto-ha-overview';
+import { labAutoHaSetupDefinition } from './operations/auto-ha/lab-auto-ha-setup';
+import { labAutoHaExecuteDefinition } from './operations/auto-ha/lab-auto-ha-execute';
 
 /** All workshop topics */
 export const allTopics: WorkshopTopic[] = [
@@ -159,4 +169,14 @@ export const allLabs: WorkshopLabDefinition[] = [
   labFullRecoveryRtoOverviewDefinition,
   labFullRecoveryRtoSetupDefinition,
   labFullRecoveryRtoExecuteDefinition,
+  labTestRegisterLabDefinition,
+  labPartialRecoveryOverviewDefinition,
+  labPartialRecoverySetupDefinition,
+  labPartialRecoveryExecuteDefinition,
+  labReportingOverviewDefinition,
+  labReportingSetupDefinition,
+  labReportingExecuteDefinition,
+  labAutoHaOverviewDefinition,
+  labAutoHaSetupDefinition,
+  labAutoHaExecuteDefinition,
 ];

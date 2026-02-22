@@ -19,6 +19,8 @@ export const labRichQueryBasicsDefinition: WorkshopLabDefinition = {
   povCapabilities: ['RICH-QUERY'],
   modes: ['lab', 'demo', 'challenge'],
   labFolderPath: 'Docs/pov-proof-exercises/proofs/01',
+  defaultCompetitorId: 'postgresql',
+  competitorIds: ['postgresql'],
   dataRequirements: [
     {
       id: 'customer-template',

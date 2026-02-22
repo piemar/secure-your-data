@@ -70,6 +70,7 @@ function buildEnhancementFromMetadata(metadata: any): Partial<Step> {
       challengeSkeleton: block.challengeSkeleton,
       expertSkeleton: block.expertSkeleton,
       inlineHints: block.inlineHints,
+      competitorEquivalents: block.competitorEquivalents,
     })),
     tips: metadata.tips,
     troubleshooting: metadata.troubleshooting,

@@ -16,6 +16,7 @@ export const integrationTopic: WorkshopTopic = {
     'DATA-REST-API',
     'DATA-API',
     'GRAPHQL',
-    'KAFKA'
+    'KAFKA',
+    'REPORTING'
   ]
 };
