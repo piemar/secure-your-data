@@ -307,6 +307,32 @@ export const validatorUtils = {
     },
 
     /**
+     * Verifies that at least one document in the given collection has the given field stored as encrypted (Binary).
+     * Uses /api/verify-field-encrypted (mongosh countDocuments with $type: "binData").
+     */
+    checkFieldEncrypted: async (uri: string, db: string, collection: string, field: string): Promise<ValidationResult> => {
+        if (!uri || uri.trim() === '') {
+            return { success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' };
+        }
+        if (!db || !collection || !field) {
+            return { success: false, message: 'db, collection, and field are required for field encryption check.' };
+        }
+        try {
+            const params = new URLSearchParams({
+                uri,
+                db,
+                collection,
+                field,
+            });
+            const response = await fetch(`/api/verify-field-encrypted?${params.toString()}`);
+            const data = await response.json();
+            return { success: data.success === true, message: data.message || (data.success ? 'Field is encrypted.' : 'Field not encrypted.') };
+        } catch (error) {
+            return { success: false, message: 'Connection to validation bridge failed. Ensure npm run dev is active.' };
+        }
+    },
+
+    /**
      * System check for installed CLI tools via Vite bridge.
      * Uses the real /api/check-tool endpoint.
      */

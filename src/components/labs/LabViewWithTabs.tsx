@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LabIntroTab } from './LabIntroTab';
 import { StepView } from './StepView';
 import { useLab } from '@/context/LabContext';
 import { heartbeat } from '@/utils/leaderboardUtils';
 import { DifficultyLevel } from './DifficultyBadge';
-import { Database, Lightbulb } from 'lucide-react';
+import { Lightbulb, BookOpen } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
+import type { LabStepPreviewConfig } from '@/types';
 
 export interface Exercise {
   id: string;
@@ -45,7 +47,11 @@ export interface Step {
   tips?: string[];
   documentationUrl?: string;
   onVerify?: () => Promise<{ success: boolean; message: string }>;
+  /** Verification ID for content-driven labs (e.g. csfle.verifyMigration); triggers real validation on Check/Next */
+  verificationId?: string;
   exercises?: Exercise[];
+  /** Optional elevated experience: app-like preview (search, table, chart, etc.) driven by prompt-generated config */
+  preview?: LabStepPreviewConfig;
 }
 
 export interface LabIntroContent {
@@ -72,6 +78,7 @@ interface LabViewWithTabsProps {
   isModerator?: boolean;
   defaultCompetitorId?: string;
   competitorIds?: string[];
+  labMongoUri?: string;
 }
 
 export function LabViewWithTabs({
@@ -87,11 +94,12 @@ export function LabViewWithTabs({
   isModerator,
   defaultCompetitorId,
   competitorIds,
+  labMongoUri,
 }: LabViewWithTabsProps) {
   const { startLab, completeLab, userEmail } = useLab();
   const storageKey = `lab${labNumber}-progress`;
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  
+  const stepToolbarRef = useRef<{ reset: () => void; openHelp: () => void } | null>(null);
   const [activeTab, setActiveTab] = useState<string>('overview');
 
   const [completedSteps, setCompletedSteps] = useState<number[]>(() => {
@@ -142,51 +150,55 @@ export function LabViewWithTabs({
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-        <div className="sticky top-0 z-10 bg-background border-b border-border px-4 sm:px-6 py-2 sm:py-3">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            {/* Left: Tabs */}
-            <TabsList className="bg-transparent">
-              <TabsTrigger value="overview" className="gap-2 text-xs sm:text-sm">
-                📖 Overview
+        <div className="sticky top-0 z-10 bg-background border-b border-border px-2 py-1">
+          <div className="flex items-center gap-1.5 min-h-0 w-full">
+            <TabsList className="bg-transparent h-5 p-0 flex-shrink-0">
+              <TabsTrigger value="overview" className="gap-0.5 text-[9px] sm:text-[10px] h-4 px-1.5">
+                Overview
               </TabsTrigger>
-              <TabsTrigger value="steps" className="gap-2 text-xs sm:text-sm">
-                🔧 Steps
+              <TabsTrigger value="steps" className="gap-0.5 text-[9px] sm:text-[10px] h-4 px-1.5">
+                Steps
                 {completedSteps.length > 0 && (
-                  <span className="ml-1 px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs">
+                  <span className="ml-0.5 px-1 py-0.5 rounded-full bg-primary/10 text-primary text-[8px]">
                     {completedSteps.length}/{steps.length}
                   </span>
                 )}
               </TabsTrigger>
             </TabsList>
-            
-            {/* Right: Atlas Capability & Business Value - Compact Inline */}
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-              {atlasCapability && (
+            {activeTab === 'steps' && (
+              <div className="flex items-center gap-1 min-w-0 flex-1 truncate text-[9px] sm:text-[10px] text-muted-foreground">
+                <span className="flex-shrink-0 font-mono">Lab {String(labNumber).padStart(2, '0')}</span>
+                <span className="flex-shrink-0">Step {currentStepIndex + 1}/{steps.length}:</span>
+                <span className="truncate font-medium text-foreground">{steps[currentStepIndex]?.title}</span>
+                {steps[currentStepIndex]?.estimatedTime && (
+                  <span className="flex-shrink-0 hidden sm:inline">⏱️ {steps[currentStepIndex].estimatedTime}</span>
+                )}
+              </div>
+            )}
+            {/* Help right-adjusted on the same line; Atlas Capability moved to Preview panel header */}
+            {activeTab === 'steps' && (
+              <div className="flex items-center gap-0.5 flex-shrink-0 ml-auto">
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10 text-primary text-xs cursor-help">
-                        <Database className="w-3 h-3" />
-                        <span className="hidden sm:inline">Atlas:</span>
-                        <span className="font-medium truncate max-w-[120px] sm:max-w-[180px]">{atlasCapability}</span>
-                      </div>
+                      <Button variant="outline" size="sm" onClick={() => stepToolbarRef.current?.openHelp()} className="h-4 gap-0.5 px-1 text-[8px]" title="Step context & help">
+                        <BookOpen className="w-2 h-2" />
+                        Help
+                      </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-xs">
-                      <p className="text-sm font-medium">Atlas Capability</p>
-                      <p className="text-sm text-muted-foreground">{atlasCapability}</p>
-                    </TooltipContent>
+                    <TooltipContent side="bottom">Step context & help</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-              )}
-              
+              </div>
+            )}
+            <div className="flex items-center gap-0.5 flex-shrink-0">
               {businessValue && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 text-amber-600 text-xs cursor-help">
-                        <Lightbulb className="w-3 h-3" />
-                        <span className="hidden sm:inline truncate max-w-[150px]">Business Value</span>
-                        <span className="sm:hidden">Value</span>
+                      <div className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-amber-500/10 text-amber-600 text-[8px] cursor-help max-w-[52px] sm:max-w-[72px] truncate">
+                        <Lightbulb className="w-2 h-2 flex-shrink-0" />
+                        <span className="truncate">Value</span>
                       </div>
                     </TooltipTrigger>
                     <TooltipContent side="bottom" className="max-w-xs">
@@ -210,6 +222,7 @@ export function LabViewWithTabs({
             whatYouWillBuild={introContent.whatYouWillBuild}
             keyConcepts={introContent.keyConcepts}
             keyInsight={introContent.keyInsight}
+            businessValue={businessValue}
             architectureDiagram={introContent.architectureDiagram}
             showEncryptionFlow={introContent.showEncryptionFlow}
             encryptionFlowType={introContent.encryptionFlowType}
@@ -234,6 +247,8 @@ export function LabViewWithTabs({
             isModerator={isModerator}
             defaultCompetitorId={defaultCompetitorId}
             competitorIds={competitorIds}
+            labMongoUri={labMongoUri}
+            stepToolbarRef={stepToolbarRef}
           />
         </TabsContent>
 

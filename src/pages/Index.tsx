@@ -202,31 +202,27 @@ function ContentRouter() {
           {/* Playlist header for labs in the active template */}
           {/* Only show if current lab is part of the template (not testing individual labs) */}
           {shouldShowTemplateNav ? (
-            <div className="border-b border-border bg-card/40 px-6 py-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                Labs in this workshop
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {templateLabs.map((lab, index) => {
-                  const isActiveLab = lab.id === currentLabId;
-                  return (
-                    <button
-                      key={lab.id}
-                      type="button"
-                      onClick={() => setCurrentLabId(lab.id)}
-                      className={
-                        'text-xs rounded-full px-3 py-1 border transition max-w-xs truncate ' +
-                        (isActiveLab
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background/40 text-muted-foreground hover:bg-muted hover:text-foreground')
-                      }
-                    >
-                      <span className="font-mono mr-1">{index + 1}.</span>
-                      <span className="align-middle">{lab.title}</span>
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="border-b border-border bg-card/20 px-2 py-1 flex items-center gap-1.5 flex-wrap">
+              <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/80 flex-shrink-0">Labs</span>
+              {templateLabs.map((lab, index) => {
+                const isActiveLab = lab.id === currentLabId;
+                return (
+                  <button
+                    key={lab.id}
+                    type="button"
+                    onClick={() => setCurrentLabId(lab.id)}
+                    className={
+                      'text-[9px] rounded-full px-1.5 py-0.5 border transition max-w-[120px] sm:max-w-[180px] truncate ' +
+                      (isActiveLab
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-background/40 text-muted-foreground hover:bg-muted hover:text-foreground')
+                    }
+                  >
+                    <span className="font-mono mr-0.5">{index + 1}.</span>
+                    <span className="align-middle truncate">{lab.title}</span>
+                  </button>
+                );
+              })}
             </div>
           ) : currentLabId && !isCurrentLabInTemplate ? (
             // Show indicator when testing individual lab outside template

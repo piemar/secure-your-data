@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2, Info, BookOpen, Clock, Lock, Eye, Unlock, GitCompare } from 'lucide-react';
+import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2, BookOpen, Clock, Lock, Eye, Unlock, GitCompare, Play, RotateCcw, FileCode, Save, PlayCircle, Layout, RefreshCw } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -10,6 +10,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Editor from '@monaco-editor/react';
 import { StepContextDrawer } from './StepContextDrawer';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
+import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { trackHintUsage, trackSolutionReveal } from '@/utils/leaderboardUtils';
 import { type InlineHint, type SkeletonTier } from './InlineHintMarker';
 import { InlineHintEditor } from './InlineHintEditor';
@@ -21,6 +23,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { GenericLabPreview } from './GenericLabPreview';
+import { getReadOnlyLabOptions, defineLabDarkTheme, LAB_EDITOR_THEME } from '@/lib/monacoLabEditorOptions';
+import type { LabStepPreviewConfig, LabPreviewData } from '@/types';
+import { useLab } from '@/context/LabContext';
+import {
+  loadLabWorkspace,
+  saveLabWorkspace,
+  logEntriesToStored,
+  storedToLogEntries,
+} from '@/services/labWorkspaceStorage';
+import { getVerificationService, type VerificationId } from '@/services/verificationService';
 
 interface CodeBlock {
   filename: string;
@@ -30,7 +43,18 @@ interface CodeBlock {
   challengeSkeleton?: string;  // Tier 2: Challenge (tasks only)
   expertSkeleton?: string;     // Tier 3: Expert (objective only)
   inlineHints?: InlineHint[];  // Line-specific hints for skeleton blanks
-  competitorEquivalents?: Record<string, { language: string; code: string; workaroundNote?: string }>;
+  competitorEquivalents?: Record<
+    string,
+    {
+      language: string;
+      code: string;
+      workaroundNote?: string;
+      /** Short bullets on challenges doing it the competitor way */
+      challenges?: string[];
+      /** Optional comparison text or capability matrix (markdown or plain text) */
+      comparisonSummary?: string;
+    }
+  >;
 }
 
 interface Exercise {
@@ -61,6 +85,12 @@ interface StepData {
   tips?: string[];
   documentationUrl?: string;
   exercises?: Exercise[];
+  /** Optional elevated experience: app-like preview (search, table, chart, etc.) */
+  preview?: LabStepPreviewConfig;
+  /** When set, real validation runs (validatorUtils/API) before allowing Next */
+  onVerify?: () => Promise<{ success: boolean; message: string }>;
+  /** Alternative: verification ID for content-driven labs (VerificationService) */
+  verificationId?: string;
 }
 
 interface StepViewProps {
@@ -79,6 +109,10 @@ interface StepViewProps {
   isModerator?: boolean;
   defaultCompetitorId?: string;
   competitorIds?: string[];
+  /** MongoDB URI for lab Run (run-node / run-mongosh). When set, Run button calls real APIs when possible. */
+  labMongoUri?: string;
+  /** When set, StepView assigns reset/check/openHelp so parent can render toolbar on same line as Overview/Steps */
+  stepToolbarRef?: React.MutableRefObject<{ reset: () => void; openHelp: () => void } | null>;
 }
 
 // Generate realistic MongoDB output based on code content with structured formatting
@@ -421,6 +455,119 @@ Permitted actions:
     };
   }
   
+  // Atlas Search / text-search: index creation, $search, autocomplete, facets, highlight
+  if (lowerCode.includes('mappings') && (lowerCode.includes('"fields"') || lowerCode.includes("'fields'"))) {
+    return {
+      success: true,
+      summary: 'Atlas Search index created',
+      output: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ✅ OUTPUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 Index created successfully. Index is building in the background.
+   Use the Atlas UI or getSearchIndexes() to confirm when ready.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+    };
+  }
+  if (lowerCode.includes('$search') && lowerCode.includes('text')) {
+    return {
+      success: true,
+      summary: 'Text search query executed',
+      output: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ✅ OUTPUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 Sample results (top 3):
+[
+  { "_id": 1, "name": "Wireless Headphones", "score": 2.84 },
+  { "_id": 2, "name": "Wire Charger", "score": 2.12 },
+  { "_id": 3, "name": "USB Cable", "score": 1.45 }
+]
+
+💡 Use $meta: "searchScore" to project the relevance score.`
+    };
+  }
+  if (lowerCode.includes('$search') && lowerCode.includes('autocomplete')) {
+    return {
+      success: true,
+      summary: 'Autocomplete suggestions returned',
+      output: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ✅ OUTPUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 Suggestions:
+[
+  { "_id": "prod1", "name": "Wireless Headphones" },
+  { "_id": "prod2", "name": "Wire Charger" }
+]
+
+💡 Use the autocomplete operator with edgeGram tokenization for typeahead.`
+    };
+  }
+  if (lowerCode.includes('searchscore') || lowerCode.includes('searchScore')) {
+    return {
+      success: true,
+      summary: 'Results with score projected and sorted',
+      output: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ✅ OUTPUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 Results sorted by relevance:
+[
+  { "name": "Wireless Headphones", "description": "...", "score": 2.84 },
+  { "name": "Wire Charger", "description": "...", "score": 2.12 }
+]
+
+💡 Sort by score descending to show most relevant first.`
+    };
+  }
+  if (lowerCode.includes('$facet') && lowerCode.includes('$search')) {
+    return {
+      success: true,
+      summary: 'Faceted search returned hits and counts',
+      output: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ✅ OUTPUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 hits: [ ... 20 documents ... ]
+   categoryCounts: [
+     { "_id": "Electronics", "count": 12 },
+     { "_id": "Accessories", "count": 8 }
+   ]
+
+💡 Use $facet to return both search hits and aggregate facet counts in one request.`
+    };
+  }
+  if (lowerCode.includes('highlight') || lowerCode.includes('searchhighlights')) {
+    return {
+      success: true,
+      summary: 'Highlight snippets returned',
+      output: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ✅ OUTPUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 highlights: [
+  { "path": "description", "score": 2.1, "texts": [{ "value": "..." }, { "value": "<em>wireless</em>", "type": "hit" }] }
+]
+
+💡 Project $meta: "searchHighlights" to show why a document matched.`
+    };
+  }
+  if (lowerCode.includes('compound') && lowerCode.includes('boost')) {
+    return {
+      success: true,
+      summary: 'Relevance-tuned query executed',
+      output: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ✅ OUTPUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 Results with name matches boosted. Compare order before/after tuning.
+
+💡 Use compound.should with score.boost to emphasize certain fields.`
+    };
+  }
+
   return {
     success: true,
     summary: 'Command executed successfully',
@@ -457,15 +604,27 @@ export function StepView({
   isModerator,
   defaultCompetitorId,
   competitorIds,
+  labMongoUri,
+  stepToolbarRef,
 }: StepViewProps) {
+  const { userEmail, userSuffix } = useLab();
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [previewPanelTab, setPreviewPanelTab] = useState<'preview' | 'compete'>('compete');
+  const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState<string>('code');
-  const [outputOpen, setOutputOpen] = useState(false);
+  const [editorPanelCollapsed, setEditorPanelCollapsed] = useState(false);
+  const [consolePanelCollapsed, setConsolePanelCollapsed] = useState(true); // default collapsed, aligned to bottom
+  const editorConsoleGroupRef = useRef<ImperativePanelGroupHandle | null>(null);
   const [competitorPanelCollapsed, setCompetitorPanelCollapsed] = useState(false);
   const [selectedCompetitorId, setSelectedCompetitorId] = useState<string | null>(null);
   const [lastOutput, setLastOutput] = useState<string>('');
+  const [lastOutputTime, setLastOutputTime] = useState<Date | null>(null);
+  /** Log entries for console: each run appends one entry so we can show timestamped lines and click-for-detail */
+  const [logEntries, setLogEntries] = useState<Array<{ time: Date; output: string }>>([]);
   const [outputSummary, setOutputSummary] = useState<string>('');
   const [outputSuccess, setOutputSuccess] = useState<boolean>(true);
   const [isRunning, setIsRunning] = useState(false);
+  const [expandedLogIndex, setExpandedLogIndex] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [direction, setDirection] = useState(0);
   
@@ -479,7 +638,17 @@ export function StepView({
   });
   const [pointsDeducted, setPointsDeducted] = useState<Record<string, number>>({});
   const [skeletonTier, setSkeletonTier] = useState<Record<string, SkeletonTier>>({});
-  const [lineHeight, setLineHeight] = useState(19); // Monaco default line height
+  const [lineHeight, setLineHeight] = useState(16); // Compact line height for editors
+  /** Per-block editable code (key = `${currentStepIndex}-${blockIdx}`). Run uses this when present. Persisted centrally. */
+  const [editableCodeByBlock, setEditableCodeByBlock] = useState<Record<string, string>>(() => {
+    try {
+      const email = typeof localStorage !== 'undefined' ? localStorage.getItem('userEmail') : null;
+      const w = loadLabWorkspace(labNumber, email);
+      return w.editors && Object.keys(w.editors).length ? w.editors : {};
+    } catch {
+      return {};
+    }
+  });
 
   // Helper functions for tiered scoring
   const getMaxPoints = (tier: SkeletonTier): number => {
@@ -523,8 +692,113 @@ export function StepView({
     return !!(block.skeleton || block.challengeSkeleton || block.expertSkeleton);
   };
 
+  /** Apply revealed answers into code (replace blanks with hint.answer) so editor shows correct values */
+  const applyRevealedAnswersToCode = useCallback((code: string, inlineHints: InlineHint[] | undefined, revealed: number[]): string => {
+    if (!inlineHints?.length || revealed.length === 0) return code;
+    const lines = code.split('\n');
+    inlineHints.forEach((hint, hintIdx) => {
+      if (revealed.includes(hintIdx)) {
+        const lineIndex = hint.line - 1;
+        if (lineIndex >= 0 && lineIndex < lines.length) {
+          const lineText = lines[lineIndex];
+          lines[lineIndex] = lineText.replace(/_{5,}/, hint.answer);
+        }
+      }
+    });
+    return lines.join('\n');
+  }, []);
+
   const currentStep = steps[currentStepIndex];
   const isCompleted = completedSteps.includes(currentStepIndex);
+
+  // Order code blocks: .cjs first so .cjs file appears in top editor when available
+  const sortedCodeBlocksWithIndex = useMemo(() => {
+    const blocks = currentStep?.codeBlocks ?? [];
+    return blocks
+      .map((block, originalIndex) => ({ block, originalIndex }))
+      .sort((a, b) => {
+        const aCjs = a.block.filename.toLowerCase().endsWith('.cjs');
+        const bCjs = b.block.filename.toLowerCase().endsWith('.cjs');
+        if (aCjs && !bCjs) return -1;
+        if (!aCjs && bCjs) return 1;
+        return 0;
+      });
+  }, [currentStep?.codeBlocks]);
+
+  // Sync editable code from display code when step/tier/reveal changes; prefer existing (saved) content so we don't overwrite
+  // Exception: if saved content contains old hardcoded URI (const uri = "mongodb://..."), overwrite with current step so we always use process.env.MONGODB_URI
+  useEffect(() => {
+    if (!currentStep?.codeBlocks) return;
+    setEditableCodeByBlock((prev) => {
+      const next = { ...prev };
+      const hasOldHardcodedUri = (code: string) =>
+        /const\s+uri\s*=\s*["']mongodb:\/\//.test(code) || /const\s+uri\s*=\s*["']\$\{/.test(code);
+      currentStep.codeBlocks.forEach((block, idx) => {
+        const blockKey = `${currentStepIndex}-${idx}`;
+        const tier = skeletonTier[blockKey] || 'guided';
+        const isSolutionRevealed = alwaysShowSolutions || !!showSolution[blockKey] || !hasAnySkeleton(block);
+        const freshCode = getDisplayCode(block, tier, isSolutionRevealed);
+        const saved = next[blockKey];
+        if (saved != null && saved !== '' && hasOldHardcodedUri(saved)) {
+          next[blockKey] = freshCode;
+        } else if (saved == null || saved === '') {
+          next[blockKey] = freshCode;
+        }
+      });
+      return next;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only sync when display source changes
+  }, [currentStepIndex, currentStep?.codeBlocks, currentStep?.id, skeletonTier, revealedAnswers, showSolution, alwaysShowSolutions]);
+
+  // When user clicks Solution or reveals an answer, push the correct content into the editor so placeholders show the right values
+  useEffect(() => {
+    if (!currentStep?.codeBlocks) return;
+    setEditableCodeByBlock((prev) => {
+      const next = { ...prev };
+      currentStep.codeBlocks.forEach((block, idx) => {
+        const blockKey = `${currentStepIndex}-${idx}`;
+        const tier = skeletonTier[blockKey] || 'guided';
+        const isSolutionRevealed = alwaysShowSolutions || !!showSolution[blockKey] || !hasAnySkeleton(block);
+        const revealed = revealedAnswers[blockKey] || [];
+        if (isSolutionRevealed) {
+          next[blockKey] = block.code ?? '';
+        } else if (revealed.length > 0 && block.inlineHints?.length) {
+          const baseCode = getDisplayCode(block, tier, false);
+          next[blockKey] = applyRevealedAnswersToCode(baseCode, block.inlineHints, revealed);
+        }
+      });
+      return next;
+    });
+  }, [currentStep?.codeBlocks, currentStepIndex, showSolution, revealedAnswers, alwaysShowSolutions, skeletonTier, applyRevealedAnswersToCode]);
+
+  // When lab or user changes (not initial mount), load that lab's editors so switching labs or return visit restores state
+  const prevLabUserRef = useRef({ labNumber, userEmail });
+  useEffect(() => {
+    if (prevLabUserRef.current.labNumber !== labNumber || prevLabUserRef.current.userEmail !== userEmail) {
+      prevLabUserRef.current = { labNumber, userEmail };
+      const w = loadLabWorkspace(labNumber, userEmail);
+      setEditableCodeByBlock(w.editors || {});
+    }
+  }, [labNumber, userEmail]);
+
+  // Load console logs for current step from central workspace (continuity on refresh/return)
+  useEffect(() => {
+    const w = loadLabWorkspace(labNumber, userEmail);
+    const entries = w.logEntriesByStep[currentStepIndex];
+    setLogEntries(storedToLogEntries(entries || []));
+  }, [labNumber, currentStepIndex, userEmail]);
+
+  // Persist all editor content for this lab to central storage (autosave for all editors)
+  useEffect(() => {
+    saveLabWorkspace(labNumber, { editors: editableCodeByBlock }, userEmail);
+  }, [labNumber, editableCodeByBlock, userEmail]);
+
+  // Persist console logs for current step to central storage
+  useEffect(() => {
+    const w = loadLabWorkspace(labNumber, userEmail);
+    const updated = { ...w.logEntriesByStep, [currentStepIndex]: logEntriesToStored(logEntries) };
+    saveLabWorkspace(labNumber, { logEntriesByStep: updated }, userEmail);
+  }, [labNumber, currentStepIndex, logEntries, userEmail]);
 
   // Competitor side-by-side: only in demo mode for moderator when step has competitor equivalents
   const stepCompetitorIds = useMemo(() => {
@@ -554,12 +828,13 @@ export function StepView({
     );
   }, [currentStepIndex, showCompetitorPanel, stepCompetitorIds, defaultCompetitorId]);
 
-  // Competitor code for first block that has equivalent for effectiveCompetitorId
+  // Competitor code for first block that has equivalent for effectiveCompetitorId (blockIndex for our-code lookup)
   const competitorBlockForSelected = useMemo(() => {
     if (!effectiveCompetitorId || !currentStep.codeBlocks) return null;
-    for (const block of currentStep.codeBlocks) {
+    for (let i = 0; i < currentStep.codeBlocks.length; i++) {
+      const block = currentStep.codeBlocks[i];
       const equiv = block.competitorEquivalents?.[effectiveCompetitorId];
-      if (equiv) return { block, equiv };
+      if (equiv) return { block, blockIndex: i, equiv };
     }
     return null;
   }, [currentStep.codeBlocks, effectiveCompetitorId]);
@@ -573,6 +848,30 @@ export function StepView({
   useEffect(() => {
     localStorage.setItem('workshop_always_show_solutions', String(alwaysShowSolutions));
   }, [alwaysShowSolutions]);
+
+  // When editor or console is collapsed/expanded, resize panes (editor % / console %)
+  useEffect(() => {
+    const group = editorConsoleGroupRef.current;
+    if (!group) return;
+    if (consolePanelCollapsed && editorPanelCollapsed) {
+      group.setLayout([94, 6]); // editor strip + thin console bar
+    } else if (consolePanelCollapsed) {
+      group.setLayout([94, 6]); // editor full, console collapsed to thin bar at bottom
+    } else if (editorPanelCollapsed) {
+      group.setLayout([12, 88]); // editor strip ~12%, console ~88%
+    } else {
+      group.setLayout([65, 35]); // editor 65%, console 35%
+    }
+  }, [editorPanelCollapsed, consolePanelCollapsed]);
+
+  // Auto-expand console when output is printed
+  const prevLogCountRef = useRef(0);
+  useEffect(() => {
+    if (logEntries.length > prevLogCountRef.current && logEntries.length > 0) {
+      setConsolePanelCollapsed(false);
+    }
+    prevLogCountRef.current = logEntries.length;
+  }, [logEntries.length]);
 
   // Helper to reveal an inline hint (conceptual)
   const revealInlineHint = useCallback((blockKey: string, hintIdx: number, tier: SkeletonTier) => {
@@ -649,22 +948,317 @@ export function StepView({
     setTimeout(() => setCopied(false), 2000);
   }, [currentStep.codeBlocks, currentStepIndex, alwaysShowSolutions, showSolution, skeletonTier]);
 
-  const handleCheckProgress = async () => {
+  /** Real validation before Next: use step's onVerify or verificationId, else allow advance (no simulation). */
+  const handleCheckProgress = useCallback(async (): Promise<boolean> => {
     setIsRunning(true);
-    const code = currentStep.codeBlocks?.[0]?.code || '';
-    
-    // Simulate execution delay
-    await new Promise(r => setTimeout(r, 800 + Math.random() * 600));
-    
-    const result = generateSimulatedOutput(code, currentStep.title);
+    const now = new Date();
+    let success = false;
+    let output = '';
+    let summary = '';
+
+    try {
+      if (currentStep.onVerify) {
+        const result = await currentStep.onVerify();
+        success = result.success;
+        summary = result.message;
+        output = result.message;
+      } else if (currentStep.verificationId) {
+        const verificationService = getVerificationService();
+        const suffix = userSuffix || (typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_user_suffix') || '') : '') || 'default';
+        const ctx = {
+          mongoUri: labMongoUri || (typeof localStorage !== 'undefined' ? localStorage.getItem('lab_mongo_uri') || undefined : undefined),
+          alias: typeof localStorage !== 'undefined' ? localStorage.getItem('lab_kms_alias') || undefined : undefined,
+          profile: typeof localStorage !== 'undefined' ? localStorage.getItem('lab_aws_profile') || undefined : undefined,
+          keyAltName: `user-${suffix}-ssn-key`,
+          expectedCount: 1,
+        };
+        const result = await verificationService.verify(currentStep.verificationId as VerificationId, ctx);
+        success = result.success;
+        summary = result.message;
+        output = result.message;
+      } else {
+        success = true;
+        summary = 'No verification configured for this step.';
+        output = summary;
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      success = false;
+      summary = 'Validation failed';
+      output = `Validation error: ${msg}`;
+    }
+
+    setLastOutput(output);
+    setLastOutputTime(now);
+    setLogEntries(prev => [...prev, { time: now, output }]);
+    setOutputSummary(summary);
+    setOutputSuccess(success);
+    setConsolePanelCollapsed(false);
+    setIsRunning(false);
+    return success;
+  }, [currentStep.onVerify, currentStep.verificationId, labMongoUri, userSuffix]);
+
+  /** Run a single code block: uses current editor content (editable code). Tries real /api/run-* when URI and language match, else simulated output. */
+  const handleRunBlock = useCallback(async (blockIdx: number) => {
+    const block = currentStep.codeBlocks?.[blockIdx];
+    const blockKey = `${currentStepIndex}-${blockIdx}`;
+    const tier = skeletonTier[blockKey] || 'guided';
+    const isSolutionRevealed = alwaysShowSolutions || !!showSolution[blockKey] || !hasAnySkeleton(block);
+    const code = (editableCodeByBlock[blockKey] ?? getDisplayCode(block!, tier, isSolutionRevealed)) || (block?.code ?? '');
+    const language = (block?.language || 'javascript').toLowerCase();
+    setIsRunning(true);
+    let result: { output: string; success: boolean; summary: string };
+
+    try {
+      // 1) Bash/shell → run-bash, or run "node <file>" via matching editor block (and any preceding commands via run-bash)
+      if (language === 'bash' || language === 'shell') {
+        const commands = code.split(/\r?\n/).map(s => s.trim()).filter(line => line && !line.startsWith('#'));
+        if (commands.length > 0) {
+          const nodeCmdIndex = commands.findIndex(cmd => /^node\s+(\S+\.(cjs|js))$/.test(cmd));
+          const nodeFileMatch = nodeCmdIndex >= 0 ? commands[nodeCmdIndex].match(/^node\s+(\S+\.(cjs|js))$/) : null;
+          const wantedFilename = nodeFileMatch?.[1];
+          const editorBlockIndex = wantedFilename != null
+            ? currentStep.codeBlocks?.findIndex(
+                (b, i) => i !== blockIdx && (b.filename != null && (b.filename === wantedFilename || b.filename.endsWith(wantedFilename) || b.filename.startsWith(wantedFilename + ' ')))
+              )
+            : -1;
+          const hasNodeSubstitution = editorBlockIndex !== undefined && editorBlockIndex >= 0 && (currentStep.codeBlocks?.[editorBlockIndex]?.code ?? (editableCodeByBlock[`${currentStepIndex}-${editorBlockIndex}`] ?? '')).trim().length > 0;
+
+          if (hasNodeSubstitution) {
+            const editorBlock = currentStep.codeBlocks?.[editorBlockIndex];
+            const editorKey = `${currentStepIndex}-${editorBlockIndex}`;
+            const editorTier = skeletonTier[editorKey] || 'guided';
+            const editorSolutionRevealed = alwaysShowSolutions || !!showSolution[editorKey] || !hasAnySkeleton(editorBlock);
+            const editorCode = (editableCodeByBlock[editorKey] ?? getDisplayCode(editorBlock!, editorTier, editorSolutionRevealed)) || (editorBlock?.code ?? '');
+            const outputs: string[] = [];
+            let lastSuccess = true;
+            const beforeNode = commands.slice(0, nodeCmdIndex);
+            if (beforeNode.length > 0) {
+              const res = await fetch('/api/run-bash', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ commands: beforeNode }),
+              });
+              const data = await res.json();
+              outputs.push([data.stdout, data.stderr].filter(Boolean).join('\n') || '(no output)');
+            }
+            const res = await fetch('/api/run-node', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code: editorCode, uri: labMongoUri || '' }),
+            });
+            const data = await res.json();
+            const stderr = (data.stderr || '').trim();
+            const stdout = (data.stdout || '').trim();
+            let out = [stderr, stdout].filter(Boolean).join('\n') || data.message || '(no output)';
+            if (data.success !== true && data.exitCode != null && data.exitCode !== 0 && !out.includes('exit code')) {
+              out += `\nExit code: ${data.exitCode}`;
+            }
+            outputs.push(out);
+            lastSuccess = data.success === true;
+            result = {
+              output: outputs.join('\n\n'),
+              success: lastSuccess,
+              summary: lastSuccess ? 'Node completed' : (data.message?.split('\n')[0] || 'Node failed'),
+            };
+          } else {
+            const res = await fetch('/api/run-bash', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ commands }),
+            });
+            const data = await res.json();
+            const out = [data.stdout, data.stderr].filter(Boolean).join('\n') || '(no output)';
+            result = {
+              output: out,
+              success: data.success === true,
+              summary: data.exitCode === 0 ? 'Command completed' : 'Command failed',
+            };
+          }
+        } else {
+          result = generateSimulatedOutput(code, currentStep.title);
+        }
+      }
+      // 2) JavaScript that looks like mongosh (db., .aggregate, $search) → run-mongosh (requires URI)
+      else if (
+        language === 'javascript' &&
+        labMongoUri &&
+        (code.includes('db.') || code.includes('.aggregate') || code.includes('$search') || code.includes('$find'))
+      ) {
+        const res = await fetch('/api/run-mongosh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, uri: labMongoUri }),
+        });
+        const data = await res.json();
+        const out = [data.stdout, data.stderr].filter(Boolean).join('\n') || data.message || '(no output)';
+        result = {
+          output: out,
+          success: data.success === true,
+          summary: data.success ? 'mongosh completed' : (data.message || 'mongosh failed'),
+        };
+      }
+      // 3) Node-like JavaScript → run-node (optional URI for MONGODB_URI env)
+      else if ((language === 'javascript' || language === 'typescript') && code.trim().length > 0) {
+        const res = await fetch('/api/run-node', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, uri: labMongoUri || '' }),
+        });
+        const data = await res.json();
+        const stderr = (data.stderr || '').trim();
+        const stdout = (data.stdout || '').trim();
+        let out = [stderr, stdout].filter(Boolean).join('\n') || data.message || '(no output)';
+        if (data.success !== true && data.exitCode != null && data.exitCode !== 0 && !out.includes('exit code')) {
+          out += `\nExit code: ${data.exitCode}`;
+        }
+        result = {
+          output: out,
+          success: data.success === true,
+          summary: data.success ? 'Node completed' : (data.message?.split('\n')[0] || 'Node failed'),
+        };
+      }
+      // 4) Fallback: simulated output (e.g. no URI, or JSON index definitions)
+      else {
+        await new Promise(r => setTimeout(r, 400 + Math.random() * 300));
+        result = generateSimulatedOutput(code, currentStep.title);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      result = {
+        output: `Error: ${msg}\n\nFalling back to simulated output.`,
+        success: false,
+        summary: 'Request failed',
+      };
+      // Optionally still show simulated output below the error
+      const sim = generateSimulatedOutput(code, currentStep.title);
+      result.output += '\n\n' + sim.output;
+      result.success = sim.success;
+      result.summary = sim.summary;
+    }
+
+    const now = new Date();
     setLastOutput(result.output);
+    setLastOutputTime(now);
+    setLogEntries(prev => [...prev, { time: now, output: result.output }]);
     setOutputSummary(result.summary);
     setOutputSuccess(result.success);
-    setOutputOpen(true);
+    setConsolePanelCollapsed(false);
     setIsRunning(false);
-  };
+  }, [currentStep?.codeBlocks, currentStep?.title, currentStepIndex, labMongoUri, editableCodeByBlock, skeletonTier, showSolution, alwaysShowSolutions]);
 
-  const handleNextStep = () => {
+  /** Run all code blocks in order and show combined output */
+  const handleRunAll = useCallback(async () => {
+    const blocks = currentStep?.codeBlocks ?? [];
+    if (blocks.length === 0) return;
+    setIsRunning(true);
+    const outputs: string[] = [];
+    let lastSuccess = true;
+    let lastSummary = '';
+    for (let i = 0; i < blocks.length; i++) {
+      const block = blocks[i];
+      const blockKey = `${currentStepIndex}-${i}`;
+      const tier = skeletonTier[blockKey] || 'guided';
+      const isSolutionRevealed = alwaysShowSolutions || !!showSolution[blockKey] || !hasAnySkeleton(block);
+      const code = (editableCodeByBlock[blockKey] ?? getDisplayCode(block, tier, isSolutionRevealed)) || block.code || '';
+      const language = (block.language || 'javascript').toLowerCase();
+      try {
+        if (language === 'bash' || language === 'shell') {
+          const commands = code.split(/\r?\n/).map((s: string) => s.trim()).filter((line: string) => line && !line.startsWith('#'));
+          if (commands.length > 0) {
+            const nodeCmdIndex = commands.findIndex((cmd: string) => /^node\s+(\S+\.(cjs|js))$/.test(cmd));
+            const nodeFileMatch = nodeCmdIndex >= 0 ? commands[nodeCmdIndex].match(/^node\s+(\S+\.(cjs|js))$/) : null;
+            const wantedFilename = nodeFileMatch?.[1];
+            const editorBlockIndex = wantedFilename != null
+              ? blocks.findIndex(
+                  (b, j) => j !== i && (b.filename != null && (b.filename === wantedFilename || b.filename.endsWith(wantedFilename) || b.filename.startsWith(wantedFilename + ' ')))
+                )
+              : -1;
+            const editorBlock = editorBlockIndex >= 0 ? blocks[editorBlockIndex] : null;
+            const editorCode = editorBlock
+              ? (editableCodeByBlock[`${currentStepIndex}-${editorBlockIndex}`] ?? getDisplayCode(editorBlock, skeletonTier[`${currentStepIndex}-${editorBlockIndex}`] || 'guided', alwaysShowSolutions || !!showSolution[`${currentStepIndex}-${editorBlockIndex}`] || !hasAnySkeleton(editorBlock))) || editorBlock.code || ''
+              : '';
+            const hasNodeSubstitution = editorBlockIndex >= 0 && editorCode.trim().length > 0;
+
+            if (hasNodeSubstitution) {
+              const beforeNode = commands.slice(0, nodeCmdIndex);
+              if (beforeNode.length > 0) {
+                const res = await fetch('/api/run-bash', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ commands: beforeNode }) });
+                const data = await res.json();
+                outputs.push([data.stdout, data.stderr].filter(Boolean).join('\n') || '(no output)');
+              }
+              const res = await fetch('/api/run-node', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: editorCode, uri: labMongoUri || '' }) });
+              const data = await res.json();
+              const out = [(data.stderr || '').trim(), (data.stdout || '').trim()].filter(Boolean).join('\n') || data.message || '(no output)';
+              outputs.push(out);
+              lastSuccess = data.success === true;
+              lastSummary = data.success ? 'Node completed' : (data.message?.split('\n')[0] || 'Node failed');
+            } else {
+              const res = await fetch('/api/run-bash', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ commands }) });
+              const data = await res.json();
+              outputs.push([data.stdout, data.stderr].filter(Boolean).join('\n') || '(no output)');
+            }
+          }
+        } else if ((language === 'javascript' || language === 'typescript') && code.trim().length > 0) {
+          const res = await fetch('/api/run-node', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, uri: labMongoUri || '' }) });
+          const data = await res.json();
+          const out = [(data.stderr || '').trim(), (data.stdout || '').trim()].filter(Boolean).join('\n') || data.message || '(no output)';
+          outputs.push(out);
+          lastSuccess = data.success === true;
+          lastSummary = data.success ? 'Node completed' : (data.message?.split('\n')[0] || 'Node failed');
+        } else {
+          const sim = generateSimulatedOutput(code, currentStep.title);
+          outputs.push(sim.output);
+          lastSuccess = sim.success;
+          lastSummary = sim.summary;
+        }
+      } catch {
+        const sim = generateSimulatedOutput(code, currentStep.title);
+        outputs.push(sim.output);
+        lastSuccess = sim.success;
+        lastSummary = sim.summary;
+      }
+    }
+    const combined = outputs.join('\n\n');
+    const now = new Date();
+    setLastOutput(combined);
+    setLastOutputTime(now);
+    setLogEntries(prev => [...prev, { time: now, output: combined }]);
+    setOutputSummary(lastSummary);
+    setOutputSuccess(lastSuccess);
+    setConsolePanelCollapsed(false);
+    setIsRunning(false);
+  }, [currentStep?.codeBlocks, currentStep?.title, currentStepIndex, labMongoUri, editableCodeByBlock, skeletonTier, showSolution, alwaysShowSolutions]);
+
+  /** Reset current step: clear output and collapse panel; clear persisted logs for this step */
+  const handleResetStep = useCallback(() => {
+    setLastOutput('');
+    setLastOutputTime(null);
+    setLogEntries([]);
+    setOutputSummary('');
+    setOutputSuccess(true);
+    setConsolePanelCollapsed(true);
+    setExpandedLogIndex(null);
+    const w = loadLabWorkspace(labNumber, userEmail);
+    const updated = { ...w.logEntriesByStep, [currentStepIndex]: [] };
+    saveLabWorkspace(labNumber, { logEntriesByStep: updated }, userEmail);
+  }, [labNumber, currentStepIndex, userEmail]);
+
+  useEffect(() => {
+    if (!stepToolbarRef) return;
+    stepToolbarRef.current = {
+      reset: handleResetStep,
+      openHelp: () => setHelpOpen(true),
+    };
+    return () => { stepToolbarRef.current = null; };
+  }, [stepToolbarRef, handleResetStep]);
+
+  const handleNextStep = async () => {
+    // Validate current step before allowing advance
+    if (currentStepIndex < steps.length - 1 && currentStep.codeBlocks?.length) {
+      const passed = await handleCheckProgress();
+      if (!passed) return; // Stay on step until check passes
+    }
     if (!isCompleted) {
       onComplete(currentStepIndex);
     }
@@ -698,231 +1292,258 @@ export function StepView({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Compact Header - Single Row */}
-      <div className="flex-shrink-0 border-b border-border px-3 sm:px-4 py-2 bg-muted/30">
-        <div className="flex items-center justify-between gap-2">
-          {/* Left: Lab info + Step info */}
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-            <span className="flex-shrink-0 text-[10px] sm:text-xs font-mono text-muted-foreground border border-border px-1.5 py-0.5 rounded">
-              Lab {String(labNumber).padStart(2, '0')}
-            </span>
-            {currentStep.difficulty && (
-              <DifficultyBadge level={currentStep.difficulty} size="sm" className="hidden xs:flex" />
-            )}
-            <div className="min-w-0 flex-1">
-              <AnimatePresence mode="wait" custom={direction}>
-                <motion.div
-                  key={currentStepIndex}
-                  custom={direction}
-                  variants={slideVariants}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={{ duration: 0.15, ease: 'easeOut' }}
-                  className="flex items-center gap-1.5 sm:gap-2"
-                >
-                  <span className="text-xs text-muted-foreground flex-shrink-0">
-                    Step {currentStepIndex + 1}/{steps.length}:
-                  </span>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="text-xs sm:text-sm font-medium truncate cursor-help">
-                          {currentStep.title}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-xs">
-                        <p className="text-sm">{currentStep.description}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  {currentStep.estimatedTime && (
-                    <span className="hidden sm:inline text-[10px] sm:text-xs text-muted-foreground flex-shrink-0">
-                      ⏱️ {currentStep.estimatedTime}
-                    </span>
-                  )}
-                  {isCompleted && (
-                    <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4 text-green-500 flex-shrink-0" />
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-          </div>
-
-          {/* Right: Actions */}
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-            <Button
-              size="sm"
-              onClick={handleCheckProgress}
-              disabled={isRunning || !currentStep.codeBlocks?.length}
-              className="gap-1 h-7 sm:h-8 text-xs px-2 sm:px-3"
-            >
-              {isRunning ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                <CheckCircle2 className="w-3 h-3" />
-              )}
-              <span className="hidden xs:inline">{isRunning ? 'Checking...' : 'Check'}</span>
-            </Button>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="p-1 rounded-md bg-amber-500/10 text-amber-600 cursor-help">
-                    <Info className="w-3 h-3" />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-xs">
-                  <p className="text-sm">
-                    <strong>Local execution required:</strong> Run <code className="bg-muted px-1 rounded">npm run dev</code> locally with AWS CLI and mongosh.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <StepContextDrawer
-              understandSection={currentStep.understandSection}
-              doThisSection={currentStep.doThisSection}
-              hints={currentStep.hints}
-              tips={currentStep.tips}
-              troubleshooting={currentStep.troubleshooting}
-              businessValue={businessValue}
-              atlasCapability={atlasCapability}
-            />
-          </div>
-        </div>
-      </div>
+      <StepContextDrawer
+        understandSection={currentStep.understandSection}
+        doThisSection={currentStep.doThisSection}
+        hints={currentStep.hints}
+        tips={currentStep.tips}
+        troubleshooting={currentStep.troubleshooting}
+        businessValue={businessValue}
+        atlasCapability={atlasCapability}
+        open={helpOpen}
+        onOpenChange={setHelpOpen}
+      />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Read-only mode toggle removed - difficulty/solution controls are now per-block in header */}
 
-        {/* Code Editor & Output - Resizable Split */}
+        {/* Layout: Left = Editor + Console (vertical split, resizable); Right = Preview */}
         <div className="flex-1 overflow-hidden min-h-0">
           {currentStep.codeBlocks && currentStep.codeBlocks.length > 0 ? (
-            <ResizablePanelGroup direction="vertical" className="h-full">
-              {/* Code Editor Panel */}
-              <ResizablePanel defaultSize={outputOpen ? 50 : 85} minSize={30}>
-                <div className={cn(
-                  "h-full flex",
-                  showCompetitorPanel && "flex-row"
-                )}>
-                  <div className={cn(
-                    "flex flex-col overflow-auto justify-start min-h-0",
-                    showCompetitorPanel && "flex-1 min-w-0 basis-0",
-                    currentStep.codeBlocks.length === 2 && !showCompetitorPanel && "gap-1"
-                  )}>
-                  {currentStep.codeBlocks.map((block, idx) => {
-                    const blockKey = `${currentStepIndex}-${idx}`;
-                    const hasSkeleton = hasAnySkeleton(block);
-                    const tier = skeletonTier[blockKey] || 'guided';
-                    const isSolutionRevealed = alwaysShowSolutions || showSolution[blockKey] || !hasSkeleton;
-                    const displayCode = getDisplayCode(block, tier, isSolutionRevealed);
-                    const maxPoints = getMaxPoints(tier);
-                    const solutionPenalty = getSolutionPenalty(tier);
-                    const isTwoBlockPattern = currentStep.codeBlocks.length === 2;
-                    
-                    return (
-                      <div 
-                        key={idx} 
-                        className={cn(
-                          "flex flex-col flex-shrink-0",
-                          isTwoBlockPattern && "flex-1 min-h-0"
-                        )}
-                      >
-                        {/* Editor Header - Merged Toolbar (Filename + Difficulty + Score + Actions) */}
-                        <div className="flex-shrink-0 px-2 sm:px-4 py-1.5 sm:py-2 bg-muted/50 border-b border-border">
-                          <div className="flex items-center justify-between gap-2">
-                            {/* Left: Filename + Difficulty selector + Score */}
-                            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 flex-wrap">
-                              <span className="text-[10px] sm:text-xs font-mono text-muted-foreground truncate max-w-[80px] sm:max-w-none">{block.filename}</span>
-                              
-                              {/* Inline difficulty selector (only for skeleton blocks that aren't revealed) */}
-                              {hasSkeleton && !isSolutionRevealed && (
+            <ResizablePanelGroup direction="horizontal" className="h-full">
+              {/* Left column: Editor (cjs/shell etc.) and Console stacked — vertical resizer between them */}
+              <ResizablePanel defaultSize={55} minSize={30} className="min-h-0">
+                <ResizablePanelGroup ref={editorConsoleGroupRef} direction="vertical" className="h-full min-h-0" id="step-editor-console">
+                  {/* Editor panel: collapsible; code blocks; shell blocks show "Terminal" header + Run all/Run selection; content always scrollable */}
+                  <ResizablePanel defaultSize={94} minSize={25} className="min-h-0">
+                    <div className="h-full min-h-0 flex flex-col border-r border-border overflow-hidden">
+                      {editorPanelCollapsed && sortedCodeBlocksWithIndex.length > 0 ? (() => {
+                        const { block: firstBlock, originalIndex: firstIdx } = sortedCodeBlocksWithIndex[0];
+                        const firstKey = `${currentStepIndex}-${firstIdx}`;
+                        const firstDisplayFilename = (() => {
+                          const base = firstBlock.filename.includes(' (') ? firstBlock.filename.split(' (')[0].trim() : firstBlock.filename;
+                          return base.replace(/^\d+\.\s*/, '').trim() || base;
+                        })();
+                        const firstIsCjs = firstDisplayFilename.toLowerCase().endsWith('.cjs');
+                        const firstIsShell = ['shell', 'bash', 'sh'].includes((firstBlock.language || '').toLowerCase());
+                        const firstTier = skeletonTier[firstKey] || 'guided';
+                        const firstHasSkeleton = hasAnySkeleton(firstBlock);
+                        const firstSolutionRevealed = alwaysShowSolutions || !!showSolution[firstKey] || !firstHasSkeleton;
+                        const firstPenalty = getSolutionPenalty(firstTier);
+                        const firstDisplayCode = getDisplayCode(firstBlock, firstTier, firstSolutionRevealed);
+                        const handleFirstSaveCjs = () => {
+                          const value = editableCodeByBlock[firstKey] ?? firstDisplayCode;
+                          // persisted via central labWorkspaceStorage when editableCodeByBlock changes
+                        };
+                        return (
+                          <div className="flex-shrink-0 flex items-center justify-between gap-1.5 border border-border border-b bg-muted px-2 py-1 min-w-0 shadow-[0_1px_0_0_var(--border)]">
+                            <div className="flex items-center gap-1.5 min-w-0 truncate">
+                              <button type="button" onClick={() => setEditorPanelCollapsed(false)} className="flex-shrink-0 p-0.5 rounded hover:bg-muted/80 transition-colors" title="Expand editor">
+                                <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                              </button>
+                              {firstIsShell ? (
                                 <>
-                                  <div className="flex gap-0.5 bg-background rounded p-0.5 border border-border">
-                                    <button
-                                      onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'guided' }))}
-                                      className={cn(
-                                        "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors",
-                                        tier === 'guided' 
-                                          ? "bg-primary text-primary-foreground" 
-                                          : "hover:bg-muted"
-                                      )}
-                                    >
-                                      Guided
-                                    </button>
-                                    <button
-                                      onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'challenge' }))}
-                                      disabled={!block.challengeSkeleton && !block.expertSkeleton}
-                                      className={cn(
-                                        "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors",
-                                        tier === 'challenge' 
-                                          ? "bg-primary text-primary-foreground" 
-                                          : "hover:bg-muted",
-                                        !block.challengeSkeleton && !block.expertSkeleton && "opacity-40 cursor-not-allowed"
-                                      )}
-                                    >
-                                      Challenge
-                                    </button>
-                                    <button
-                                      onClick={() => setSkeletonTier(prev => ({ ...prev, [blockKey]: 'expert' }))}
-                                      disabled={!block.expertSkeleton}
-                                      className={cn(
-                                        "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors",
-                                        tier === 'expert' 
-                                          ? "bg-primary text-primary-foreground" 
-                                          : "hover:bg-muted",
-                                        !block.expertSkeleton && "opacity-40 cursor-not-allowed"
-                                      )}
-                                    >
-                                      Expert
-                                    </button>
-                                  </div>
-                                  
-                                  {/* Score display */}
-                                  <div className="flex items-center gap-1 text-[10px] sm:text-xs">
-                                    <span className={cn(
-                                      "font-mono font-medium",
-                                      (pointsDeducted[blockKey] || 0) > 0 ? "text-amber-600" : "text-foreground"
-                                    )}>
-                                      {Math.max(0, maxPoints - (pointsDeducted[blockKey] || 0))}
-                                    </span>
-                                    <span className="text-muted-foreground">/ {maxPoints}pts</span>
-                                  </div>
+                                  <Terminal className="w-3 h-3 flex-shrink-0 text-green-500" aria-hidden />
+                                  <span className="text-[8px] font-medium text-white truncate">Terminal</span>
+                                </>
+                              ) : (
+                                <>
+                                  <FileCode className="w-3 h-3 flex-shrink-0 text-green-500" />
+                                  <span className="font-mono text-[8px] text-white truncate" title={firstBlock.filename}>{firstDisplayFilename}</span>
                                 </>
                               )}
                             </div>
-                            
-                            {/* Right: Solution + Copy buttons */}
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              {hasSkeleton && !isSolutionRevealed && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => revealSolution(blockKey, tier)}
-                                  className="gap-1 h-6 text-[10px] sm:text-xs px-1.5 sm:px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                >
-                                  <Eye className="w-3 h-3" />
-                                  <span className="hidden sm:inline">Solution</span>
-                                  <span>(-{solutionPenalty})</span>
+                            <div className="flex items-center gap-0.5 flex-shrink-0">
+                              {firstIsShell && (
+                                <>
+                                  <span className="text-[7px] text-muted-foreground/70 mr-0.5">—</span>
+                                  <TooltipProvider><Tooltip><TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" onClick={handleRunAll} disabled={isRunning || !currentStep.codeBlocks?.length} className="h-3.5 w-3.5 text-primary" title="Run all">
+                                      {isRunning ? <Loader2 className="w-2 h-2 animate-spin" /> : <PlayCircle className="w-2 h-2" />}
+                                    </Button>
+                                  </TooltipTrigger><TooltipContent side="bottom">Run all</TooltipContent></Tooltip></TooltipProvider>
+                                  <TooltipProvider><Tooltip><TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" onClick={() => handleRunBlock(firstIdx)} disabled={isRunning || !currentStep.codeBlocks?.length} className="h-3.5 w-3.5 text-primary" title="Run selection">
+                                      <Play className="w-2 h-2" />
+                                    </Button>
+                                  </TooltipTrigger><TooltipContent side="bottom">Run selection</TooltipContent></Tooltip></TooltipProvider>
+                                </>
+                              )}
+                              {firstIsCjs && (
+                                <TooltipProvider><Tooltip><TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" onClick={handleFirstSaveCjs} className="h-3.5 gap-0.5 px-1 text-[8px]">
+                                    <Save className="w-2 h-2" /><span className="hidden xs:inline">Save</span>
+                                  </Button>
+                                </TooltipTrigger><TooltipContent side="bottom">Save</TooltipContent></Tooltip></TooltipProvider>
+                              )}
+                              <TooltipProvider><Tooltip><TooltipTrigger asChild>
+                                <Button variant="ghost" size="sm" onClick={() => stepToolbarRef?.current?.reset()} className="h-3.5 gap-0.5 px-1 text-[8px]" title="Reset step">
+                                  <RotateCcw className="w-2 h-2" /><span className="hidden sm:inline">Reset</span>
+                                </Button>
+                              </TooltipTrigger><TooltipContent side="bottom">Reset step</TooltipContent></Tooltip></TooltipProvider>
+                              {firstHasSkeleton && !firstSolutionRevealed && (
+                                <Button variant="ghost" size="sm" onClick={() => revealSolution(firstKey, firstTier)} className="gap-0.5 h-3.5 text-[8px] px-1 text-destructive hover:text-destructive hover:bg-destructive/10">
+                                  <Eye className="w-2 h-2" /><span className="hidden sm:inline">Solution</span><span>(-{firstPenalty})</span>
                                 </Button>
                               )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleCopyCode(idx)}
-                                className="gap-1 h-6 text-[10px] sm:text-xs px-1.5 sm:px-2"
-                              >
-                                {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                              <Button variant="ghost" size="sm" onClick={() => handleCopyCode(firstIdx)} className="gap-0.5 h-3.5 text-[8px] px-1" title="Copy">
+                                {copied ? <Check className="w-2 h-2 text-green-500" /> : <Copy className="w-2 h-2" />}
                                 <span className="hidden xs:inline">{copied ? 'Copied!' : 'Copy'}</span>
                               </Button>
                             </div>
                           </div>
+                        );
+                      })() : editorPanelCollapsed ? null : (
+                      <div className={cn(
+                        "flex-1 flex min-h-0 overflow-auto",
+                        showCompetitorPanel && "flex-row"
+                      )}>
+                        <div className={cn(
+                          "flex flex-col overflow-auto justify-start min-h-0 flex-1 min-w-0",
+                          showCompetitorPanel && "min-w-0 basis-0",
+                          sortedCodeBlocksWithIndex.length === 2 && !showCompetitorPanel && "gap-1"
+                        )}>
+                  {sortedCodeBlocksWithIndex.map(({ block, originalIndex }) => {
+                    const blockKey = `${currentStepIndex}-${originalIndex}`;
+                    const hasSkeleton = hasAnySkeleton(block);
+                    const tier = skeletonTier[blockKey] || 'guided';
+                    const isSolutionRevealed = alwaysShowSolutions || showSolution[blockKey] || !hasSkeleton;
+                    const displayCode = getDisplayCode(block, tier, isSolutionRevealed);
+                    const solutionPenalty = getSolutionPenalty(tier);
+                    const isTwoBlockPattern = sortedCodeBlocksWithIndex.length === 2;
+                    const displayFilename = (() => {
+                      const base = block.filename.includes(' (') ? block.filename.split(' (')[0].trim() : block.filename;
+                      return base.replace(/^\d+\.\s*/, '').trim() || base;
+                    })();
+                    const isCjs = displayFilename.toLowerCase().endsWith('.cjs');
+                    const isShellBlock = ['shell', 'bash', 'sh'].includes((block.language || '').toLowerCase());
+
+                    const handleBlockCodeChange = (v: string | undefined) => {
+                      const value = v ?? '';
+                      setEditableCodeByBlock((prev) => ({ ...prev, [blockKey]: value }));
+                      // all editors persisted via central labWorkspaceStorage
+                    };
+
+                    const handleSaveCjs = () => {
+                      const value = editableCodeByBlock[blockKey] ?? displayCode;
+                      // persisted via central labWorkspaceStorage
+                    };
+
+                    return (
+                      <div 
+                        key={originalIndex} 
+                        className={cn(
+                          "flex flex-col flex-shrink-0",
+                          isTwoBlockPattern && "flex-1 min-h-0",
+                          originalIndex > 0 && "border-t border-border"
+                        )}
+                      >
+                                        {/* Block header: collapse toggle on same row as filename/Terminal (first block only); sticky when scrolling */}
+                        <div className="sticky top-0 z-10 flex-shrink-0 flex items-center justify-between gap-1.5 border border-border border-b bg-muted px-2 py-1 min-w-0 shadow-[0_1px_0_0_var(--border)]">
+                          <div className="flex items-center gap-1.5 min-w-0 truncate">
+                            {originalIndex === 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setEditorPanelCollapsed(true)}
+                                className="flex-shrink-0 p-0.5 rounded hover:bg-muted/80 transition-colors"
+                                title="Collapse editor"
+                              >
+                                <ChevronUp className="w-3 h-3 text-muted-foreground" />
+                              </button>
+                            )}
+                            {isShellBlock ? (
+                              <>
+                                <Terminal className="w-3 h-3 flex-shrink-0 text-green-500" aria-hidden />
+                                <span className="text-[8px] font-medium text-white truncate">Terminal</span>
+                              </>
+                            ) : (
+                              <>
+                                <FileCode className="w-3 h-3 flex-shrink-0 text-green-500" />
+                                <span className="font-mono text-[8px] text-white truncate" title={block.filename}>{displayFilename}</span>
+                              </>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-0.5 flex-shrink-0">
+                            {isShellBlock && (
+                              <>
+                                <span className="text-[7px] text-muted-foreground/70 mr-0.5">—</span>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button variant="ghost" size="icon" onClick={handleRunAll} disabled={isRunning || !currentStep.codeBlocks?.length} className="h-3.5 w-3.5 text-primary" title="Run all">
+                                        {isRunning ? <Loader2 className="w-2 h-2 animate-spin" /> : <PlayCircle className="w-2 h-2" />}
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom">Run all</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button variant="ghost" size="icon" onClick={() => handleRunBlock(originalIndex)} disabled={isRunning || !currentStep.codeBlocks?.length} className="h-3.5 w-3.5 text-primary" title="Run selection">
+                                        <Play className="w-2 h-2" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom">Run selection</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </>
+                            )}
+                            {isCjs ? (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="sm" onClick={handleSaveCjs} className="h-3.5 gap-0.5 px-1 text-[8px]">
+                                      <Save className="w-2 h-2" />
+                                      <span className="hidden xs:inline">Save</span>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom">Save (autosave also enabled)</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : null}
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" onClick={() => stepToolbarRef?.current?.reset()} className="h-3.5 gap-0.5 px-1 text-[8px]" title="Reset step">
+                                    <RotateCcw className="w-2 h-2" />
+                                    <span className="hidden sm:inline">Reset</span>
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">Reset step (clear output)</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            {hasSkeleton && !isSolutionRevealed && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => revealSolution(blockKey, tier)}
+                                className="gap-0.5 h-3.5 text-[8px] px-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              >
+                                <Eye className="w-2 h-2" />
+                                <span className="hidden sm:inline">Solution</span>
+                                <span>(-{solutionPenalty})</span>
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCopyCode(originalIndex)}
+                              className="gap-0.5 h-3.5 text-[8px] px-1"
+                              title="Copy"
+                            >
+                              {copied ? <Check className="w-2 h-2 text-green-500" /> : <Copy className="w-2 h-2" />}
+                              <span className="hidden xs:inline">{copied ? 'Copied!' : 'Copy'}</span>
+                            </Button>
+                          </div>
                         </div>
-                        
-                        {/* Monaco Editor with Inline Hint Widgets */}
+
                         <InlineHintEditor
-                          key={`editor-${currentStepIndex}-${idx}-${isSolutionRevealed}`}
+                          key={`editor-${currentStepIndex}-${originalIndex}-${isSolutionRevealed}`}
                           code={displayCode}
+                          controlledValue={editableCodeByBlock[blockKey]}
+                          onCodeChange={handleBlockCodeChange}
                           language={block.language}
                           lineHeight={lineHeight}
                           setLineHeight={setLineHeight}
@@ -937,19 +1558,6 @@ export function StepView({
                           equalHeightSplit={isTwoBlockPattern}
                         />
 
-                        {/* Footer removed - controls now in header */}
-
-                        {/* Solution Revealed Banner */}
-                        {hasAnySkeleton(block) && isSolutionRevealed && !alwaysShowSolutions && showSolution[blockKey] && (
-                          <div className="flex-shrink-0 px-4 py-2 bg-green-500/10 border-t border-green-500/30">
-                            <div className="flex items-center gap-2">
-                              <CheckCircle2 className="w-4 h-4 text-green-600" />
-                              <span className="text-sm text-green-700 dark:text-green-500">
-                                Solution revealed • Copy the code and run it in your terminal
-                              </span>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     );
                   })}
@@ -998,57 +1606,265 @@ export function StepView({
                           <div className="flex-1 min-h-0 overflow-auto">
                             <Editor
                               height="100%"
+                              theme={LAB_EDITOR_THEME}
+                              beforeMount={defineLabDarkTheme}
                               language={competitorBlockForSelected.equiv.language}
                               value={competitorBlockForSelected.equiv.code}
-                              options={{
-                                readOnly: true,
-                                minimap: { enabled: false },
-                                lineNumbers: 'on',
-                                scrollBeyondLastLine: false,
-                                wordWrap: 'on',
-                              }}
+                              options={getReadOnlyLabOptions()}
                             />
                           </div>
                         </div>
                       )}
                     </div>
                   )}
-                </div>
-              </ResizablePanel>
+                        </div>
+                      )}
+                    </div>
+                  </ResizablePanel>
 
-              {/* Resizable Handle */}
-              <ResizableHandle withHandle className="bg-border hover:bg-primary/50 transition-colors" />
+                  {/* Divider splitter between Editor and Console — same visual weight as vertical splitter (thin draggable bar) */}
+                  <ResizableHandle
+                    withHandle
+                    className="bg-border hover:bg-primary/50 transition-colors data-[panel-group-direction=vertical]:cursor-ns-resize shrink-0"
+                  />
 
-              {/* Output Panel */}
-              <ResizablePanel defaultSize={outputOpen ? 50 : 15} minSize={10} collapsible>
-                <div className="h-full flex flex-col bg-background/95">
-                  <button 
-                    onClick={() => setOutputOpen(!outputOpen)}
-                    className="flex-shrink-0 flex items-center gap-2 px-6 py-2 border-t border-border bg-muted/50 hover:bg-muted transition-colors text-sm"
+              {/* Console panel: run output; collapsible, default collapsed; vertically resizable with editor above */}
+              <ResizablePanel defaultSize={6} minSize={15} collapsible collapsedSize={6} className="min-h-0">
+                <div className="h-full min-h-0 flex flex-col bg-background/95">
+                  <button
+                    type="button"
+                    onClick={() => setConsolePanelCollapsed((c) => !c)}
+                    className="flex-shrink-0 flex items-center gap-2 px-2 py-1 border border-border border-b bg-muted/40 hover:bg-muted transition-colors text-left w-full"
+                    title={consolePanelCollapsed ? 'Expand console' : 'Collapse console'}
                   >
-                    {outputOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-                    <Terminal className="w-4 h-4 text-primary" />
-                    <span>Output</span>
+                    {consolePanelCollapsed ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    <Terminal className="w-3.5 h-3.5 text-green-500" />
+                    <span className="text-[8px] font-medium text-white">Console</span>
                     {outputSummary && (
                       <span className={cn(
-                        "ml-2 px-2 py-0.5 rounded text-xs font-medium",
-                        outputSuccess 
-                          ? "bg-green-500/10 text-green-500" 
-                          : "bg-red-500/10 text-red-500"
+                        "ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium",
+                        outputSuccess ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
                       )}>
                         {outputSuccess ? '✓' : '✗'} {outputSummary}
                       </span>
                     )}
-                    {lastOutput && !outputOpen && !outputSummary && (
-                      <span className="text-xs text-muted-foreground ml-2">
-                        (Drag handle or click to expand)
-                      </span>
-                    )}
                   </button>
-                  <div className="flex-1 overflow-auto px-6 py-4 bg-[hsl(220,20%,6%)]">
-                    <pre className="font-mono text-sm text-primary whitespace-pre-wrap leading-relaxed">
-                      {lastOutput || '// Run "Check My Progress" to see output'}
-                    </pre>
+                  <div className="flex-1 min-h-0 overflow-auto px-2 py-1.5 bg-[hsl(220,20%,6%)] font-mono text-xs text-white">
+                    {logEntries.length > 0 ? (
+                      <div className="space-y-0.5">
+                        {logEntries.flatMap((entry, entryIndex) => {
+                          const timeStr = entry.time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
+                          const lines = entry.output.split(/\r?\n/);
+                          return lines.map((line, lineIndex) => {
+                            const key = `${entryIndex}-${lineIndex}`;
+                            const isExpanded = expandedLogIndex === key;
+                            return (
+                              <div key={key} className="rounded">
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedLogIndex(isExpanded ? null : key)}
+                                  className="w-full text-left px-1.5 py-0.5 hover:bg-white/5 rounded text-xs text-white leading-snug font-mono"
+                                >
+                                  <span className="text-muted-foreground">{timeStr}</span>
+                                  <span className="mx-1 text-muted-foreground">[lab]</span>
+                                  <span className="break-all">{line || ' '}</span>
+                                </button>
+                                {isExpanded && (
+                                  <div className="px-2 py-1.5 mt-0.5 mb-1 rounded bg-black/30 text-[11px] text-white/90 whitespace-pre-wrap break-all border border-white/10">
+                                    <div className="text-muted-foreground text-[10px] mb-0.5">Detail</div>
+                                    {line}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          });
+                        })}
+                      </div>
+                    ) : (
+                      <pre className="whitespace-pre-wrap leading-snug text-white/80 text-xs">
+                        {lastOutput || ''}
+                      </pre>
+                    )}
+                    {!outputSuccess && lastOutput && (
+                      <>
+                        {lastOutput.includes('MODULE_NOT_FOUND') && (
+                          <p className="mt-1.5 text-[10px] text-amber-400/90">
+                            {(lastOutput.includes('mongocrypt.node') || lastOutput.includes('mongodb-client-encryption')) ? (
+                              <>Tip: <code className="bg-white/10 px-0.5 rounded">mongodb-client-encryption</code> needs its native addon built. In Docker: rebuild the app image (Dockerfile has build deps), then <code className="bg-white/10 px-0.5 rounded">docker compose up -d --build app</code>. The container runs <code className="bg-white/10 px-0.5 rounded">npm rebuild mongodb-client-encryption</code> on startup to compile it.</>
+                            ) : (
+                              <>Tip: The run environment uses this app’s node_modules. If you see this in Docker, ensure the image has run <code className="bg-white/10 px-0.5 rounded">npm ci</code> so <code className="bg-white/10 px-0.5 rounded">mongodb</code> and <code className="bg-white/10 px-0.5 rounded">mongodb-client-encryption</code> are present.</>
+                            )}
+                          </p>
+                        )}
+                        {(lastOutput.includes('Whitelist') || lastOutput.includes('Connection Failed')) && (
+                          <p className="mt-1.5 text-[10px] text-amber-400/90">
+                            Tip: Using <strong>Atlas</strong>? Add your IP in Atlas → Network Access (or 0.0.0.0/0 for testing). Using <strong>Local Docker</strong>? In Workshop Settings choose “Local Docker”, then run <code className="bg-white/10 px-0.5 rounded">docker compose up -d mongo app</code> so MongoDB is running and the app uses the correct URI.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </ResizablePanel>
+                </ResizablePanelGroup>
+              </ResizablePanel>
+
+              <ResizableHandle withHandle className="bg-border hover:bg-primary/50 transition-colors" />
+
+              {/* Preview panel: right column — same width as left column via horizontal slider */}
+              <ResizablePanel defaultSize={45} minSize={20}>
+                <div className="h-full flex flex-col bg-background/95 border-l border-border">
+                  <div className="flex-shrink-0 flex items-center gap-1.5 px-1.5 py-0.5 border border-border border-b bg-muted/40">
+                    <Tabs value={previewPanelTab} onValueChange={(v) => setPreviewPanelTab(v as 'preview' | 'compete')} className="flex-shrink-0">
+                      <TabsList className="bg-transparent h-5 p-0 gap-0">
+                        <TabsTrigger value="compete" className="text-[9px] h-4 px-1.5 data-[state=active]:bg-muted">Compete</TabsTrigger>
+                        <TabsTrigger value="preview" className="text-[9px] h-4 px-1.5 data-[state=active]:bg-muted">Preview</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                    {atlasCapability && (
+                      <div className="flex-1 flex justify-center min-w-0">
+                        <span className="text-[9px] font-medium text-primary truncate" title={atlasCapability}>{atlasCapability}</span>
+                      </div>
+                    )}
+                    {previewPanelTab === 'preview' && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={() => setPreviewRefreshKey((k) => k + 1)} className="h-4 w-4">
+                              <RefreshCw className="w-2.5 h-2.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">Refresh preview</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </div>
+                  <div className="flex-1 overflow-auto min-h-0 px-2 py-2">
+                    {previewPanelTab === 'compete' ? (
+                      stepCompetitorIds.length > 0 ? (
+                        <div className="flex flex-col h-full min-h-0 gap-2 overflow-auto">
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="text-[10px] text-muted-foreground">Competitor:</span>
+                            <Select value={effectiveCompetitorId ?? ''} onValueChange={(v) => setSelectedCompetitorId(v)}>
+                              <SelectTrigger className="h-6 text-[10px] w-[140px]">
+                                <SelectValue placeholder="Select…" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {stepCompetitorIds.map((id) => (
+                                  <SelectItem key={id} value={id}>
+                                    {getCompetitorProductLabel(id)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {competitorBlockForSelected && (
+                            <>
+                              <div className="flex-shrink-0">
+                                <p className="text-[10px] font-medium text-muted-foreground mb-1">How {getCompetitorProductLabel(effectiveCompetitorId ?? '')} does it (prefer code)</p>
+                                <div className="rounded border border-border overflow-hidden min-h-[120px] flex-1">
+                                  <Editor
+                                    height="180"
+                                    theme={LAB_EDITOR_THEME}
+                                    beforeMount={defineLabDarkTheme}
+                                    language={competitorBlockForSelected.equiv.language}
+                                    value={competitorBlockForSelected.equiv.code}
+                                    options={getReadOnlyLabOptions()}
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex-shrink-0 rounded border border-amber-500/20 bg-amber-500/5 p-2 space-y-2">
+                                <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">Challenges vs MongoDB</p>
+                                {competitorBlockForSelected.equiv.workaroundNote && (
+                                  <p className="text-[10px] text-muted-foreground leading-snug">{competitorBlockForSelected.equiv.workaroundNote}</p>
+                                )}
+                                {competitorBlockForSelected.equiv.challenges && competitorBlockForSelected.equiv.challenges.length > 0 && (
+                                  <ul className="list-disc list-inside text-[10px] text-muted-foreground space-y-0.5">
+                                    {competitorBlockForSelected.equiv.challenges.map((c, i) => (
+                                      <li key={i}>{c}</li>
+                                    ))}
+                                  </ul>
+                                )}
+                                {competitorBlockForSelected.equiv.comparisonSummary && (
+                                  <div className="text-[10px] text-muted-foreground leading-snug whitespace-pre-wrap border-t border-amber-500/20 pt-1.5 mt-1.5">
+                                    {competitorBlockForSelected.equiv.comparisonSummary}
+                                  </div>
+                                )}
+                                {!competitorBlockForSelected.equiv.workaroundNote &&
+                                  (!competitorBlockForSelected.equiv.challenges || competitorBlockForSelected.equiv.challenges.length === 0) &&
+                                  !competitorBlockForSelected.equiv.comparisonSummary && (
+                                    <p className="text-[10px] text-muted-foreground italic">Compare with the MongoDB approach in the editor — native driver support, no workarounds.</p>
+                                  )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="h-full min-h-[80px] flex items-center justify-center text-center text-muted-foreground text-[10px]">No competitor comparison for this step.</div>
+                      )
+                    ) : previewPanelTab === 'preview' && stepCompetitorIds.length > 0 && competitorBlockForSelected ? (
+                      (() => {
+                        const { block, blockIndex, equiv } = competitorBlockForSelected;
+                        const blockKey = `${currentStepIndex}-${blockIndex}`;
+                        const tier = skeletonTier[blockKey] || 'guided';
+                        const isSolutionRevealed = alwaysShowSolutions || !!showSolution[blockKey] || !hasAnySkeleton(block);
+                        const ourCode = editableCodeByBlock[blockKey] ?? getDisplayCode(block, tier, isSolutionRevealed) ?? block.code ?? '';
+                        return (
+                          <div key={previewRefreshKey} className="h-full min-h-0 flex flex-col">
+                            <div className="flex items-center gap-2 flex-shrink-0 mb-1">
+                              <span className="text-[10px] text-muted-foreground">Preview: side-by-side comparison</span>
+                            </div>
+                            <div className="flex-1 min-h-0 grid grid-cols-2 gap-2">
+                              <div className="flex flex-col min-h-0 rounded border border-border overflow-hidden">
+                                <div className="flex-shrink-0 px-2 py-1 bg-muted/50 border-b border-border text-[10px] font-medium text-muted-foreground">
+                                  {getCompetitorProductLabel(effectiveCompetitorId ?? '')} (competitor)
+                                </div>
+                                <div className="flex-1 min-h-0">
+                                  <Editor
+                                    height="100%"
+                                    theme={LAB_EDITOR_THEME}
+                                    beforeMount={defineLabDarkTheme}
+                                    language={equiv.language}
+                                    value={equiv.code}
+                                    options={getReadOnlyLabOptions()}
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex flex-col min-h-0 rounded border border-border overflow-hidden">
+                                <div className="flex-shrink-0 px-2 py-1 bg-primary/10 border-b border-border text-[10px] font-medium text-primary">
+                                  MongoDB (editor)
+                                </div>
+                                <div className="flex-1 min-h-0">
+                                  <Editor
+                                    height="100%"
+                                    theme={LAB_EDITOR_THEME}
+                                    beforeMount={defineLabDarkTheme}
+                                    language={block.language}
+                                    value={ourCode}
+                                    options={getReadOnlyLabOptions()}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    ) : previewPanelTab === 'preview' && currentStep.preview ? (
+                      <div key={previewRefreshKey} className="h-full min-h-0">
+                        <GenericLabPreview
+                          preview={currentStep.preview}
+                          data={{ rawOutput: lastOutput } as LabPreviewData}
+                          isRunning={isRunning}
+                          hasRun={!!lastOutput}
+                        />
+                      </div>
+                    ) : previewPanelTab === 'preview' ? (
+                      <div className="h-full min-h-[120px] flex flex-col items-center justify-center text-center rounded border border-dashed border-border p-4 text-muted-foreground">
+                        <Layout className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                        <p className="text-xs font-medium mb-0.5">Preview: frontend demo</p>
+                        <p className="text-[10px]">When configured, this tab shows a visual frontend that demonstrates how this capability can be used (e.g. search, table, chart, encryption demo). Run the step code to see results here.</p>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </ResizablePanel>

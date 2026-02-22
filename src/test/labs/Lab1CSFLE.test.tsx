@@ -21,6 +21,7 @@ vi.mock("@/utils/validatorUtils", () => ({
     checkKeyPolicy: vi.fn().mockResolvedValue({ success: true, message: "Key policy verified" }),
     checkDataKey: vi.fn().mockResolvedValue({ success: true, message: "DEK exists" }),
     checkKeyVaultCount: vi.fn().mockResolvedValue({ success: true, message: "Count verified" }),
+    checkFieldEncrypted: vi.fn().mockResolvedValue({ success: true, message: "Field encrypted" }),
   }
 }));
 

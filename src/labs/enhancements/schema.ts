@@ -75,6 +75,10 @@ export interface CodeBlockMetadata {
       language: string;
       code: string;
       workaroundNote?: string;
+      /** Short bullets on challenges doing it the competitor way (vs MongoDB) */
+      challenges?: string[];
+      /** Optional comparison text, capability matrix, or diagram description */
+      comparisonSummary?: string;
     }
   >;
 }

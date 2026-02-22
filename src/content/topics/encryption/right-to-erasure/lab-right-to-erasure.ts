@@ -16,7 +16,7 @@ export const lab3Definition: WorkshopLabDefinition = {
   title: 'Lab 3: Right to Erasure & Multi-Tenant Patterns',
   description: 'Learn data migration from plaintext to encrypted state, per-tenant key isolation, and GDPR right-to-erasure / crypto-shredding patterns.',
   difficulty: 'advanced',
-  estimatedTotalTimeMinutes: 50,
+  estimatedTotalTimeMinutes: 45,
   tags: ['csfle', 'migration', 'gdpr', 'crypto-shredding', 'multi-tenant', 'compliance'],
   labFolderPath: 'Docs/pov-proof-exercises/proofs/46',
   keyConcepts: [
@@ -102,23 +102,6 @@ export const lab3Definition: WorkshopLabDefinition = {
         'Ensure the old CMK is still accessible during rotation so the driver can decrypt the DEK before rewrapping.',
         'In production, point to a NEW CMK alias (e.g., alias/mongodb-lab-key-v2).',
         'After rotation, your encrypted data remains unchanged, but the trust root has been updated.'
-      ]
-    },
-    {
-      id: 'lab-right-to-erasure-step-production-patterns',
-      title: 'Step 4: Infrastructure: Rotation Readiness Check',
-      narrative: 'Before rotating keys in MongoDB, you must verify that the (new) CMK exists and is accessible. Use the AWS CLI to check aliases, key policy, and basic encrypt/decrypt operations to ensure rotation will succeed.',
-      instructions: 'Use the AWS CLI to list KMS aliases, describe the CMK backing your MongoDB alias, inspect the key policy, and run a test encrypt/decrypt round trip. Confirm that KeyState is "Enabled" and that your IAM principal can both encrypt and decrypt.',
-      estimatedTimeMinutes: 8,
-      modes: ['lab'],
-      verificationId: 'csfle.verifyKmsAlias',
-      points: 15,
-      enhancementId: 'right-to-erasure.rotation-readiness',
-      hints: [
-        'Use aws kms list-aliases to confirm your CMK alias exists.',
-        'Use aws kms describe-key to check that the key is enabled.',
-        'Use aws kms get-key-policy to verify your IAM principal is allowed to use the key.',
-        'Run aws kms encrypt and aws kms decrypt with a small payload to validate end-to-end access.'
       ]
     }
   ],

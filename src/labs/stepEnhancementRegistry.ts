@@ -57,6 +57,19 @@ export function getStepEnhancementSync(enhancementId?: string): Partial<Step> | 
   return factory ? factory() : undefined;
 }
 
+/** Get lab user suffix for placeholder substitution (YOUR_SUFFIX → same key as Lab 1). */
+function getLabUserSuffix(): string {
+  if (typeof window === 'undefined' || !window.localStorage) return 'default';
+  return window.localStorage.getItem('lab_user_suffix') || 'default';
+}
+
+/** Replace YOUR_SUFFIX in code/skeleton strings so Lab 3 uses the same DEK key name as Lab 1. */
+function substitutePlaceholders(text: string | undefined): string | undefined {
+  if (text == null || typeof text !== 'string') return text;
+  const suffix = getLabUserSuffix();
+  return text.replace(/\bYOUR_SUFFIX\b/g, suffix);
+}
+
 /**
  * Build a Partial<Step> from enhancement metadata.
  */
@@ -65,10 +78,10 @@ function buildEnhancementFromMetadata(metadata: any): Partial<Step> {
     codeBlocks: metadata.codeBlocks?.map((block: any) => ({
       filename: block.filename,
       language: block.language,
-      code: block.code,
-      skeleton: block.skeleton,
-      challengeSkeleton: block.challengeSkeleton,
-      expertSkeleton: block.expertSkeleton,
+      code: substitutePlaceholders(block.code),
+      skeleton: substitutePlaceholders(block.skeleton),
+      challengeSkeleton: substitutePlaceholders(block.challengeSkeleton),
+      expertSkeleton: substitutePlaceholders(block.expertSkeleton),
       inlineHints: block.inlineHints,
       competitorEquivalents: block.competitorEquivalents,
     })),

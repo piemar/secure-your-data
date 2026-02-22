@@ -11,6 +11,7 @@ export type VerificationId =
   | "csfle.verifyComplete"
   | "csfle.verifyMigration"
   | "csfle.verifyTenantDEKs"
+  | "csfle.verifyMultiTenantKeys"
   | "csfle.verifyKeyRotation"
   | "csfle.verifyDataKey"
   // QE
@@ -75,6 +76,7 @@ export class VerificationService {
         return validatorUtils.checkMigration(ctx.mongoUri || "");
 
       case "csfle.verifyTenantDEKs":
+      case "csfle.verifyMultiTenantKeys":
         return validatorUtils.checkTenantDEKs(ctx.mongoUri || "");
 
       case "csfle.verifyKeyRotation":

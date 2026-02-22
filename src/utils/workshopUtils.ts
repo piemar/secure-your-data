@@ -324,3 +324,19 @@ export async function updateWorkshopSession(
 export async function deleteCurrentWorkshopSession(): Promise<void> {
   localStorage.removeItem(WORKSHOP_SESSION_KEY);
 }
+
+/**
+ * Get the MongoDB URI to use for lab execution (Run in browser).
+ * Used by StepView when calling /api/run-node or /api/run-mongosh.
+ * Returns atlas connection string when session uses Atlas, or default local URI when session uses local.
+ * For local: use mongo:27017 when running in Docker, 127.0.0.1:27017 when running standalone (e.g. npm run dev).
+ */
+export function getLabMongoUri(runningInContainer?: boolean): string {
+  const session = getWorkshopSession();
+  if (!session) return '';
+  if (session.mongodbSource === 'atlas' && session.atlasConnectionString) return session.atlasConnectionString;
+  if (session.mongodbSource === 'local') {
+    return runningInContainer ? 'mongodb://mongo:27017' : 'mongodb://127.0.0.1:27017';
+  }
+  return '';
+}

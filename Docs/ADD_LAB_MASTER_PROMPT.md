@@ -80,6 +80,7 @@ Use this table for **full structured** mode. For **minimal** mode, only the star
 | **Data requirements (optional)** | [USER_INPUT: id, type, path, description; or "none"] | Optional; inferred from proof if needed |
 | **Competitor products (optional)** | [USER_INPUT: e.g. ['postgresql','cosmosdb-vcore','dynamodb'] or "none"] | Optional; default "none". When set, generate competitor equivalent code per code block for demo side-by-side. |
 | **Default competitor (optional)** | [USER_INPUT: e.g. postgresql] | Optional; only if competitor products are specified. Product shown by default in demo side-by-side. |
+| **Elevated experience (preview) (optional)** | [USER_INPUT: For steps that benefit from an app-like preview, specify per step: `preview: { type, config }`. See "Elevated experience" below.] | Optional; infer when the step clearly fits (e.g. Search → type 'search', aggregation counts → type 'chart' or 'table'). |
 
 **Notes:**
 
@@ -90,6 +91,32 @@ Use this table for **full structured** mode. For **minimal** mode, only the star
 - **Primary POV:** If the lab covers multiple POV capabilities, put it in the **topic + POV folder** that matches the **primary** capability (the main one the lab teaches). Example: a lab that teaches RICH-QUERY and touches encryption belongs in the RICH-QUERY folder.
 - **Proof and capability:** Proof numbers and POV capability labels (e.g. PARTIAL-RECOVERY, REPORTING) are listed in `Docs/POV.txt`; source proof content is in `Docs/pov-proof-exercises/proofs/<n>/README.md`. Use the proof README for sourceSection names (Description, Setup, Execution, Measurement).
 - **MongoDB docs:** Use MongoDB official documentation (https://www.mongodb.com/docs/) and other sources when needed to determine what to implement, define key concepts, and ensure correct terminology and code patterns.
+
+### Elevated experience (preview) – generic component for any POV
+
+When a step demonstrates a capability that is best shown as an **app-like preview** (search UI, table, chart, encryption demo, or diagram), add a **`preview`** field to that step so the workshop renders an elevated experience above the Console when the user clicks Run. The schema is generic: the same component (`GenericLabPreview`) renders based on `type` + `config`. You can add this for **any** POV—current or future—by emitting the right config.
+
+**Schema (in lab step):** `preview?: LabStepPreviewConfig` — see `src/types/index.ts` for full types. Summary:
+
+| type | When to use | config shape (main fields) |
+|------|--------------|----------------------------|
+| `search` | Atlas Search, text search, autocomplete, faceted search | `searchField`, `searchPlaceholder`, `autocomplete`, `facetFields`, `resultFields`, `showScore`, `highlight` |
+| `table` | Any step that returns a list of documents (find, aggregation) | `columns`, `maxRows` |
+| `chart` | Aggregation with counts or metrics (e.g. group by category) | `chartType`: 'bar' \| 'line' \| 'pie', `xField`, `yField`, `title` |
+| `encryption-demo` | CSFLE/QE insert or query showing encrypted vs decrypted | `mode`: 'insert' \| 'query' \| 'both', `fields` |
+| `diagram` | HA, scale-out, backup flow (topology, timeline) | `variant`: 'topology' \| 'timeline' \| 'flow', `title` |
+| `terminal` | CLI-heavy step; no app preview, keep Console only | (no config) |
+
+**Examples:**
+
+- Atlas Search step (text search):  
+  `preview: { type: 'search', config: { searchField: true, resultFields: ['name', 'description'], showScore: true } }`
+- Aggregation returning counts:  
+  `preview: { type: 'chart', config: { chartType: 'bar', xField: '_id', yField: 'count', title: 'Count by category' } }`
+- Find/aggregation returning documents:  
+  `preview: { type: 'table', config: { columns: ['name', 'price', 'category'], maxRows: 20 } }`
+
+When generating a new lab, **consider** adding `preview` for steps where an app-like view would help (search, tables, charts, encryption demos). Omit it for purely terminal/CLI steps. See **`Docs/LAB_APP_PREVIEW_AND_VISUALIZATION.md`** for the full taxonomy and implementation details.
 
 ---
 

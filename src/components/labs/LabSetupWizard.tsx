@@ -47,7 +47,7 @@ export const LabSetupWizard: React.FC = () => {
     } = useLab();
 
     const [phase, setPhase] = useState<SetupPhase>(mongoUri ? 'ready' : 'onboarding');
-    const [localUri, setLocalUri] = useState(mongoUri);
+    const [localUri, setLocalUri] = useState(mongoUri || 'mongodb://mongo:27017');
     const [uriFromWorkshop, setUriFromWorkshop] = useState(false);
     const [isCheckingPrereqs, setIsCheckingPrereqs] = useState(false);
     const [prereqResults, setPrereqResults] = useState<Record<string, { verified: boolean; message: string; path?: string }>>({});
@@ -77,20 +77,19 @@ export const LabSetupWizard: React.FC = () => {
         if (mongoUri) setPhase('ready');
     }, [mongoUri]);
 
-    // Initialize URI from workshop session if available
+    // Initialize URI from workshop session if available; otherwise keep default (mongodb://mongo:27017)
     useEffect(() => {
         const session = getWorkshopSession();
-        if (session && !localUri) {
+        if (session) {
             if (session.mongodbSource === 'local') {
-                const localMongoUri = 'mongodb://mongo:27017';
-                setLocalUri(localMongoUri);
+                setLocalUri('mongodb://mongo:27017');
                 setUriFromWorkshop(true);
             } else if (session.mongodbSource === 'atlas' && session.atlasConnectionString) {
                 setLocalUri(session.atlasConnectionString);
                 setUriFromWorkshop(true);
             }
         }
-    }, [localUri]);
+    }, []);
 
     const copyToClipboard = async (text: string, id: string) => {
         await navigator.clipboard.writeText(text);
@@ -413,16 +412,16 @@ export const LabSetupWizard: React.FC = () => {
                     </div>
                 )}
 
-                {/* Atlas Connection */}
+                {/* MongoDB URI (Atlas or local Docker) */}
                 <div className="space-y-3">
                     <h3 className="text-sm font-semibold flex items-center gap-2">
-                        <Cloud className="w-4 h-4 text-primary" />
-                        MongoDB Atlas Cluster
+                        <Database className="w-4 h-4 text-primary" />
+                        MongoDB URI
                     </h3>
                     <div className="space-y-2">
                         <Input
                             id="uri"
-                            placeholder="mongodb+srv://user:pass@cluster.mongodb.net/ or mongodb://mongo:27017"
+                            placeholder="mongodb://mongo:27017 (local Docker) or mongodb+srv://user:pass@cluster.mongodb.net/ (Atlas)"
                             value={localUri}
                             onChange={(e) => {
                                 setLocalUri(e.target.value);
@@ -432,9 +431,14 @@ export const LabSetupWizard: React.FC = () => {
                             className="font-mono text-xs"
                         />
                         {uriFromWorkshop && (
-                            <div className="flex items-center gap-2 text-xs text-blue-600">
-                                <Database className="w-3 h-3" />
-                                <span>Pre-configured from workshop session ({getWorkshopSession()?.mongodbSource === 'local' ? 'Local Docker' : 'Atlas'})</span>
+                            <div className="flex flex-col gap-0.5 text-xs text-blue-600">
+                                <div className="flex items-center gap-2">
+                                    <Database className="w-3 h-3" />
+                                    <span>Pre-configured from workshop session ({getWorkshopSession()?.mongodbSource === 'local' ? 'Local Docker' : 'Atlas'})</span>
+                                </div>
+                                {getWorkshopSession()?.mongodbSource === 'local' && (
+                                    <span className="text-muted-foreground text-[11px]">In Docker, lab Run uses the server URI (e.g. mongodb://root:example@mongo:27017). Use <code className="bg-muted px-0.5 rounded">process.env.MONGODB_URI</code> in scripts.</span>
+                                )}
                             </div>
                         )}
                         {hasAtlasConnection && (

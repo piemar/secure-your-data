@@ -12,6 +12,12 @@ export const labTextSearchExperienceDefinition: WorkshopLabDefinition = {
   prerequisites: ['lab-text-search-basics', 'lab-text-search-with-autocomplete'],
   povCapabilities: ['TEXT-SEARCH', 'AUTO-COMPLETE', 'RICH-QUERY'],
   modes: ['lab', 'demo', 'challenge'],
+  keyConcepts: [
+    { term: 'Faceted search', explanation: 'Return both search hits and aggregate counts (facets) so users can filter by category, price, etc.' },
+    { term: 'Highlighting', explanation: 'Use $meta: "searchHighlights" to show snippets with matching terms marked (e.g. <em>).' },
+    { term: 'Relevance tuning', explanation: 'Use compound.should with score.boost to emphasize certain fields (e.g. title over body).' },
+    { term: '$facet', explanation: 'Run multiple pipelines in one request (e.g. hits + facet counts).' },
+  ],
   steps: [
     {
       id: 'lab-text-search-experience-step-1',
@@ -24,6 +30,11 @@ export const labTextSearchExperienceDefinition: WorkshopLabDefinition = {
       enhancementId: 'text-search.facetedSearch',
       verificationId: 'text-search.verifyFacetedSearch',
       points: 10,
+      hints: [
+        'Use $facet to return both a "hits" pipeline (e.g. $limit 20) and a "categoryCounts" $group.',
+        'Identify 2–3 structured fields (e.g. category, price band) for filters.',
+        'Return facet counts alongside hits so the UI can render filters and result list together.',
+      ],
     },
     {
       id: 'lab-text-search-experience-step-2',
@@ -36,6 +47,11 @@ export const labTextSearchExperienceDefinition: WorkshopLabDefinition = {
       enhancementId: 'text-search.highlighting',
       verificationId: 'text-search.verifyHighlighting',
       points: 10,
+      hints: [
+        'Add "highlight" to the $search stage with "path" and optionally "maxNumPassages".',
+        'Project $meta: "searchHighlights" to get snippets with matching terms marked.',
+        'Display highlight snippets next to each result so users see why it matched.',
+      ],
     },
     {
       id: 'lab-text-search-experience-step-3',
@@ -48,6 +64,11 @@ export const labTextSearchExperienceDefinition: WorkshopLabDefinition = {
       enhancementId: 'text-search.relevanceTuning',
       verificationId: 'text-search.verifyRelevanceTuning',
       points: 10,
+      hints: [
+        'Use compound.should with multiple text clauses and score.boost to emphasize name over description.',
+        'Compare result order before and after tuning to validate.',
+        'Document the final index and query settings for your playbook.',
+      ],
     },
   ],
 };

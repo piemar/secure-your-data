@@ -14,6 +14,9 @@ interface StepContextDrawerProps {
   businessValue?: string;
   atlasCapability?: string;
   trigger?: React.ReactNode;
+  /** When provided, drawer is controlled (e.g. open from tab bar). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function StepContextDrawer({
@@ -25,6 +28,8 @@ export function StepContextDrawer({
   businessValue,
   atlasCapability,
   trigger,
+  open: controlledOpen,
+  onOpenChange,
 }: StepContextDrawerProps) {
   const [revealedHints, setRevealedHints] = useState<number[]>([]);
 
@@ -38,8 +43,11 @@ export function StepContextDrawer({
     }
   };
 
+  const isControlled = controlledOpen !== undefined && onOpenChange != null;
+
   return (
-    <Sheet>
+    <Sheet {...(isControlled ? { open: controlledOpen, onOpenChange } : {})}>
+      {!isControlled && (
       <SheetTrigger asChild>
         {trigger || (
           <Button variant="outline" size="sm" className="gap-1.5 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3">
@@ -49,6 +57,7 @@ export function StepContextDrawer({
           </Button>
         )}
       </SheetTrigger>
+      )}
       <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">

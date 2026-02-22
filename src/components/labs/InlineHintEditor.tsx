@@ -3,9 +3,13 @@ import Editor, { Monaco } from '@monaco-editor/react';
 import { InlineHintMarker, type InlineHint, type SkeletonTier } from './InlineHintMarker';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { MONACO_LAB_EDITOR_OPTIONS, defineLabDarkTheme, LAB_EDITOR_THEME } from '@/lib/monacoLabEditorOptions';
 
 interface InlineHintEditorProps {
   code: string;
+  /** When provided, editor is controlled and editable (when not read-only). Run uses this value. */
+  controlledValue?: string;
+  onCodeChange?: (value: string) => void;
   language: string;
   lineHeight: number;
   setLineHeight: (height: number) => void;
@@ -31,6 +35,8 @@ interface BlankPosition {
 
 export function InlineHintEditor({
   code,
+  controlledValue,
+  onCodeChange,
   language,
   lineHeight,
   setLineHeight,
@@ -44,6 +50,8 @@ export function InlineHintEditor({
   onRevealAnswer,
   equalHeightSplit,
 }: InlineHintEditorProps) {
+  // Allow editing so users can fill in blanks; skeleton is initial content only
+  const isReadOnly = false;
   const containerRef = useRef<HTMLDivElement>(null);
   const [editorInstance, setEditorInstance] = useState<any>(null);
   const [monacoInstance, setMonacoInstance] = useState<Monaco | null>(null);
@@ -128,6 +136,8 @@ export function InlineHintEditor({
     
     return lines.join('\n');
   }, [code, inlineHints, revealedAnswers]);
+
+  const editorValue = isReadOnly ? displayCode : (controlledValue ?? code);
 
   // Update blank positions when code or hints change
   useEffect(() => {
@@ -247,8 +257,9 @@ export function InlineHintEditor({
   // Filter out positions where answer is already revealed
   const visiblePositions = blankPositions.filter(pos => !revealedAnswers.includes(pos.hintIdx));
 
-  // Configure Monaco before mount to add CSS rule for green answers
+  // Configure Monaco before mount: lab-dark theme (matches app background) + CSS for green answers
   const handleBeforeMount = useCallback((monaco: Monaco) => {
+    defineLabDarkTheme(monaco);
     // Define custom CSS for the revealed answer decoration
     const styleElement = document.getElementById('monaco-answer-styles') || document.createElement('style');
     styleElement.id = 'monaco-answer-styles';
@@ -283,22 +294,22 @@ export function InlineHintEditor({
       <Editor
         height={equalHeightSplit ? "100%" : `${calculatedHeight}px`}
         language={language === 'bash' ? 'shell' : language}
-        value={displayCode}
-        theme="vs-dark"
+        value={editorValue}
+        onChange={(v) => !isReadOnly && onCodeChange?.(v ?? '')}
+        theme={LAB_EDITOR_THEME}
         options={{
-          readOnly: true,
-          minimap: { enabled: false },
-          fontSize: 11,
-          lineNumbers: 'on',
-          scrollBeyondLastLine: false,
-          wordWrap: 'on',
-          automaticLayout: true,
-          tabSize: 2,
-          padding: { top: 8, bottom: 8 },
+          ...MONACO_LAB_EDITOR_OPTIONS,
+          readOnly: isReadOnly,
+          fontSize: 10,
+          padding: { top: 6, bottom: 48 },
           lineHeight: lineHeight,
           folding: false,
           lineDecorationsWidth: 0,
           lineNumbersMinChars: 3,
+          // Shell/terminal: no line numbers so it looks like a real terminal
+          ...(['shell', 'bash', 'sh'].includes((language || '').toLowerCase())
+            ? { lineNumbers: 'off' as const, lineDecorationsWidth: 0, renderLineHighlight: 'none' }
+            : {}),
         }}
         beforeMount={handleBeforeMount}
         onMount={handleEditorMount}

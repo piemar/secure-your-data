@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { addPoints, completeLab as updateLeaderboardLab, startLab as updateLeaderboardStart } from '@/utils/leaderboardUtils';
 import { createGamificationService, GamificationEvent } from '@/services/gamificationService';
 import { useWorkshopSession } from '@/contexts/WorkshopSessionContext';
+import { useWorkshopConfig } from '@/context/WorkshopConfigContext';
 import { getWorkshopSession } from '@/utils/workshopUtils';
 import { getMetricsService } from '@/services/metricsService';
 
@@ -78,30 +79,33 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return saved ? JSON.parse(saved) : {};
     });
 
-    // Load email from localStorage on mount
+    // Load email and lab suffix (firstname-lastname for KMS alias) from localStorage on mount
     useEffect(() => {
         const savedEmail = localStorage.getItem('userEmail');
         if (savedEmail) {
             setUserEmailState(savedEmail);
         }
+        const savedSuffix = localStorage.getItem('lab_user_suffix');
+        if (savedSuffix) {
+            setUserSuffixState(savedSuffix);
+            setVerifiedTools(prev => ({ ...prev, suffix: { verified: true, path: savedSuffix } }));
+        }
     }, []);
+
+    const { runningInContainer } = useWorkshopConfig();
 
     // Initialize MongoDB URI from workshop session if available
     useEffect(() => {
         const session = getWorkshopSession();
         if (session && !mongoUri) {
             if (session.mongodbSource === 'local') {
-                // Use local Docker MongoDB (for Docker Compose, use mongo:27017)
-                // For browser access, this would be localhost:27017, but in Docker it's mongo:27017
-                // We'll use mongo:27017 as the default for Docker Compose setup
-                const localUri = 'mongodb://mongo:27017';
+                const localUri = runningInContainer ? 'mongodb://mongo:27017' : 'mongodb://127.0.0.1:27017';
                 setMongoUri(localUri);
             } else if (session.mongodbSource === 'atlas' && session.atlasConnectionString) {
-                // Use Atlas connection string from session
                 setMongoUri(session.atlasConnectionString);
             }
         }
-    }, [mongoUri]);
+    }, [mongoUri, runningInContainer]);
 
     const resetProgress = () => {
         setMongoUri('');
@@ -121,7 +125,8 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             libmongocrypt: { verified: false, path: '' },
             mongoCryptShared: { verified: false, path: '' }
         });
-        setUserSuffix('');
+        setUserSuffixState('');
+        if (typeof localStorage !== 'undefined') localStorage.removeItem('lab_user_suffix');
         // Don't reset email - keep it persistent
     };
 
@@ -197,6 +202,10 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     const setVerifiedTool = (tool: string, verified: boolean, path: string) => {
+        if (tool === 'suffix' && path) {
+            localStorage.setItem('lab_user_suffix', path);
+            setUserSuffixState(path);
+        }
         setVerifiedTools(prev => ({
             ...prev,
             [tool]: { verified, path }

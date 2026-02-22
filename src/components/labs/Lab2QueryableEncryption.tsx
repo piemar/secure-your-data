@@ -1,12 +1,14 @@
 import { LabRunner } from '@/labs/LabRunner';
 import { validatorUtils } from '@/utils/validatorUtils';
 import { useLab } from '@/context/LabContext';
+import { useCloudProvider } from '@/context/WorkshopConfigContext';
 import { DifficultyLevel } from './DifficultyBadge';
 import { QEArchitectureDiagram } from './LabArchitectureDiagrams';
 import { createStepEnhancements } from '@/utils/labStepEnhancements';
 
 export function Lab2QueryableEncryption() {
   const { mongoUri, awsRegion, verifiedTools } = useLab();
+  const cloud = useCloudProvider();
   const suffix = verifiedTools['suffix']?.path || 'suffix';
   const aliasName = `alias/mongodb-lab-key-${suffix}`;
   const cryptSharedLibPath = verifiedTools['mongoCryptShared']?.path || '';
@@ -37,26 +39,27 @@ export function Lab2QueryableEncryption() {
       challengeSteps?: Array<{ instruction: string; hint?: string }>;
     }>;
   }> = [
-    {
-      id: 'lab-queryable-encryption-step-create-deks',
-      title: 'Step 1: Create Data Encryption Keys (DEKs) for QE',
-      estimatedTime: '10 min',
-      description: 'Before defining encrypted fields, you need to create Data Encryption Keys (DEKs) for each field you want to encrypt. Unlike CSFLE, QE requires a separate DEK for each encrypted field. Create DEKs for both salary (range queries) and taxId (equality queries). We will use keyAltNames to reference them, making the code more maintainable.',
-      tips: [
-        'ACTION REQUIRED: Run the Node.js script below to create two DEKs - one for salary and one for taxId.',
-        'BEST PRACTICE: Using keyAltNames (like "qe-salary-dek") is better than hardcoding UUIDs - easier to maintain and rotate.',
-        'SA NUANCE: Bound Metadata. In QE, the metadata collections (.esc, .ecoc) are tied to a specific field and its DEK.',
-        'COMPLIANCE: This 1-to-1 mapping allows for granular rotation without impacting other fields.',
-        'VERIFICATION: Use the "Check My Progress" button to verify the DEKs were created successfully.',
-      ],
-      codeBlocks: [
-        {
-          filename: 'createQEDeks.cjs (Node.js - Create this file)',
-          language: 'javascript',
-          code: `const { MongoClient, ClientEncryption } = require("mongodb");
+      {
+        id: 'lab-queryable-encryption-step-create-deks',
+        title: 'Step 1: Create Data Encryption Keys (DEKs) for QE',
+        estimatedTime: '10 min',
+        description: 'Before defining encrypted fields, you need to create Data Encryption Keys (DEKs) for each field you want to encrypt. Unlike CSFLE, QE requires a separate DEK for each encrypted field. Create DEKs for both salary (range queries) and taxId (equality queries). We will use keyAltNames to reference them, making the code more maintainable.',
+        tips: [
+          'ACTION REQUIRED: Run the Node.js script below to create two DEKs - one for salary and one for taxId.',
+          'BEST PRACTICE: Using keyAltNames (like "qe-salary-dek") is better than hardcoding UUIDs - easier to maintain and rotate.',
+          'SA NUANCE: Bound Metadata. In QE, the metadata collections (.esc, .ecoc) are tied to a specific field and its DEK.',
+          'COMPLIANCE: This 1-to-1 mapping allows for granular rotation without impacting other fields.',
+          'VERIFICATION: Use the "Check My Progress" button to verify the DEKs were created successfully.',
+        ],
+        codeBlocks: [
+          {
+            filename: 'createQEDeks.cjs (Node.js - Create this file)',
+            language: 'javascript',
+            code: `const { MongoClient, ClientEncryption } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
-const uri = "${mongoUri}";
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
 const keyVaultNamespace = "encryption.__keyVault";
 
 async function run() {
@@ -79,26 +82,45 @@ async function run() {
     kmsProviders,
   });
 
-  // Create DEK for salary (range queries)
-  const salaryDekId = await encryption.createDataKey("aws", {
-    masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" },
-    keyAltNames: ["qe-salary-dek"]
-  });
-  console.log("Salary Altname: qe-salary-dek, Salary DEK UUID:", salaryDekId.toString());
+  const keyVaultDB = client.db("encryption");
+  const keyVaultColl = keyVaultDB.collection("__keyVault");
 
-  // Create DEK for taxId (equality queries)
-  const taxDekId = await encryption.createDataKey("aws", {
-    masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" },
-    keyAltNames: ["qe-taxid-dek"]
-  });
-  console.log("TaxId Altname: qe-taxid-dek,  DEK UUID:", taxDekId.toString());
+  // Create DEK for salary (range queries) — idempotent: reuse if exists
+  const salaryKeyAltName = "qe-salary-dek";
+  let existingSalary = await keyVaultColl.findOne({ keyAltNames: salaryKeyAltName });
+  let salaryDekId;
+  if (existingSalary) {
+    salaryDekId = existingSalary._id;
+    console.log("Salary Altname: qe-salary-dek, reusing existing DEK UUID:", salaryDekId.toString());
+  } else {
+    salaryDekId = await encryption.createDataKey("aws", {
+      masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" },
+      keyAltNames: [salaryKeyAltName]
+    });
+    console.log("Salary Altname: qe-salary-dek, Salary DEK UUID:", salaryDekId.toString());
+  }
+
+  // Create DEK for taxId (equality queries) — idempotent: reuse if exists
+  const taxKeyAltName = "qe-taxid-dek";
+  let existingTax = await keyVaultColl.findOne({ keyAltNames: taxKeyAltName });
+  let taxDekId;
+  if (existingTax) {
+    taxDekId = existingTax._id;
+    console.log("TaxId Altname: qe-taxid-dek, reusing existing DEK UUID:", taxDekId.toString());
+  } else {
+    taxDekId = await encryption.createDataKey("aws", {
+      masterKey: { key: "${aliasName}", region: "${awsRegion || 'eu-central-1'}" },
+      keyAltNames: [taxKeyAltName]
+    });
+    console.log("TaxId Altname: qe-taxid-dek,  DEK UUID:", taxDekId.toString());
+  }
 
   await client.close();
 }
 
 run().catch(console.error);`,
-          // Tier 1: Guided
-          skeleton: `// ══════════════════════════════════════════════════════════════
+            // Tier 1: Guided
+            skeleton: `// ══════════════════════════════════════════════════════════════
 // Create DEKs for Queryable Encryption (QE)
 // ══════════════════════════════════════════════════════════════
 // QE requires a SEPARATE DEK for each encrypted field (unlike CSFLE).
@@ -107,7 +129,8 @@ run().catch(console.error);`,
 const { MongoClient, ClientEncryption } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
-const uri = "${mongoUri}";
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
 const keyVaultNamespace = "encryption.__keyVault";
 
 async function run() {
@@ -165,31 +188,31 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints mapping (line numbers match skeleton without trailing comments):
-          // Row 17: accessKeyId blank
-          // Row 18: secretAccessKey blank
-          // Row 24: ClientEncryption constructor blank
-          // Row 33: findOne blank for salary existence check
-          // Row 40: createDataKey blank
-          // Row 42: keyAltNames blank
-          // Row 47: qe-taxid-dek blank
-          // Row 48: findOne blank for taxId existence check
-          // Row 55: createDataKey blank
-          // Row 57: keyAltNames blank
-          inlineHints: [
-            { line: 18, blankText: '___________', hint: 'AWS credential property for the access key', answer: 'accessKeyId' },
-            { line: 19, blankText: '_______________', hint: 'AWS credential property for the secret key', answer: 'secretAccessKey' },
-            { line: 25, blankText: '___________________', hint: 'The class that handles encryption operations', answer: 'ClientEncryption' },
-            { line: 34, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
-            { line: 41, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
-            { line: 43, blankText: '___________', hint: 'Property for human-readable key identifiers', answer: 'keyAltNames' },
-            { line: 49, blankText: '___________', hint: 'The keyAltName for the taxId field DEK', answer: 'qe-taxid-dek' },
-            { line: 50, blankText: '______', hint: 'Same method to find a document for existence check', answer: 'findOne' },
-            { line: 57, blankText: '____________', hint: 'Same method as above for creating DEKs', answer: 'createDataKey' },
-            { line: 59, blankText: '___________', hint: 'Same keyAltNames property for the taxId DEK', answer: 'keyAltNames' }
-          ],
-          // Tier 2: Challenge
-          challengeSkeleton: `// ══════════════════════════════════════════════════════════════
+            // Inline hints mapping (line numbers match skeleton without trailing comments):
+            // Row 17: accessKeyId blank
+            // Row 18: secretAccessKey blank
+            // Row 24: ClientEncryption constructor blank
+            // Row 33: findOne blank for salary existence check
+            // Row 40: createDataKey blank
+            // Row 42: keyAltNames blank
+            // Row 47: qe-taxid-dek blank
+            // Row 48: findOne blank for taxId existence check
+            // Row 55: createDataKey blank
+            // Row 57: keyAltNames blank
+            inlineHints: [
+              { line: 18, blankText: '___________', hint: 'AWS credential property for the access key', answer: 'accessKeyId' },
+              { line: 19, blankText: '_______________', hint: 'AWS credential property for the secret key', answer: 'secretAccessKey' },
+              { line: 25, blankText: '___________________', hint: 'The class that handles encryption operations', answer: 'ClientEncryption' },
+              { line: 34, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
+              { line: 41, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
+              { line: 43, blankText: '___________', hint: 'Property for human-readable key identifiers', answer: 'keyAltNames' },
+              { line: 49, blankText: '___________', hint: 'The keyAltName for the taxId field DEK', answer: 'qe-taxid-dek' },
+              { line: 50, blankText: '______', hint: 'Same method to find a document for existence check', answer: 'findOne' },
+              { line: 57, blankText: '____________', hint: 'Same method as above for creating DEKs', answer: 'createDataKey' },
+              { line: 59, blankText: '___________', hint: 'Same keyAltNames property for the taxId DEK', answer: 'keyAltNames' }
+            ],
+            // Tier 2: Challenge
+            challengeSkeleton: `// ══════════════════════════════════════════════════════════════
 // CHALLENGE MODE - Create DEKs for Queryable Encryption
 // ══════════════════════════════════════════════════════════════
 
@@ -197,7 +220,7 @@ run().catch(console.error);`,
 // ───────────────────────────────────────────────────
 // Requirements:
 //   • Import MongoClient and ClientEncryption from "mongodb"
-//   • Connect to: ${mongoUri}
+//   • Connect using process.env.MONGODB_URI (Lab Setup)
 //   • Initialize ClientEncryption with AWS KMS providers
 
 // Write your setup code:
@@ -217,15 +240,15 @@ run().catch(console.error);`,
 
 
 `,
-          // Tier 3: Expert
-          expertSkeleton: `// ══════════════════════════════════════════════════════════════
+            // Tier 3: Expert
+            expertSkeleton: `// ══════════════════════════════════════════════════════════════
 // EXPERT MODE - Queryable Encryption Key Setup
 // ══════════════════════════════════════════════════════════════
 //
 // OBJECTIVE: Prepare Data Encryption Keys for Queryable Encryption
 //
 // Your solution must:
-//   1. Connect to MongoDB Atlas: ${mongoUri}
+//   1. Connect using process.env.MONGODB_URI (Lab Setup)
 //   2. Configure AWS KMS as the key provider (use SSO credentials)
 //   3. Create TWO separate DEKs - one for each encrypted field:
 //      - Salary DEK (keyAltName: "qe-salary-dek")
@@ -243,49 +266,51 @@ run().catch(console.error);`,
 
 
 `
-        },
-        {
-          filename: 'Terminal - Run the script',
-          language: 'bash',
-          code: `# Run in your terminal (NOT mongosh):
+          },
+          {
+            filename: 'Terminal - Run the script',
+            language: 'bash',
+            code: `# Run in your terminal (NOT mongosh):
 node createQEDeks.cjs
 
 # Expected Output:
 # Salary Altname: qe-salary-dek, Salary DEK UUID: 7274650f-1ea0-48e1-b47e-33d3bba95a21
 # TaxId Altname: qe-taxid-dek,  DEK UUID: a1b2c3d4-5e6f-7890-abcd-ef1234567890
 # (Your UUIDs will be different)`
-        },
-      ],
-      hints: [
-        'Blank 1: The method to generate a new Data Encryption Key is "createDataKey".',
-        'Blank 2: The property for human-readable key identifiers is "keyAltNames".',
-        'Blank 3: Same method as above - "createDataKey" for the second DEK.',
-        'Blank 4: The keyAltName for the taxId field should be "qe-taxid-dek".'
-      ],
-      onVerify: async () => validatorUtils.checkQEDEKs(mongoUri)
-    },
-    {
-      id: 'lab-queryable-encryption-step-create-collection',
-      title: 'Step 2: Create QE Collection with Encrypted Fields',
-      estimatedTime: '15 min',
-      description: 'Create the collection with the encryptedFields configuration. This single step defines which fields to encrypt AND creates the collection. MongoDB will automatically create the system catalog (.esc) and context cache (.ecoc) collections. We use keyAltNames to look up the DEKs, making the code cleaner and more maintainable.',
-      tips: [
-        'ACTION REQUIRED: Run either the Node.js script OR the mongosh commands below to create the collection.',
-        'BEST PRACTICE: Look up DEKs by keyAltNames instead of hardcoding UUIDs - easier to maintain and rotate.',
-        'AUTOMATIC METADATA: MongoDB automatically creates .enxcol_.employees.esc and .enxcol_.employees.ecoc collections.',
-        'QUERY TYPES: Both fields use "equality" queries. Range queries are supported on MongoDB 8.0+ server but require client library updates.',
-        'CURRENT LIMITATION: Even with mongodb@7.0.0 and mongodb-client-encryption@7.0.0, client-side validation rejects "range" queryType.',
-        'SERVER SUPPORT: MongoDB 8.0.18 server accepts range queries, but client libraries need updates for full support.',
-        'WORKAROUND: Use equality queries for now. Range queries will work once client libraries are updated.',
-        'IMPORTANT: You can only create a collection with encryptedFields ONCE. If it already exists, drop it first: db.employees.drop()'
-      ],
-      codeBlocks: [
-        {
-          filename: 'createQECollection.cjs (Node.js - Create this file)',
-          language: 'javascript',
-          code: `const { MongoClient } = require("mongodb");
+          },
+        ],
+        hints: [
+          'Blank 1: The method to generate a new Data Encryption Key is "createDataKey".',
+          'Blank 2: The property for human-readable key identifiers is "keyAltNames".',
+          'Blank 3: Same method as above - "createDataKey" for the second DEK.',
+          'Blank 4: The keyAltName for the taxId field should be "qe-taxid-dek".'
+        ],
+        onVerify: async () => validatorUtils.checkQEDEKs(mongoUri)
+      },
+      {
+        id: 'lab-queryable-encryption-step-create-collection',
+        title: 'Step 2: Create QE Collection with Encrypted Fields',
+        estimatedTime: '15 min',
+        description: 'Create the collection with the encryptedFields configuration. This single step defines which fields to encrypt AND creates the collection. MongoDB will automatically create the system catalog (.esc) and context cache (.ecoc) collections. We use keyAltNames to look up the DEKs, making the code cleaner and more maintainable.',
+        tips: [
+          'ACTION REQUIRED: Run either the Node.js script OR the mongosh commands below to create the collection.',
+          'BEST PRACTICE: Look up DEKs by keyAltNames instead of hardcoding UUIDs - easier to maintain and rotate.',
+          'AUTOMATIC METADATA: MongoDB automatically creates .enxcol_.employees.esc and .enxcol_.employees.ecoc collections.',
+          'QUERY TYPES: Both fields use "equality" queries. Range queries are supported on MongoDB 8.0+ server but require client library updates.',
+          'CURRENT LIMITATION: Even with mongodb@7.0.0 and mongodb-client-encryption@7.0.0, client-side validation rejects "range" queryType.',
+          'SERVER SUPPORT: MongoDB 8.0.18 server accepts range queries, but client libraries need updates for full support.',
+          'WORKAROUND: Use equality queries for now. Range queries will work once client libraries are updated.',
+          'IMPORTANT: You can only create a collection with encryptedFields ONCE. If it already exists, drop it first: db.employees.drop()',
+          'TIP: When copying multiline scripts into mongosh, use the .editor command first to enter multiline mode. Paste your code, then press Ctrl+D to execute.'
+        ],
+        codeBlocks: [
+          {
+            filename: 'createQECollection.cjs (Node.js - Create this file)',
+            language: 'javascript',
+            code: `const { MongoClient } = require("mongodb");
 
-const uri = "${mongoUri}";
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
 const keyVaultNamespace = "encryption.__keyVault";
 
 async function run() {
@@ -335,14 +360,15 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          skeleton: `// ══════════════════════════════════════════════════════════════
+            skeleton: `// ══════════════════════════════════════════════════════════════
 // Create QE Collection with Encrypted Fields Configuration
 // ══════════════════════════════════════════════════════════════
 // This defines which fields to encrypt AND creates the collection.
 // MongoDB automatically creates .esc and .ecoc metadata collections.
 
 const { MongoClient } = require("mongodb");
-const uri = "${mongoUri}";
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
@@ -386,59 +412,60 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints for Step 2 - line numbers match skeleton exactly
-          // L1-14: setup, L15: .______({ keyAltNames }), L16-18: more, L19: "____________"
-          // L20-28: more, L29: path: "_______", L30-31: more, L32: queryType: "________"
-          // L33-44: more, L45: db.________________("employees"
-          inlineHints: [
-            // User-reported missing marker rows: 15, 19, 29, 32, 45
-            { line: 15, blankText: '______', hint: 'Method to find a single document by query', answer: 'findOne' },
-            { line: 19, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
-            { line: 29, blankText: '_______', hint: 'The field name for salary data', answer: 'salary' },
-            { line: 32, blankText: '________', hint: 'Query type for searching encrypted fields', answer: 'equality' },
-            { line: 45, blankText: '________________', hint: 'Method to create a new collection', answer: 'createCollection' }
-          ]
-        },
-        {
-          filename: 'Terminal - Run the Node.js script',
-          language: 'bash',
-          code: `# Run in your terminal (NOT mongosh):
+            // Inline hints for Step 2 - line numbers match skeleton exactly
+            // L1-14: setup, L15: .______({ keyAltNames }), L16-18: more, L19: "____________"
+            // L20-28: more, L29: path: "_______", L30-31: more, L32: queryType: "________"
+            // L33-44: more, L45: db.________________("employees"
+            inlineHints: [
+              // User-reported missing marker rows: 15, 19, 29, 32, 45
+              { line: 15, blankText: '______', hint: 'Method to find a single document by query', answer: 'findOne' },
+              { line: 19, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
+              { line: 29, blankText: '_______', hint: 'The field name for salary data', answer: 'salary' },
+              { line: 32, blankText: '________', hint: 'Query type for searching encrypted fields', answer: 'equality' },
+              { line: 45, blankText: '________________', hint: 'Method to create a new collection', answer: 'createCollection' }
+            ]
+          },
+          {
+            filename: 'Terminal - Run the Node.js script',
+            language: 'bash',
+            code: `# Run in your terminal (NOT mongosh):
 node createQECollection.cjs
 
 # Expected Output:
 # Collection 'employees' created with encryptedFields!
 # MongoDB automatically created .esc and .ecoc metadata collections.`
-        },
-      ],
-      hints: [
-        'Blank 1: The method to find one document is "findOne".',
-        'Blank 2: The keyAltName for taxId DEK is "qe-taxid-dek".',
-        'Blank 3: The field to encrypt for salary data is "salary".',
-        'Blank 4: For this lab we use "equality" query type.',
-        'Blank 5: The method to create a collection is "createCollection".'
-      ],
-      onVerify: async () => validatorUtils.checkQECollection('hr', 'employees', mongoUri)
-    },
-    {
-      id: 'lab-queryable-encryption-step-test-queries',
-      title: 'Step 3: Insert Test Data with Encrypted Fields',
-      estimatedTime: '8 min',
-      description: 'Before you can test queries, you need to insert documents with encrypted fields. Use a QE-enabled client connection to insert data. The fields defined in encryptedFields will be automatically encrypted. You can use either Node.js or mongosh.',
-      tips: [
-        'ACTION REQUIRED: Run either the Node.js script OR mongosh commands below to insert test documents.',
-        'QE CLIENT: You must use a MongoDB client configured with Queryable Encryption to insert encrypted data.',
-        'AUTO-ENCRYPTION: Fields defined in encryptedFields are automatically encrypted on insert.',
-        'TEST DATA: Insert at least 3-5 documents with different salary values to test range queries.',
-        'IMPORTANT: In mongosh, you need to use a QE-enabled connection string or configure encryption.'
-      ],
-      codeBlocks: [
-        {
-          filename: 'insertQEData.cjs (Node.js - Create this file)',
-          language: 'javascript',
-          code: `const { MongoClient } = require("mongodb");
+          },
+        ],
+        hints: [
+          'Blank 1: The method to find one document is "findOne".',
+          'Blank 2: The keyAltName for taxId DEK is "qe-taxid-dek".',
+          'Blank 3: The field to encrypt for salary data is "salary".',
+          'Blank 4: For this lab we use "equality" query type.',
+          'Blank 5: The method to create a collection is "createCollection".'
+        ],
+        onVerify: async () => validatorUtils.checkQECollection('hr', 'employees', mongoUri)
+      },
+      {
+        id: 'lab-queryable-encryption-step-test-queries',
+        title: 'Step 3: Insert Test Data with Encrypted Fields',
+        estimatedTime: '8 min',
+        description: 'Before you can test queries, you need to insert documents with encrypted fields. Use a QE-enabled client connection to insert data. The fields defined in encryptedFields will be automatically encrypted. You can use either Node.js or mongosh.',
+        tips: [
+          'ACTION REQUIRED: Run either the Node.js script OR mongosh commands below to insert test documents.',
+          'QE CLIENT: You must use a MongoDB client configured with Queryable Encryption to insert encrypted data.',
+          'AUTO-ENCRYPTION: Fields defined in encryptedFields are automatically encrypted on insert.',
+          'TEST DATA: Insert at least 3-5 documents with different salary values to test range queries.',
+          'IMPORTANT: In mongosh, you need to use a QE-enabled connection string or configure encryption.'
+        ],
+        codeBlocks: [
+          {
+            filename: 'insertQEData.cjs (Node.js - Create this file)',
+            language: 'javascript',
+            code: `const { MongoClient } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
-const uri = "${mongoUri}";
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   // Get SSO credentials (same as createQEDeks.cjs)
@@ -529,7 +556,7 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          skeleton: `// ══════════════════════════════════════════════════════════════
+            skeleton: `// ══════════════════════════════════════════════════════════════
 // Insert Test Data with QE-Enabled Client
 // ══════════════════════════════════════════════════════════════
 // Fields defined in encryptedFields are automatically encrypted.
@@ -537,7 +564,8 @@ run().catch(console.error);`,
 const { MongoClient } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
-const uri = "${mongoUri}";
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const credentials = await fromSSO()();
@@ -593,60 +621,61 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints for Step 3 - line numbers match skeleton exactly
-          // L1-12: setup with full kmsProviders, L24: .______({ keyAltNames })
-          // L28: "____________", L38: bsonType: "___", L39: path: "______"
-          // L45: _______________: {, L56: .___________([
-          inlineHints: [
-            { line: 24, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
-            { line: 28, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
-            { line: 38, blankText: '___', hint: 'BSON type for integer values', answer: 'int' },
-            { line: 39, blankText: '______', hint: 'Field name for tax identification', answer: 'taxId' },
-            { line: 45, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
-            { line: 56, blankText: '___________', hint: 'Method to insert multiple documents', answer: 'insertMany' }
-          ]
-        },
-        {
-          filename: 'Terminal - Run the Node.js script',
-          language: 'bash',
-          code: `# Run in your terminal (NOT mongosh):
+            // Inline hints for Step 3 - line numbers match skeleton exactly
+            // L1-12: setup with full kmsProviders, L24: .______({ keyAltNames })
+            // L28: "____________", L38: bsonType: "___", L39: path: "______"
+            // L45: _______________: {, L56: .___________([
+            inlineHints: [
+              { line: 24, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
+              { line: 28, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
+              { line: 38, blankText: '___', hint: 'BSON type for integer values', answer: 'int' },
+              { line: 39, blankText: '______', hint: 'Field name for tax identification', answer: 'taxId' },
+              { line: 45, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
+              { line: 56, blankText: '___________', hint: 'Method to insert multiple documents', answer: 'insertMany' }
+            ]
+          },
+          {
+            filename: 'Terminal - Run the Node.js script',
+            language: 'bash',
+            code: `# Run in your terminal (NOT mongosh):
 node insertQEData.cjs
 
 # Expected Output:
 # Inserted 5 test documents with encrypted salary and taxId fields!`
-        },
-      ],
-      hints: [
-        'Blank 1: The method to find a single document is "findOne".',
-        'Blank 2: The keyAltName for the taxId DEK is "qe-taxid-dek".',
-        'Blank 3: The BSON type for integer values is "int".',
-        'Blank 4: The field name for tax identification is "taxId".',
-        'Blank 5: The config property to enable automatic encryption is "autoEncryption".',
-        'Blank 6: The method to insert multiple documents is "insertMany".'
-      ],
-      onVerify: async () => validatorUtils.checkQERangeQuery('hr', 'employees', mongoUri)
-    },
-    {
-      id: 'lab-queryable-encryption-step-metadata',
-      title: 'Step 4: Query Encrypted Data - QE vs Non-QE Client Comparison',
-      estimatedTime: '15 min',
-      description: 'Demonstrate the power of Queryable Encryption by comparing queries with a QE-enabled client vs a standard client. This side-by-side comparison shows how QE allows you to query encrypted data while a standard client only sees Binary ciphertext. Test various query types: equality, range, prefix, and suffix.',
-      tips: [
-        'ACTION REQUIRED: Run the Node.js script below to see the difference between QE-enabled and standard clients.',
-        'BREAKTHROUGH FEATURE: QE allows querying encrypted data without decrypting first - a standard client only sees Binary ciphertext!',
-        'QUERY TYPES: QE supports Equality, Range, Prefix, and Suffix queries on encrypted fields.',
-        'NOTE: Prefix/Suffix queries work best when fields are configured with prefix/suffix queryType. With equality queries, regex may work but is not optimal.',
-        'DEMO POWER: This side-by-side comparison is your most powerful SA tool for demonstrating QE capabilities.',
-        'IMPORTANT: Without QE, you cannot query encrypted fields - you only see Binary data. With QE, queries work transparently.'
-      ],
-      codeBlocks: [
-        {
-          filename: 'queryQERange.cjs (Node.js - Create this file)',
-          language: 'javascript',
-          code: `const { MongoClient } = require("mongodb");
+          },
+        ],
+        hints: [
+          'Blank 1: The method to find a single document is "findOne".',
+          'Blank 2: The keyAltName for the taxId DEK is "qe-taxid-dek".',
+          'Blank 3: The BSON type for integer values is "int".',
+          'Blank 4: The field name for tax identification is "taxId".',
+          'Blank 5: The config property to enable automatic encryption is "autoEncryption".',
+          'Blank 6: The method to insert multiple documents is "insertMany".'
+        ],
+        onVerify: async () => validatorUtils.checkQERangeQuery('hr', 'employees', mongoUri)
+      },
+      {
+        id: 'lab-queryable-encryption-step-metadata',
+        title: 'Step 4: Query Encrypted Data - QE vs Non-QE Client Comparison',
+        estimatedTime: '15 min',
+        description: 'Demonstrate the power of Queryable Encryption by comparing queries with a QE-enabled client vs a standard client. This side-by-side comparison shows how QE allows you to query encrypted data while a standard client only sees Binary ciphertext. Test various query types: equality, range, prefix, and suffix.',
+        tips: [
+          'ACTION REQUIRED: Run the Node.js script below to see the difference between QE-enabled and standard clients.',
+          'BREAKTHROUGH FEATURE: QE allows querying encrypted data without decrypting first - a standard client only sees Binary ciphertext!',
+          'QUERY TYPES: QE supports Equality, Range, Prefix, and Suffix queries on encrypted fields.',
+          'NOTE: Prefix/Suffix queries work best when fields are configured with prefix/suffix queryType. With equality queries, regex may work but is not optimal.',
+          'DEMO POWER: This side-by-side comparison is your most powerful SA tool for demonstrating QE capabilities.',
+          'IMPORTANT: Without QE, you cannot query encrypted fields - you only see Binary data. With QE, queries work transparently.'
+        ],
+        codeBlocks: [
+          {
+            filename: 'queryQERange.cjs (Node.js - Create this file)',
+            language: 'javascript',
+            code: `const { MongoClient } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
-const uri = "${mongoUri}";
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   // Get SSO credentials
@@ -794,8 +823,8 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Tier 1: Guided - skeleton with blanks for Step 4
-          skeleton: `// ══════════════════════════════════════════════════════════════
+            // Tier 1: Guided - skeleton with blanks for Step 4
+            skeleton: `// ══════════════════════════════════════════════════════════════
 // Query Encrypted Data - QE vs Non-QE Client Comparison
 // ══════════════════════════════════════════════════════════════
 // This script demonstrates the power of Queryable Encryption
@@ -803,7 +832,8 @@ run().catch(console.error);`,
 const { MongoClient } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
-const uri = "${mongoUri}";
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const credentials = await fromSSO()();
@@ -882,23 +912,23 @@ async function run() {
 }
 
 run().catch(console.error);`,
-          // Inline hints for Step 4 - line numbers match skeleton
-          inlineHints: [
-            { line: 26, blankText: '___________', hint: 'The MongoDB client class', answer: 'MongoClient' },
-            { line: 27, blankText: '_______', hint: 'Method to establish a connection', answer: 'connect' },
-            { line: 31, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
-            { line: 44, blankText: '______', hint: 'Same method to find a DEK document', answer: 'findOne' },
-            { line: 48, blankText: '____________', hint: 'The keyAltName for taxId DEK', answer: 'qe-taxid-dek' },
-            { line: 58, blankText: '___', hint: 'BSON type for integer', answer: 'int' },
-            { line: 59, blankText: '______', hint: 'BSON type for text values', answer: 'string' },
-            { line: 65, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
-            { line: 81, blankText: '______', hint: 'Method to find a document by encrypted field', answer: 'findOne' }
-          ]
-        },
-        {
-          filename: 'Terminal - Run the Node.js script',
-          language: 'bash',
-          code: `# Run in your terminal (NOT mongosh):
+            // Inline hints for Step 4 - line numbers match skeleton
+            inlineHints: [
+              { line: 26, blankText: '___________', hint: 'The MongoDB client class', answer: 'MongoClient' },
+              { line: 27, blankText: '_______', hint: 'Method to establish a connection', answer: 'connect' },
+              { line: 31, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
+              { line: 44, blankText: '______', hint: 'Same method to find a DEK document', answer: 'findOne' },
+              { line: 48, blankText: '____________', hint: 'The keyAltName for taxId DEK', answer: 'qe-taxid-dek' },
+              { line: 58, blankText: '___', hint: 'BSON type for integer', answer: 'int' },
+              { line: 59, blankText: '______', hint: 'BSON type for text values', answer: 'string' },
+              { line: 65, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
+              { line: 81, blankText: '______', hint: 'Method to find a document by encrypted field', answer: 'findOne' }
+            ]
+          },
+          {
+            filename: 'Terminal - Run the Node.js script',
+            language: 'bash',
+            code: `# Run in your terminal (NOT mongosh):
 node queryQERange.cjs
 
 # Expected Output:
@@ -930,11 +960,11 @@ node queryQERange.cjs
 #
 # === Suffix Query: TaxId ends with '6789' ===
 # Found 1 employees...`
-        },
-      ],
-      onVerify: async () => validatorUtils.checkQERangeQuery('hr', 'employees', mongoUri)
-    }
-  ];
+          },
+        ],
+        onVerify: async () => validatorUtils.checkQERangeQuery('hr', 'employees', mongoUri)
+      }
+    ];
 
   const introContent = {
     whatYouWillBuild: [
@@ -1015,9 +1045,7 @@ node queryQERange.cjs
     }
   ];
 
-  // Create stepEnhancements Map to preserve all rich content
   const stepEnhancements = createStepEnhancements(lab2Steps);
-
   return (
     <LabRunner
       labNumber={2}

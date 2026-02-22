@@ -373,18 +373,31 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
         </Button>
       </div>
 
-      {/* Collapse toggle - only show on desktop */}
+      {/* Collapse toggle - inside sidebar bounds (right-0) so click never hits main content; only toggles sidebar */}
       {!isMobileOverlay && (
-        <button
-          onClick={toggleSidebar}
-          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-sidebar-accent border border-sidebar-border flex items-center justify-center hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
-        >
-          {sidebarOpen ? (
-            <ChevronLeft className="w-4 h-4" />
-          ) : (
-            <ChevronRight className="w-4 h-4" />
-          )}
-        </button>
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 z-50 flex items-center justify-center" aria-hidden>
+          <button
+            type="button"
+            aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (e.nativeEvent) e.nativeEvent.stopImmediatePropagation();
+              toggleSidebar();
+            }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              if (e.nativeEvent) e.nativeEvent.stopImmediatePropagation();
+            }}
+            className="w-6 h-6 rounded-full bg-sidebar-accent border border-sidebar-border flex items-center justify-center hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors shrink-0"
+          >
+            {sidebarOpen ? (
+              <ChevronLeft className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
+          </button>
+        </div>
       )}
     </aside>
   );

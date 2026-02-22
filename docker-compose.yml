@@ -1,31 +1,70 @@
-version: "3.9"
+# Run MongoDB only (for local dev): docker compose up mongo -d
+# Run full stack: docker compose up
+# Lab "Run" needs MongoDB on localhost:27017 when using "Local" in workshop; mongo service exposes 27017.
+# Queryable Encryption and encrypted collections require a replica set (standalone not supported).
+# (version is obsolete in Compose V2 and is ignored – removed to avoid the warning.)
 
 services:
   app:
+    #image: pierrepetersson/mongodb-workshop-sandbox:latest
     build:
       context: .
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
     environment:
-      # Used by dev server verification endpoints when no URI provided
-      - MONGODB_URI=mongodb://mongo:27017
+      # Replica set required for QE/CSFLE encrypted collections. mongo-init inits rs0.
+      - MONGODB_URI=mongodb://root:example@mongo:27017/?replicaSet=rs0
     volumes:
+      - ~/.aws:/root/.aws
       - .:/usr/src/app
       - /usr/src/app/node_modules
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
+      mongo-init:
+        condition: service_completed_successfully
+
+  # Create keyfile in mongo data volume first (replica set + auth requires it). Runs once then exits.
+  mongo-keyfile-init:
+    image: mongo:8.0
+    restart: "no"
+    volumes:
+      - mongo-data:/data/db
+    entrypoint: ["/bin/sh", "-c", "if [ ! -f /data/db/keyfile ]; then openssl rand -base64 756 > /data/db/keyfile && chmod 400 /data/db/keyfile; fi"]
 
   mongo:
     image: mongo:8.0
     restart: unless-stopped
     ports:
       - "27017:27017"
+    command: ["mongod", "--replSet", "rs0", "--keyFile", "/data/db/keyfile", "--bind_ip_all"]
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example
     volumes:
       - mongo-data:/data/db
+    depends_on:
+      mongo-keyfile-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "-u", "root", "-p", "example", "--eval", "db.adminCommand('ping')"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  # One-time init: start replica set so encrypted collections are supported.
+  mongo-init:
+    image: mongo:8.0
+    restart: "no"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    entrypoint: ["mongosh", "mongodb://root:example@mongo:27017", "--quiet", "--eval", "try { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}); } catch(e) { if (e.codeName !== 'AlreadyInitialized' && (!e.errmsg || e.errmsg.indexOf('already initialized') < 0)) throw e; }"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
 
 volumes:
   mongo-data:

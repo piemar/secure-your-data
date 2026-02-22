@@ -7,8 +7,8 @@ import type { EnhancementMetadataRegistry } from '@/labs/enhancements/schema';
  *
  * Replace placeholders with values from the Setup Wizard:
  * - YOUR_MONGO_URI: Connection string from Lab Setup
- * - YOUR_SUFFIX: User suffix from Lab Setup (e.g., test-suffix)
- * - alias/mongodb-lab-key-YOUR_SUFFIX: KMS alias from Lab 1
+ * - YOUR_SUFFIX: firstname-lastname from Lab Setup (alias format: alias/mongodb-lab-key-<firstname>-<lastname>)
+ * - KMS alias in Lab 1 must match: alias/mongodb-lab-key-<firstname>-<lastname> (e.g. alias/mongodb-lab-key-pierre-petersson)
  * - YOUR_AWS_REGION: AWS region (e.g., eu-central-1)
  */
 
@@ -25,8 +25,10 @@ export const enhancements: EnhancementMetadataRegistry = {
         code: `const { MongoClient, ClientEncryption } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
-const uri = "YOUR_MONGO_URI";
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
 const keyVaultNamespace = "encryption.__keyVault";
+const keyAltName = "user-YOUR_SUFFIX-ssn-key";
 
 async function run() {
   const credentials = await fromSSO()();
@@ -41,13 +43,31 @@ async function run() {
   const client = await MongoClient.connect(uri);
   const keyVaultDB = client.db("encryption");
   const keyDoc = await keyVaultDB.collection("__keyVault").findOne({
-    keyAltNames: "user-YOUR_SUFFIX-ssn-key"
+    keyAltNames: keyAltName
   });
 
+  let dekId;
   if (!keyDoc) {
-    throw new Error("DEK not found! Run createKey.cjs from Lab 1 first.");
+    const enc = new ClientEncryption(client, { keyVaultNamespace, kmsProviders });
+    const region = process.env.AWS_REGION || "eu-central-1";
+    const masterKeyAlias = "alias/mongodb-lab-key-" + keyAltName.replace(/^user-(.+)-ssn-key$/, "$1");
+    try {
+      dekId = await enc.createDataKey("aws", { masterKey: { key: masterKeyAlias, region }, keyAltNames: [keyAltName] });
+      console.log("Created DEK for migration (AWS KMS, keyAltName:", keyAltName + ")");
+    } catch (err) {
+      throw new Error("DEK not found and could not create with AWS. Create the KMS key and alias in Lab 1 (" + masterKeyAlias + "), run createKey.cjs, then run this script again. " + (err.message || err));
+    }
+  } else {
+    const provider = keyDoc.masterKey && keyDoc.masterKey.provider;
+    if (provider === "local") {
+      throw new Error(
+        "Existing DEK was created with local KMS. Lab 3 uses only AWS. Remove the DEK: in mongosh run " +
+        "db.getSiblingDB('encryption').getCollection('__keyVault').deleteOne({ keyAltNames: '" + keyAltName + "' }). " +
+        "Then create the KMS alias in Lab 1, run createKey.cjs, and run this script again."
+      );
+    }
+    dekId = keyDoc._id;
   }
-  const dekId = keyDoc._id;
 
   const encryption = new ClientEncryption(client, {
     keyVaultNamespace,
@@ -100,6 +120,11 @@ FROM patients_legacy;
 -- No built-in key vault; key management is application responsibility.
 -- No queryable encryption: range/prefix queries on encrypted data not supported.`,
             workaroundNote: 'PostgreSQL has no client-side field encryption. Use pgcrypto or application-level encryption; key vault and queryable encryption are not built-in.',
+            challenges: [
+              'Key vault and key lifecycle are application responsibility.',
+              'No queryable encryption: cannot run range or prefix queries on encrypted fields.',
+              'Key rotation and crypto-shredding require custom application logic.',
+            ],
           },
           'cosmosdb-vcore': {
             language: 'javascript',
@@ -113,12 +138,18 @@ for (const doc of legacyDocs) {
 }
 // No DEK/key vault abstraction; no queryable encryption on encrypted fields.`,
             workaroundNote: 'Cosmos DB for MongoDB vCore offers encryption at rest, not client-side field encryption. Manual app-level encryption required; no queryable encryption.',
+            challenges: [
+              'No native client-side field-level or queryable encryption.',
+              'Encryption keys and DEK management must be implemented in the application.',
+              'Right-to-erasure (crypto-shredding) requires custom key deletion and re-encryption.',
+            ],
           },
         },
         skeleton: `const { MongoClient, ClientEncryption } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
-const uri = "YOUR_MONGO_URI";
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
 const keyVaultNamespace = "encryption.__keyVault";
 
 async function run() {
@@ -193,7 +224,8 @@ node migrateToCSFLE.cjs
         code: `const { MongoClient, ClientEncryption } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
-const uri = "YOUR_MONGO_URI";
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
 const keyVaultNamespace = "encryption.__keyVault";
 
 async function run() {
@@ -207,10 +239,14 @@ async function run() {
   };
 
   const client = await MongoClient.connect(uri);
+  const keyVaultDB = client.db("encryption");
   const encryption = new ClientEncryption(client, {
     keyVaultNamespace,
     kmsProviders,
   });
+
+  const region = process.env.AWS_REGION || "eu-central-1";
+  const masterKeyAlias = "alias/mongodb-lab-key-YOUR_SUFFIX";
 
   const tenants = ["acme", "contoso", "fabrikam"];
   for (const tenantId of tenants) {
@@ -221,8 +257,8 @@ async function run() {
     if (!existingKey) {
       const dekId = await encryption.createDataKey("aws", {
         masterKey: {
-          key: "alias/mongodb-lab-key-YOUR_SUFFIX",
-          region: "YOUR_AWS_REGION"
+          key: masterKeyAlias,
+          region: region
         },
         keyAltNames: [keyAltName]
       });
@@ -272,6 +308,14 @@ for (const tenantId of tenants) {
           { line: 10, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
         ],
       },
+      {
+        filename: 'Terminal',
+        language: 'bash',
+        code: `# Run the multi-tenant isolation script:
+node multiTenantIsolation.cjs
+
+# Expected: Created DEK for tenant: acme (and contoso, fabrikam if not already present).`,
+      },
     ],
     tips: [
       'One DEK per tenant ensures blast radius isolation if a key is compromised.',
@@ -292,14 +336,22 @@ for (const tenantId of tenants) {
         code: `const { MongoClient, ClientEncryption } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
-const uri = "YOUR_MONGO_URI";
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
 const keyVaultNamespace = "encryption.__keyVault";
 
 async function run() {
   const credentials = await fromSSO()();
-  const kmsProviders = { aws: { ... } };
+  const kmsProviders = {
+    aws: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
+  };
 
   const client = await MongoClient.connect(uri);
+  const keyVaultDB = client.db("encryption");
   const encryption = new ClientEncryption(client, {
     keyVaultNamespace,
     kmsProviders,
@@ -311,12 +363,13 @@ async function run() {
   });
   if (!keyDoc) throw new Error("DEK not found");
 
+  const region = process.env.AWS_REGION || "eu-central-1";
   const newCMKAlias = "alias/mongodb-lab-key-YOUR_SUFFIX";
   const result = await encryption.rewrapManyDataKey(
     { keyAltNames: keyAltName },
     {
       provider: "aws",
-      masterKey: { key: newCMKAlias, region: "YOUR_AWS_REGION" }
+      masterKey: { key: newCMKAlias, region: region }
     }
   );
 
@@ -342,6 +395,14 @@ const result = await encryption.___________________(
           { line: 6, blankText: '___________________', hint: 'Method to rotate DEKs to a new CMK', answer: 'rewrapManyDataKey' },
           { line: 7, blankText: '___________', hint: 'Field to filter which DEKs to rotate', answer: 'keyAltNames' },
         ],
+      },
+      {
+        filename: 'Terminal',
+        language: 'bash',
+        code: `# Run the key rotation script:
+node rotateCMK.cjs
+
+# Expected: Rotation complete! Modified: 1`,
       },
     ],
     tips: [

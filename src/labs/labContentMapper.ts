@@ -44,7 +44,9 @@ export function mapLabDefinitionToSteps(
       codeBlocks: enhancement.codeBlocks,
       troubleshooting: enhancement.troubleshooting,
       onVerify: enhancement.onVerify,
+      verificationId: step.verificationId,
       exercises: enhancement.exercises,
+      preview: step.preview,
       ...enhancement // Allow any other step properties to be overridden
     };
   });

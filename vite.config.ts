@@ -1,9 +1,10 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import os from "os";
 import { componentTagger } from "lovable-tagger";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
-import { exec } from "child_process";
+import { exec, execFile } from "child_process";
 import { writeFileSync, readFileSync, existsSync, statSync } from "fs";
 import { MongoClient } from "mongodb";
 
@@ -163,6 +164,24 @@ export default defineConfig(({ mode }) => ({
       name: 'tooling-proxy',
       configureServer(server: any) {
         server.middlewares.use((req: any, res: any, next: any) => {
+          // Workshop config: cloud provider and defaults (set via env at container start)
+          if (req.url && req.url.startsWith('/api/config')) {
+            const cloud = (process.env.WORKSHOP_CLOUD || 'aws').toLowerCase();
+            const validCloud = ['aws', 'azure', 'gcp'].includes(cloud) ? cloud : 'aws';
+            const deploymentMode = process.env.WORKSHOP_DEPLOYMENT === 'central' ? 'central' : 'local';
+            const config = {
+              cloud: validCloud,
+              deploymentMode,
+              runningInContainer: process.env.WORKSHOP_RUNNING_IN_CONTAINER === 'true',
+              awsDefaultRegion: process.env.WORKSHOP_AWS_DEFAULT_REGION || 'eu-central-1',
+              azureKeyVaultSuffix: process.env.WORKSHOP_AZURE_KEY_VAULT_SUFFIX || '.vault.azure.net',
+              gcpDefaultLocation: process.env.WORKSHOP_GCP_DEFAULT_LOCATION || 'global',
+            };
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(config));
+            return;
+          }
+
           if (req.url && req.url.startsWith('/api/check-tool')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
             const tool = url.searchParams.get('tool');
@@ -236,9 +255,11 @@ export default defineConfig(({ mode }) => ({
 
           if (req.url && req.url.startsWith('/api/verify-index')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
-            const uri = url.searchParams.get('uri') || '';
+            let uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
             const dbName = 'encryption';
             const collName = '__keyVault';
+            const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
+            const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : uri;
 
             // Construct a safe mongosh command to check indexes
             // We use --eval to run a script that returns JSON
@@ -248,8 +269,7 @@ export default defineConfig(({ mode }) => ({
               print(JSON.stringify(!!found));
             `;
 
-            // Mask password for safety in logs, but simpler here since we just pass URI
-            const cmd = `mongosh "${uri}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
+            const cmd = `mongosh "${effectiveUri.replace(/"/g, '\\"')}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
 
             exec(cmd, (error: any, stdout: any, stderr: any) => {
               if (error) {
@@ -373,13 +393,14 @@ export default defineConfig(({ mode }) => ({
             const url = new URL(req.url, `http://${req.headers.host}`);
             const expectedCount = parseInt(url.searchParams.get('expectedCount') || '1', 10);
 
-            // User-provided URI for their lab cluster (required)
-            const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            let uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
             if (!uri) {
               res.statusCode = 400;
               res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required' }));
               return;
             }
+            const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
+            const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : uri;
             const dbName = 'encryption';
             const collName = '__keyVault';
 
@@ -389,7 +410,7 @@ export default defineConfig(({ mode }) => ({
               print(count);
             `;
 
-            const cmd = `mongosh "${uri}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
+            const cmd = `mongosh "${effectiveUri.replace(/"/g, '\\"')}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
 
             exec(cmd, (error: any, stdout: any, stderr: any) => {
               if (error) {
@@ -432,13 +453,14 @@ export default defineConfig(({ mode }) => ({
 
           if (req.url && req.url.startsWith('/api/verify-qe-deks')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
-            // User-provided URI for their lab cluster (required)
-            const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            let uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
             if (!uri) {
               res.statusCode = 400;
               res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required' }));
               return;
             }
+            const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
+            const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : uri;
             const dbName = 'encryption';
             const collName = '__keyVault';
 
@@ -456,7 +478,7 @@ export default defineConfig(({ mode }) => ({
             // Escape $ for shell (so $in becomes \$in in the shell command)
             // Then escape quotes for the eval string
             const escapedScript = script.replace(/\$/g, '\\$').replace(/"/g, '\\"');
-            const cmd = `mongosh "${uri}" --quiet --eval "${escapedScript}"`;
+            const cmd = `mongosh "${effectiveUri.replace(/"/g, '\\"')}" --quiet --eval "${escapedScript}"`;
 
             exec(cmd, (error: any, stdout: any, stderr: any) => {
               if (error) {
@@ -503,13 +525,14 @@ export default defineConfig(({ mode }) => ({
             const url = new URL(req.url, `http://${req.headers.host}`);
             const dbName = url.searchParams.get('db') || 'hr';
             const collName = url.searchParams.get('coll') || 'employees';
-            // User-provided URI for their lab cluster (required)
-            const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            let uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
             if (!uri) {
               res.statusCode = 400;
               res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required' }));
               return;
             }
+            const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
+            const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : uri;
 
             // Check for .esc and .ecoc collections
             const script = `
@@ -521,7 +544,7 @@ export default defineConfig(({ mode }) => ({
               print(JSON.stringify(result));
             `;
 
-            const cmd = `mongosh "${uri}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
+            const cmd = `mongosh "${effectiveUri.replace(/"/g, '\\"')}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
 
             exec(cmd, (error: any, stdout: any, stderr: any) => {
               if (error) {
@@ -560,13 +583,14 @@ export default defineConfig(({ mode }) => ({
             const url = new URL(req.url, `http://${req.headers.host}`);
             const dbName = url.searchParams.get('db') || 'hr';
             const collName = url.searchParams.get('coll') || 'employees';
-            // User-provided URI for their lab cluster (required)
-            const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            let uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
             if (!uri) {
               res.statusCode = 400;
               res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required' }));
               return;
             }
+            const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
+            const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : uri;
 
             // Check if collection exists and has encryptedFields configuration
             const script = `
@@ -585,7 +609,7 @@ export default defineConfig(({ mode }) => ({
               print(JSON.stringify(result));
             `;
 
-            const cmd = `mongosh "${uri}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
+            const cmd = `mongosh "${effectiveUri.replace(/"/g, '\\"')}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
 
             exec(cmd, (error: any, stdout: any, stderr: any) => {
               if (error) {
@@ -629,13 +653,14 @@ export default defineConfig(({ mode }) => ({
             const url = new URL(req.url, `http://${req.headers.host}`);
             const dbName = url.searchParams.get('db') || 'hr';
             const collName = url.searchParams.get('coll') || 'employees';
-            // User-provided URI for their lab cluster (required)
-            const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            let uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
             if (!uri) {
               res.statusCode = 400;
               res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required' }));
               return;
             }
+            const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
+            const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : uri;
 
             // Check if collection has documents and verify encrypted field exists
             const script = `
@@ -651,7 +676,7 @@ export default defineConfig(({ mode }) => ({
               print(JSON.stringify(result));
             `;
 
-            const cmd = `mongosh "${uri}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
+            const cmd = `mongosh "${effectiveUri.replace(/"/g, '\\"')}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
 
             exec(cmd, (error: any, stdout: any, stderr: any) => {
               if (error) {
@@ -693,13 +718,14 @@ export default defineConfig(({ mode }) => ({
 
           if (req.url && req.url.startsWith('/api/verify-migration')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
-            // User-provided URI for their lab cluster (required)
-            const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            let uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
             if (!uri) {
               res.statusCode = 400;
               res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required' }));
               return;
             }
+            const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
+            const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : uri;
             const dbName = 'medical';
             const collName = 'patients_secure';
 
@@ -720,7 +746,7 @@ export default defineConfig(({ mode }) => ({
               print(JSON.stringify(result));
             `;
 
-            const cmd = `mongosh "${uri}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
+            const cmd = `mongosh "${effectiveUri.replace(/"/g, '\\"')}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
 
             exec(cmd, (error: any, stdout: any, stderr: any) => {
               if (error) {
@@ -767,13 +793,14 @@ export default defineConfig(({ mode }) => ({
 
           if (req.url && req.url.startsWith('/api/verify-tenant-deks')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
-            // User-provided URI for their lab cluster (required)
-            const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            let uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
             if (!uri) {
               res.statusCode = 400;
               res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required' }));
               return;
             }
+            const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
+            const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : uri;
             const expectedTenants = ['acme', 'contoso', 'fabrikam'];
 
             // Check if tenant DEKs exist
@@ -788,7 +815,7 @@ export default defineConfig(({ mode }) => ({
               print(JSON.stringify({ found: found, expected: tenants.length, actual: found.length }));
             `;
 
-            const cmd = `mongosh "${uri}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
+            const cmd = `mongosh "${effectiveUri.replace(/"/g, '\\"')}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
 
             exec(cmd, (error: any, stdout: any, stderr: any) => {
               if (error) {
@@ -825,13 +852,14 @@ export default defineConfig(({ mode }) => ({
 
           if (req.url && req.url.startsWith('/api/verify-key-rotation')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
-            // User-provided URI for their lab cluster (required)
-            const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            let uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
             if (!uri) {
               res.statusCode = 400;
               res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required' }));
               return;
             }
+            const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
+            const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : uri;
             const keyAltName = url.searchParams.get('keyAltName') || 'user-pierre-petersson-ssn-key';
 
             // Check if DEK exists and get its master key info
@@ -850,7 +878,7 @@ export default defineConfig(({ mode }) => ({
               }
             `;
 
-            const cmd = `mongosh "${uri}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
+            const cmd = `mongosh "${effectiveUri.replace(/"/g, '\\"')}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
 
             exec(cmd, (error: any, stdout: any, stderr: any) => {
               if (error) {
@@ -887,7 +915,7 @@ export default defineConfig(({ mode }) => ({
 
           if (req.url && req.url.startsWith('/api/verify-datakey')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
-            const uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            let uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
             const keyAltName = url.searchParams.get('keyAltName') || '';
             
             if (!uri) {
@@ -895,6 +923,8 @@ export default defineConfig(({ mode }) => ({
               res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' }));
               return;
             }
+            const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
+            const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : uri;
             
             if (!keyAltName) {
               res.statusCode = 400;
@@ -916,7 +946,7 @@ export default defineConfig(({ mode }) => ({
               print(JSON.stringify(result));
             `;
 
-            const cmd = `mongosh "${uri}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
+            const cmd = `mongosh "${effectiveUri.replace(/"/g, '\\"')}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
 
             exec(cmd, (error: any, stdout: any, stderr: any) => {
               if (error) {
@@ -946,6 +976,55 @@ export default defineConfig(({ mode }) => ({
                   success: false,
                   message: `Failed to parse database response: ${e.message}`
                 }));
+              }
+            });
+            return;
+          }
+
+          if (req.url && req.url.startsWith('/api/verify-field-encrypted')) {
+            const url = new URL(req.url, `http://${req.headers.host}`);
+            let uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            const dbName = url.searchParams.get('db') || '';
+            const collection = url.searchParams.get('collection') || '';
+            const field = url.searchParams.get('field') || '';
+            if (!uri || !dbName || !collection || !field) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, message: 'uri, db, collection, and field are required.' }));
+              return;
+            }
+            const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
+            const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : uri;
+            const script = `
+              var count = db.getSiblingDB('${dbName.replace(/'/g, "\\'")}').getCollection('${collection.replace(/'/g, "\\'")}').countDocuments({ ${field.replace(/'/g, "\\'")}: { $type: "binData" } });
+              print(JSON.stringify({ encrypted: count > 0, count: count }));
+            `;
+            const escapedForShell = script.replace(/\$/g, '\\$').replace(/"/g, '\\"').replace(/\n/g, ' ');
+            const cmd = `mongosh "${effectiveUri.replace(/"/g, '\\"')}" --quiet --eval "${escapedForShell}"`;
+            exec(cmd, { timeout: 15000, maxBuffer: 512 * 1024 }, (error: any, stdout: string, stderr: string) => {
+              res.setHeader('Content-Type', 'application/json');
+              if (error) {
+                res.end(JSON.stringify({
+                  success: false,
+                  message: stderr?.trim() || error.message || 'Connection failed. Ensure MongoDB is running and URI is correct.'
+                }));
+                return;
+              }
+              try {
+                const result = JSON.parse(stdout.trim());
+                if (result.encrypted) {
+                  res.end(JSON.stringify({
+                    success: true,
+                    message: `Verified: at least one document in ${dbName}.${collection} has field "${field}" stored as encrypted (Binary).`
+                  }));
+                } else {
+                  res.end(JSON.stringify({
+                    success: false,
+                    message: `No encrypted "${field}" found in ${dbName}.${collection}. Run the CSFLE test script (e.g. node testCSFLE.cjs) to insert a document with CSFLE.`
+                  }));
+                }
+              } catch (e: any) {
+                res.end(JSON.stringify({ success: false, message: `Failed to parse response: ${(e as Error).message}` }));
               }
             });
             return;
@@ -1148,6 +1227,176 @@ export default defineConfig(({ mode }) => ({
             }
           }
 
+          // Run shell commands (allowed list for workshop labs)
+          if (req.url && req.url.startsWith('/api/run-bash') && req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+            req.on('end', () => {
+              try {
+                const { command, commands: rawCommands } = JSON.parse(body || '{}');
+                const commands = Array.isArray(rawCommands)
+                  ? rawCommands
+                  : typeof command === 'string'
+                    ? command.split('\n').map((s: string) => s.trim()).filter(Boolean)
+                    : [];
+                const allowedPrefixes = ['aws ', 'echo ', 'env ', 'npm ', 'npx ', 'node ', 'mongosh ', 'cd '];
+                const isAllowed = (line: string) => {
+                  const t = line.trim();
+                  if (!t || t.startsWith('#')) return true;
+                  if (allowedPrefixes.some(p => t.startsWith(p))) return true;
+                  if (/^[A-Za-z_][A-Za-z0-9_]*=\$\(aws\s/.test(t) || /^[A-Za-z_][A-Za-z0-9_]*=.*\$\(aws\s/.test(t)) return true;
+                  if (/^--[A-Za-z0-9-]+/.test(t)) return true;
+                  if (/^\)\s*;?\s*$/.test(t)) return true;
+                  if (/^cat\s+<<\w+(\s+>|\s*>>)\s*policy\.json\s*$/.test(t)) return true;
+                  if (t === 'EOF') return true;
+                  if (t.length <= 500 && /^\s*[\s"{}\[\]:,*A-Za-z0-9._$-]+$/.test(t)) return true;
+                  return false;
+                };
+                const toRun = commands.filter((l: string) => {
+                  const t = l.trim();
+                  return t && !t.startsWith('#') && isAllowed(l);
+                });
+                if (toRun.length === 0) {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: false, stdout: '', stderr: 'No allowed commands', exitCode: 1 }));
+                  return;
+                }
+                const script = toRun.join('\n');
+                exec(script, { timeout: 30000, maxBuffer: 1024 * 1024 }, (error: any, stdout: string, stderr: string) => {
+                  const exitCode = error?.code ?? (error ? 1 : 0);
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({
+                    success: exitCode === 0,
+                    stdout: stdout || '',
+                    stderr: stderr || '',
+                    exitCode,
+                  }));
+                });
+              } catch (e: any) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: false, stdout: '', stderr: (e as Error).message || 'Invalid request', exitCode: 1 }));
+              }
+            });
+            return;
+          }
+
+          // Run Node.js code (e.g. lab scripts). Uses temp file and MONGODB_URI env.
+          if (req.url && req.url.startsWith('/api/run-node') && req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+            req.on('end', () => {
+              try {
+                const { code, uri } = JSON.parse(body || '{}');
+                if (typeof code !== 'string' || !code.trim()) {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: false, stdout: '', stderr: 'No code provided', message: 'No code provided' }));
+                  return;
+                }
+                const cwd = process.cwd();
+                const nodeModulesPath = path.join(cwd, 'node_modules');
+                if (!existsSync(nodeModulesPath) || !statSync(nodeModulesPath).isDirectory()) {
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({
+                    success: false,
+                    stdout: '',
+                    stderr: `node_modules not found at ${nodeModulesPath}. Run npm install (or npm ci) in the project root.`,
+                    message: 'node_modules not found. Run npm install in the project root.',
+                  }));
+                  return;
+                }
+                const tmpDir = os.tmpdir();
+                const tmpFile = path.join(tmpDir, `workshop-run-${Date.now()}-${Math.random().toString(36).slice(2, 10)}.cjs`);
+                writeFileSync(tmpFile, code, 'utf-8');
+                if (!existsSync(tmpFile)) {
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: false, stdout: '', stderr: `Temp script not created: ${tmpFile}`, message: `Temp script not created: ${tmpFile}` }));
+                  return;
+                }
+                const nodeUri = (uri || '').trim();
+                const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(nodeUri);
+                const effectiveNodeUri = isLocalNoAuth && process.env.MONGODB_URI
+                  ? process.env.MONGODB_URI
+                  : nodeUri;
+                const env = {
+                  ...process.env,
+                  MONGODB_URI: effectiveNodeUri,
+                  NODE_PATH: nodeModulesPath,
+                };
+                execFile(process.execPath, [tmpFile], { timeout: 30000, maxBuffer: 1024 * 1024, env, cwd }, (error: any, stdout: string, stderr: string) => {
+                  try { require('fs').unlinkSync(tmpFile); } catch { /* ignore */ }
+                  const exitCode = error?.code ?? (error ? 1 : 0);
+                  const out = (stdout || '').trim();
+                  const err = (stderr || '').trim();
+                  // When failed, prefer stderr/stdout so the Console shows the real Node error (e.g. module not found, connection refused)
+                  const failedMessage = [err, out].filter(Boolean).join('\n') || error?.message || 'Command failed';
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({
+                    success: exitCode === 0,
+                    stdout: stdout || '',
+                    stderr: stderr || '',
+                    exitCode,
+                    error: exitCode !== 0,
+                    message: exitCode === 0 ? (out || 'OK') : failedMessage,
+                  }));
+                });
+              } catch (e: any) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: false, stdout: '', stderr: (e as Error).message || 'Invalid request', error: true, message: (e as Error).message }));
+              }
+            });
+            return;
+          }
+
+          // Run mongosh script. Requires URI in body.
+          if (req.url && req.url.startsWith('/api/run-mongosh') && req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+            req.on('end', () => {
+              try {
+                const { code, uri } = JSON.parse(body || '{}');
+                if (typeof code !== 'string' || !code.trim()) {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: false, stdout: '', stderr: 'No code provided', message: 'No code provided' }));
+                  return;
+                }
+                if (!uri || typeof uri !== 'string') {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: false, stdout: '', stderr: 'MongoDB URI required', message: 'MongoDB URI required' }));
+                  return;
+                }
+                // When client sends localhost/127.0.0.1 and server has MONGODB_URI (e.g. Docker), use env so connection works
+                const effectiveUri = (/^mongodb:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(uri.trim()) && process.env.MONGODB_URI)
+                  ? process.env.MONGODB_URI
+                  : uri;
+                const escaped = code.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$');
+                const cmd = `mongosh "${effectiveUri}" --quiet --eval "${escaped}"`;
+                exec(cmd, { timeout: 15000, maxBuffer: 512 * 1024 }, (error: any, stdout: string, stderr: string) => {
+                  const exitCode = error?.code ?? (error ? 1 : 0);
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({
+                    success: exitCode === 0,
+                    stdout: stdout || '',
+                    stderr: stderr || '',
+                    exitCode,
+                    error: exitCode !== 0,
+                    message: error?.message || (exitCode !== 0 ? stderr || stdout : ''),
+                  }));
+                });
+              } catch (e: any) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: false, stdout: '', stderr: (e as Error).message || 'Invalid request', error: true, message: (e as Error).message }));
+              }
+            });
+            return;
+          }
+
           if (req.url && req.url.startsWith('/api/check-file')) {
             try {
               const url = new URL(req.url, `http://${req.headers.host}`);
@@ -1255,7 +1504,7 @@ export default defineConfig(({ mode }) => ({
           if (req.url && req.url.startsWith('/api/check-versions')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
             const checkType = url.searchParams.get('type') || 'all';
-            const uri = url.searchParams.get('uri') || '';
+            let uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
             
             try {
               const packageJson = JSON.parse(readFileSync('./package.json', 'utf-8'));
@@ -1331,8 +1580,10 @@ export default defineConfig(({ mode }) => ({
               // Check MongoDB Atlas version
               const checkAtlasVersion = () => {
                 if ((checkType === 'all' || checkType === 'atlas') && uri) {
+                  const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
+                  const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : uri;
                   const script = `try { print(JSON.stringify({ version: db.version() })); } catch(e) { print(JSON.stringify({ error: e.message })); }`;
-                  const cmd = `mongosh "${uri}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
+                  const cmd = `mongosh "${effectiveUri.replace(/"/g, '\\"')}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
                   
                   exec(cmd, (atlasError, atlasStdout) => {
                     if (!atlasError && atlasStdout) {

@@ -12,6 +12,12 @@ export const labTextSearchWithAutocompleteDefinition: WorkshopLabDefinition = {
   prerequisites: ['lab-text-search-basics'],
   povCapabilities: ['TEXT-SEARCH', 'AUTO-COMPLETE'],
   modes: ['lab', 'demo', 'challenge'],
+  keyConcepts: [
+    { term: 'Autocomplete field type', explanation: 'Uses edge n-grams so prefix matches return suggestions as the user types.' },
+    { term: 'edgeGram tokenization', explanation: 'Splits text into overlapping tokens from the start; ideal for typeahead.' },
+    { term: 'autocomplete operator', explanation: 'In $search, matches the query as a prefix against the autocomplete path.' },
+    { term: 'Typeahead UX', explanation: 'Debounce input and use a small limit (e.g. 10) for fast, relevant suggestions.' },
+  ],
   steps: [
     {
       id: 'lab-text-search-autocomplete-step-1',
@@ -24,6 +30,11 @@ export const labTextSearchWithAutocompleteDefinition: WorkshopLabDefinition = {
       enhancementId: 'text-search.autocompleteIndex',
       verificationId: 'text-search.verifyAutocompleteIndex',
       points: 10,
+      hints: [
+        'Add a field with "type": "autocomplete" and "tokenization": "edgeGram".',
+        'Set minGrams and maxGrams to control the length of prefix tokens.',
+        'Keep a separate autocomplete field so you can tune it independently of full-text search.',
+      ],
     },
     {
       id: 'lab-text-search-autocomplete-step-2',
@@ -36,6 +47,11 @@ export const labTextSearchWithAutocompleteDefinition: WorkshopLabDefinition = {
       enhancementId: 'text-search.typeaheadQuery',
       verificationId: 'text-search.verifyTypeahead',
       points: 10,
+      hints: [
+        'Use the "autocomplete" operator in $search with "query" and "path".',
+        'Parameterize the query value from the user input (with debounce in your app).',
+        'Return a small set of suggestions with id and label for the UI.',
+      ],
     },
     {
       id: 'lab-text-search-autocomplete-step-3',
@@ -48,6 +64,11 @@ export const labTextSearchWithAutocompleteDefinition: WorkshopLabDefinition = {
       enhancementId: 'text-search.typeaheadDesign',
       verificationId: 'text-search.verifyTypeaheadDesign',
       points: 10,
+      hints: [
+        'Expose a single suggest endpoint that runs the autocomplete aggregation.',
+        'Use debounce (e.g. 150–300 ms) and a minimum character length (e.g. 2).',
+        'Keep the response small: id and label per suggestion.',
+      ],
     },
   ],
 };

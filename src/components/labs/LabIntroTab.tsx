@@ -10,6 +10,8 @@ interface LabIntroTabProps {
   whatYouWillBuild: string[];
   keyConcepts: Array<{ term: string; explanation: string }>;
   keyInsight: string;
+  /** Why this feature matters and how to position it (business value). */
+  businessValue?: string;
   architectureDiagram?: React.ReactNode;
   showEncryptionFlow?: boolean;
   encryptionFlowType?: 'csfle' | 'qe';
@@ -24,6 +26,7 @@ export function LabIntroTab({
   whatYouWillBuild,
   keyConcepts,
   keyInsight,
+  businessValue,
   architectureDiagram,
   showEncryptionFlow = false,
   encryptionFlowType = 'csfle',
@@ -90,6 +93,17 @@ export function LabIntroTab({
             <span className="text-muted-foreground italic">"{keyInsight}"</span>
           </div>
         </div>
+
+        {/* Business value: why this matters and how to position */}
+        {businessValue && (
+          <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 flex items-start gap-3">
+            <Lightbulb className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <span className="font-medium text-amber-600 dark:text-amber-400">Why this matters & how to position: </span>
+              <span className="text-muted-foreground">{businessValue}</span>
+            </div>
+          </div>
+        )}
 
         {/* Architecture/Flow Section */}
         {(showEncryptionFlow || architectureDiagram) && (

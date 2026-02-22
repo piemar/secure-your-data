@@ -164,6 +164,88 @@ export interface WorkshopLabStep {
    * Example: "Execution - TEST 1"
    */
   sourceSection?: string;
+  /**
+   * Optional elevated experience: when set, Run (or Try it) can render an app-like preview
+   * instead of or alongside terminal output. The prompt can generate this for any POV.
+   */
+  preview?: LabStepPreviewConfig;
+}
+
+/**
+ * Generic lab step preview: schema-driven config so the ADD_LAB_MASTER_PROMPT
+ * (or future prompts) can create an elevated experience for any POV.
+ * One component (GenericLabPreview) renders based on type + config + run result.
+ */
+export type LabStepPreviewConfig =
+  | { type: 'search'; config: SearchPreviewConfig }
+  | { type: 'table'; config: TablePreviewConfig }
+  | { type: 'chart'; config: ChartPreviewConfig }
+  | { type: 'encryption-demo'; config: EncryptionDemoPreviewConfig }
+  | { type: 'diagram'; config: DiagramPreviewConfig }
+  | { type: 'terminal'; config?: Record<string, unknown> };
+
+export interface SearchPreviewConfig {
+  /** Show search input and run query on change */
+  searchField?: boolean;
+  /** Placeholder for search input */
+  searchPlaceholder?: string;
+  /** Show autocomplete suggestions dropdown (for autocomplete steps) */
+  autocomplete?: boolean;
+  /** Facet field names to show as filters (e.g. ['category', 'priceBand']) */
+  facetFields?: string[];
+  /** Document fields to show in results (e.g. ['name', 'description', 'score']) */
+  resultFields?: string[];
+  /** Show relevance score in results */
+  showScore?: boolean;
+  /** Show highlight snippets */
+  highlight?: boolean;
+}
+
+export interface TablePreviewConfig {
+  /** Column keys to display (order preserved) */
+  columns?: string[];
+  /** Max rows to show */
+  maxRows?: number;
+}
+
+export interface ChartPreviewConfig {
+  /** bar | line | pie */
+  chartType?: 'bar' | 'line' | 'pie';
+  /** Field to use for x/categories */
+  xField?: string;
+  /** Field to use for y/values */
+  yField?: string;
+  /** Optional title */
+  title?: string;
+}
+
+export interface EncryptionDemoPreviewConfig {
+  /** insert | query | both */
+  mode?: 'insert' | 'query' | 'both';
+  /** Fields to show as encrypted vs decrypted */
+  fields?: string[];
+}
+
+export interface DiagramPreviewConfig {
+  /** topology | timeline | flow */
+  variant?: 'topology' | 'timeline' | 'flow';
+  /** Optional title */
+  title?: string;
+}
+
+/**
+ * Data passed to GenericLabPreview after Run: the raw run result (stdout/parsed)
+ * plus optional structured data (e.g. aggregation result array for search/table/chart).
+ */
+export interface LabPreviewData {
+  /** Raw output from run (terminal or API) */
+  rawOutput?: string;
+  /** Parsed result array (e.g. aggregation cursor) for search/table/chart */
+  documents?: Record<string, unknown>[];
+  /** For search: facet counts per field */
+  facets?: Record<string, { _id: unknown; count: number }[]>;
+  /** For autocomplete: suggestion list */
+  suggestions?: { _id: unknown; label?: string }[];
 }
 
 /**

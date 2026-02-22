@@ -7,6 +7,8 @@ import { useWorkshopSession } from '@/contexts/WorkshopSessionContext';
 import { useRole } from '@/contexts/RoleContext';
 import { buildStepEnhancementsAsync } from './stepEnhancementRegistry';
 import { labIntroComponents } from './labIntroComponents';
+import { getLabMongoUri } from '@/utils/workshopUtils';
+import { useWorkshopConfig } from '@/context/WorkshopConfigContext';
 
 interface LabRunnerProps {
   labNumber: number;
@@ -97,6 +99,7 @@ export function LabRunner(props: LabRunnerProps) {
   const { labId, labNumber, stepEnhancements, labContextOverlay } = props;
   const { currentMode, activeTemplate } = useWorkshopSession();
   const { isModerator } = useRole();
+  const { runningInContainer } = useWorkshopConfig();
   const [labDef, setLabDef] = useState<WorkshopLabDefinition | null>(null);
   const [enhancements, setEnhancements] = useState<Map<string, Partial<Step>>>(new Map());
   const [loading, setLoading] = useState(false);
@@ -187,7 +190,8 @@ export function LabRunner(props: LabRunnerProps) {
       steps: filteredSteps
     };
 
-    // Merge stepEnhancements prop with loaded enhancements
+    // Merge: component-provided stepEnhancements (e.g. from Lab1CSFLE/Lab2QueryableEncryption) override
+    // async-loaded enhancements so the IDE shows the same code as main (full codeBlocks, hints, etc.)
     const combinedEnhancements = new Map(enhancements);
     if (stepEnhancements) {
       stepEnhancements.forEach((value, key) => {
@@ -241,6 +245,7 @@ export function LabRunner(props: LabRunnerProps) {
         isModerator={isModerator}
         defaultCompetitorId={defaultCompetitorId}
         competitorIds={competitorIds}
+        labMongoUri={getLabMongoUri(runningInContainer)}
       />
     );
   }
@@ -250,6 +255,6 @@ export function LabRunner(props: LabRunnerProps) {
     return <div>Error: Either provide labId or all required props</div>;
   }
 
-  return <LabViewWithTabs {...props as Required<LabRunnerProps>} />;
+  return <LabViewWithTabs {...props as Required<LabRunnerProps>} labMongoUri={getLabMongoUri(runningInContainer)} />;
 }
 

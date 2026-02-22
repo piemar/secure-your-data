@@ -3,6 +3,7 @@ import Editor from '@monaco-editor/react';
 import { Play, RotateCcw, Copy, Check, Terminal, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { getEditableLabOptions, defineLabDarkTheme, LAB_EDITOR_THEME } from '@/lib/monacoLabEditorOptions';
 
 interface CodePlaygroundProps {
   initialCode: string;
@@ -139,25 +140,16 @@ export function CodePlayground({
         </div>
       </div>
 
-      {/* Editor */}
+      {/* Editor with IntelliSense / code completion */}
       <div className="border-b border-border">
         <Editor
           height={height}
           language={language}
           value={code}
           onChange={handleEditorChange}
-          theme="vs-dark"
-          options={{
-            minimap: { enabled: false },
-            fontSize: 13,
-            lineNumbers: 'on',
-            scrollBeyondLastLine: false,
-            wordWrap: 'on',
-            automaticLayout: true,
-            tabSize: 2,
-            readOnly,
-            padding: { top: 12, bottom: 12 },
-          }}
+          theme={LAB_EDITOR_THEME}
+          beforeMount={defineLabDarkTheme}
+          options={getEditableLabOptions({ readOnly, fontSize: 13 })}
         />
       </div>
 

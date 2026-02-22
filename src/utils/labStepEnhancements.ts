@@ -29,6 +29,8 @@ export function createStepEnhancements(steps: Step[]): Map<string, Partial<Step>
     if (step.hints) enhancement.hints = step.hints;
     if (step.difficulty) enhancement.difficulty = step.difficulty;
     if (step.estimatedTime) enhancement.estimatedTime = step.estimatedTime;
+    if (step.expectedOutput) enhancement.expectedOutput = step.expectedOutput;
+    if (step.documentationUrl) enhancement.documentationUrl = step.documentationUrl;
     
     // Only add to map if there's actual enhancement data
     if (Object.keys(enhancement).length > 0) {

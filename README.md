@@ -59,6 +59,12 @@
    npm run dev
    ```
 
+   **If you use "Local" MongoDB** in the workshop (for the **Run** button in labs), something must be listening on `localhost:27017`. With Docker Compose:
+   ```bash
+   docker compose up mongo -d
+   ```
+   Then lab Run (mongosh/Node) will connect to that instance. If you run the full app in Docker (`docker compose up`), the app container uses `MONGODB_URI=mongodb://mongo:27017` automatically.
+
 4. **Open your browser**:
    Navigate to `http://localhost:8080` (or the port shown in your terminal)
 
