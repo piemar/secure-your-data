@@ -13,7 +13,7 @@
 services:
   app:
     # Pre-published image (use when not testing local image changes):
-    # image: pierrepetersson/mongodb-workshop-sandbox:latest
+    # image: pierrepetersson/mongodb-workshop-sandbox-final:latest
     build:
       context: .
       dockerfile: Dockerfile.full
