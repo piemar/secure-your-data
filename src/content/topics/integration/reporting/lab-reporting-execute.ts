@@ -36,6 +36,12 @@ export const labReportingExecuteDefinition: WorkshopLabDefinition = {
       enhancementId: 'reporting.query-count',
       sourceProof: 'proofs/16/README.md',
       sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-reporting-execute-step-2',
@@ -49,7 +55,12 @@ export const labReportingExecuteDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'reporting.query-carriers',
       sourceProof: 'proofs/16/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-reporting-execute-step-3',
@@ -63,7 +74,12 @@ export const labReportingExecuteDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'reporting.query-delays',
       sourceProof: 'proofs/16/README.md',
-      sourceSection: 'Measurement',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Measurement',
     },
   ],
 };

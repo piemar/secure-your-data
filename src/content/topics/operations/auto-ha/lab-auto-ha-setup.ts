@@ -33,6 +33,12 @@ export const labAutoHaSetupDefinition: WorkshopLabDefinition = {
       enhancementId: 'auto-ha.atlas-cluster',
       sourceProof: 'proofs/17/README.md',
       sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-auto-ha-setup-step-2',
@@ -46,7 +52,12 @@ export const labAutoHaSetupDefinition: WorkshopLabDefinition = {
       points: 5,
       enhancementId: 'auto-ha.connection-string',
       sourceProof: 'proofs/17/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
     {
       id: 'lab-auto-ha-setup-step-3',
@@ -60,7 +71,12 @@ export const labAutoHaSetupDefinition: WorkshopLabDefinition = {
       points: 5,
       enhancementId: 'auto-ha.python-env',
       sourceProof: 'proofs/17/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
   ],
 };

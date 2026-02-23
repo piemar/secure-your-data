@@ -37,6 +37,12 @@ export const labPartialRecoveryExecuteDefinition: WorkshopLabDefinition = {
       enhancementId: 'partial-recovery.verify-present',
       sourceProof: 'proofs/15/README.md',
       sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-partial-recovery-execute-step-2',
@@ -50,7 +56,12 @@ export const labPartialRecoveryExecuteDefinition: WorkshopLabDefinition = {
       points: 5,
       enhancementId: 'partial-recovery.delete-docs',
       sourceProof: 'proofs/15/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-partial-recovery-execute-step-3',
@@ -64,7 +75,12 @@ export const labPartialRecoveryExecuteDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'partial-recovery.pitr-export-import',
       sourceProof: 'proofs/15/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
   ],
 };

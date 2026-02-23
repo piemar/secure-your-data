@@ -60,14 +60,38 @@ export function getStepEnhancementSync(enhancementId?: string): Partial<Step> | 
 /** Get lab user suffix for placeholder substitution (YOUR_SUFFIX → same key as Lab 1). */
 function getLabUserSuffix(): string {
   if (typeof window === 'undefined' || !window.localStorage) return 'default';
-  return window.localStorage.getItem('lab_user_suffix') || 'default';
+  return window.localStorage.getItem('lab_user_suffix') || localStorage.getItem('userEmail')?.split('@')[0] || 'default';
 }
 
-/** Replace YOUR_SUFFIX in code/skeleton strings so Lab 3 uses the same DEK key name as Lab 1. */
+/** Get lab alias name (alias/mongodb-lab-key-<suffix>) for CSFLE/QE labs. */
+function getLabAliasName(): string {
+  return `alias/mongodb-lab-key-${getLabUserSuffix()}`;
+}
+
+/** Get AWS region for KMS (from localStorage or default). */
+function getLabAwsRegion(): string {
+  if (typeof window === 'undefined' || !window.localStorage) return 'eu-central-1';
+  return localStorage.getItem('aws_region') || localStorage.getItem('lab_aws_region') || 'eu-central-1';
+}
+
+/** Get crypt shared library path (optional; empty if not set). */
+function getCryptSharedLibPath(): string {
+  if (typeof window === 'undefined' || !window.localStorage) return '';
+  return localStorage.getItem('crypt_shared_lib_path') || localStorage.getItem('mongo_crypt_shared_path') || '';
+}
+
+/** Replace placeholders in code/skeleton strings for content-driven labs (Lab 1, 2, 3). */
 function substitutePlaceholders(text: string | undefined): string | undefined {
   if (text == null || typeof text !== 'string') return text;
   const suffix = getLabUserSuffix();
-  return text.replace(/\bYOUR_SUFFIX\b/g, suffix);
+  const aliasName = getLabAliasName();
+  const awsRegion = getLabAwsRegion();
+  const cryptPath = getCryptSharedLibPath();
+  return text
+    .replace(/\bYOUR_SUFFIX\b/g, suffix)
+    .replace(/\bALIAS_NAME\b/g, aliasName)
+    .replace(/(?<!process\.env\.)\bAWS_REGION\b/g, awsRegion)
+    .replace(/\bCRYPT_SHARED_LIB_PATH\b/g, cryptPath);
 }
 
 /**

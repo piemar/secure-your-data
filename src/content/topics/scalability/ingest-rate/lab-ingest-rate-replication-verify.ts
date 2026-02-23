@@ -30,7 +30,12 @@ export const labIngestRateReplicationVerifyDefinition: WorkshopLabDefinition = {
       description: 'Collection with replication enforced (2+ copies)',
       type: 'collection',
       namespace: 'INGEST-RATE.records',
-      sizeHint: 'verify on secondaries',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: 'verify on secondaries',
     },
   ],
   steps: [
@@ -48,6 +53,12 @@ export const labIngestRateReplicationVerifyDefinition: WorkshopLabDefinition = {
       enhancementId: 'ingest-rate.monitor-replication',
       sourceProof: 'proofs/03/README.md',
       sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-ingest-rate-replication-verify-step-2',
@@ -62,7 +73,12 @@ export const labIngestRateReplicationVerifyDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'ingest-rate.verify-nodes',
       sourceProof: 'proofs/03/README.md',
-      sourceSection: 'Measurement',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Measurement',
     },
     {
       id: 'lab-ingest-rate-replication-verify-step-3',
@@ -77,7 +93,12 @@ export const labIngestRateReplicationVerifyDefinition: WorkshopLabDefinition = {
       points: 20,
       enhancementId: 'ingest-rate.failover-test',
       sourceProof: 'proofs/03/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
   ],
 };

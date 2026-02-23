@@ -33,6 +33,12 @@ export const labAutoHaExecuteDefinition: WorkshopLabDefinition = {
       enhancementId: 'auto-ha.run-without-retry',
       sourceProof: 'proofs/17/README.md',
       sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-auto-ha-execute-step-2',
@@ -46,7 +52,12 @@ export const labAutoHaExecuteDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'auto-ha.trigger-failover',
       sourceProof: 'proofs/17/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-auto-ha-execute-step-3',
@@ -60,7 +71,12 @@ export const labAutoHaExecuteDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'auto-ha.run-with-retry',
       sourceProof: 'proofs/17/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
   ],
 };

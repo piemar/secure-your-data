@@ -12,7 +12,7 @@ Welcome! This guide will help you quickly create new labs, quests, and demo scri
 
 Labs live under **topic-centric paths**: `src/content/topics/<topic>/<pov>/lab-*.ts`. Each step uses an **enhancementId** (e.g. `full-recovery-rpo.concepts`); code blocks and tips live in **enhancements.ts** in the same folder. Registration is in **src/content/topics/index.ts** (and, for new POVs, **src/labs/enhancements/loader.ts**).
 
-**Recommended:** Use the [Master Template Prompt](ADD_LAB_MASTER_PROMPT.md) to generate a full lab plus enhancements and registration in one go. For architecture and a step-by-step checklist, see [ARCHITECTURE_AND_ADDING_LABS.md](ARCHITECTURE_AND_ADDING_LABS.md).
+**Recommended:** Use the [Master Template Prompt](ADD_LAB_MASTER_PROMPT.md) to generate a full lab plus enhancements and registration in one go. All new labs, new steps, and updates to existing steps must follow the **standardized approach (Lab 1 Step 3)**: no Terminal block for running node; Node + Mongosh steps use two blocks only (Node, then Mongosh) **when the step can run the same in mongosh**—otherwise one block and no mongosh tab; execution via Run all / Run selection; skeleton + inlineHints for all code blocks. See [ADD_LAB_MASTER_PROMPT.md](ADD_LAB_MASTER_PROMPT.md) and [CONTENT_STANDARDS.md](CONTENT_STANDARDS.md). For architecture and a step-by-step checklist, see [ARCHITECTURE_AND_ADDING_LABS.md](ARCHITECTURE_AND_ADDING_LABS.md).
 
 ### Step 1: Use the Creation Script (scaffold only)
 

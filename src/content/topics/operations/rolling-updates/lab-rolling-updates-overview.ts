@@ -41,6 +41,12 @@ export const labRollingUpdatesOverviewDefinition: WorkshopLabDefinition = {
       enhancementId: 'rolling-updates.concepts',
       sourceProof: 'proofs/12/README.md',
       sourceSection: 'Description',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-rolling-updates-overview-step-2',
@@ -54,7 +60,12 @@ export const labRollingUpdatesOverviewDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'rolling-updates.verification',
       sourceProof: 'proofs/12/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-rolling-updates-overview-step-3',
@@ -68,7 +79,12 @@ export const labRollingUpdatesOverviewDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'rolling-updates.trigger',
       sourceProof: 'proofs/12/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
   ],
 };

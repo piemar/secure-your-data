@@ -28,6 +28,12 @@ export const labTestRegisterLabDefinition: WorkshopLabDefinition = {
       enhancementId: 'partial-recovery-rpo.step-1',
       sourceProof: 'proofs/14/README.md',
       sourceSection: 'Description',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-test-register-lab-step-2',
@@ -39,7 +45,12 @@ export const labTestRegisterLabDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'partial-recovery-rpo.step-2',
       sourceProof: 'proofs/14/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-test-register-lab-step-3',
@@ -51,7 +62,12 @@ export const labTestRegisterLabDefinition: WorkshopLabDefinition = {
       points: 5,
       enhancementId: 'partial-recovery-rpo.step-3',
       sourceProof: 'proofs/14/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
   ],
 };

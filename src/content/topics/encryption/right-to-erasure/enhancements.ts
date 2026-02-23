@@ -3,6 +3,9 @@ import type { EnhancementMetadataRegistry } from '@/labs/enhancements/schema';
 /**
  * Right to Erasure (Lab 3) Enhancement Metadata
  *
+ * Lab 3 is content-driven: rendered via LabRunner; step content (codeBlocks, skeleton,
+ * inlineHints) comes from this file. See Docs/LAB_IMPLEMENTATION_PATHS.md.
+ *
  * Source PoV Proof Exercise: Docs/pov-proof-exercises/proofs/46/README.md (CSFLE - advanced patterns)
  *
  * Replace placeholders with values from the Setup Wizard:
@@ -20,7 +23,7 @@ export const enhancements: EnhancementMetadataRegistry = {
     sourceSection: 'CSFLE - Migration',
     codeBlocks: [
       {
-        filename: 'migrateToCSFLE.cjs (Node.js)',
+        filename: 'migrateToCSFLE.cjs',
         language: 'javascript',
         code: `const { MongoClient, ClientEncryption } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
@@ -87,6 +90,7 @@ async function run() {
     ]);
   }
 
+  await secureCollection.drop().catch(() => {});
   const legacyDocs = await legacyCollection.find({}).toArray();
   for (const doc of legacyDocs) {
     const encryptedSSN = await encryption.encrypt(doc.ssn, {
@@ -176,6 +180,7 @@ async function run() {
 
   const legacyCollection = client.db("medical").collection("patients_legacy");
   const secureCollection = client.db("medical").collection("patients_secure");
+  await secureCollection.drop().catch(() => {});
   const legacyDocs = await legacyCollection.find({}).toArray();
 
   for (const doc of legacyDocs) {
@@ -189,22 +194,15 @@ async function run() {
 }
 run().catch(console.error);`,
         inlineHints: [
-          { line: 18, blankText: '______', hint: 'Method to retrieve a single document', answer: 'findOne' },
-          { line: 23, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
-          { line: 33, blankText: '_________', hint: 'Method to encrypt a value manually', answer: 'encrypt' },
-          { line: 34, blankText: '____________', hint: 'Algorithm suffix for queryable encryption', answer: 'Deterministic' },
+          { line: 20, blankText: '______', hint: 'Method to retrieve a single document', answer: 'findOne' },
+          { line: 25, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
+          { line: 36, blankText: '_________', hint: 'Method to encrypt a value manually', answer: 'encrypt' },
+          { line: 37, blankText: '____________', hint: 'Algorithm suffix for deterministic encryption', answer: 'Deterministic' },
         ],
-      },
-      {
-        filename: 'Terminal - Run the script',
-        language: 'bash',
-        code: `# Replace placeholders in migrateToCSFLE.cjs, then run:
-node migrateToCSFLE.cjs
-
-# Expected: Migration complete! Migrated 3 documents.`,
       },
     ],
     tips: [
+      'Replace placeholders in the script, then use Run all or Run selection to execute. Expected: Migration complete! Migrated 3 documents.',
       'Replace YOUR_MONGO_URI and YOUR_SUFFIX with values from the Setup Wizard.',
       'Use explicit encryption for migration - automatic encryption expects ciphertext.',
       'Deterministic encryption preserves query capabilities on PII.',
@@ -219,7 +217,7 @@ node migrateToCSFLE.cjs
     sourceSection: 'CSFLE - Multi-Tenant',
     codeBlocks: [
       {
-        filename: 'multiTenantIsolation.cjs (Node.js)',
+        filename: 'multiTenantIsolation.cjs',
         language: 'javascript',
         code: `const { MongoClient, ClientEncryption } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
@@ -268,6 +266,58 @@ async function run() {
   await client.close();
 }
 run().catch(console.error);`,
+        skeleton: `const { MongoClient, ClientEncryption } = require("mongodb");
+const { fromSSO } = require("@aws-sdk/credential-providers");
+
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
+const keyVaultNamespace = "encryption.__keyVault";
+
+async function run() {
+  const credentials = await fromSSO()();
+  const kmsProviders = {
+    aws: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
+  };
+
+  const client = await MongoClient.connect(uri);
+  const keyVaultDB = client.db("encryption");
+  const encryption = new ClientEncryption(client, {
+    keyVaultNamespace,
+    kmsProviders,
+  });
+
+  const region = process.env.AWS_REGION || "eu-central-1";
+  const masterKeyAlias = "alias/mongodb-lab-key-YOUR_SUFFIX";
+
+  const tenants = ["acme", "contoso", "fabrikam"];
+  for (const tenantId of tenants) {
+    const keyAltName = \`_______-\${tenantId}\`;
+    const existingKey = await keyVaultDB.collection("__keyVault").findOne({
+      ___________: keyAltName
+    });
+    if (!existingKey) {
+      const dekId = await encryption.____________("aws", {
+        masterKey: {
+          key: masterKeyAlias,
+          region: region
+        },
+        keyAltNames: [keyAltName]
+      });
+      console.log(\`Created DEK for tenant: \${tenantId}\`);
+    }
+  }
+  await client.close();
+}
+run().catch(console.error);`,
+        inlineHints: [
+          { line: 30, blankText: '_______', hint: 'Prefix for tenant-specific key names', answer: 'tenant' },
+          { line: 32, blankText: '___________', hint: 'Field to query for existing DEK names', answer: 'keyAltNames' },
+          { line: 35, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
+        ],
         competitorEquivalents: {
           postgresql: {
             language: 'sql',
@@ -288,36 +338,10 @@ CREATE POLICY tenant_isolation ON patients
             workaroundNote: 'RDBMS uses schemas or RLS for tenant isolation; no per-tenant encryption keys. Key rotation and crypto-shredding require application-managed keys.',
           },
         },
-        skeleton: `const tenants = ["acme", "contoso", "fabrikam"];
-for (const tenantId of tenants) {
-  const keyAltName = \`_______-\${tenantId}\`;
-  const keyVaultDB = client.db("encryption");
-  const existingKey = await keyVaultDB.collection("__keyVault").findOne({
-    ___________: keyAltName
-  });
-  if (!existingKey) {
-    const dekId = await encryption.____________("aws", {
-      masterKey: { key: "alias/mongodb-lab-key-YOUR_SUFFIX", region: "YOUR_AWS_REGION" },
-      keyAltNames: [keyAltName]
-    });
-  }
-}`,
-        inlineHints: [
-          { line: 3, blankText: '_______', hint: 'Prefix for tenant-specific key names', answer: 'tenant' },
-          { line: 7, blankText: '___________', hint: 'Field to query for existing DEK names', answer: 'keyAltNames' },
-          { line: 10, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
-        ],
-      },
-      {
-        filename: 'Terminal',
-        language: 'bash',
-        code: `# Run the multi-tenant isolation script:
-node multiTenantIsolation.cjs
-
-# Expected: Created DEK for tenant: acme (and contoso, fabrikam if not already present).`,
       },
     ],
     tips: [
+      'Use Run all or Run selection to execute the script. Expected: Created DEK for tenant: acme (and contoso, fabrikam if not already present).',
       'One DEK per tenant ensures blast radius isolation if a key is compromised.',
       'Use keyAltNames like "tenant-{tenantId}" for dynamic DEK lookup.',
       'Enables per-tenant crypto-shredding for GDPR compliance.',
@@ -331,7 +355,7 @@ node multiTenantIsolation.cjs
     sourceSection: 'CSFLE - Key Rotation',
     codeBlocks: [
       {
-        filename: 'rotateCMK.cjs (Node.js)',
+        filename: 'rotateCMK.cjs',
         language: 'javascript',
         code: `const { MongoClient, ClientEncryption } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
@@ -377,35 +401,84 @@ async function run() {
   await client.close();
 }
 run().catch(console.error);`,
-        skeleton: `const keyAltName = "user-YOUR_SUFFIX-___-key";
-const keyDoc = await keyVaultDB.collection("__keyVault").______({
-  keyAltNames: keyAltName
-});
+        skeleton: `const { MongoClient, ClientEncryption } = require("mongodb");
+const { fromSSO } = require("@aws-sdk/credential-providers");
 
-const result = await encryption.___________________(
-  { ___________: keyAltName },
-  {
-    provider: "aws",
-    masterKey: { key: newCMKAlias, region: "YOUR_AWS_REGION" }
-  }
-);`,
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
+const keyVaultNamespace = "encryption.__keyVault";
+
+async function run() {
+  const credentials = await fromSSO()();
+  const kmsProviders = {
+    aws: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    }
+  };
+
+  const client = await MongoClient.connect(uri);
+  const keyVaultDB = client.db("encryption");
+  const encryption = new ClientEncryption(client, {
+    keyVaultNamespace,
+    kmsProviders,
+  });
+
+  const keyAltName = "user-YOUR_SUFFIX-___-key";
+  const keyDoc = await keyVaultDB.collection("__keyVault").______({
+    keyAltNames: keyAltName
+  });
+  if (!keyDoc) throw new Error("DEK not found");
+
+  const region = process.env.AWS_REGION || "eu-central-1";
+  const newCMKAlias = "alias/mongodb-lab-key-YOUR_SUFFIX";
+  const result = await encryption.___________________(
+    { ___________: keyAltName },
+    {
+      provider: "aws",
+      masterKey: { key: newCMKAlias, region: region }
+    }
+  );
+
+  console.log("Rotation complete! Modified:", result.bulkWriteResult.modifiedCount);
+  await client.close();
+}
+run().catch(console.error);`,
         inlineHints: [
-          { line: 1, blankText: '___', hint: 'Field name in keyAltName pattern', answer: 'ssn' },
-          { line: 3, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
-          { line: 6, blankText: '___________________', hint: 'Method to rotate DEKs to a new CMK', answer: 'rewrapManyDataKey' },
-          { line: 7, blankText: '___________', hint: 'Field to filter which DEKs to rotate', answer: 'keyAltNames' },
+          { line: 25, blankText: '___', hint: 'Field name in keyAltName pattern', answer: 'ssn' },
+          { line: 26, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
+          { line: 33, blankText: '___________________', hint: 'Method to rotate DEKs to a new CMK', answer: 'rewrapManyDataKey' },
+          { line: 34, blankText: '___________', hint: 'Field to filter which DEKs to rotate', answer: 'keyAltNames' },
         ],
-      },
-      {
-        filename: 'Terminal',
-        language: 'bash',
-        code: `# Run the key rotation script:
-node rotateCMK.cjs
+        competitorEquivalents: {
+          postgresql: {
+            language: 'sql',
+            code: `-- PostgreSQL: No built-in key rotation. Application manages keys;
+-- rotation = decrypt with old key, re-encrypt with new key (full scan).
 
-# Expected: Rotation complete! Modified: 1`,
+-- 1. Add new key version to app config
+-- 2. Full table scan: SELECT id, decrypt(encrypted_col, old_key) AS plain
+--    INSERT INTO temp_table SELECT id, encrypt(plain, new_key)
+-- 3. Swap tables or update rows in place
+-- 4. Retire old key
+
+-- No envelope-style rotation; data must be re-encrypted by application.`,
+            workaroundNote: 'Key rotation requires application-level re-encryption; no envelope rotation like MongoDB rewrapManyDataKey.',
+          },
+          'cosmosdb-vcore': {
+            language: 'javascript',
+            code: `// Cosmos DB (MongoDB vCore): Encryption at rest is managed by the service.
+// No client-side DEK rotation; key rotation is a platform operation.
+// For client-side encrypted fields (if implemented in app), same as PostgreSQL:
+// full scan, decrypt with old key, encrypt with new key.`,
+            workaroundNote: 'Platform manages encryption keys; no client-side DEK/CMK rotation API.',
+          },
+        },
       },
     ],
     tips: [
+      'Use Run all or Run selection to execute the script. Expected: Rotation complete! Modified: 1.',
       'rewrapManyDataKey is metadata-only - no data re-encryption required.',
       'Old CMK must be accessible during rotation to decrypt the DEK.',
       'In production, use a NEW CMK alias (e.g., alias/mongodb-lab-key-v2).',

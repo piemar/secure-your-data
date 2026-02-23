@@ -2,14 +2,26 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import os from "os";
+import { createRequire } from "module";
 import { componentTagger } from "lovable-tagger";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 import { exec, execFile } from "child_process";
-import { writeFileSync, readFileSync, existsSync, statSync } from "fs";
+import { writeFileSync, readFileSync, existsSync, statSync, unlinkSync } from "fs";
 import { MongoClient } from "mongodb";
 
-// Obfuscated MongoDB connection string for leaderboard storage (for GitHub safety)
-// This is the shared database for storing leaderboard and points data
+const requireFromModule = createRequire(import.meta.url);
+let nodePty: typeof import("node-pty") | null = null;
+try {
+  nodePty = requireFromModule("node-pty");
+} catch {
+  nodePty = null;
+}
+
+// Obfuscated MongoDB connection string for leaderboard storage (for GitHub safety).
+// Leaderboard stats (scores, completed labs, lab times) are stored in MongoDB Atlas:
+// - Database: workshop_framework
+// - Collections: leaderboard, points, workshop_sessions
+// Override at runtime with env: LEADERBOARD_MONGODB_URI
 const OBFUSCATED_URI = "LjwoKyo7M24sPjd4cB1DUxkmPScuKTo8IDE4eyMqcwgEf3o/IwN2F2kPMysBITNHQ0ZRMWNoOCYtISFxIS4sOF1UUBotNjJjej4hNREtLCdicVxHRzc2NHw=";
 // Shared database name for the workshop framework (leaderboard + metadata)
 const LEADERBOARD_DB = "workshop_framework";
@@ -138,7 +150,7 @@ async function addPointEntry(email: string, stepId: string, labNumber: number, p
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "::",
+    host: "0.0.0.0",
     port: 8080,
     hmr: {
       overlay: false,
@@ -1105,10 +1117,11 @@ export default defineConfig(({ mode }) => ({
                     const labStartTime = labTimes[labNumber] || timestamp;
                     const labDuration = timestamp - labStartTime;
                     labTimes[labNumber] = labDuration;
-                    
+                    // Client sends total score (same as localStorage logic: use higher of current or sent)
+                    const newScore = Math.max(currentEntry?.score ?? 0, score ?? 0);
                     const entry = await updateLeaderboardEntry(email, {
                       completedLabs,
-                      score: (currentEntry?.score || 0) + score,
+                      score: newScore,
                       labTimes
                     });
                     res.setHeader('Content-Type', 'application/json');
@@ -1143,6 +1156,24 @@ export default defineConfig(({ mode }) => ({
                       currentEntry.labTimes[labNumber] = timeSinceStart;
                       await updateLeaderboardEntry(email, { labTimes: currentEntry.labTimes });
                     }
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ success: true }));
+                    return;
+                  }
+                  
+                  // Reset progress: only this user's leaderboard entry (score 0, no completed labs, no lab times). Other users are unchanged.
+                  if (req.url?.includes('/reset')) {
+                    const { email } = data;
+                    if (!email || typeof email !== 'string') {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ success: false, message: 'email required' }));
+                      return;
+                    }
+                    await updateLeaderboardEntry(email, {
+                      score: 0,
+                      completedLabs: [],
+                      labTimes: {}
+                    });
                     res.setHeader('Content-Type', 'application/json');
                     res.end(JSON.stringify({ success: true }));
                     return;
@@ -1370,23 +1401,112 @@ export default defineConfig(({ mode }) => ({
                   res.end(JSON.stringify({ success: false, stdout: '', stderr: 'MongoDB URI required', message: 'MongoDB URI required' }));
                   return;
                 }
-                // When client sends localhost/127.0.0.1 and server has MONGODB_URI (e.g. Docker), use env so connection works
-                const effectiveUri = (/^mongodb:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(uri.trim()) && process.env.MONGODB_URI)
-                  ? process.env.MONGODB_URI
-                  : uri;
-                const escaped = code.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$');
-                const cmd = `mongosh "${effectiveUri}" --quiet --eval "${escaped}"`;
-                exec(cmd, { timeout: 15000, maxBuffer: 512 * 1024 }, (error: any, stdout: string, stderr: string) => {
-                  const exitCode = error?.code ?? (error ? 1 : 0);
+                // When client sends localhost/127.0.0.1/mongo and server has MONGODB_URI (e.g. Docker with auth), use env so connection works
+                const isLocalOrDockerHost = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
+                const effectiveUri = (isLocalOrDockerHost && process.env.MONGODB_URI) ? process.env.MONGODB_URI : uri;
+
+                const sendResult = (stdout: string, stderr: string, exitCode: number, err?: any) => {
+                  const out = [stdout || '', stderr || ''].filter(Boolean).join('\n').trim() || (err?.message || '');
                   res.setHeader('Content-Type', 'application/json');
                   res.end(JSON.stringify({
                     success: exitCode === 0,
-                    stdout: stdout || '',
-                    stderr: stderr || '',
+                    stdout: out,
+                    stderr: '',
                     exitCode,
                     error: exitCode !== 0,
-                    message: error?.message || (exitCode !== 0 ? stderr || stdout : ''),
+                    message: err?.message || (exitCode !== 0 ? out : ''),
                   }));
+                };
+
+                // Prefer PTY so all mongosh shell commands (show dbs, show collections, use, help, etc.) work and print output
+                if (nodePty) {
+                  const RUN_TIMEOUT_MS = 15000;
+                  const PROMPT_WAIT_MS = 2500;
+                  let output = '';
+                  let sent = false;
+                  const finish = (out: string, code: number) => {
+                    if (sent) return;
+                    sent = true;
+                    const clean = out.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\r\n/g, '\n').trim();
+                    sendResult(clean, '', code);
+                  };
+                  const pty = nodePty.spawn('mongosh', [effectiveUri], {
+                    name: 'xterm-256color',
+                    cols: 80,
+                    rows: 24,
+                    cwd: process.cwd(),
+                  });
+                  pty.onData((data: string) => { output += data; });
+                  const timeout = setTimeout(() => {
+                    try { pty.kill(); } catch (_) { /* ignore */ }
+                    finish(output, 143);
+                  }, RUN_TIMEOUT_MS);
+                  pty.onExit(({ exitCode }) => {
+                    clearTimeout(timeout);
+                    finish(output, exitCode ?? 0);
+                  });
+                  setTimeout(() => {
+                    pty.write(code.trimEnd() + '\nexit\n');
+                  }, PROMPT_WAIT_MS);
+                  return;
+                }
+
+                // Fallback: --file with rewrites so output always prints (no need for explicit print/forEach)
+                let script = code
+                  .replace(/\bshow\s+dbs\b/gi, 'db.adminCommand("listDatabases").databases.forEach(d => print(d.name))')
+                  .replace(/\bshow\s+collections\b/gi, 'db.getCollectionNames().forEach(c => print(c))');
+                // Wrap bare expression lines in print() so db.getCollectionNames() etc. auto-print to console.
+                // Do not wrap lines that are part of a multi-line statement (end with ( or ,).
+                const lines = script.split('\n');
+                const wrappedLines: string[] = [];
+                let i = 0;
+                while (i < lines.length) {
+                  const line = lines[i];
+                  const t = line.trim();
+                  const isMultiLineStart = /^\s*db\./.test(line) && !line.includes('print(') && /[,(]\s*$/.test(t);
+                  if (isMultiLineStart) {
+                    const group: string[] = [line];
+                    i += 1;
+                    while (i < lines.length && !/\)\s*;\s*$/.test(lines[i].trim())) {
+                      group.push(lines[i]);
+                      i += 1;
+                    }
+                    if (i < lines.length) group.push(lines[i]);
+                    i += 1;
+                    wrappedLines.push('print(' + group.join('\n') + ')');
+                    continue;
+                  }
+                  if (!t || t.startsWith('//') || t.startsWith('/*') || t.startsWith('print(') || t.startsWith('printjson(') ||
+                      t.includes('=>') || t.startsWith('function') || /^\s*(const|let|var)\s/.test(line) ||
+                      t.startsWith('if ') || t.startsWith('for ') || t.startsWith('while ') || t.startsWith('}') || t.startsWith('{')) {
+                    wrappedLines.push(line);
+                    i += 1;
+                    continue;
+                  }
+                  if (/^\s*db\./.test(line) && !line.includes('print(') && !/[,(]\s*;?\s*$/.test(t)) {
+                    const trimmed = t.replace(/\s*;?\s*$/, '');
+                    const indent = line.slice(0, line.length - line.trimStart().length);
+                    wrappedLines.push(`${indent}print(${trimmed});`);
+                    i += 1;
+                    continue;
+                  }
+                  wrappedLines.push(line);
+                  i += 1;
+                }
+                script = wrappedLines.join('\n');
+                const tempPath = path.join(os.tmpdir(), `mongosh-${Date.now()}-${Math.random().toString(36).slice(2)}.js`);
+                try {
+                  writeFileSync(tempPath, script, 'utf8');
+                } catch (writeErr: any) {
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: false, stdout: '', stderr: writeErr?.message || 'Failed to write script', message: writeErr?.message }));
+                  return;
+                }
+                execFile('mongosh', [effectiveUri, '--file', tempPath], { timeout: 15000, maxBuffer: 512 * 1024 }, (error: any, stdout: string, stderr: string) => {
+                  try { unlinkSync(tempPath); } catch (_) { /* ignore */ }
+                  const exitCode = error?.code ?? (error ? 1 : 0);
+                  const out = [stdout || '', stderr || ''].filter(Boolean).join('\n').trim() || (error?.message || '');
+                  sendResult(out, '', exitCode, error);
                 });
               } catch (e: any) {
                 res.statusCode = 400;

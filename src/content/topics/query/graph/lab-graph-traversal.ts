@@ -23,6 +23,11 @@ export const labGraphTraversalDefinition: WorkshopLabDefinition = {
       estimatedTimeMinutes: 10,
       verificationId: 'graph.verifyModel',
       points: 10,
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-graph-traversal-step-2',
@@ -34,6 +39,11 @@ export const labGraphTraversalDefinition: WorkshopLabDefinition = {
       estimatedTimeMinutes: 10,
       verificationId: 'graph.verifyTraversal',
       points: 10,
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-graph-traversal-step-3',
@@ -45,6 +55,11 @@ export const labGraphTraversalDefinition: WorkshopLabDefinition = {
       estimatedTimeMinutes: 10,
       verificationId: 'graph.verifyExplanation',
       points: 10,
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
   ],
 };

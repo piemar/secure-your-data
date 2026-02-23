@@ -42,6 +42,12 @@ export const labPortableOverviewDefinition: WorkshopLabDefinition = {
       enhancementId: 'portable.concepts',
       sourceProof: 'proofs/10/README.md',
       sourceSection: 'Description',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-portable-overview-step-2',
@@ -55,7 +61,12 @@ export const labPortableOverviewDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'portable.cutover',
       sourceProof: 'proofs/10/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-portable-overview-step-3',
@@ -69,7 +80,12 @@ export const labPortableOverviewDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'portable.prerequisites',
       sourceProof: 'proofs/10/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
   ],
 };

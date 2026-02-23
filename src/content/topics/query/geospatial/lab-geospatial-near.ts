@@ -23,6 +23,12 @@ export const labGeospatialNearDefinition: WorkshopLabDefinition = {
       estimatedTimeMinutes: 8,
       verificationId: 'geospatial.verifyIndex',
       points: 10,
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-geospatial-near-step-2',
@@ -33,6 +39,12 @@ export const labGeospatialNearDefinition: WorkshopLabDefinition = {
         '- Use $near with a reference point and a small radius.\n- Return the top N nearest locations and their distances.\n- Experiment with different radii and coordinates.',
       estimatedTimeMinutes: 9,
       verificationId: 'geospatial.verifyNearQueries',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
       points: 10,
     },
     {
@@ -44,6 +56,12 @@ export const labGeospatialNearDefinition: WorkshopLabDefinition = {
         '- Define an API contract for a /stores/near endpoint.\n- Show sample request and response payloads.\n- Capture edge cases (no nearby results, invalid coordinates).',
       estimatedTimeMinutes: 8,
       verificationId: 'geospatial.verifyFeatureDesign',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
       points: 10,
     },
   ],

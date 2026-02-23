@@ -27,7 +27,12 @@ export const labRichQueryBasicsDefinition: WorkshopLabDefinition = {
       description: 'mgeneratejs template for insurance customer records',
       type: 'file',
       path: 'CustomerSingleView.json',
-      sizeHint: '~1KB template',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: '~1KB template',
     },
     {
       id: 'customers-collection',
@@ -52,6 +57,11 @@ export const labRichQueryBasicsDefinition: WorkshopLabDefinition = {
       enhancementId: 'rich-query.compound-query',
       sourceProof: 'proofs/01/README.md',
       sourceSection: 'Execution - TEST 1',
+      hints: [
+        'Use find() with a filter object; combine conditions with $and or $or.',
+        'Reference nested fields with dot notation (e.g. address.state).',
+        'Use $elemMatch on array fields to match documents where at least one element satisfies all criteria.',
+      ],
     },
     {
       id: 'lab-rich-query-basics-step-2',
@@ -67,6 +77,11 @@ export const labRichQueryBasicsDefinition: WorkshopLabDefinition = {
       enhancementId: 'rich-query.projection-sort',
       sourceProof: 'proofs/01/README.md',
       sourceSection: 'Execution - TEST 1',
+      hints: [
+        'Pass a projection object as the second argument to find() (e.g. { field: 1 } to include, { field: 0 } to exclude).',
+        'Use sort() with an object (e.g. { lastname: 1, dob: -1 }) to order results.',
+        'Combine find(), projection, and sort() in a single chain for efficiency.',
+      ],
     },
     {
       id: 'lab-rich-query-basics-step-3',
@@ -82,6 +97,11 @@ export const labRichQueryBasicsDefinition: WorkshopLabDefinition = {
       enhancementId: 'rich-query.pagination',
       sourceProof: 'proofs/01/README.md',
       sourceSection: 'Execution - TEST 1',
+      hints: [
+        'Use limit(n) to cap the number of documents returned.',
+        'Use skip(n) to skip the first n documents (e.g. skip((page - 1) * pageSize)).',
+        'Combine limit and skip with your filter and sort for consistent pagination.',
+      ],
     },
     {
       id: 'lab-rich-query-basics-step-4',
@@ -97,6 +117,11 @@ export const labRichQueryBasicsDefinition: WorkshopLabDefinition = {
       enhancementId: 'rich-query.index-explain',
       sourceProof: 'proofs/01/README.md',
       sourceSection: 'Execution - TEST 1',
+      hints: [
+        'Create a compound index with equality fields first, then the range field (e.g. dob) last.',
+        'Use explain("executionStats") on the cursor to see whether the query uses IXSCAN or COLLSCAN.',
+        'Match the index key order to your query predicate order for best performance.',
+      ],
     },
   ],
 };

@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { NewPresentationView } from '@/components/presentation/NewPresentationView';
-import { Lab1CSFLE } from '@/components/labs/Lab1CSFLE';
-import { Lab2QueryableEncryption } from '@/components/labs/Lab2QueryableEncryption';
 import { LabSetupWizard } from '@/components/labs/LabSetupWizard';
 import { Leaderboard } from '@/components/labs/Leaderboard';
 import { WorkshopNotStarted } from '@/components/labs/WorkshopNotStarted';
@@ -20,7 +18,7 @@ import { useNavigation } from '@/contexts/NavigationContext';
 import { useRole } from '@/contexts/RoleContext';
 import { useLab } from '@/context/LabContext';
 import { areLabsEnabled } from '@/utils/workshopUtils';
-import { Lock, AlertCircle } from 'lucide-react';
+import { Lock, AlertCircle, Check } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useLocation } from 'react-router-dom';
@@ -29,7 +27,7 @@ import type { WorkshopLabDefinition } from '@/types';
 
 function ContentRouter() {
   const { currentSection, setSection } = useNavigation();
-  const { isLabAccessible, isLabCompleted } = useLab();
+  const { isLabAccessible, isLabCompleted, completedLabs } = useLab();
   const { isModerator } = useRole();
   const { currentMode, activeTemplate, currentLabId, setCurrentLabId } = useWorkshopSession();
   const location = useLocation();
@@ -145,17 +143,26 @@ function ContentRouter() {
       if (!activeTemplate || !activeTemplate.labIds) {
         // If moderator and has a currentLabId, allow testing individual labs
         if (isModerator && currentLabId) {
-          let labContent: JSX.Element;
-          if (currentLabId === 'lab-csfle-fundamentals') {
-            labContent = <Lab1CSFLE />;
-          } else if (currentLabId === 'lab-queryable-encryption') {
-            labContent = <Lab2QueryableEncryption />;
-          } else if (currentLabId === 'lab-right-to-erasure') {
-            labContent = <LabRunner labNumber={3} labId="lab-right-to-erasure" />;
-          } else {
-            labContent = <LabRunner labNumber={1} labId={currentLabId} />;
-          }
-          return labContent;
+          const labNumber = currentLabId === 'lab-csfle-fundamentals' ? 1 : currentLabId === 'lab-queryable-encryption' ? 2 : currentLabId === 'lab-right-to-erasure' ? 3 : 1;
+          const businessValue = currentLabId === 'lab-csfle-fundamentals'
+            ? 'Protect PII at the application layer before it reaches the database'
+            : currentLabId === 'lab-queryable-encryption'
+              ? 'Query encrypted data without exposing plaintext to the database'
+              : undefined;
+          const atlasCapability = currentLabId === 'lab-csfle-fundamentals'
+            ? 'Client-Side Field Level Encryption'
+            : currentLabId === 'lab-queryable-encryption'
+              ? 'Queryable Encryption + Range Queries'
+              : undefined;
+          return (
+            <LabRunner
+              key={currentLabId}
+              labNumber={labNumber}
+              labId={currentLabId}
+              businessValue={businessValue}
+              atlasCapability={atlasCapability}
+            />
+          );
         }
         
         return (
@@ -177,20 +184,29 @@ function ContentRouter() {
         return <WorkshopNotStarted />;
       }
 
-      // Decide which component renders the current lab.
+      // Decide which component renders the current lab (unified: all labs via LabRunner + content).
       let labContent: JSX.Element;
-      if (currentLabId === 'lab-csfle-fundamentals') {
-        labContent = <Lab1CSFLE />;
-      } else if (currentLabId === 'lab-queryable-encryption') {
-        labContent = <Lab2QueryableEncryption />;
-      } else if (currentLabId === 'lab-right-to-erasure') {
-        const r2eIndex = templateLabs?.findIndex(l => l.id === 'lab-right-to-erasure');
-        labContent = <LabRunner labNumber={r2eIndex >= 0 ? r2eIndex + 1 : 3} labId="lab-right-to-erasure" />;
-      } else {
-        const index = activeTemplate.labIds.indexOf(currentLabId);
-        const labNumber = index >= 0 ? index + 1 : 1;
-        labContent = <LabRunner labNumber={labNumber} labId={currentLabId} />;
-      }
+      const index = activeTemplate.labIds.indexOf(currentLabId);
+      const labNumber = index >= 0 ? index + 1 : (currentLabId === 'lab-csfle-fundamentals' ? 1 : currentLabId === 'lab-queryable-encryption' ? 2 : currentLabId === 'lab-right-to-erasure' ? 3 : 1);
+      const businessValue = currentLabId === 'lab-csfle-fundamentals'
+        ? 'Protect PII at the application layer before it reaches the database'
+        : currentLabId === 'lab-queryable-encryption'
+          ? 'Query encrypted data without exposing plaintext to the database'
+          : undefined;
+      const atlasCapability = currentLabId === 'lab-csfle-fundamentals'
+        ? 'Client-Side Field Level Encryption'
+        : currentLabId === 'lab-queryable-encryption'
+          ? 'Queryable Encryption + Range Queries'
+          : undefined;
+      labContent = (
+        <LabRunner
+          key={currentLabId}
+          labNumber={labNumber}
+          labId={currentLabId}
+          businessValue={businessValue}
+          atlasCapability={atlasCapability}
+        />
+      );
 
       // Check if currentLabId is part of the active template
       // If not, we're testing an individual lab and shouldn't show template navigation
@@ -206,19 +222,24 @@ function ContentRouter() {
               <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/80 flex-shrink-0">Labs</span>
               {templateLabs.map((lab, index) => {
                 const isActiveLab = lab.id === currentLabId;
+                const labNumber = index + 1;
+                const isCompleted = completedLabs.includes(labNumber);
                 return (
                   <button
                     key={lab.id}
                     type="button"
                     onClick={() => setCurrentLabId(lab.id)}
                     className={
-                      'text-[9px] rounded-full px-1.5 py-0.5 border transition max-w-[120px] sm:max-w-[180px] truncate ' +
+                      'text-[9px] rounded-full px-1.5 py-0.5 border transition max-w-[120px] sm:max-w-[180px] truncate flex items-center gap-1 ' +
                       (isActiveLab
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-background/40 text-muted-foreground hover:bg-muted hover:text-foreground')
+                        ? 'bg-white dark:bg-white/90 text-foreground border-border'
+                        : isCompleted
+                        ? 'bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/40 hover:bg-green-500/25'
+                        : 'bg-background/40 text-muted-foreground hover:bg-muted hover:text-foreground border-border')
                     }
                   >
-                    <span className="font-mono mr-0.5">{index + 1}.</span>
+                    {isCompleted && <Check className="w-3 h-3 flex-shrink-0 text-green-600 dark:text-green-400" />}
+                    <span className="font-mono mr-0.5">{labNumber}.</span>
                     <span className="align-middle truncate">{lab.title}</span>
                   </button>
                 );
@@ -241,7 +262,14 @@ function ContentRouter() {
       if (!canAccessLabs) {
         return <WorkshopNotStarted />;
       }
-      return <Lab1CSFLE />;
+      return (
+        <LabRunner
+          labNumber={1}
+          labId="lab-csfle-fundamentals"
+          businessValue="Protect PII at the application layer before it reaches the database"
+          atlasCapability="Client-Side Field Level Encryption"
+        />
+      );
     case 'lab2':
       // Check if workshop is started for attendees
       if (!canAccessLabs) {
@@ -268,7 +296,14 @@ function ContentRouter() {
           </div>
         );
       }
-      return <Lab2QueryableEncryption />;
+      return (
+        <LabRunner
+          labNumber={2}
+          labId="lab-queryable-encryption"
+          businessValue="Query encrypted data without exposing plaintext to the database"
+          atlasCapability="Queryable Encryption + Range Queries"
+        />
+      );
     case 'lab3':
       // Check if workshop is started for attendees
       if (!canAccessLabs) {

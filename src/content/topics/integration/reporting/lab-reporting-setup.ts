@@ -33,6 +33,12 @@ export const labReportingSetupDefinition: WorkshopLabDefinition = {
       enhancementId: 'reporting.atlas-biconnector',
       sourceProof: 'proofs/16/README.md',
       sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-reporting-setup-step-2',
@@ -46,7 +52,12 @@ export const labReportingSetupDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'reporting.load-data',
       sourceProof: 'proofs/16/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
     {
       id: 'lab-reporting-setup-step-3',
@@ -60,7 +71,12 @@ export const labReportingSetupDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'reporting.odbc-workbench',
       sourceProof: 'proofs/16/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
   ],
 };

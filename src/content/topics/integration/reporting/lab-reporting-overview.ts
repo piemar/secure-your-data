@@ -24,7 +24,12 @@ export const labReportingOverviewDefinition: WorkshopLabDefinition = {
   keyConcepts: [
     {
       term: 'BI Connector',
-      explanation: 'Atlas feature that exposes MongoDB collections as SQL-queryable tables so BI tools can connect via ODBC/JDBC.',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      explanation: 'Atlas feature that exposes MongoDB collections as SQL-queryable tables so BI tools can connect via ODBC/JDBC.',
     },
     {
       term: 'SQL/ODBC',
@@ -53,6 +58,12 @@ export const labReportingOverviewDefinition: WorkshopLabDefinition = {
       enhancementId: 'reporting.concepts',
       sourceProof: 'proofs/16/README.md',
       sourceSection: 'Description',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-reporting-overview-step-2',
@@ -66,7 +77,12 @@ export const labReportingOverviewDefinition: WorkshopLabDefinition = {
       points: 5,
       enhancementId: 'reporting.flow',
       sourceProof: 'proofs/16/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-reporting-overview-step-3',
@@ -80,7 +96,12 @@ export const labReportingOverviewDefinition: WorkshopLabDefinition = {
       points: 5,
       enhancementId: 'reporting.requirements',
       sourceProof: 'proofs/16/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
   ],
 };

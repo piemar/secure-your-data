@@ -23,6 +23,12 @@ export const labGraphRecommendationsDefinition: WorkshopLabDefinition = {
       estimatedTimeMinutes: 10,
       verificationId: 'graph.verifyInteractionsModel',
       points: 10,
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-graph-recommendations-step-2',
@@ -33,6 +39,12 @@ export const labGraphRecommendationsDefinition: WorkshopLabDefinition = {
         '- Starting from a given item, traverse to users and then to other items.\n- Count and rank candidate recommendations.\n- Return top N items with scores.',
       estimatedTimeMinutes: 10,
       verificationId: 'graph.verifyRecommendations',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
       points: 10,
     },
     {
@@ -44,6 +56,12 @@ export const labGraphRecommendationsDefinition: WorkshopLabDefinition = {
         '- Define an endpoint such as /items/:id/recommendations.\n- Show sample JSON responses.\n- Discuss how to cache or precompute results for scale.',
       estimatedTimeMinutes: 10,
       verificationId: 'graph.verifyRecommendationApi',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
       points: 10,
     },
   ],

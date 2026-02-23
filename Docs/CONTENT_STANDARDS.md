@@ -47,6 +47,19 @@ This document defines the standards and best practices for creating workshop con
   - Estimated time
   - Modes array (at least 1 mode)
 
+### Step code blocks and execution (standardized approach – Lab 1 Step 3)
+
+All labs and steps must follow the **standardized approach** implemented for Lab 1 (CSFLE) Step 3 (Key Vault setup). See `Docs/ADD_LAB_MASTER_PROMPT.md` for the full definition.
+
+- **No Terminal block:** Do not add a Terminal (bash) block that only runs `node file.cjs` or `node file.js`. Execution is via **Run all** and **Run selection** in the editor header; the app runs the current tab’s content (node or mongosh) using temp files when needed.
+- **Node + Mongosh steps:** When a step offers both a Node script and a Mongosh alternative, define **exactly two blocks** in the enhancement: (1) Node block (e.g. `keyvault-setup.cjs`), (2) Mongosh block (`filename: 'Mongosh'`, `language: 'mongosh'`). No Terminal block. The UI shows one composite slot with header **"mongosh ! node"**; mongosh is the first and default tab; Run all and Run selection run the active tab’s content.
+- **When to include Mongosh:** **Only add a Mongosh block when the same functionality can be executed in mongosh** (e.g. key vault index, list/count keys). Do **not** add a Mongosh block for steps that require a driver to perform the action (e.g. create DEK, auto-encrypt, rewrap keys, explicit encrypt for migration); those steps have one block only and the editor shows the filename with **no mongosh tab**.
+- **Skeleton and hints:** Both Node and Mongosh blocks use the same rigour: `skeleton` with placeholders and `inlineHints` with `line`, `blankText`, `hint`, `answer`. Hint placement verification applies to all blocks (run the hint rendering test and do a visual check). Use `$exists` (not `exists`) in MongoDB operators where required (e.g. `partialFilterExpression`).
+- **Tips:** Mention using Run all or Run selection to execute (no separate terminal). For Mongosh, note that return values are printed to the console.
+- **Lab sample data (dataRequirements):** When a lab’s steps require pre-loaded collections or data (e.g. query/aggregation labs so that Run returns sensible results), include a `dataRequirements` array with at least one entry of type `'collection'` (with `namespace`) or type `'script'` (with `path` to a seed script). See **`Docs/LAB_SAMPLE_DATA_PLAN.md`** (Load Sample Data UX, reset = original dataset).
+
+**Reference:** `src/content/topics/encryption/csfle/enhancements.ts` → `csfle.init-keyvault`.
+
 ### Mode Coverage
 
 - **Minimum**: Support 2 modes for reusability

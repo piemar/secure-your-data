@@ -39,6 +39,19 @@ interface LabContextType extends LabState {
 
 const LabContext = createContext<LabContextType | undefined>(undefined);
 
+/**
+ * Map content-driven step IDs (e.g. lab-csfle-fundamentals-step-create-cmk) to lab number.
+ * Regex lab-?(\d+) only matches legacy step IDs; content-driven labs use lab-<name>-step-...
+ */
+function getLabNumberFromStepId(stepId: string): number {
+  const numericMatch = stepId.match(/lab-?(\d+)/i) || stepId.match(/lab(\d+)/i);
+  if (numericMatch) return parseInt(numericMatch[1], 10);
+  if (stepId.includes('lab-csfle-fundamentals')) return 1;
+  if (stepId.includes('lab-queryable-encryption')) return 2;
+  if (stepId.includes('lab-right-to-erasure')) return 3;
+  return 1;
+}
+
 export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { activeTemplate } = useWorkshopSession();
     const gamificationService = React.useMemo(() => {
@@ -92,6 +105,23 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
     }, []);
 
+    // Hydrate currentScore from leaderboard when userEmail is available so sidebar shows persisted score
+    useEffect(() => {
+        const email = userEmail || (typeof localStorage !== 'undefined' ? localStorage.getItem('userEmail') : null);
+        if (!email) return;
+        const hydrate = async () => {
+            const { syncLeaderboardFromApi } = await import('@/utils/leaderboardUtils');
+            await syncLeaderboardFromApi();
+            const { getLeaderboardEntries } = await import('@/utils/leaderboardUtils');
+            const entries = getLeaderboardEntries();
+            const entry = entries.find(e => e.email === email);
+            if (entry != null && typeof entry.score === 'number') {
+                setCurrentScore(entry.score);
+            }
+        };
+        hydrate();
+    }, [userEmail]);
+
     const { runningInContainer } = useWorkshopConfig();
 
     // Initialize MongoDB URI from workshop session if available
@@ -113,6 +143,8 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentScore(0);
         setCompletedSteps([]);
         setAssistedSteps([]);
+        setCompletedLabs([]);
+        setLabStartTimes({});
         setVerifiedTools({
             awsCli: { verified: false, path: '' },
             mongosh: { verified: false, path: '' },
@@ -165,8 +197,8 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         
         // Use GamificationService if enabled
         if (gamificationService.isEnabled() && email) {
-            const labMatch = stepId.match(/lab-?(\d+)/i) || stepId.match(/lab(\d+)/i);
-            const labId = labMatch ? `lab-${labMatch[1]}` : 'lab-unknown';
+            const labNumber = getLabNumberFromStepId(stepId);
+            const labId = `lab-${labNumber}`;
             
             const event: GamificationEvent = {
                 type: 'step_completed',
@@ -194,8 +226,7 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
             
             if (email) {
-                const labMatch = stepId.match(/lab(\d+)/i);
-                const labNumber = labMatch ? parseInt(labMatch[1]) : 1;
+                const labNumber = getLabNumberFromStepId(stepId);
                 addPoints(email, points, labNumber);
             }
         }

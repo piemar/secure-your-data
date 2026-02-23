@@ -42,6 +42,12 @@ export const labWorkloadIsolationOverviewDefinition: WorkshopLabDefinition = {
       enhancementId: 'workload-isolation.concepts',
       sourceProof: 'proofs/05/README.md',
       sourceSection: 'Description',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-workload-isolation-overview-step-2',
@@ -55,7 +61,12 @@ export const labWorkloadIsolationOverviewDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'workload-isolation.atlas-topology',
       sourceProof: 'proofs/05/README.md',
-      sourceSection: 'Setup - Configure Atlas Environment',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup - Configure Atlas Environment',
     },
     {
       id: 'lab-workload-isolation-overview-step-3',
@@ -69,7 +80,12 @@ export const labWorkloadIsolationOverviewDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'workload-isolation.read-preference-tags',
       sourceProof: 'proofs/05/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
   ],
 };

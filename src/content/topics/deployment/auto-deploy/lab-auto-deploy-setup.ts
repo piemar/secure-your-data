@@ -35,6 +35,12 @@ export const labAutoDeploySetupDefinition: WorkshopLabDefinition = {
       enhancementId: 'auto-deploy.python-setup',
       sourceProof: 'proofs/11/README.md',
       sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-auto-deploy-setup-step-2',
@@ -48,7 +54,12 @@ export const labAutoDeploySetupDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'auto-deploy.atlas-setup',
       sourceProof: 'proofs/11/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
     {
       id: 'lab-auto-deploy-setup-step-3',
@@ -62,7 +73,12 @@ export const labAutoDeploySetupDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'auto-deploy.api-keys',
       sourceProof: 'proofs/11/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
   ],
 };

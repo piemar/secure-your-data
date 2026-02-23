@@ -26,8 +26,9 @@ const metadataCache = new Map<string, EnhancementMetadata>();
 export async function loadEnhancementMetadata(
   enhancementId: string
 ): Promise<EnhancementMetadata | undefined> {
-  // Check cache first
-  if (metadataCache.has(enhancementId)) {
+  // In development, skip cache so file changes (e.g. new code blocks) are picked up without full reload
+  const useCache = typeof import.meta.env !== 'undefined' && !import.meta.env.DEV;
+  if (useCache && metadataCache.has(enhancementId)) {
     return metadataCache.get(enhancementId);
   }
 
@@ -42,7 +43,7 @@ export async function loadEnhancementMetadata(
     
     if (module && module.enhancements[enhancementId]) {
       const metadata = module.enhancements[enhancementId];
-      metadataCache.set(enhancementId, metadata);
+      if (useCache) metadataCache.set(enhancementId, metadata);
       return metadata;
     }
   } catch (error) {

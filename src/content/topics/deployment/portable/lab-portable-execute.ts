@@ -27,7 +27,12 @@ export const labPortableExecuteDefinition: WorkshopLabDefinition = {
       description: 'test.customers collection (insurance customer records)',
       type: 'collection',
       namespace: 'test.customers',
-      sizeHint: '~200k documents after initial load',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: '~200k documents after initial load',
     },
     {
       id: 'customer-single-view',
@@ -52,6 +57,12 @@ export const labPortableExecuteDefinition: WorkshopLabDefinition = {
       enhancementId: 'portable.initiate',
       sourceProof: 'proofs/10/README.md',
       sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-portable-execute-step-2',
@@ -65,7 +76,12 @@ export const labPortableExecuteDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'portable.cutover-execute',
       sourceProof: 'proofs/10/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-portable-execute-step-3',
@@ -79,7 +95,12 @@ export const labPortableExecuteDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'portable.verify',
       sourceProof: 'proofs/10/README.md',
-      sourceSection: 'Measurement',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Measurement',
     },
   ],
 };

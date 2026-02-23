@@ -23,6 +23,12 @@ export const labGeospatialPerformanceDefinition: WorkshopLabDefinition = {
       estimatedTimeMinutes: 10,
       verificationId: 'geospatial.verifyBaselineExplain',
       points: 10,
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-geospatial-performance-step-2',
@@ -33,6 +39,12 @@ export const labGeospatialPerformanceDefinition: WorkshopLabDefinition = {
         '- Experiment with compound indexes combining 2dsphere and filter fields.\n- Restrict queries with additional non-geospatial predicates.\n- Compare explain() output before and after tuning.',
       estimatedTimeMinutes: 10,
       verificationId: 'geospatial.verifyTunedExplain',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
       points: 10,
     },
     {
@@ -44,6 +56,12 @@ export const labGeospatialPerformanceDefinition: WorkshopLabDefinition = {
         '- Document 3–5 “dos and don’ts” for geospatial queries.\n- Highlight index choices, coordinate precision, and query bounds.\n- Map recommendations back to the GEOSPATIAL PoV capability.',
       estimatedTimeMinutes: 10,
       verificationId: 'geospatial.verifyBestPractices',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
       points: 10,
     },
   ],

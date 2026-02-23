@@ -27,7 +27,12 @@ export const labRollingUpdatesExecuteDefinition: WorkshopLabDefinition = {
       description: 'read.py and write.py from proofs/12',
       type: 'file',
       path: 'read.py',
-      sizeHint: '~3KB',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: '~3KB',
     },
   ],
   modes: ['lab', 'demo'],
@@ -45,6 +50,12 @@ export const labRollingUpdatesExecuteDefinition: WorkshopLabDefinition = {
       enhancementId: 'rolling-updates.start-scripts',
       sourceProof: 'proofs/12/README.md',
       sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-rolling-updates-execute-step-2',
@@ -58,7 +69,12 @@ export const labRollingUpdatesExecuteDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'rolling-updates.upgrade',
       sourceProof: 'proofs/12/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-rolling-updates-execute-step-3',
@@ -72,7 +88,12 @@ export const labRollingUpdatesExecuteDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'rolling-updates.verify',
       sourceProof: 'proofs/12/README.md',
-      sourceSection: 'Measurement',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Measurement',
     },
   ],
 };

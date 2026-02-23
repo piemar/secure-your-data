@@ -120,6 +120,7 @@ for doc in col.aggregate(pipeline):
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'secondaryPreferred sends reads to secondaries when available; falls back to primary.',
       'readPreferenceTags filters which secondaries qualify (must match node tags).',
       'Writes (insert, update, delete) always go to primary regardless of read preference.',
@@ -249,6 +250,7 @@ print();`,
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script (e.g. mongosh script.js).',
       'Run with: mongosh "mongodb+srv://..." --username USER ./print_repset_conf.js',
       'Output shows each node host and its nodeType tag.',
       'Expect 2 nodes with nodeType:ANALYTICS and 3 with nodeType:ELECTABLE.',
@@ -297,6 +299,7 @@ rs.conf().members.forEach((m, i) => {
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the commands (mongosh-style).',
       'rs.conf() returns the replica set configuration document.',
       'members array contains one object per node.',
       'tags object is used by read preference to route queries.',
@@ -373,6 +376,7 @@ while True:
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'MongoClient without read preference uses primary for all operations.',
       'bulk_write sends writes to the primary; replication propagates to secondaries.',
       'Run this script in one terminal; it runs indefinitely.',
@@ -462,6 +466,7 @@ for doc in col.aggregate(pipeline):
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'readPreference + readPreferenceTags routes aggregation reads to analytics nodes.',
       'Run this in a separate terminal from the update script.',
       'Both scripts run indefinitely; let them run 10+ minutes before checking metrics.',

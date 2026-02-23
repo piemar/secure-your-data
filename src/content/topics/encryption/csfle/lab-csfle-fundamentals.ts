@@ -40,7 +40,12 @@ export const lab1Definition: WorkshopLabDefinition = {
       description: 'encryption.__keyVault collection for DEKs',
       type: 'collection',
       namespace: 'encryption.__keyVault',
-      sizeHint: 'created by driver',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: 'created by driver',
     },
     {
       id: 'encrypted-collection',
@@ -63,6 +68,7 @@ export const lab1Definition: WorkshopLabDefinition = {
       verificationId: 'csfle.verifyCmkExists',
       points: 10,
       enhancementId: 'csfle.create-cmk',
+      preview: { type: 'encryption-demo', config: { variant: 'default' } },
       sourceProof: 'proofs/46/README.md',
       sourceSection: 'Setup',
       hints: [
@@ -81,6 +87,7 @@ export const lab1Definition: WorkshopLabDefinition = {
       verificationId: 'csfle.verifyKeyPolicy',
       points: 10,
       enhancementId: 'csfle.apply-key-policy',
+      preview: { type: 'encryption-demo', config: { variant: 'default' } },
       sourceProof: 'proofs/46/README.md',
       sourceSection: 'Setup',
       hints: [
@@ -100,6 +107,7 @@ export const lab1Definition: WorkshopLabDefinition = {
       verificationId: 'csfle.verifyKeyVaultIndex',
       points: 10,
       enhancementId: 'csfle.init-keyvault',
+      preview: { type: 'encryption-demo', config: { variant: 'default' } },
       sourceProof: 'proofs/46/README.md',
       sourceSection: 'Setup',
       hints: [
@@ -113,12 +121,13 @@ export const lab1Definition: WorkshopLabDefinition = {
       id: 'lab-csfle-fundamentals-step-create-deks',
       title: 'Generate Data Encryption Keys (DEKs)',
       narrative: 'The DEK (Data Encryption Key) is what actually encrypts your data. The CMK "wraps" the DEK, meaning the DEK is stored encrypted in MongoDB using the CMK from AWS KMS.',
-      instructions: 'Create a Node.js script (createKey.cjs), configure KMS providers with AWS credentials, use ClientEncryption.createDataKey() to generate and store the DEK, then run the script with Node.js.',
+      instructions: 'Create a Node.js script (createKey.cjs), configure KMS providers with AWS credentials, use ClientEncryption.createDataKey() to generate and store the DEK. Use Run all or Run selection in the editor to run the script.',
       estimatedTimeMinutes: 8,
       modes: ['lab', 'challenge'],
       verificationId: 'csfle.verifyDekCreated',
       points: 15,
       enhancementId: 'csfle.create-deks',
+      preview: { type: 'encryption-demo', config: { variant: 'csfle-toggle', fields: ['ssn'] } },
       sourceProof: 'proofs/46/README.md',
       sourceSection: 'Setup',
       hints: [
@@ -131,26 +140,33 @@ export const lab1Definition: WorkshopLabDefinition = {
     {
       id: 'lab-csfle-fundamentals-step-verify-dek',
       title: 'Verify DEK Creation in Key Vault',
-      narrative: 'Connect to MongoDB Atlas using mongosh and query the key vault to verify that exactly one Data Encryption Key has been created. This is a critical verification step.',
-      instructions: 'Connect to Atlas, switch to the encryption database, query the __keyVault collection, and confirm you see exactly 1 document with your keyAltName.',
+      narrative: 'Connect to MongoDB Atlas using mongosh and query the key vault to verify that your Data Encryption Key (with your keyAltName) has been created. This is a critical verification step.',
+      instructions: 'Connect to Atlas, switch to the encryption database, query the __keyVault collection, and confirm you see a document with your keyAltName (e.g. user-<firstname>-<lastname>-ssn-key). You can use the provided Node script: use Run all or Run selection in the editor to run it.',
       estimatedTimeMinutes: 5,
       modes: ['demo', 'lab', 'challenge'],
-      verificationId: 'csfle.verifyKeyVaultCount',
+      verificationId: 'csfle.verifyDekCreated',
       points: 5,
       enhancementId: 'csfle.verify-dek',
+      preview: { type: 'encryption-demo', config: { variant: 'default' } },
       sourceProof: 'proofs/46/README.md',
-      sourceSection: 'Setup'
+      sourceSection: 'Setup',
+      hints: [
+        'The database name for encryption key vault is "encryption".',
+        'Use db.collection("__keyVault").find({}) to list all DEK documents.',
+        'To verify your DEK: find a document where keyAltNames contains your key (e.g. user-<firstname>-<lastname>-ssn-key).'
+      ]
     },
     {
       id: 'lab-csfle-fundamentals-step-test-csfle',
       title: 'Test CSFLE: Insert & Query with Encryption',
       narrative: 'Create and run a Node.js test script that demonstrates the difference between encrypted and non-encrypted connections. This proves that CSFLE is working by showing ciphertext vs plaintext side-by-side.',
-      instructions: 'Create testCSFLE.cjs that uses both a standard client (no CSFLE) and a CSFLE-enabled client. Insert documents with both, then query to see the difference: standard client shows Binary ciphertext, CSFLE client shows decrypted plaintext.',
+      instructions: 'Create testCSFLE.cjs that uses both a standard client (no CSFLE) and a CSFLE-enabled client. Insert documents with both, then query to see the difference: standard client shows Binary ciphertext, CSFLE client shows decrypted plaintext. Use Run all or Run selection in the editor to run the test script.',
       estimatedTimeMinutes: 15,
       modes: ['demo', 'lab', 'challenge'],
       verificationId: 'csfle.verifyEncryptionWorking',
       points: 20,
       enhancementId: 'csfle.test-csfle',
+      preview: { type: 'encryption-demo', config: { variant: 'csfle-toggle', fields: ['ssn'] } },
       sourceProof: 'proofs/46/README.md',
       sourceSection: 'Execution',
       hints: [
@@ -164,14 +180,20 @@ export const lab1Definition: WorkshopLabDefinition = {
       id: 'lab-csfle-fundamentals-step-complete-application',
       title: 'The Complete Application',
       narrative: 'Bringing it all together. Here is the full, clean code for a production-ready CSFLE application. Notice it is only ~50 lines of code!',
-      instructions: 'Review the complete application code that brings together all the concepts: CMK setup, DEK creation, schema map definition, and automatic encryption/decryption.',
+      instructions: 'Review the complete application code that brings together all the concepts: CMK setup, DEK creation, schema map definition, and automatic encryption/decryption. Use Run all or Run selection in the editor to run the application.',
       estimatedTimeMinutes: 10,
       modes: ['demo', 'lab'],
       verificationId: 'csfle.verifyComplete',
       points: 10,
       enhancementId: 'csfle.complete-application',
+      preview: { type: 'encryption-demo', config: { variant: 'csfle-toggle', fields: ['ssn'] } },
       sourceProof: 'proofs/46/README.md',
-      sourceSection: 'Execution'
+      sourceSection: 'Execution',
+      hints: [
+        'Look up the DEK by keyAltName from the key vault before building the schemaMap.',
+        'The schemaMap uses keyId (Binary UUID), not keyAltName; get it from the DEK document _id.',
+        'Pass kmsProviders and schemaMap in the autoEncryption option when creating the MongoClient.'
+      ]
     }
   ],
   modes: ['lab', 'demo', 'challenge'],

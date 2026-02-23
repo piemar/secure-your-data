@@ -30,7 +30,12 @@ export const labIngestRateBasicsDefinition: WorkshopLabDefinition = {
       description: 'Target collection for bulk insert (1KB, 4KB, or 16KB records)',
       type: 'collection',
       namespace: 'INGEST-RATE.records',
-      sizeHint: 'grows during test',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: 'grows during test',
     },
   ],
   steps: [
@@ -48,6 +53,12 @@ export const labIngestRateBasicsDefinition: WorkshopLabDefinition = {
       enhancementId: 'ingest-rate.cluster-setup',
       sourceProof: 'proofs/03/README.md',
       sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-ingest-rate-basics-step-2',
@@ -62,7 +73,12 @@ export const labIngestRateBasicsDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'ingest-rate.small-records',
       sourceProof: 'proofs/03/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-ingest-rate-basics-step-3',
@@ -77,7 +93,12 @@ export const labIngestRateBasicsDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'ingest-rate.measure-rate',
       sourceProof: 'proofs/03/README.md',
-      sourceSection: 'Measurement',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Measurement',
     },
   ],
 };

@@ -16,9 +16,13 @@ export type VerificationId =
   | "csfle.verifyDataKey"
   // QE
   | "qe.verifyDEKs"
+  | "qe.verifyQEDEKs"
   | "qe.verifyCollection"
+  | "qe.verifyQECollection"
   | "qe.verifyMetadata"
+  | "qe.verifyQEMetadata"
   | "qe.verifyRangeQuery"
+  | "qe.verifyQERangeQuery"
   // Flags
   | "verify-encrypted-collections"
   | "verify-no-plaintext-pii"
@@ -83,15 +87,19 @@ export class VerificationService {
         return validatorUtils.checkKeyRotation(ctx.mongoUri || "", ctx.keyAltName || "");
 
       case "qe.verifyDEKs":
+      case "qe.verifyQEDEKs":
         return validatorUtils.checkQEDEKs(ctx.mongoUri);
 
       case "qe.verifyCollection":
+      case "qe.verifyQECollection":
         return validatorUtils.checkQECollection(ctx.db || "hr", ctx.coll || "employees", ctx.mongoUri);
 
       case "qe.verifyMetadata":
+      case "qe.verifyQEMetadata":
         return validatorUtils.checkQEMetadata(ctx.db || "hr", ctx.coll || "employees", ctx.mongoUri);
 
       case "qe.verifyRangeQuery":
+      case "qe.verifyQERangeQuery":
         return validatorUtils.checkQERangeQuery(ctx.db || "hr", ctx.coll || "employees", ctx.mongoUri);
 
       // Flag verifications

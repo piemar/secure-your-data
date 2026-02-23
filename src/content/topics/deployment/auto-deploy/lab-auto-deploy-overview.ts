@@ -41,6 +41,12 @@ export const labAutoDeployOverviewDefinition: WorkshopLabDefinition = {
       enhancementId: 'auto-deploy.concepts',
       sourceProof: 'proofs/11/README.md',
       sourceSection: 'Description',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-auto-deploy-overview-step-2',
@@ -54,7 +60,12 @@ export const labAutoDeployOverviewDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'auto-deploy.flow',
       sourceProof: 'proofs/11/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-auto-deploy-overview-step-3',
@@ -68,7 +79,12 @@ export const labAutoDeployOverviewDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'auto-deploy.config',
       sourceProof: 'proofs/11/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
   ],
 };

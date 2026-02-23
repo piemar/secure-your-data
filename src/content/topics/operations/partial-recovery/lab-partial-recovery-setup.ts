@@ -33,6 +33,12 @@ export const labPartialRecoverySetupDefinition: WorkshopLabDefinition = {
       enhancementId: 'partial-recovery.tools',
       sourceProof: 'proofs/15/README.md',
       sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-partial-recovery-setup-step-2',
@@ -46,7 +52,12 @@ export const labPartialRecoverySetupDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'partial-recovery.atlas-clusters',
       sourceProof: 'proofs/15/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
     {
       id: 'lab-partial-recovery-setup-step-3',
@@ -60,7 +71,12 @@ export const labPartialRecoverySetupDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'partial-recovery.load-and-snapshot',
       sourceProof: 'proofs/15/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
   ],
 };

@@ -27,7 +27,12 @@ export const labMigratableExecuteDefinition: WorkshopLabDefinition = {
       description: 'POCDB.POCCOLL collection (created by POCDriver)',
       type: 'collection',
       namespace: 'POCDB.POCCOLL',
-      sizeHint: '~900MB after initial load',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: '~900MB after initial load',
     },
   ],
   modes: ['lab', 'demo'],
@@ -45,6 +50,12 @@ export const labMigratableExecuteDefinition: WorkshopLabDefinition = {
       enhancementId: 'migratable.initiate',
       sourceProof: 'proofs/09/README.md',
       sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-migratable-execute-step-2',
@@ -58,7 +69,12 @@ export const labMigratableExecuteDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'migratable.cutover-execute',
       sourceProof: 'proofs/09/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-migratable-execute-step-3',
@@ -72,7 +88,12 @@ export const labMigratableExecuteDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'migratable.verify',
       sourceProof: 'proofs/09/README.md',
-      sourceSection: 'Measurement',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Measurement',
     },
   ],
 };

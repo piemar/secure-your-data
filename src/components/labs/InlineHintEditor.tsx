@@ -3,7 +3,7 @@ import Editor, { Monaco } from '@monaco-editor/react';
 import { InlineHintMarker, type InlineHint, type SkeletonTier } from './InlineHintMarker';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { MONACO_LAB_EDITOR_OPTIONS, defineLabDarkTheme, LAB_EDITOR_THEME } from '@/lib/monacoLabEditorOptions';
+import { MONACO_LAB_EDITOR_OPTIONS, defineLabDarkTheme, registerMongoshLanguage, LAB_EDITOR_THEME } from '@/lib/monacoLabEditorOptions';
 
 interface InlineHintEditorProps {
   code: string;
@@ -22,6 +22,8 @@ interface InlineHintEditorProps {
   onRevealHint: (hintIdx: number) => void;
   onRevealAnswer: (hintIdx: number) => void;
   equalHeightSplit?: boolean;
+  /** When true, editor fills its container (flex-1 min-h-0) and uses height 100% for responsive layout with console pane. */
+  fillContainer?: boolean;
 }
 
 interface BlankPosition {
@@ -49,6 +51,7 @@ export function InlineHintEditor({
   onRevealHint,
   onRevealAnswer,
   equalHeightSplit,
+  fillContainer = false,
 }: InlineHintEditorProps) {
   // Allow editing so users can fill in blanks; skeleton is initial content only
   const isReadOnly = false;
@@ -61,6 +64,8 @@ export function InlineHintEditor({
   const [isEditorReady, setIsEditorReady] = useState(false);
 
   // Find all blank positions by matching each hint's blankText; supports multiple blanks per line.
+  // When multiple hints share a line, search for each blankText after the previous match so we don't
+  // match a shorter blank (e.g. _______) inside an earlier longer one (e.g. _________).
   const findBlankPositions = useCallback((codeText: string, hints: InlineHint[]): BlankPosition[] => {
     const positions: BlankPosition[] = [];
     const lines = codeText.split('\n');
@@ -71,6 +76,9 @@ export function InlineHintEditor({
       hintsByLine.get(lineNum)!.push(hintIdx);
     });
 
+    // Per line: search from this index so we get the next occurrence of blankText (not the first if already used).
+    const searchFromByLine = new Map<number, number>();
+
     hints.forEach((hint, hintIdx) => {
       const lineIndex = hint.line - 1;
       if (lineIndex < 0 || lineIndex >= lines.length) return;
@@ -78,8 +86,10 @@ export function InlineHintEditor({
       const blankText = hint.blankText;
 
       if (blankText) {
-        const explicitIndex = lineText.indexOf(blankText);
+        const fromIndex = searchFromByLine.get(hint.line) ?? 0;
+        const explicitIndex = lineText.indexOf(blankText, fromIndex);
         if (explicitIndex !== -1) {
+          searchFromByLine.set(hint.line, explicitIndex + blankText.length);
           positions.push({
             hintIdx,
             line: hint.line,
@@ -159,6 +169,14 @@ export function InlineHintEditor({
     const actualLineHeight = options.get(66) || 19; // 66 = EditorOption.lineHeight
     setLineHeight(actualLineHeight);
     
+    // Initialize scroll position (in case editor is pre-scrolled or in a scroll container)
+    try {
+      setScrollTop(editor.getScrollTop?.() ?? 0);
+      setScrollLeft(editor.getScrollLeft?.() ?? 0);
+    } catch {
+      // ignore
+    }
+    
     // Track scroll position
     editor.onDidScrollChange((e: any) => {
       setScrollTop(e.scrollTop || 0);
@@ -214,36 +232,36 @@ export function InlineHintEditor({
     };
   }, [editorInstance, monacoInstance, inlineHints, revealedAnswers, displayCode]);
 
-  // Calculate pixel position for a line/column in the editor
+  // Calculate pixel position for a line/column in the editor.
+  // The "?" marker must appear exactly where the blank (___________) is rendered.
   const getPositionPixels = useCallback((lineNumber: number, column: number) => {
     if (!editorInstance) return { top: 0, left: 0 };
-    
+
+    // Prefer Monaco's API so the marker aligns with the actual rendered position.
     try {
-      // Use Monaco's built-in method to get coordinates
       const position = { lineNumber, column };
       const coords = editorInstance.getScrolledVisiblePosition(position);
-      
-      if (coords) {
-        // Adjust for marker width (w-5 = 20px, so center it)
+      if (coords != null && typeof coords.top === 'number' && typeof coords.left === 'number') {
         return {
-          top: coords.top,
-          left: coords.left - 10, // Center the 20px marker
+          top: Math.max(0, coords.top),
+          left: Math.max(0, coords.left - 10), // -10 so "?" sits near start of blank
         };
       }
     } catch {
-      // Fallback to calculation
+      // fall through to fallback
     }
-    
-    // Fallback: approximate based on line height and character width
-    const fontSize = 11;
+
+    // Fallback: approximate from line/column (matches editor padding and font)
+    const isTerminal = ['shell', 'bash', 'sh'].includes((language || '').toLowerCase());
+    const lineNumWidth = isTerminal ? 0 : 40;
+    const paddingTop = 6; // match Monaco options padding.top
+    const fontSize = 10; // match Monaco options fontSize
     const charWidth = fontSize * 0.6;
-    const lineNumWidth = 40; // Approximate line number gutter width
-    
-    return {
-      top: (lineNumber - 1) * lineHeight + 8 - scrollTop, // 8 = padding top
-      left: lineNumWidth + (column - 1) * charWidth - scrollLeft - 10, // Center the marker
-    };
-  }, [editorInstance, lineHeight, scrollTop, scrollLeft]);
+    const contentTop = (lineNumber - 1) * lineHeight + paddingTop - scrollTop;
+    const top = Math.max(0, contentTop);
+    const left = lineNumWidth + (column - 1) * charWidth - scrollLeft - 10;
+    return { top, left };
+  }, [editorInstance, lineHeight, scrollTop, scrollLeft, language]);
 
   // Show "?" hint markers whenever we have skeleton + inline hints + blanks found (any tier).
   // This ensures placeholders always get a hint marker for guided learning.
@@ -260,6 +278,7 @@ export function InlineHintEditor({
   // Configure Monaco before mount: lab-dark theme (matches app background) + CSS for green answers
   const handleBeforeMount = useCallback((monaco: Monaco) => {
     defineLabDarkTheme(monaco);
+    registerMongoshLanguage(monaco);
     // Define custom CSS for the revealed answer decoration
     const styleElement = document.getElementById('monaco-answer-styles') || document.createElement('style');
     styleElement.id = 'monaco-answer-styles';
@@ -274,25 +293,30 @@ export function InlineHintEditor({
     }
   }, []);
 
-  // Calculate dynamic height based on line count
-  // For 2-block pattern: use flex-based equal split
-  // For single blocks or more: use line-based calculation
+  // Calculate dynamic height based on line count (when not filling container).
+  // Add extra rows so scroll works effectively; same principle for node and mongosh.
   const lineCount = displayCode.split('\n').length;
+  const EXTRA_ROWS = 6; // extra lines so there is room to scroll
   const paddingVertical = 16; // 8px top + 8px bottom
+  const effectiveLines = lineCount + EXTRA_ROWS;
   const calculatedHeight = equalHeightSplit
-    ? Math.max(200, Math.min(350, lineCount * lineHeight + paddingVertical))
-    : Math.max(150, Math.min(500, lineCount * lineHeight + paddingVertical));
+    ? Math.max(200, Math.min(350, effectiveLines * lineHeight + paddingVertical))
+    : Math.max(200, Math.min(600, effectiveLines * lineHeight + paddingVertical));
+
+  const useFillHeight = fillContainer || equalHeightSplit;
 
   return (
     <div 
       className={cn(
-        "flex-shrink-0 relative",
-        equalHeightSplit && "flex-1 min-h-[200px]"
+        "relative",
+        equalHeightSplit && "flex-1 min-h-[200px]",
+        useFillHeight && "flex-1 min-h-0",
+        !useFillHeight && "flex-shrink-0"
       )} 
       ref={containerRef}
     >
       <Editor
-        height={equalHeightSplit ? "100%" : `${calculatedHeight}px`}
+        height={useFillHeight ? "100%" : `${calculatedHeight}px`}
         language={language === 'bash' ? 'shell' : language}
         value={editorValue}
         onChange={(v) => !isReadOnly && onCodeChange?.(v ?? '')}
@@ -325,7 +349,8 @@ export function InlineHintEditor({
             
             // Don't render if position is significantly off-screen (allow some buffer)
             // Use calculatedHeight as upper bound instead of arbitrary 1000
-            if (pos.top < -30 || pos.top > calculatedHeight + 50) return null;
+            const heightForBounds = useFillHeight ? (containerRef.current?.clientHeight ?? calculatedHeight) : calculatedHeight;
+            if (pos.top < -30 || pos.top > heightForBounds + 50) return null;
             
             return (
               <motion.div 

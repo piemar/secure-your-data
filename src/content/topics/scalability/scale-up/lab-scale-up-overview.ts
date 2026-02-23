@@ -42,6 +42,12 @@ export const labScaleUpOverviewDefinition: WorkshopLabDefinition = {
       enhancementId: 'scale-up.concepts',
       sourceProof: 'proofs/08/README.md',
       sourceSection: 'Description',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-scale-up-overview-step-2',
@@ -55,7 +61,12 @@ export const labScaleUpOverviewDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'scale-up.rolling-update',
       sourceProof: 'proofs/08/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-scale-up-overview-step-3',
@@ -69,7 +80,12 @@ export const labScaleUpOverviewDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'scale-up.metrics',
       sourceProof: 'proofs/08/README.md',
-      sourceSection: 'Measurement',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Measurement',
     },
   ],
 };

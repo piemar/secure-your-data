@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Trophy, Clock, Award, Users, TrendingUp, Medal } from 'lucide-react';
 import { useLab } from '@/context/LabContext';
-import { getSortedLeaderboard, heartbeat, type LeaderboardEntry } from '@/utils/leaderboardUtils';
+import { heartbeat, type LeaderboardEntry } from '@/utils/leaderboardUtils';
 
 export function Leaderboard() {
   const { userEmail } = useLab();
@@ -10,21 +10,20 @@ export function Leaderboard() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const updateLeaderboard = () => {
+    const updateLeaderboard = async () => {
+      const { syncLeaderboardFromApi, getSortedLeaderboard } = await import('@/utils/leaderboardUtils');
+      await syncLeaderboardFromApi();
       const entries = getSortedLeaderboard();
       setLeaderboard(entries);
       setLoading(false);
     };
 
-    // Initial load
     updateLeaderboard();
 
-    // Send heartbeat for current user
     if (userEmail) {
       heartbeat(userEmail);
     }
 
-    // Refresh every 2 seconds
     const interval = setInterval(() => {
       updateLeaderboard();
       if (userEmail) {
@@ -32,7 +31,6 @@ export function Leaderboard() {
       }
     }, 2000);
 
-    // Also listen for storage changes (in case another tab updates the leaderboard)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'workshop_leaderboard') {
         updateLeaderboard();

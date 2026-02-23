@@ -30,6 +30,12 @@ export const labOperationsMonitoringDefinition: WorkshopLabDefinition = {
         'Open the Atlas UI for your workshop cluster. Explore the Metrics tab and identify CPU, memory, and operation rate graphs. Then open the Performance Advisor / slow queries view and note how queries against encrypted collections appear. Capture a screenshot or notes about which metrics you would watch during a workshop.',
       estimatedTimeMinutes: 10,
       points: 10,
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-operations-monitoring-step-alerts',
@@ -39,6 +45,12 @@ export const labOperationsMonitoringDefinition: WorkshopLabDefinition = {
       instructions:
         'In Atlas, create at least two alerts: one for high CPU or operation rate, and one for low disk space or replica set unhealthy status. Use email as the notification channel. Think about thresholds that would be appropriate during a live workshop vs. production.',
       estimatedTimeMinutes: 10,
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
       points: 10,
     },
     {
@@ -49,6 +61,12 @@ export const labOperationsMonitoringDefinition: WorkshopLabDefinition = {
       instructions:
         'Use the Performance Advisor or Query Profiler to inspect recommended indexes for your CSFLE / QE sample workload. Note any recommendations for encrypted collections and decide which you would apply. Document how you would explain these recommendations to a customer.',
       estimatedTimeMinutes: 5,
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
       points: 5,
     },
   ],

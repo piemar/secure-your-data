@@ -30,7 +30,12 @@ export const labFlexibleNestedDocumentsDefinition: WorkshopLabDefinition = {
       description: 'Python scripts for nested document evolution',
       type: 'script',
       path: 'microservice_one.py',
-      sizeHint: 'proof 02 scripts',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: 'proof 02 scripts',
     },
   ],
   steps: [
@@ -48,6 +53,12 @@ export const labFlexibleNestedDocumentsDefinition: WorkshopLabDefinition = {
       enhancementId: 'flexible.nested-subdoc',
       sourceProof: 'proofs/02/README.md',
       sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-flexible-nested-documents-step-2',
@@ -62,7 +73,12 @@ export const labFlexibleNestedDocumentsDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'flexible.add-arrays',
       sourceProof: 'proofs/02/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-flexible-nested-documents-step-3',
@@ -77,7 +93,12 @@ export const labFlexibleNestedDocumentsDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'flexible.nested-queries',
       sourceProof: 'proofs/02/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
   ],
 };

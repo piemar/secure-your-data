@@ -35,6 +35,12 @@ export const labFullRecoveryRpoSetupDefinition: WorkshopLabDefinition = {
       enhancementId: 'full-recovery-rpo.mgeneratejs',
       sourceProof: 'proofs/13/README.md',
       sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-full-recovery-rpo-setup-step-2',
@@ -48,7 +54,12 @@ export const labFullRecoveryRpoSetupDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'full-recovery-rpo.atlas-setup',
       sourceProof: 'proofs/13/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
     {
       id: 'lab-full-recovery-rpo-setup-step-3',
@@ -62,7 +73,12 @@ export const labFullRecoveryRpoSetupDefinition: WorkshopLabDefinition = {
       points: 5,
       enhancementId: 'full-recovery-rpo.snapshots',
       sourceProof: 'proofs/13/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
   ],
 };

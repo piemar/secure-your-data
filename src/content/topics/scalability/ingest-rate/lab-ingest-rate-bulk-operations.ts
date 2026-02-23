@@ -30,7 +30,12 @@ export const labIngestRateBulkOperationsDefinition: WorkshopLabDefinition = {
       description: 'Target collection for bulk insert operations',
       type: 'collection',
       namespace: 'INGEST-RATE.records',
-      sizeHint: 'grows during test',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: 'grows during test',
     },
   ],
   steps: [
@@ -48,6 +53,12 @@ export const labIngestRateBulkOperationsDefinition: WorkshopLabDefinition = {
       enhancementId: 'ingest-rate.ordered-vs-unordered',
       sourceProof: 'proofs/03/README.md',
       sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-ingest-rate-bulk-operations-step-2',
@@ -62,7 +73,12 @@ export const labIngestRateBulkOperationsDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'ingest-rate.batch-sizing',
       sourceProof: 'proofs/03/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-ingest-rate-bulk-operations-step-3',
@@ -77,7 +93,12 @@ export const labIngestRateBulkOperationsDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'ingest-rate.write-concern',
       sourceProof: 'proofs/03/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
   ],
 };

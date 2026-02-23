@@ -23,6 +23,12 @@ export const labGeospatialPolygonsDefinition: WorkshopLabDefinition = {
       estimatedTimeMinutes: 10,
       verificationId: 'geospatial.verifyPolygons',
       points: 10,
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-geospatial-polygons-step-2',
@@ -33,6 +39,12 @@ export const labGeospatialPolygonsDefinition: WorkshopLabDefinition = {
         '- Use $geoWithin to find locations in a given region.\n- Use $geoIntersects to detect overlaps for complex shapes.\n- Compare results across regions.',
       estimatedTimeMinutes: 10,
       verificationId: 'geospatial.verifyWithinIntersects',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
       points: 10,
     },
     {
@@ -44,6 +56,12 @@ export const labGeospatialPolygonsDefinition: WorkshopLabDefinition = {
         '- Choose a scenario (e.g., “eligible for 1-hour delivery”).\n- Write queries that answer “in zone” vs “out of zone”.\n- Document how SAs should explain this capability to customers.',
       estimatedTimeMinutes: 10,
       verificationId: 'geospatial.verifyScenario',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
       points: 10,
     },
   ],

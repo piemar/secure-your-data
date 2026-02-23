@@ -1,3 +1,4 @@
+# Thin image: uses your published base. For local dev without publishing, use Dockerfile.full in docker-compose instead.
 FROM pierrepetersson/mongodb-workshop-sandbox:latest
 
 WORKDIR /usr/src/app

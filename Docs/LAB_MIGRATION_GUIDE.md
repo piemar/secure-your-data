@@ -1,6 +1,6 @@
 # Lab Migration Guide: From TSX to Content-Driven
 
-This guide explains how to migrate existing labs from monolithic TSX components to the content-driven `WorkshopLabDefinition` format while preserving all rich content.
+This guide explains how to migrate existing labs from monolithic TSX components to the content-driven `WorkshopLabDefinition` format while preserving all rich content. It aligns with `Docs/METADATA_DRIVEN_ENHANCEMENT_SYSTEM_COMPLETE.md` and `Docs/LAB_IMPLEMENTATION_PATHS.md`.
 
 ## Migration Overview
 
@@ -11,15 +11,15 @@ This guide explains how to migrate existing labs from monolithic TSX components 
 - Future YAML/JSON migration
 
 **Strategy**: 
-- Lab structure → Content definition (`WorkshopLabDefinition`)
-- Rich content → Step enhancements (`Map<string, Partial<Step>>`)
-- Component → Thin wrapper using `LabRunner`
+- Lab structure → Content definition (`WorkshopLabDefinition`) under `src/content/topics/<topic>/<pov>/lab-*.ts`
+- Rich content (code blocks, skeletons, hints, tips) → Step enhancements in **topic POV folder**: `src/content/topics/<topic>/<pov>/enhancements.ts`, keyed by `enhancementId`
+- Rendering → `LabRunner` with `labId`; enhancements loaded by the loader from `enhancements.ts` (no component required for step content)
 
 ## Migration Steps
 
 ### Step 1: Create Content Definition
 
-Create `src/content/labs/lab-{name}.ts`:
+Create the lab definition under the **topic POV folder**: `src/content/topics/<topic>/<pov>/lab-{name}.ts`. Example: `src/content/topics/encryption/my-pov/lab-my-lab.ts`.
 
 ```typescript
 import { WorkshopLabDefinition } from '@/types';
@@ -39,12 +39,12 @@ export const labMyLabDefinition: WorkshopLabDefinition = {
       narrative: 'Context and background',
       instructions: 'What to do',
       estimatedTimeMinutes: 10,
-      verificationId: 'myLab.verifyStep1',
+      verificationId: 'myLab.verifyStep1',  // Resolved by verification service
       points: 10,
-      hints: [
-        'Basic hint 1',
-        'Basic hint 2'
-      ]
+      enhancementId: 'my-pov.step-1',       // Links to enhancements.ts entry
+      sourceProof: 'proofs/XX/README.md',
+      sourceSection: 'Setup',
+      hints: ['Basic hint 1', 'Basic hint 2']
     }
     // ... more steps
   ],
@@ -53,58 +53,25 @@ export const labMyLabDefinition: WorkshopLabDefinition = {
 };
 ```
 
-**What goes in content definition:**
+**What goes in the lab definition:**
 - ✅ Step structure (IDs, titles, narrative, instructions)
-- ✅ Basic metadata (time, difficulty, verification IDs)
+- ✅ Basic metadata (time, difficulty, verificationId, enhancementId, sourceProof, sourceSection)
 - ✅ Basic hints
-- ❌ Code blocks (goes in stepEnhancements)
-- ❌ Skeletons (goes in stepEnhancements)
-- ❌ Verification functions (goes in stepEnhancements)
-- ❌ Exercises (goes in stepEnhancements)
-- ❌ Tips (goes in stepEnhancements)
+- ❌ Code blocks, skeletons, tips, exercises → these go in **`enhancements.ts`** in the same POV folder (see Step 2)
 
-### Step 2: Update Component to Use Content Definition
+### Step 2: Add Enhancement Metadata (content-driven path)
 
-**Before (Monolithic)**:
+Create or extend `src/content/topics/<topic>/<pov>/enhancements.ts`. Each step’s `enhancementId` (e.g. `my-pov.step-1`) must have a matching entry with code blocks, skeleton, inlineHints, tips, and optionally competitorEquivalents. The loader (`src/labs/enhancements/loader.ts`) resolves enhancements by the **prefix** of `enhancementId` (e.g. `my-pov` → module for that POV); the prefix must be registered in the loader’s `moduleMap` if the POV is new.
+
+**Preferred (full content-driven):** No TSX component for step content. The app renders the lab via:
+
 ```tsx
-<LabRunner
-  labNumber={1}
-  title="..."
-  description="..."
-  steps={labSteps}  // All content in TSX
-  introContent={introContent}
-/>
+<LabRunner labNumber={1} labId="lab-my-lab" />
 ```
 
-**After (Content-Driven)**:
-```tsx
-import { createStepEnhancements } from '@/utils/labStepEnhancements';
+LabRunner loads the lab definition from ContentService and, for each step with an `enhancementId`, loads the enhancement from the POV’s `enhancements.ts`. Verification is done via `verificationId` on the step (resolved by the verification service), not via `onVerify` in the enhancement.
 
-export function MyLab() {
-  const { mongoUri, awsRegion, verifiedTools } = useLab();
-  
-  // Keep existing step definitions with rich content
-  const labSteps: Step[] = [
-    {
-      id: 'lab-my-lab-step-1',  // Must match content definition!
-      title: 'Step 1 Title',
-      // ... all rich content (code blocks, skeletons, hints, exercises, verification)
-    }
-  ];
-
-  // Extract rich content into stepEnhancements Map
-  const stepEnhancements = createStepEnhancements(labSteps);
-
-  return (
-    <LabRunner
-      labNumber={1}
-      labId="lab-my-lab"  // Loads from content definition
-      stepEnhancements={stepEnhancements}  // Preserves rich content
-      introContent={introContent}  // Optional: custom intro
-    />
-  );
-}
-```
+**Legacy (hybrid):** If you still pass `stepEnhancements` from a component, those override the async-loaded enhancements. Prefer migrating that content into `enhancements.ts` so the lab is fully content-driven (see `Docs/LAB_IMPLEMENTATION_PATHS.md`).
 
 ### Step 3: Align Step IDs
 
@@ -131,22 +98,10 @@ export function MyLab() {
 - Lab 2: `lab-queryable-encryption-step-{step-name}`
 - Lab 3: `lab-right-to-erasure-step-{step-name}`
 
-### Step 4: Register in ContentService
+### Step 4: Register in ContentService and loader
 
-Add to `src/services/contentService.ts`:
-
-```typescript
-import { labMyLabDefinition } from '../content/labs/lab-my-lab';
-
-class InMemoryContentService {
-  private labs: WorkshopLabDefinition[] = [
-    lab1Definition,
-    lab2Definition,
-    lab3Definition,
-    labMyLabDefinition  // Add here
-  ];
-}
-```
+- **ContentService:** Ensure the lab is included in the labs list (e.g. via `src/content/topics/index.ts` and the `allLabs` array used by the content service).
+- **Loader:** If the lab uses a **new** POV prefix for `enhancementId`, add that prefix to the `moduleMap` in `src/labs/enhancements/loader.ts` so it points to the correct `enhancements.ts` module under `src/content/topics/...`.
 
 ### Step 5: Test Migration
 
@@ -158,42 +113,46 @@ class InMemoryContentService {
 
 ## What Gets Preserved
 
-### ✅ Preserved via stepEnhancements
+### ✅ Preserved in enhancement metadata (`enhancements.ts`)
 
-- **Code Blocks**: Full code, skeletons (guided/challenge/expert), inline hints
-- **Tips**: SA tips, best practices, action required notices
-- **Exercises**: Quizzes, fill-in-the-blank, challenges
-- **Verification Functions**: `onVerify` callbacks
-- **Troubleshooting**: Troubleshooting guides
-- **Custom Sections**: `understandSection`, `doThisSection`
+- **Code blocks**: Full code, skeletons (guided/challenge/expert), inline hints
+- **Tips**: SA tips, best practices, competitorEquivalents
+- **Troubleshooting**: Optional troubleshooting in enhancement
+- **Exercises**: Optional in enhancement metadata
 
-### ✅ Preserved via introContent
+### ✅ Preserved in lab definition
 
-- **Architecture Diagrams**: React components
-- **Key Concepts**: Term/explanation pairs
-- **Custom Insights**: Lab-specific insights
-- **Encryption Flow**: Visual flow diagrams
+- **Step structure**: IDs, titles, narrative, instructions
+- **Basic metadata**: Time estimates, difficulty, points, verificationId, enhancementId, sourceProof, sourceSection
+- **Basic hints**: Simple text hints (step-level)
 
-### ✅ Preserved in Content Definition
+### ✅ Preserved via intro / lab-specific overrides
 
-- **Step Structure**: IDs, titles, narrative, instructions
-- **Basic Metadata**: Time estimates, difficulty, points
-- **Verification IDs**: References to verification logic
-- **Basic Hints**: Simple text hints
+- **Key concepts, architecture diagrams**: Via `labIntroComponents` or intro content from lab definition (see `labIntroComponents.tsx`). Key concepts can also be on the lab definition.
+- **Verification**: Step-level `verificationId` is resolved by the verification service; no `onVerify` in enhancement for content-driven labs.
+
+## Standardized approach (Lab 1 Step 3)
+
+When migrating or adding steps, follow the **standardized approach** (see `Docs/ADD_LAB_MASTER_PROMPT.md`):
+
+- **No Terminal block** that only runs `node file.cjs`. Users run code via **Run all** and **Run selection** in the editor.
+- **Node + Mongosh steps:** Define exactly two blocks (Node block, then Mongosh block with `filename: 'Mongosh'`, `language: 'mongosh'`) **only when the same functionality can be executed in mongosh** (e.g. key vault index). Do not add a Mongosh block for driver-only steps (create DEK, auto-encrypt, rewrap, etc.); those steps have one block and the editor shows the filename only, no mongosh tab. Do not add a Terminal block. The UI shows one composite slot "mongosh ! node"; mongosh is first and default.
+- **Skeleton + inlineHints** for both Node and Mongosh blocks where the step uses fill-in-the-blank; run hint placement verification for all blocks.
+
+Reference: `csfle.init-keyvault` in `src/content/topics/encryption/csfle/enhancements.ts` (Lab 1 Step 3).
 
 ## Migration Checklist
 
-- [ ] Create content definition file (`src/content/labs/lab-{name}.ts`)
-- [ ] Define all steps with proper IDs
-- [ ] Update component to use `labId` with `stepEnhancements`
-- [ ] Align step IDs between content definition and component
-- [ ] Register lab in ContentService
-- [ ] Test lab loads correctly
-- [ ] Test code blocks render
-- [ ] Test skeletons display
-- [ ] Test verification functions work
-- [ ] Test exercises function
-- [ ] Test step navigation
+- [ ] Create lab definition under topic POV: `src/content/topics/<topic>/<pov>/lab-*.ts`
+- [ ] Define all steps with proper IDs, `enhancementId`, `verificationId`, `sourceProof`, `sourceSection`
+- [ ] Create or extend `src/content/topics/<topic>/<pov>/enhancements.ts` with matching enhancement entries
+- [ ] **No Terminal block** for running node scripts; execution via Run all / Run selection. Node + Mongosh steps: two blocks only (Node, then Mongosh).
+- [ ] If new POV prefix: add prefix to `moduleMap` in `src/labs/enhancements/loader.ts`
+- [ ] Register lab (e.g. via `src/content/topics/index.ts` / allLabs)
+- [ ] Test lab loads via `LabRunner` with `labId`
+- [ ] Test code blocks and skeletons render
+- [ ] Test verification (via `verificationId`) works
+- [ ] Test step navigation and optional exercises
 - [ ] Update router/navigation if needed
 
 ## Common Issues & Solutions
@@ -213,38 +172,17 @@ id: 'lab-my-lab-step-1'  // ✅
 id: 'step-1'  // ❌ Won't work!
 ```
 
-### Issue: Verification Functions Don't Work
+### Issue: Verification doesn't run
 
 **Symptom**: "Check My Progress" button doesn't work
 
-**Solution**: Ensure `onVerify` is in `stepEnhancements`:
+**Solution (content-driven):** Ensure each step has a `verificationId` in the lab definition and that the verification service registers a handler for that ID. No `onVerify` is used when enhancements are loaded from `enhancements.ts`.
 
-```typescript
-const stepEnhancements = createStepEnhancements(labSteps);
-// stepEnhancements automatically includes onVerify functions
-```
-
-### Issue: Code Blocks Don't Render
+### Issue: Code blocks don't render
 
 **Symptom**: Code blocks are missing or empty
 
-**Solution**: Ensure code blocks are in component step definitions:
-
-```typescript
-const labSteps: Step[] = [
-  {
-    id: 'lab-my-lab-step-1',
-    codeBlocks: [
-      {
-        filename: 'script.js',
-        language: 'javascript',
-        code: `...`,
-        skeleton: `...`
-      }
-    ]
-  }
-];
-```
+**Solution (content-driven):** Ensure the step has an `enhancementId` that matches an entry in the POV’s `enhancements.ts`, and that the enhancement has `codeBlocks` with `filename`, `language`, `code`, and optionally `skeleton` and `inlineHints`. The enhancementId **prefix** must be registered in `src/labs/enhancements/loader.ts` `moduleMap`.
 
 ### Issue: Intro Content Missing
 
@@ -261,46 +199,35 @@ const labSteps: Step[] = [
 
 ## Examples
 
-### Example 1: Lab 1 (CSFLE Fundamentals)
+### Example 1: Lab 1 (CSFLE Fundamentals) – content-driven
 
-**Content Definition**: `src/content/labs/lab-csfle-fundamentals.ts`
-- 7 steps defined
-- Basic structure and metadata
+**Lab definition**: `src/content/topics/encryption/csfle/lab-csfle-fundamentals.ts` – 7 steps, each with `enhancementId` (e.g. `csfle.create-cmk`), `verificationId`, `sourceProof`, `sourceSection`.
 
-**Component**: `src/components/labs/Lab1CSFLE.tsx`
-- 7 steps with rich content
-- Code blocks with skeletons (guided/challenge/expert)
-- Inline hints, tips, exercises
-- Verification functions
-- Custom intro with architecture diagram
+**Enhancements**: `src/content/topics/encryption/csfle/enhancements.ts` – full code blocks, skeletons, inline hints, tips, competitorEquivalents for all 7 steps.
 
-**Result**: ✅ Fully migrated, all content preserved
+**Rendering**: `LabRunner` with `labId="lab-csfle-fundamentals"` (e.g. from Index). No dedicated TSX component; enhancements loaded by loader.
 
-### Example 2: Lab 2 (Queryable Encryption)
+**Result**: ✅ Fully content-driven
 
-**Content Definition**: `src/content/labs/lab-queryable-encryption.ts`
-- 4 steps defined
-- QE-specific structure
+### Example 2: Lab 2 (Queryable Encryption) – content-driven
 
-**Component**: `src/components/labs/Lab2QueryableEncryption.tsx`
-- 4 steps with QE code examples
-- Range query demonstrations
-- Metadata collection exploration
+**Lab definition**: `src/content/topics/encryption/queryable-encryption/lab-queryable-encryption.ts` – 4 steps with `enhancementId`, `verificationId`, etc.
 
-**Result**: ✅ Fully migrated, all content preserved
+**Enhancements**: `src/content/topics/encryption/queryable-encryption/enhancements.ts` – full step content.
 
-### Example 3: Lab 3 (Right to Erasure)
+**Rendering**: `LabRunner` with `labId="lab-queryable-encryption"`.
 
-**Content Definition**: `src/content/labs/lab-right-to-erasure.ts`
-- 4 steps defined
-- GDPR/compliance focus
+**Result**: ✅ Fully content-driven
 
-**Component**: `src/components/labs/Lab3RightToErasure.tsx`
-- 4 steps with migration patterns
-- Multi-tenant key isolation
-- Crypto-shredding demonstrations
+### Example 3: Lab 3 (Right to Erasure) – content-driven
 
-**Result**: ✅ Fully migrated, all content preserved
+**Lab definition**: `src/content/topics/encryption/right-to-erasure/lab-right-to-erasure.ts`
+
+**Enhancements**: `src/content/topics/encryption/right-to-erasure/enhancements.ts`
+
+**Rendering**: `LabRunner` with `labId="lab-right-to-erasure"`.
+
+**Result**: ✅ Fully content-driven
 
 ## Next Steps After Migration
 
@@ -320,6 +247,8 @@ const labSteps: Step[] = [
 ## Questions?
 
 See:
-- `CONTRIBUTING.md` - General contribution guide
-- `Docs/LAB_LIBRARY_ARCHITECTURE.md` - Lab library architecture
-- `Docs/PHASE_7_COMPLETION_SUMMARY.md` - Phase 7 migration details
+- `Docs/METADATA_DRIVEN_ENHANCEMENT_SYSTEM_COMPLETE.md` – Enhancement schema, loader, and topic-based paths
+- `Docs/LAB_IMPLEMENTATION_PATHS.md` – Content-driven vs legacy component path; all encryption labs now content-driven
+- `Docs/VALIDATE_LABS_MASTER_PROMPT.md` – Quality audit against ADD_LAB_MASTER_PROMPT
+- `Docs/LAB_FOLDER_STRUCTURE_GUIDELINE.md` – Topic/POV folder layout
+- `CONTRIBUTING.md` – General contribution guide

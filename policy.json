@@ -1,0 +1,16 @@
+{
+"Version": "2012-10-17",
+"Statement": [{
+"Sid": "Enable IAM User Permissions",
+"Effect": "Allow",
+"Principal": {"AWS": "arn:aws:iam::979559056307:root"},
+"Action": "kms:*",
+"Resource": "*"
+}, {
+"Sid": "Allow My User",
+"Effect": "Allow",
+"Principal": {"AWS": "arn:aws:sts::979559056307:assumed-role/AWSReservedSSO_Solution-Architects.User_9ab2177bc40a8a52/pierre.petersson@mongodb.com"},
+"Action": "kms:*",
+"Resource": "*"
+}]
+}

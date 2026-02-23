@@ -77,6 +77,7 @@ db.customers._________()`,
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the mongosh verify commands.',
       'Use the 1M record dataset for faster setup and testing.',
       'The 10M record dataset is better for performance benchmarking.',
       'Ensure you have sufficient storage on your Atlas cluster.',
@@ -132,6 +133,7 @@ db.customers._________()`,
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the commands (mongosh-style).',
       'Indexes enable efficient filtering before aggregation.',
       'The country index will be used by $match stages in aggregations.',
       'Index creation may take a few minutes on large collections.',
@@ -193,6 +195,7 @@ db.customers.aggregate([
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the query.',
       'The $match stage uses the country index for efficient filtering.',
       '$avg calculates the average of numeric values.',
       'This aggregation demonstrates single-command analytics on indexed subsets.',
@@ -247,6 +250,7 @@ db.customers.explain("_________").aggregate([
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the query.',
       'executionStats provides detailed performance metrics.',
       'Look for IXSCAN vs COLLSCAN to verify index usage.',
       'Compare executionTimeMillis to expected benchmarks.',
@@ -313,6 +317,7 @@ db.customers.aggregate([
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the query.',
       '$unwind expands arrays, creating one document per array element.',
       'This allows aggregating across nested structures.',
       'Negative balances (Mortgage) are correctly summed.',
@@ -371,6 +376,7 @@ db.customers.aggregate([
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the query.',
       'This aggregation processes all documents (no $match filter).',
       '$sort orders results after grouping.',
       'Performance is good even without filtering because grouping is efficient.',
@@ -452,6 +458,7 @@ db.customers.aggregate([
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the query.',
       '$project computes derived fields before grouping.',
       '$size calculates the length of an array.',
       'This demonstrates aggregating on document structure metrics.',
@@ -524,6 +531,7 @@ db.customers.explain("_________").aggregate([
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the query.',
       'Compare your results to MongoDB benchmarks.',
       'Index usage significantly improves performance.',
       'Complex pipelines ($unwind, $project) take longer but scale well.',
@@ -587,6 +595,7 @@ db.sales.aggregate([
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the query.',
       'Group by day using $dateToString.',
       'Use $sum and $avg for metrics.',
       'Extend to encrypted segments with proper schema.',
@@ -623,6 +632,7 @@ db.metrics.aggregate([
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the query.',
       'Time-series collections optimize storage.',
       '$dateTrunc for hourly/daily buckets.',
       'Atlas Charts for auto-refresh dashboards.',

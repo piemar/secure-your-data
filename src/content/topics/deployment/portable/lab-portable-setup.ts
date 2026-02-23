@@ -37,6 +37,12 @@ export const labPortableSetupDefinition: WorkshopLabDefinition = {
       enhancementId: 'portable.atlas-setup',
       sourceProof: 'proofs/10/README.md',
       sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-portable-setup-step-2',
@@ -50,7 +56,12 @@ export const labPortableSetupDefinition: WorkshopLabDefinition = {
       points: 5,
       enhancementId: 'portable.connection-strings',
       sourceProof: 'proofs/10/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
     {
       id: 'lab-portable-setup-step-3',
@@ -64,7 +75,12 @@ export const labPortableSetupDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'portable.mgeneratejs-setup',
       sourceProof: 'proofs/10/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
   ],
 };

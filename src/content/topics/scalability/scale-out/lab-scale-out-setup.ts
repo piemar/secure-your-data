@@ -29,7 +29,12 @@ export const labScaleOutSetupDefinition: WorkshopLabDefinition = {
       description: 'Atlas API and cluster config template',
       type: 'file',
       path: 'atlas.properties.template',
-      sizeHint: '1KB',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: '1KB',
     },
     {
       id: 'makefile',
@@ -67,6 +72,12 @@ export const labScaleOutSetupDefinition: WorkshopLabDefinition = {
       enhancementId: 'scale-out.aws-setup',
       sourceProof: 'proofs/07/README.md',
       sourceSection: 'Setup - Create AWS Environment',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-scale-out-setup-step-2',
@@ -80,7 +91,12 @@ export const labScaleOutSetupDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'scale-out.atlas-config',
       sourceProof: 'proofs/07/README.md',
-      sourceSection: 'Setup - Configure Atlas Environment',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup - Configure Atlas Environment',
     },
     {
       id: 'lab-scale-out-setup-step-3',
@@ -94,7 +110,12 @@ export const labScaleOutSetupDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'scale-out.script-config',
       sourceProof: 'proofs/07/README.md',
-      sourceSection: 'Setup - Configure The Main Proof Scripts',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup - Configure The Main Proof Scripts',
     },
   ],
 };

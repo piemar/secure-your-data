@@ -24,7 +24,12 @@ export const labPartialRecoveryOverviewDefinition: WorkshopLabDefinition = {
   keyConcepts: [
     {
       term: 'Partial recovery',
-      explanation: 'Restore only the lost subset of data (e.g. 100 customer records) into the live database, not a full cluster restore.',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      explanation: 'Restore only the lost subset of data (e.g. 100 customer records) into the live database, not a full cluster restore.',
     },
     {
       term: 'PITR to temp cluster',
@@ -53,6 +58,12 @@ export const labPartialRecoveryOverviewDefinition: WorkshopLabDefinition = {
       enhancementId: 'partial-recovery.concepts',
       sourceProof: 'proofs/15/README.md',
       sourceSection: 'Description',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-partial-recovery-overview-step-2',
@@ -66,7 +77,12 @@ export const labPartialRecoveryOverviewDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'partial-recovery.flow',
       sourceProof: 'proofs/15/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-partial-recovery-overview-step-3',
@@ -80,7 +96,12 @@ export const labPartialRecoveryOverviewDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'partial-recovery.requirements',
       sourceProof: 'proofs/15/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
   ],
 };

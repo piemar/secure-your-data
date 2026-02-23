@@ -284,6 +284,7 @@ db.test_results.find({_________: true}).pretty()`,
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the query (mongosh-style).',
       'latest: true marks the most recent test run.',
       'test_data contains arrays; use $unwind for charting.',
     ],

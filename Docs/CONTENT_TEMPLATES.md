@@ -2,6 +2,8 @@
 
 This document provides template examples and references for creating workshop content.
 
+**Standardized approach:** When creating or updating labs and steps, follow the **standardized approach (Lab 1 Step 3)**. See `Docs/ADD_LAB_MASTER_PROMPT.md` and `Docs/CONTENT_STANDARDS.md`: no Terminal block that only runs node; Node + Mongosh steps use exactly two blocks (Node, then Mongosh) **only when the same functionality can run in mongosh**—otherwise one block and no mongosh tab; composite UI "mongosh ! node" when both are present; skeleton + inlineHints for all code blocks; execution via Run all / Run selection.
+
 ## Lab Template
 
 ### Basic Lab Structure

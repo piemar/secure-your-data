@@ -25,7 +25,12 @@ export const labRichQueryAggregationsDefinition: WorkshopLabDefinition = {
       description: 'Customer collection with indexed fields for aggregation',
       type: 'collection',
       namespace: 'RICH-QUERY.customers',
-      sizeHint: '1M docs',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: '1M docs',
     },
   ],
   steps: [
@@ -43,6 +48,11 @@ export const labRichQueryAggregationsDefinition: WorkshopLabDefinition = {
       enhancementId: 'rich-query.basic-aggregation',
       sourceProof: 'proofs/01/README.md',
       sourceSection: 'Execution - Aggregation',
+      hints: [
+        'Use $match as the first stage to filter documents before grouping.',
+        'In $group, use _id for the grouping key and accumulator operators like $sum, $count for values.',
+        'Add $sort after $group to order the grouped results (e.g. by total descending).',
+      ],
     },
     {
       id: 'lab-rich-query-aggregations-step-2',
@@ -58,6 +68,11 @@ export const labRichQueryAggregationsDefinition: WorkshopLabDefinition = {
       enhancementId: 'rich-query.projection-aggregation',
       sourceProof: 'proofs/01/README.md',
       sourceSection: 'Execution - Aggregation',
+      hints: [
+        'Use $project to include, exclude, or rename fields in the pipeline output.',
+        'Use $cond for conditional computed fields (e.g. tier based on a numeric range).',
+        'Shape the output to match what your dashboard or API expects.',
+      ],
     },
     {
       id: 'lab-rich-query-aggregations-step-3',
@@ -73,6 +88,11 @@ export const labRichQueryAggregationsDefinition: WorkshopLabDefinition = {
       enhancementId: 'rich-query.facets',
       sourceProof: 'proofs/01/README.md',
       sourceSection: 'Execution - Aggregation',
+      hints: [
+        'Use a single $facet stage with multiple sub-pipelines (each an array of stages).',
+        'Each sub-pipeline runs over the same input documents and can $match, $group, $sort independently.',
+        'Return at least two facets (e.g. by region and by category) in one round trip.',
+      ],
     },
   ],
 };

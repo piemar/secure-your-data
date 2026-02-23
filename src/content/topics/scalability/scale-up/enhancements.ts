@@ -309,6 +309,7 @@ Scale-down: M30 → M20 (same process)`,
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the query (e.g. in Compass or mongosh).',
       'No gaps = proof successful; zero data loss during scale-up.',
       'If you see gaps, check that retryable writes are enabled (default in driver).',
       'Scale-down verification: same process after M30 → M20.',

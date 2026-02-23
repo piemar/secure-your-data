@@ -30,7 +30,12 @@ export const labWorkloadIsolationReadPreferenceDefinition: WorkshopLabDefinition
       description: 'Operational update workload script',
       type: 'script',
       path: 'update_docs.py',
-      sizeHint: '3KB',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: '3KB',
     },
     {
       id: 'query-docs-py',
@@ -61,6 +66,12 @@ export const labWorkloadIsolationReadPreferenceDefinition: WorkshopLabDefinition
       enhancementId: 'workload-isolation.update-script',
       sourceProof: 'proofs/05/README.md',
       sourceSection: 'Execution - Update Workload',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-workload-isolation-read-preference-step-2',
@@ -74,7 +85,12 @@ export const labWorkloadIsolationReadPreferenceDefinition: WorkshopLabDefinition
       points: 10,
       enhancementId: 'workload-isolation.query-script',
       sourceProof: 'proofs/05/README.md',
-      sourceSection: 'Execution - Query Workload',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution - Query Workload',
     },
     {
       id: 'lab-workload-isolation-read-preference-step-3',
@@ -89,7 +105,12 @@ export const labWorkloadIsolationReadPreferenceDefinition: WorkshopLabDefinition
       points: 20,
       enhancementId: 'workload-isolation.metrics-verification',
       sourceProof: 'proofs/05/README.md',
-      sourceSection: 'Measurement',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Measurement',
     },
   ],
 };

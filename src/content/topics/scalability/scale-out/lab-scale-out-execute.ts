@@ -29,7 +29,12 @@ export const labScaleOutExecuteDefinition: WorkshopLabDefinition = {
       description: 'Metrics collection (batch_execution_times, chunk_counts, disk_sizes)',
       type: 'collection',
       namespace: 'test_results.test_results',
-      sizeHint: 'grows during run',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: 'grows during run',
     },
   ],
   steps: [
@@ -46,6 +51,12 @@ export const labScaleOutExecuteDefinition: WorkshopLabDefinition = {
       enhancementId: 'scale-out.run-test',
       sourceProof: 'proofs/07/README.md',
       sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-scale-out-execute-step-2',
@@ -59,7 +70,12 @@ export const labScaleOutExecuteDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'scale-out.inspect-results',
       sourceProof: 'proofs/07/README.md',
-      sourceSection: 'Measurement',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Measurement',
     },
     {
       id: 'lab-scale-out-execute-step-3',
@@ -74,7 +90,12 @@ export const labScaleOutExecuteDefinition: WorkshopLabDefinition = {
       points: 20,
       enhancementId: 'scale-out.atlas-charts',
       sourceProof: 'proofs/07/README.md',
-      sourceSection: 'Measurement',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Measurement',
     },
   ],
 };

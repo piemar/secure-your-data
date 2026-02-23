@@ -30,7 +30,12 @@ export const labFlexibleBasicEvolutionDefinition: WorkshopLabDefinition = {
       description: 'Python script to create initial employee collection',
       type: 'script',
       path: 'create_model.py',
-      sizeHint: '~2KB',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: '~2KB',
     },
     {
       id: 'alter-model-script',
@@ -55,6 +60,11 @@ export const labFlexibleBasicEvolutionDefinition: WorkshopLabDefinition = {
       enhancementId: 'flexible.initial-collection',
       sourceProof: 'proofs/02/README.md',
       sourceSection: 'Setup',
+      hints: [
+        'Create the database by using it (e.g. client.db("FLEXIBLE")); no explicit create command needed.',
+        'Use insertMany() to insert 10–20 documents with fields name, email, salary.',
+        'Verify with find() or countDocuments() that the documents are stored.',
+      ],
     },
     {
       id: 'lab-flexible-basic-evolution-step-2',
@@ -70,6 +80,11 @@ export const labFlexibleBasicEvolutionDefinition: WorkshopLabDefinition = {
       enhancementId: 'flexible.add-fields',
       sourceProof: 'proofs/02/README.md',
       sourceSection: 'Execution',
+      hints: [
+        'Use updateMany() with a filter and { $set: { department: "Engineering" } } to add a field.',
+        '$set only adds or updates the specified fields; existing fields are left unchanged.',
+        'Add birth_date to a different subset (e.g. filter by name or _id) to simulate partial rollout.',
+      ],
     },
     {
       id: 'lab-flexible-basic-evolution-step-3',
@@ -85,6 +100,11 @@ export const labFlexibleBasicEvolutionDefinition: WorkshopLabDefinition = {
       enhancementId: 'flexible.mixed-queries',
       sourceProof: 'proofs/02/README.md',
       sourceSection: 'Execution',
+      hints: [
+        'Query with find({}) to return all documents; those without a field will have it absent or null.',
+        'Use find({ department: { $exists: true } }) to get only documents with the new field.',
+        'Use find({ birth_date: { $gte: start, $lte: end } }) for range queries; missing birth_date won\'t match.',
+      ],
     },
   ],
 };

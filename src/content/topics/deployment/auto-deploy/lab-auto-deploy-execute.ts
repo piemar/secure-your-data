@@ -27,7 +27,12 @@ export const labAutoDeployExecuteDefinition: WorkshopLabDefinition = {
       description: 'auto_deploy_atlas.py provisioning script',
       type: 'file',
       path: 'auto_deploy_atlas.py',
-      sizeHint: '~2KB',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: '~2KB',
     },
   ],
   modes: ['lab', 'demo'],
@@ -45,6 +50,12 @@ export const labAutoDeployExecuteDefinition: WorkshopLabDefinition = {
       enhancementId: 'auto-deploy.configure',
       sourceProof: 'proofs/11/README.md',
       sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-auto-deploy-execute-step-2',
@@ -58,7 +69,12 @@ export const labAutoDeployExecuteDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'auto-deploy.execute',
       sourceProof: 'proofs/11/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-auto-deploy-execute-step-3',
@@ -72,7 +88,12 @@ export const labAutoDeployExecuteDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'auto-deploy.verify',
       sourceProof: 'proofs/11/README.md',
-      sourceSection: 'Measurement',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Measurement',
     },
   ],
 };

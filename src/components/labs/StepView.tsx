@@ -672,19 +672,37 @@ export function StepView({
     }
   };
 
-  // Get display code based on tier
+  /** Fill all blanks in skeleton with answers from inlineHints. Use this for "Solution" so the displayed solution is exactly the skeleton with no placeholders (same lines as skeleton). */
+  const fillAllBlanksInSkeleton = useCallback((skeleton: string, inlineHints: InlineHint[] | undefined): string => {
+    if (!inlineHints?.length) return skeleton;
+    const lines = skeleton.split('\n');
+    inlineHints.forEach((hint) => {
+      const lineIndex = hint.line - 1;
+      if (lineIndex >= 0 && lineIndex < lines.length && lines[lineIndex].includes(hint.blankText)) {
+        lines[lineIndex] = lines[lineIndex].replace(hint.blankText, hint.answer);
+      }
+    });
+    return lines.join('\n');
+  }, []);
+
+  // Get display code based on tier. When solution is revealed and block has skeleton + inlineHints, show skeleton with all blanks filled (so solution is same structure as skeleton).
   const getDisplayCode = (block: CodeBlock, tier: SkeletonTier, solutionRevealed: boolean): string => {
-    if (solutionRevealed) return block.code;
-    
-    switch (tier) {
-      case 'expert':
-        return block.expertSkeleton || block.challengeSkeleton || block.skeleton || block.code;
-      case 'challenge':
-        return block.challengeSkeleton || block.skeleton || block.code;
-      case 'guided':
-      default:
-        return block.skeleton || block.code;
+    const base = (() => {
+      switch (tier) {
+        case 'expert':
+          return block.expertSkeleton || block.challengeSkeleton || block.skeleton || block.code;
+        case 'challenge':
+          return block.challengeSkeleton || block.skeleton || block.code;
+        case 'guided':
+        default:
+          return block.skeleton || block.code;
+      }
+    })();
+    if (solutionRevealed && block.skeleton && block.inlineHints?.length) {
+      return fillAllBlanksInSkeleton(block.skeleton, block.inlineHints);
     }
+    if (solutionRevealed) return block.code;
+    return base;
   };
 
   // Check if block has any skeleton tier
@@ -701,7 +719,10 @@ export function StepView({
         const lineIndex = hint.line - 1;
         if (lineIndex >= 0 && lineIndex < lines.length) {
           const lineText = lines[lineIndex];
-          lines[lineIndex] = lineText.replace(/_{5,}/, hint.answer);
+          // Replace the specific blankText so multiple blanks per line work correctly
+          lines[lineIndex] = lineText.includes(hint.blankText)
+            ? lineText.replace(hint.blankText, hint.answer)
+            : lineText.replace(/_{5,}/, hint.answer);
         }
       }
     });
@@ -725,8 +746,56 @@ export function StepView({
       });
   }, [currentStep?.codeBlocks]);
 
-  // Sync editable code from display code when step/tier/reveal changes; prefer existing (saved) content so we don't overwrite
-  // Exception: if saved content contains old hardcoded URI (const uri = "mongodb://..."), overwrite with current step so we always use process.env.MONGODB_URI
+  // Pairs: node (.cjs/.js) + Mongosh block → one slot with "mongosh ! node" toggle (Run uses editor content: node → run-node, mongosh → run-mongosh)
+  const nodeMongoshPairs = useMemo(() => {
+    const blocks = currentStep?.codeBlocks ?? [];
+    const map = new Map<number, number>();
+    for (let i = 0; i < blocks.length; i++) {
+      const b = blocks[i];
+      const isMongosh = (b.filename === 'Mongosh' || b.filename === 'mongosh') && (b.language || '').toLowerCase() === 'mongosh';
+      if (!isMongosh) continue;
+      for (let j = i - 1; j >= 0; j--) {
+        const prev = blocks[j];
+        const isNode = (prev.filename.toLowerCase().endsWith('.cjs') || prev.filename.toLowerCase().endsWith('.js')) && ['javascript', 'typescript'].includes((prev.language || '').toLowerCase());
+        if (isNode) {
+          map.set(j, i);
+          break;
+        }
+      }
+    }
+    return map;
+  }, [currentStep?.codeBlocks]);
+
+  type DisplaySlot = { type: 'single'; block: CodeBlock; originalIndex: number } | {
+    type: 'node-mongosh';
+    nodeBlock: CodeBlock;
+    nodeIndex: number;
+    mongoshBlock: CodeBlock;
+    mongoshIndex: number;
+  };
+
+  const displaySlots = useMemo((): DisplaySlot[] => {
+    const blocks = currentStep?.codeBlocks ?? [];
+    const mongoshIndices = new Set(nodeMongoshPairs.values());
+    const nodeIndices = new Set(nodeMongoshPairs.keys());
+    return sortedCodeBlocksWithIndex
+      .filter(({ originalIndex }) => !mongoshIndices.has(originalIndex))
+      .map(({ block, originalIndex }) => {
+        const mongoshIdx = nodeMongoshPairs.get(originalIndex);
+        if (mongoshIdx != null) {
+          const mongoshBlock = blocks[mongoshIdx];
+          return { type: 'node-mongosh' as const, nodeBlock: block, nodeIndex: originalIndex, mongoshBlock, mongoshIndex: mongoshIdx };
+        }
+        return { type: 'single' as const, block, originalIndex };
+      });
+  }, [currentStep?.codeBlocks, sortedCodeBlocksWithIndex, nodeMongoshPairs]);
+
+  const [nodeMongoshViewByKey, setNodeMongoshViewByKey] = useState<Record<string, 'node' | 'mongosh'>>({});
+
+  // Sync editable code from display code when step/tier/reveal changes.
+  // For blocks with a skeleton in guided mode: always show skeleton with only currently revealed answers
+  // (so we never show persisted content that had answers filled in from a previous session).
+  // Exception: if saved content contains old hardcoded URI, overwrite so we use process.env.MONGODB_URI.
   useEffect(() => {
     if (!currentStep?.codeBlocks) return;
     setEditableCodeByBlock((prev) => {
@@ -737,12 +806,21 @@ export function StepView({
         const blockKey = `${currentStepIndex}-${idx}`;
         const tier = skeletonTier[blockKey] || 'guided';
         const isSolutionRevealed = alwaysShowSolutions || !!showSolution[blockKey] || !hasAnySkeleton(block);
-        const freshCode = getDisplayCode(block, tier, isSolutionRevealed);
+        const baseSkeleton = getDisplayCode(block, tier, false);
+        const revealed = revealedAnswers[blockKey] || [];
         const saved = next[blockKey];
-        if (saved != null && saved !== '' && hasOldHardcodedUri(saved)) {
-          next[blockKey] = freshCode;
+        if (isSolutionRevealed) {
+          next[blockKey] =
+            block.skeleton && block.inlineHints?.length
+              ? fillAllBlanksInSkeleton(block.skeleton, block.inlineHints)
+              : (block.code ?? '');
+        } else if (hasAnySkeleton(block) && block.inlineHints?.length) {
+          // Always derive from skeleton + current revealed answers so we show _____ until user clicks "Show answer"
+          next[blockKey] = applyRevealedAnswersToCode(baseSkeleton, block.inlineHints, revealed);
+        } else if (saved != null && saved !== '' && hasOldHardcodedUri(saved)) {
+          next[blockKey] = baseSkeleton;
         } else if (saved == null || saved === '') {
-          next[blockKey] = freshCode;
+          next[blockKey] = baseSkeleton;
         }
       });
       return next;
@@ -761,7 +839,10 @@ export function StepView({
         const isSolutionRevealed = alwaysShowSolutions || !!showSolution[blockKey] || !hasAnySkeleton(block);
         const revealed = revealedAnswers[blockKey] || [];
         if (isSolutionRevealed) {
-          next[blockKey] = block.code ?? '';
+          next[blockKey] =
+            block.skeleton && block.inlineHints?.length
+              ? fillAllBlanksInSkeleton(block.skeleton, block.inlineHints)
+              : (block.code ?? '');
         } else if (revealed.length > 0 && block.inlineHints?.length) {
           const baseCode = getDisplayCode(block, tier, false);
           next[blockKey] = applyRevealedAnswersToCode(baseCode, block.inlineHints, revealed);
@@ -941,8 +1022,8 @@ export function StepView({
     const isSolutionRevealed = alwaysShowSolutions || showSolution[blockKey] || !hasSkeleton;
     const tier = skeletonTier[blockKey] || 'guided';
     
-    // Copy the solution if revealed, otherwise copy current tier skeleton
-    const code = isSolutionRevealed ? (block?.code || '') : getDisplayCode(block!, tier, false);
+    // Copy what's displayed: filled skeleton when solution revealed (skeleton + inlineHints), else tier skeleton
+    const code = getDisplayCode(block!, tier, isSolutionRevealed) || block?.code || '';
     await navigator.clipboard.writeText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -965,9 +1046,10 @@ export function StepView({
       } else if (currentStep.verificationId) {
         const verificationService = getVerificationService();
         const suffix = userSuffix || (typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_user_suffix') || '') : '') || 'default';
+        const storedAlias = typeof localStorage !== 'undefined' ? localStorage.getItem('lab_kms_alias') || undefined : undefined;
         const ctx = {
           mongoUri: labMongoUri || (typeof localStorage !== 'undefined' ? localStorage.getItem('lab_mongo_uri') || undefined : undefined),
-          alias: typeof localStorage !== 'undefined' ? localStorage.getItem('lab_kms_alias') || undefined : undefined,
+          alias: storedAlias || (suffix ? `alias/mongodb-lab-key-${suffix}` : undefined),
           profile: typeof localStorage !== 'undefined' ? localStorage.getItem('lab_aws_profile') || undefined : undefined,
           keyAltName: `user-${suffix}-ssn-key`,
           expectedCount: 1,
@@ -1010,8 +1092,31 @@ export function StepView({
     let result: { output: string; success: boolean; summary: string };
 
     try {
-      // 1) Bash/shell → run-bash, or run "node <file>" via matching editor block (and any preceding commands via run-bash)
-      if (language === 'bash' || language === 'shell') {
+      // 1) Explicit mongosh block → run-mongosh (requires URI)
+      if (language === 'mongosh') {
+        if (!labMongoUri?.trim()) {
+          result = {
+            output: 'MongoDB URI required to run mongosh. Set it in Workshop Settings.',
+            success: false,
+            summary: 'URI required',
+          };
+        } else {
+          const res = await fetch('/api/run-mongosh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, uri: labMongoUri }),
+          });
+          const data = await res.json();
+          const out = [data.stdout, data.stderr].filter(Boolean).join('\n') || data.message || '(no output)';
+          result = {
+            output: out,
+            success: data.success === true,
+            summary: data.success ? 'mongosh completed' : (data.message || 'mongosh failed'),
+          };
+        }
+      }
+      // 2) Bash/shell → run-bash, or run "node <file>" via matching editor block (and any preceding commands via run-bash)
+      else if (language === 'bash' || language === 'shell') {
         const commands = code.split(/\r?\n/).map(s => s.trim()).filter(line => line && !line.startsWith('#'));
         if (commands.length > 0) {
           const nodeCmdIndex = commands.findIndex(cmd => /^node\s+(\S+\.(cjs|js))$/.test(cmd));
@@ -1079,7 +1184,7 @@ export function StepView({
           result = generateSimulatedOutput(code, currentStep.title);
         }
       }
-      // 2) JavaScript that looks like mongosh (db., .aggregate, $search) → run-mongosh (requires URI)
+      // 3) JavaScript that looks like mongosh (db., .aggregate, $search) → run-mongosh (requires URI)
       else if (
         language === 'javascript' &&
         labMongoUri &&
@@ -1098,7 +1203,7 @@ export function StepView({
           summary: data.success ? 'mongosh completed' : (data.message || 'mongosh failed'),
         };
       }
-      // 3) Node-like JavaScript → run-node (optional URI for MONGODB_URI env)
+      // 4) Node-like JavaScript → run-node (optional URI for MONGODB_URI env)
       else if ((language === 'javascript' || language === 'typescript') && code.trim().length > 0) {
         const res = await fetch('/api/run-node', {
           method: 'POST',
@@ -1118,7 +1223,7 @@ export function StepView({
           summary: data.success ? 'Node completed' : (data.message?.split('\n')[0] || 'Node failed'),
         };
       }
-      // 4) Fallback: simulated output (e.g. no URI, or JSON index definitions)
+      // 5) Fallback: simulated output (e.g. no URI, or JSON index definitions)
       else {
         await new Promise(r => setTimeout(r, 400 + Math.random() * 300));
         result = generateSimulatedOutput(code, currentStep.title);
@@ -1147,15 +1252,26 @@ export function StepView({
     setIsRunning(false);
   }, [currentStep?.codeBlocks, currentStep?.title, currentStepIndex, labMongoUri, editableCodeByBlock, skeletonTier, showSolution, alwaysShowSolutions]);
 
-  /** Run all code blocks in order and show combined output */
+  /** Run all code blocks in order: for composite (node+mongosh) slots runs only the active tab; for single slots runs that block. Skips terminal-only blocks. */
   const handleRunAll = useCallback(async () => {
     const blocks = currentStep?.codeBlocks ?? [];
     if (blocks.length === 0) return;
+    // Build list of block indices to run from display slots (one per slot; for node-mongosh use active view)
+    const indicesToRun: number[] = [];
+    for (const slot of displaySlots) {
+      if (slot.type === 'node-mongosh') {
+        const slotKey = `${currentStepIndex}-${slot.nodeIndex}`;
+        const view = nodeMongoshViewByKey[slotKey] ?? 'mongosh';
+        indicesToRun.push(view === 'mongosh' ? slot.mongoshIndex : slot.nodeIndex);
+      } else {
+        indicesToRun.push(slot.originalIndex);
+      }
+    }
     setIsRunning(true);
     const outputs: string[] = [];
     let lastSuccess = true;
     let lastSummary = '';
-    for (let i = 0; i < blocks.length; i++) {
+    for (const i of indicesToRun) {
       const block = blocks[i];
       const blockKey = `${currentStepIndex}-${i}`;
       const tier = skeletonTier[blockKey] || 'guided';
@@ -1163,7 +1279,20 @@ export function StepView({
       const code = (editableCodeByBlock[blockKey] ?? getDisplayCode(block, tier, isSolutionRevealed)) || block.code || '';
       const language = (block.language || 'javascript').toLowerCase();
       try {
-        if (language === 'bash' || language === 'shell') {
+        if (language === 'mongosh' && code.trim().length > 0) {
+          if (labMongoUri?.trim()) {
+            const res = await fetch('/api/run-mongosh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, uri: labMongoUri }) });
+            const data = await res.json();
+            const out = [data.stdout, data.stderr].filter(Boolean).join('\n') || data.message || '(no output)';
+            outputs.push(out);
+            lastSuccess = data.success === true;
+            lastSummary = data.success ? 'mongosh completed' : (data.message || 'mongosh failed');
+          } else {
+            outputs.push('MongoDB URI required to run mongosh. Set it in Workshop Settings.');
+            lastSuccess = false;
+            lastSummary = 'URI required';
+          }
+        } else if (language === 'bash' || language === 'shell') {
           const commands = code.split(/\r?\n/).map((s: string) => s.trim()).filter((line: string) => line && !line.startsWith('#'));
           if (commands.length > 0) {
             const nodeCmdIndex = commands.findIndex((cmd: string) => /^node\s+(\S+\.(cjs|js))$/.test(cmd));
@@ -1228,7 +1357,7 @@ export function StepView({
     setOutputSuccess(lastSuccess);
     setConsolePanelCollapsed(false);
     setIsRunning(false);
-  }, [currentStep?.codeBlocks, currentStep?.title, currentStepIndex, labMongoUri, editableCodeByBlock, skeletonTier, showSolution, alwaysShowSolutions]);
+  }, [currentStep?.codeBlocks, currentStep?.title, currentStepIndex, labMongoUri, editableCodeByBlock, skeletonTier, showSolution, alwaysShowSolutions, displaySlots, nodeMongoshViewByKey]);
 
   /** Reset current step: clear output and collapse panel; clear persisted logs for this step */
   const handleResetStep = useCallback(() => {
@@ -1318,13 +1447,21 @@ export function StepView({
                   {/* Editor panel: collapsible; code blocks; shell blocks show "Terminal" header + Run all/Run selection; content always scrollable */}
                   <ResizablePanel defaultSize={94} minSize={25} className="min-h-0">
                     <div className="h-full min-h-0 flex flex-col border-r border-border overflow-hidden">
-                      {editorPanelCollapsed && sortedCodeBlocksWithIndex.length > 0 ? (() => {
-                        const { block: firstBlock, originalIndex: firstIdx } = sortedCodeBlocksWithIndex[0];
+                      {editorPanelCollapsed && displaySlots.length > 0 ? (() => {
+                        const firstSlot = displaySlots[0];
+                        const firstBlock = firstSlot.type === 'node-mongosh' ? firstSlot.nodeBlock : firstSlot.block;
+                        const firstIdx = firstSlot.type === 'node-mongosh' ? firstSlot.nodeIndex : firstSlot.originalIndex;
                         const firstKey = `${currentStepIndex}-${firstIdx}`;
                         const firstDisplayFilename = (() => {
                           const base = firstBlock.filename.includes(' (') ? firstBlock.filename.split(' (')[0].trim() : firstBlock.filename;
                           return base.replace(/^\d+\.\s*/, '').trim() || base;
                         })();
+                        const firstIsNodeMongosh = firstSlot.type === 'node-mongosh';
+                        const firstIsDriverOnly = firstSlot.type === 'single' && (
+                          (firstBlock.filename?.toLowerCase().endsWith('.cjs') || firstBlock.filename?.toLowerCase().endsWith('.js')) && ['javascript', 'typescript'].includes((firstBlock.language || '').toLowerCase())
+                          || ['python', 'py'].includes((firstBlock.language || '').toLowerCase())
+                          || firstBlock.filename?.toLowerCase().endsWith('.py')
+                        );
                         const firstIsCjs = firstDisplayFilename.toLowerCase().endsWith('.cjs');
                         const firstIsShell = ['shell', 'bash', 'sh'].includes((firstBlock.language || '').toLowerCase());
                         const firstTier = skeletonTier[firstKey] || 'guided';
@@ -1347,6 +1484,15 @@ export function StepView({
                                   <Terminal className="w-3 h-3 flex-shrink-0 text-green-500" aria-hidden />
                                   <span className="text-[8px] font-medium text-white truncate">Terminal</span>
                                 </>
+                              ) : firstIsNodeMongosh ? (
+                                <>
+                                  <FileCode className="w-3 h-3 flex-shrink-0 text-green-500" />
+                                  <span className="font-mono text-[8px] text-white flex items-center gap-1 truncate">
+                                    <button type="button" onClick={() => setNodeMongoshViewByKey((prev) => ({ ...prev, [firstKey]: 'mongosh' }))} className={cn("truncate", (nodeMongoshViewByKey[firstKey] ?? 'mongosh') === 'mongosh' ? 'underline font-semibold' : 'opacity-80 hover:opacity-100')} title="Show Mongosh script">mongosh</button>
+                                    <span className="text-muted-foreground flex-shrink-0">!</span>
+                                    <button type="button" onClick={() => setNodeMongoshViewByKey((prev) => ({ ...prev, [firstKey]: 'node' }))} className={cn("truncate", (nodeMongoshViewByKey[firstKey] ?? 'mongosh') === 'node' ? 'underline font-semibold' : 'opacity-80 hover:opacity-100')} title="Show Node script">node</button>
+                                  </span>
+                                </>
                               ) : (
                                 <>
                                   <FileCode className="w-3 h-3 flex-shrink-0 text-green-500" />
@@ -1355,16 +1501,19 @@ export function StepView({
                               )}
                             </div>
                             <div className="flex items-center gap-0.5 flex-shrink-0">
-                              {firstIsShell && (
+                              {(firstIsShell || firstIsNodeMongosh || firstIsDriverOnly) && (
                                 <>
-                                  <span className="text-[7px] text-muted-foreground/70 mr-0.5">—</span>
+                                  {firstIsShell && <span className="text-[7px] text-muted-foreground/70 mr-0.5">—</span>}
                                   <TooltipProvider><Tooltip><TooltipTrigger asChild>
                                     <Button variant="ghost" size="icon" onClick={handleRunAll} disabled={isRunning || !currentStep.codeBlocks?.length} className="h-3.5 w-3.5 text-primary" title="Run all">
                                       {isRunning ? <Loader2 className="w-2 h-2 animate-spin" /> : <PlayCircle className="w-2 h-2" />}
                                     </Button>
                                   </TooltipTrigger><TooltipContent side="bottom">Run all</TooltipContent></Tooltip></TooltipProvider>
                                   <TooltipProvider><Tooltip><TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" onClick={() => handleRunBlock(firstIdx)} disabled={isRunning || !currentStep.codeBlocks?.length} className="h-3.5 w-3.5 text-primary" title="Run selection">
+                                    <Button variant="ghost" size="icon" onClick={() => {
+                                      const runIdx = firstIsNodeMongosh && firstSlot.type === 'node-mongosh' ? ((nodeMongoshViewByKey[firstKey] ?? 'mongosh') === 'mongosh' ? firstSlot.mongoshIndex : firstSlot.nodeIndex) : firstIdx;
+                                      handleRunBlock(runIdx);
+                                    }} disabled={isRunning || !currentStep.codeBlocks?.length} className="h-3.5 w-3.5 text-primary" title="Run selection">
                                       <Play className="w-2 h-2" />
                                     </Button>
                                   </TooltipTrigger><TooltipContent side="bottom">Run selection</TooltipContent></Tooltip></TooltipProvider>
@@ -1404,20 +1553,196 @@ export function StepView({
                           showCompetitorPanel && "min-w-0 basis-0",
                           sortedCodeBlocksWithIndex.length === 2 && !showCompetitorPanel && "gap-1"
                         )}>
-                  {sortedCodeBlocksWithIndex.map(({ block, originalIndex }) => {
+                  {displaySlots.map((slot, slotIndex) => {
+                    if (slot.type === 'node-mongosh') {
+                      const { nodeBlock, nodeIndex, mongoshBlock, mongoshIndex } = slot;
+                      const slotKey = `${currentStepIndex}-${nodeIndex}`;
+                      const view = nodeMongoshViewByKey[slotKey] ?? 'mongosh';
+                      const activeBlock = view === 'mongosh' ? mongoshBlock : nodeBlock;
+                      const activeIndex = view === 'mongosh' ? mongoshIndex : nodeIndex;
+                      const activeKey = `${currentStepIndex}-${activeIndex}`;
+                      const nodeKey = `${currentStepIndex}-${nodeIndex}`;
+                      const mongoshKey = `${currentStepIndex}-${mongoshIndex}`;
+                      const hasSkeleton = hasAnySkeleton(activeBlock);
+                      const tier = skeletonTier[activeKey] || 'guided';
+                      const isSolutionRevealed = alwaysShowSolutions || showSolution[activeKey] || !hasSkeleton;
+                      const displayCode = getDisplayCode(activeBlock, tier, isSolutionRevealed);
+                      const solutionPenalty = getSolutionPenalty(tier);
+                      const handleBlockCodeChange = (v: string | undefined) => {
+                        const value = v ?? '';
+                        setEditableCodeByBlock((prev) => ({ ...prev, [activeKey]: value }));
+                      };
+                      const handleSaveCjs = () => { /* persisted via labWorkspaceStorage */ };
+                      return (
+                        <div key={`node-mongosh-${nodeIndex}`} className={cn("flex flex-col flex-1 min-h-0", slotIndex > 0 && "border-t border-border")}>
+                          <div className="sticky top-0 z-10 flex-shrink-0 flex items-center justify-between gap-1.5 border border-border border-b bg-muted px-2 py-1 min-w-0 shadow-[0_1px_0_0_var(--border)]">
+                            <div className="flex items-center gap-1.5 min-w-0 truncate">
+                              {slotIndex === 0 && (
+                                <button type="button" onClick={() => setEditorPanelCollapsed(true)} className="flex-shrink-0 p-0.5 rounded hover:bg-muted/80 transition-colors" title="Collapse editor">
+                                  <ChevronUp className="w-3 h-3 text-muted-foreground" />
+                                </button>
+                              )}
+                              <FileCode className="w-3 h-3 flex-shrink-0 text-green-500" />
+                              <span className="font-mono text-[8px] text-white flex items-center gap-1 truncate">
+                                <button
+                                  type="button"
+                                  onClick={() => setNodeMongoshViewByKey((prev) => ({ ...prev, [slotKey]: 'mongosh' }))}
+                                  className={cn("truncate", view === 'mongosh' ? 'underline font-semibold' : 'opacity-80 hover:opacity-100')}
+                                  title="Show Mongosh script"
+                                >
+                                  mongosh
+                                </button>
+                                <span className="text-muted-foreground flex-shrink-0">!</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setNodeMongoshViewByKey((prev) => ({ ...prev, [slotKey]: 'node' }))}
+                                  className={cn("truncate", view === 'node' ? 'underline font-semibold' : 'opacity-80 hover:opacity-100')}
+                                  title="Show Node script"
+                                >
+                                  node
+                                </button>
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-0.5 flex-shrink-0">
+                              <TooltipProvider><Tooltip><TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={handleRunAll} disabled={isRunning || !currentStep.codeBlocks?.length} className="h-3.5 w-3.5 text-primary" title="Run all">
+                                  {isRunning ? <Loader2 className="w-2 h-2 animate-spin" /> : <PlayCircle className="w-2 h-2" />}
+                                </Button>
+                              </TooltipTrigger><TooltipContent side="bottom">Run all</TooltipContent></Tooltip></TooltipProvider>
+                              <TooltipProvider><Tooltip><TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={() => handleRunBlock(activeIndex)} disabled={isRunning || !currentStep.codeBlocks?.length} className="h-3.5 w-3.5 text-primary" title="Run selection">
+                                  {isRunning ? <Loader2 className="w-2 h-2 animate-spin" /> : <Play className="w-2 h-2" />}
+                                </Button>
+                              </TooltipTrigger><TooltipContent side="bottom">Run selection</TooltipContent></Tooltip></TooltipProvider>
+                              {view === 'node' && (
+                                <TooltipProvider><Tooltip><TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" onClick={handleSaveCjs} className="h-3.5 gap-0.5 px-1 text-[8px]"><Save className="w-2 h-2" /><span className="hidden xs:inline">Save</span></Button>
+                                </TooltipTrigger><TooltipContent side="bottom">Save</TooltipContent></Tooltip></TooltipProvider>
+                              )}
+                              <TooltipProvider><Tooltip><TooltipTrigger asChild>
+                                <Button variant="ghost" size="sm" onClick={() => stepToolbarRef?.current?.reset()} className="h-3.5 gap-0.5 px-1 text-[8px]" title="Reset step"><RotateCcw className="w-2 h-2" /><span className="hidden sm:inline">Reset</span></Button>
+                              </TooltipTrigger><TooltipContent side="bottom">Reset step</TooltipContent></Tooltip></TooltipProvider>
+                              {hasSkeleton && !isSolutionRevealed && (
+                                <Button variant="ghost" size="sm" onClick={() => revealSolution(activeKey, tier)} className="gap-0.5 h-3.5 text-[8px] px-1 text-destructive hover:text-destructive hover:bg-destructive/10">
+                                  <Eye className="w-2 h-2" /><span className="hidden sm:inline">Solution</span><span>(-{solutionPenalty})</span>
+                                </Button>
+                              )}
+                              <Button variant="ghost" size="sm" onClick={() => handleCopyCode(activeIndex)} className="gap-0.5 h-3.5 text-[8px] px-1" title="Copy">
+                                {copied ? <Check className="w-2 h-2 text-green-500" /> : <Copy className="w-2 h-2" />}
+                                <span className="hidden xs:inline">{copied ? 'Copied!' : 'Copy'}</span>
+                              </Button>
+                            </div>
+                          </div>
+                          <InlineHintEditor
+                            key={`editor-${activeKey}-${isSolutionRevealed}`}
+                            code={displayCode}
+                            controlledValue={editableCodeByBlock[activeKey]}
+                            onCodeChange={handleBlockCodeChange}
+                            language={activeBlock.language}
+                            lineHeight={lineHeight}
+                            setLineHeight={setLineHeight}
+                            hasSkeleton={hasSkeleton}
+                            isSolutionRevealed={isSolutionRevealed}
+                            inlineHints={activeBlock.inlineHints}
+                            tier={tier}
+                            revealedHints={revealedHints[activeKey] || []}
+                            revealedAnswers={revealedAnswers[activeKey] || []}
+                            onRevealHint={(hintIdx) => revealInlineHint(activeKey, hintIdx, tier)}
+                            onRevealAnswer={(hintIdx) => revealInlineAnswer(activeKey, hintIdx, tier)}
+                            equalHeightSplit={false}
+                            fillContainer={true}
+                          />
+                        </div>
+                      );
+                    }
+
+                    const { block, originalIndex } = slot;
                     const blockKey = `${currentStepIndex}-${originalIndex}`;
                     const hasSkeleton = hasAnySkeleton(block);
                     const tier = skeletonTier[blockKey] || 'guided';
                     const isSolutionRevealed = alwaysShowSolutions || showSolution[blockKey] || !hasSkeleton;
                     const displayCode = getDisplayCode(block, tier, isSolutionRevealed);
                     const solutionPenalty = getSolutionPenalty(tier);
-                    const isTwoBlockPattern = sortedCodeBlocksWithIndex.length === 2;
+                    const isTwoBlockPattern = displaySlots.length === 2;
                     const displayFilename = (() => {
                       const base = block.filename.includes(' (') ? block.filename.split(' (')[0].trim() : block.filename;
                       return base.replace(/^\d+\.\s*/, '').trim() || base;
                     })();
                     const isCjs = displayFilename.toLowerCase().endsWith('.cjs');
                     const isShellBlock = ['shell', 'bash', 'sh'].includes((block.language || '').toLowerCase());
+                    const isNodeBlock = (block.filename?.toLowerCase().endsWith('.cjs') || block.filename?.toLowerCase().endsWith('.js')) && ['javascript', 'typescript'].includes((block.language || '').toLowerCase());
+                    const isDriverOnlyBlock = isNodeBlock || ['python', 'py'].includes((block.language || '').toLowerCase()) || (block.filename?.toLowerCase().endsWith('.py'));
+
+                    // Single driver-only block (Node, Python, etc.): no mongosh tab — show filename only and editor (driver must run the code)
+                    if (slot.type === 'single' && isDriverOnlyBlock) {
+                      const handleBlockCodeChange = (v: string | undefined) => {
+                        const value = v ?? '';
+                        setEditableCodeByBlock((prev) => ({ ...prev, [blockKey]: value }));
+                      };
+                      return (
+                        <div key={`driver-only-${originalIndex}`} className={cn("flex flex-col flex-1 min-h-0", slotIndex > 0 && "border-t border-border")}>
+                          <div className="sticky top-0 z-10 flex-shrink-0 flex items-center justify-between gap-1.5 border border-border border-b bg-muted px-2 py-1 min-w-0 shadow-[0_1px_0_0_var(--border)]">
+                            <div className="flex items-center gap-1.5 min-w-0 truncate">
+                              {slotIndex === 0 && (
+                                <button type="button" onClick={() => setEditorPanelCollapsed(true)} className="flex-shrink-0 p-0.5 rounded hover:bg-muted/80 transition-colors" title="Collapse editor">
+                                  <ChevronUp className="w-3 h-3 text-muted-foreground" />
+                                </button>
+                              )}
+                              <FileCode className="w-3.5 h-3.5 flex-shrink-0 text-green-500" />
+                              <span className="font-mono text-[8px] text-white truncate" title={block.filename}>{displayFilename}</span>
+                            </div>
+                            <div className="flex items-center gap-0.5 flex-shrink-0">
+                              <TooltipProvider><Tooltip><TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={handleRunAll} disabled={isRunning || !currentStep.codeBlocks?.length} className="h-3.5 w-3.5 text-primary" title="Run all">
+                                  {isRunning ? <Loader2 className="w-2 h-2 animate-spin" /> : <PlayCircle className="w-2 h-2" />}
+                                </Button>
+                              </TooltipTrigger><TooltipContent side="bottom">Run all</TooltipContent></Tooltip></TooltipProvider>
+                              <TooltipProvider><Tooltip><TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={() => handleRunBlock(originalIndex)} disabled={isRunning || !currentStep.codeBlocks?.length} className="h-3.5 w-3.5 text-primary" title="Run selection">
+                                  {isRunning ? <Loader2 className="w-2 h-2 animate-spin" /> : <Play className="w-2 h-2" />}
+                                </Button>
+                              </TooltipTrigger><TooltipContent side="bottom">Run selection</TooltipContent></Tooltip></TooltipProvider>
+                              {isCjs && (
+                                <TooltipProvider><Tooltip><TooltipTrigger asChild>
+                                  <Button variant="ghost" size="sm" onClick={() => {}} className="h-3.5 gap-0.5 px-1 text-[8px]"><Save className="w-2 h-2" /><span className="hidden xs:inline">Save</span></Button>
+                                </TooltipTrigger><TooltipContent side="bottom">Save</TooltipContent></Tooltip></TooltipProvider>
+                              )}
+                              <TooltipProvider><Tooltip><TooltipTrigger asChild>
+                                <Button variant="ghost" size="sm" onClick={() => stepToolbarRef?.current?.reset()} className="h-3.5 gap-0.5 px-1 text-[8px]" title="Reset step"><RotateCcw className="w-2 h-2" /><span className="hidden sm:inline">Reset</span></Button>
+                              </TooltipTrigger><TooltipContent side="bottom">Reset step</TooltipContent></Tooltip></TooltipProvider>
+                              {hasSkeleton && !isSolutionRevealed && (
+                                <Button variant="ghost" size="sm" onClick={() => revealSolution(blockKey, tier)} className="gap-0.5 h-3.5 text-[8px] px-1 text-destructive hover:text-destructive hover:bg-destructive/10">
+                                  <Eye className="w-2 h-2" /><span className="hidden sm:inline">Solution</span><span>(-{solutionPenalty})</span>
+                                </Button>
+                              )}
+                              <Button variant="ghost" size="sm" onClick={() => handleCopyCode(originalIndex)} className="gap-0.5 h-3.5 text-[8px] px-1" title="Copy">
+                                {copied ? <Check className="w-2 h-2 text-green-500" /> : <Copy className="w-2 h-2" />}
+                                <span className="hidden xs:inline">{copied ? 'Copied!' : 'Copy'}</span>
+                              </Button>
+                            </div>
+                          </div>
+                          <InlineHintEditor
+                            key={`editor-${blockKey}-${isSolutionRevealed}`}
+                            code={displayCode}
+                            controlledValue={editableCodeByBlock[blockKey]}
+                            onCodeChange={handleBlockCodeChange}
+                            language={block.language}
+                            lineHeight={lineHeight}
+                            setLineHeight={setLineHeight}
+                            hasSkeleton={hasSkeleton}
+                            isSolutionRevealed={isSolutionRevealed}
+                            inlineHints={block.inlineHints}
+                            tier={tier}
+                            revealedHints={revealedHints[blockKey] || []}
+                            revealedAnswers={revealedAnswers[blockKey] || []}
+                            onRevealHint={(hintIdx) => revealInlineHint(blockKey, hintIdx, tier)}
+                            onRevealAnswer={(hintIdx) => revealInlineAnswer(blockKey, hintIdx, tier)}
+                            equalHeightSplit={false}
+                            fillContainer={true}
+                          />
+                        </div>
+                      );
+                    }
 
                     const handleBlockCodeChange = (v: string | undefined) => {
                       const value = v ?? '';
@@ -1436,13 +1761,13 @@ export function StepView({
                         className={cn(
                           "flex flex-col flex-shrink-0",
                           isTwoBlockPattern && "flex-1 min-h-0",
-                          originalIndex > 0 && "border-t border-border"
+                          slotIndex > 0 && "border-t border-border"
                         )}
                       >
                                         {/* Block header: collapse toggle on same row as filename/Terminal (first block only); sticky when scrolling */}
                         <div className="sticky top-0 z-10 flex-shrink-0 flex items-center justify-between gap-1.5 border border-border border-b bg-muted px-2 py-1 min-w-0 shadow-[0_1px_0_0_var(--border)]">
                           <div className="flex items-center gap-1.5 min-w-0 truncate">
-                            {originalIndex === 0 && (
+                            {slotIndex === 0 && (
                               <button
                                 type="button"
                                 onClick={() => setEditorPanelCollapsed(true)}
@@ -1802,53 +2127,6 @@ export function StepView({
                       ) : (
                         <div className="h-full min-h-[80px] flex items-center justify-center text-center text-muted-foreground text-[10px]">No competitor comparison for this step.</div>
                       )
-                    ) : previewPanelTab === 'preview' && stepCompetitorIds.length > 0 && competitorBlockForSelected ? (
-                      (() => {
-                        const { block, blockIndex, equiv } = competitorBlockForSelected;
-                        const blockKey = `${currentStepIndex}-${blockIndex}`;
-                        const tier = skeletonTier[blockKey] || 'guided';
-                        const isSolutionRevealed = alwaysShowSolutions || !!showSolution[blockKey] || !hasAnySkeleton(block);
-                        const ourCode = editableCodeByBlock[blockKey] ?? getDisplayCode(block, tier, isSolutionRevealed) ?? block.code ?? '';
-                        return (
-                          <div key={previewRefreshKey} className="h-full min-h-0 flex flex-col">
-                            <div className="flex items-center gap-2 flex-shrink-0 mb-1">
-                              <span className="text-[10px] text-muted-foreground">Preview: side-by-side comparison</span>
-                            </div>
-                            <div className="flex-1 min-h-0 grid grid-cols-2 gap-2">
-                              <div className="flex flex-col min-h-0 rounded border border-border overflow-hidden">
-                                <div className="flex-shrink-0 px-2 py-1 bg-muted/50 border-b border-border text-[10px] font-medium text-muted-foreground">
-                                  {getCompetitorProductLabel(effectiveCompetitorId ?? '')} (competitor)
-                                </div>
-                                <div className="flex-1 min-h-0">
-                                  <Editor
-                                    height="100%"
-                                    theme={LAB_EDITOR_THEME}
-                                    beforeMount={defineLabDarkTheme}
-                                    language={equiv.language}
-                                    value={equiv.code}
-                                    options={getReadOnlyLabOptions()}
-                                  />
-                                </div>
-                              </div>
-                              <div className="flex flex-col min-h-0 rounded border border-border overflow-hidden">
-                                <div className="flex-shrink-0 px-2 py-1 bg-primary/10 border-b border-border text-[10px] font-medium text-primary">
-                                  MongoDB (editor)
-                                </div>
-                                <div className="flex-1 min-h-0">
-                                  <Editor
-                                    height="100%"
-                                    theme={LAB_EDITOR_THEME}
-                                    beforeMount={defineLabDarkTheme}
-                                    language={block.language}
-                                    value={ourCode}
-                                    options={getReadOnlyLabOptions()}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()
                     ) : previewPanelTab === 'preview' && currentStep.preview ? (
                       <div key={previewRefreshKey} className="h-full min-h-0">
                         <GenericLabPreview

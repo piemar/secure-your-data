@@ -5,17 +5,65 @@ const LAB_EDITOR_BACKGROUND = '#0c0e12';
 
 /**
  * Define a custom Monaco theme that matches the app's dark background.
+ * Includes a rule so mongosh shell keywords (show, use, exit, help) are colored in cyan.
  * Call from Editor beforeMount so all lab editors use the same background.
  */
 export function defineLabDarkTheme(monaco: typeof import('monaco-editor')) {
   monaco.editor.defineTheme('lab-dark', {
     base: 'vs-dark',
     inherit: true,
-    rules: [],
+    rules: [
+      { token: 'keyword.control.mongosh', foreground: '4EC9B0', fontStyle: 'bold' },
+    ],
     colors: {
       'editor.background': LAB_EDITOR_BACKGROUND,
     },
   });
+}
+
+/**
+ * Register the "mongosh" language so Monaco can use it for syntax highlighting.
+ * Mongosh is JavaScript + shell helpers; we use JavaScript highlighting and add
+ * theme rules so shell keywords (show, use, exit, help) are colored distinctly.
+ * Call from Editor beforeMount once.
+ */
+export function registerMongoshLanguage(monaco: typeof import('monaco-editor')) {
+  try {
+    monaco.languages.register({ id: 'mongosh' });
+    monaco.languages.setMonarchTokensProvider('mongosh', {
+      defaultToken: 'source.js',
+      tokenPostfix: '.js',
+      keywords: [
+        'break', 'case', 'catch', 'continue', 'default', 'delete', 'do', 'else', 'finally', 'for', 'function',
+        'if', 'in', 'instanceof', 'new', 'return', 'switch', 'this', 'throw', 'try', 'typeof', 'var', 'void',
+        'while', 'with', 'const', 'let', 'async', 'await', 'yield', 'class', 'extends', 'super', 'import',
+        'export', 'from', 'as', 'of', 'true', 'false', 'null', 'undefined',
+      ],
+      tokenizer: {
+        root: [
+          [/\b(show|use|exit|quit|help|it|rs|sh)\b/, 'keyword.control.mongosh'],
+          [/[a-zA-Z_$][\w$]*/, { cases: { '@keywords': 'keyword', '@default': 'identifier' } }],
+          [/\d*\.\d+([eE][\-+]?\d+)?/, 'number.float'],
+          [/\d+/, 'number'],
+          [/["](?:[^"\\]|\\.)*["]/, 'string'],
+          [/'([^'\\]|\\.)*'/, 'string'],
+          [/\/\/.*$/, 'comment'],
+          [/\/\*/, 'comment', '@comment'],
+          [/[{}()\[\]]/, '@brackets'],
+          [/[.,;]/, 'delimiter'],
+          [/[=><!~?:&|+\-*\/\^%]+/, 'operator'],
+          [/\s+/, 'white'],
+        ],
+        comment: [
+          [/[^\/*]+/, 'comment'],
+          [/\*\//, 'comment', '@pop'],
+          [/[\/*]/, 'comment'],
+        ],
+      },
+    });
+  } catch (_) {
+    // If registration fails, editor will fall back to no highlighting; InlineHintEditor maps mongosh → javascript
+  }
 }
 
 /**

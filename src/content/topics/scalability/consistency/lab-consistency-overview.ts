@@ -42,6 +42,12 @@ export const labConsistencyOverviewDefinition: WorkshopLabDefinition = {
       enhancementId: 'consistency.concepts',
       sourceProof: 'proofs/06/README.md',
       sourceSection: 'Description',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-consistency-overview-step-2',
@@ -55,7 +61,12 @@ export const labConsistencyOverviewDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'consistency.driver-settings',
       sourceProof: 'proofs/06/README.md',
-      sourceSection: 'Description',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Description',
     },
     {
       id: 'lab-consistency-overview-step-3',
@@ -69,7 +80,12 @@ export const labConsistencyOverviewDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'consistency.failover',
       sourceProof: 'proofs/06/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
   ],
 };

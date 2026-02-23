@@ -49,6 +49,12 @@ export const labAutoHaOverviewDefinition: WorkshopLabDefinition = {
       enhancementId: 'auto-ha.concepts',
       sourceProof: 'proofs/17/README.md',
       sourceSection: 'Description',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-auto-ha-overview-step-2',
@@ -63,6 +69,11 @@ export const labAutoHaOverviewDefinition: WorkshopLabDefinition = {
       enhancementId: 'auto-ha.flow',
       sourceProof: 'proofs/17/README.md',
       sourceSection: 'Execution',
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-auto-ha-overview-step-3',
@@ -77,6 +88,11 @@ export const labAutoHaOverviewDefinition: WorkshopLabDefinition = {
       enhancementId: 'auto-ha.requirements',
       sourceProof: 'proofs/17/README.md',
       sourceSection: 'Setup',
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
   ],
 };

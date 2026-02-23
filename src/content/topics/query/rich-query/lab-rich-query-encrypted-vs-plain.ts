@@ -36,6 +36,11 @@ export const labRichQueryEncryptedVsPlainDefinition: WorkshopLabDefinition = {
       modes: ['lab', 'demo', 'challenge'],
       enhancementId: 'rich-query.encrypted-vs-plain-setup',
       points: 10,
+      hints: [
+        'Use the same database and collection names as in the CSFLE and QE labs for consistency.',
+        'Check that both plain and encrypted collections have data (e.g. find().limit(1)).',
+        'Write a simple find() or aggregation on the plain collection as a baseline to compare later.',
+      ],
     },
     {
       id: 'lab-rich-query-encrypted-step-2',
@@ -48,6 +53,11 @@ export const labRichQueryEncryptedVsPlainDefinition: WorkshopLabDefinition = {
       modes: ['lab', 'demo', 'challenge'],
       enhancementId: 'rich-query.encrypted-vs-plain-queries',
       points: 15,
+      hints: [
+        'With CSFLE (deterministic), only equality queries on encrypted fields are supported.',
+        'With QE, equality and range queries on encrypted fields are supported; check driver version.',
+        'Run the same query shape against plain vs encrypted collections and note any errors or different results.',
+      ],
     },
     {
       id: 'lab-rich-query-encrypted-step-3',
@@ -60,6 +70,11 @@ export const labRichQueryEncryptedVsPlainDefinition: WorkshopLabDefinition = {
       modes: ['lab', 'demo', 'challenge'],
       enhancementId: 'rich-query.encrypted-vs-plain-design',
       points: 10,
+      hints: [
+        'Keep fields that need range or sort queries plain (or use QE if range is required).',
+        'Encrypt only PII that is queried by equality (e.g. lookup by ID or exact match).',
+        'Document which fields are encrypted and which query patterns are allowed for the playbook.',
+      ],
     },
   ],
 };

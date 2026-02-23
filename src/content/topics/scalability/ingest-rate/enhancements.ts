@@ -64,7 +64,7 @@ db.performance._________()`,
             answer: 'status',
           },
           {
-            line: 12,
+            line: 14,
             blankText: '_________',
             hint: 'Method to list all indexes on a collection',
             answer: 'getIndexes',
@@ -73,6 +73,7 @@ db.performance._________()`,
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the commands (mongosh-style).',
       'Use M40 or higher cluster tier for production-like performance testing.',
       'Ensure backup is enabled on your Atlas cluster.',
       'Create indexes before ingestion for better performance.',
@@ -179,21 +180,57 @@ async function ingestSmallRecords() {
 ingestSmallRecords().catch(console.error);`,
         inlineHints: [
           {
-            line: 4,
+            line: 5,
             blankText: '_________',
             hint: 'Write concern value to ensure replication (majority, 1, 2)',
             answer: 'majority',
           },
           {
-            line: 25,
+            line: 29,
             blankText: '_________',
             hint: 'Boolean: false allows parallel processing, true stops on error',
             answer: 'false',
           },
         ],
       },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
+        code: `// Same ingestion in mongosh: bulk insert with write concern
+// Switch to the ingest_test database and insert in batches
+
+use ingest_test;
+
+const batchSize = 5000;
+const totalRecords = 200000;
+const batches = Math.ceil(totalRecords / batchSize);
+const startTime = new Date();
+
+for (let i = 0; i < batches; i++) {
+  const docs = [];
+  for (let j = 0; j < batchSize && (i * batchSize + j) < totalRecords; j++) {
+    docs.push({
+      timestamp: new Date(),
+      userId: Math.floor(Math.random() * 10000),
+      category: ['A', 'B', 'C'][Math.floor(Math.random() * 3)],
+      data: 'x'.repeat(1000)
+    });
+  }
+  db.performance.insertMany(docs, { ordered: false, writeConcern: { w: 'majority' } });
+  if ((i + 1) % 10 === 0) print('Inserted batch ' + (i + 1) + '/' + batches);
+}
+
+const endTime = new Date();
+const duration = (endTime - startTime) / 1000;
+const rate = totalRecords / duration;
+print('\\nIngestion complete!');
+print('Total records: ' + totalRecords);
+print('Duration: ' + duration.toFixed(2) + ' seconds');
+print('Rate: ' + rate.toFixed(0) + ' records/second');`,
+      },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'Use ordered: false for better performance when errors are acceptable.',
       'Batch size of 5000-10000 documents typically works well for small records.',
       'Monitor ingestion rate using mongostat or Atlas metrics.',
@@ -288,21 +325,43 @@ async function measureIngestionRate() {
 measureIngestionRate().catch(console.error);`,
         inlineHints: [
           {
-            line: 8,
+            line: 10,
             blankText: '_________',
             hint: 'Method to count documents in a collection',
             answer: 'countDocuments',
           },
           {
-            line: 20,
+            line: 21,
             blankText: '_________',
             hint: 'Read preference to read from secondary nodes',
             answer: 'secondary',
           },
         ],
       },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
+        code: `// Same measurement in mongosh: count, timestamps, replication check
+use ingest_test;
+
+const count = db.performance.countDocuments({});
+print('Total documents: ' + count);
+
+const first = db.performance.findOne({}, { sort: { timestamp: 1 } });
+const last = db.performance.findOne({}, { sort: { timestamp: -1 } });
+if (first && last) {
+  const duration = (last.timestamp - first.timestamp) / 1000;
+  const rate = count / duration;
+  print('Duration: ' + duration.toFixed(2) + ' seconds');
+  print('Average rate: ' + rate.toFixed(0) + ' documents/second');
+}
+
+// Replication: run with readPreference secondary in a separate shell, or use rs.status()
+print('\\nReplication: run rs.printSlaveReplicationInfo() or check secondary count in another shell.');`,
+      },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'Compare your results to MongoDB benchmarks: 20K/sec (1KB), 3.5K/sec (10KB), 460/sec (50KB).',
       'Use rs.printSlaveReplicationInfo() to check replication lag.',
       'Verify data on all replica set members to ensure redundancy.',
@@ -385,21 +444,46 @@ async function compareBulkOperations() {
 compareBulkOperations().catch(console.error);`,
         inlineHints: [
           {
-            line: 13,
+            line: 15,
             blankText: '_________',
             hint: 'Boolean: true stops on first error',
             answer: 'true',
           },
           {
-            line: 18,
+            line: 20,
             blankText: '_________',
             hint: 'Boolean: false continues on errors, faster',
             answer: 'false',
           },
         ],
       },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
+        code: `// Same comparison in mongosh: ordered vs unordered insertMany
+use ingest_test;
+
+const testDocs = Array.from({ length: 10000 }, (_, i) => ({
+  index: i,
+  timestamp: new Date(),
+  data: 'x'.repeat(1000)
+}));
+
+// Test 1: Ordered
+const start1 = new Date();
+db.test_ordered.insertMany(testDocs, { ordered: true });
+const duration1 = (new Date() - start1) / 1000;
+print('Ordered: ' + (testDocs.length / duration1).toFixed(0) + ' docs/sec');
+
+// Test 2: Unordered
+const start2 = new Date();
+db.test_unordered.insertMany(testDocs, { ordered: false });
+const duration2 = (new Date() - start2) / 1000;
+print('Unordered: ' + (testDocs.length / duration2).toFixed(0) + ' docs/sec');`,
+      },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'Unordered operations are typically 10-30% faster for bulk inserts.',
       'Use ordered: false when you can handle partial failures.',
       'Use ordered: true when you need to stop on first error.',
@@ -502,8 +586,35 @@ async function optimizeBatchSize() {
 optimizeBatchSize().catch(console.error);`,
         inlineHints: [],
       },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
+        code: `// Same batch-size test in mongosh: try different batch sizes
+use ingest_test;
+
+const totalDocs = 50000;
+const batchSizes = [100, 500, 1000, 5000, 10000];
+
+for (const batchSize of batchSizes) {
+  db.batch_test.deleteMany({});
+  const batches = Math.ceil(totalDocs / batchSize);
+  const startTime = new Date();
+  for (let i = 0; i < batches; i++) {
+    const docs = [];
+    const remaining = Math.min(batchSize, totalDocs - i * batchSize);
+    for (let j = 0; j < remaining; j++) {
+      docs.push({ batch: i, index: i * batchSize + j, timestamp: new Date(), data: 'x'.repeat(1000) });
+    }
+    db.batch_test.insertMany(docs, { ordered: false });
+  }
+  const duration = (new Date() - startTime) / 1000;
+  const rate = totalDocs / duration;
+  print('Batch size ' + batchSize + ': ' + rate.toFixed(0) + ' docs/sec (' + duration.toFixed(2) + 's)');
+}`,
+      },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'Optimal batch size depends on document size and network latency.',
       'For small documents (1KB), batch sizes of 5000-10000 work well.',
       'For larger documents, use smaller batches (1000-5000) to avoid memory issues.',
@@ -592,21 +703,44 @@ async function testWriteConcern() {
 testWriteConcern().catch(console.error);`,
         inlineHints: [
           {
-            line: 11,
+            line: 12,
             blankText: '_________',
             hint: 'Write concern value: 1 means acknowledge from primary only',
             answer: '1',
           },
           {
-            line: 20,
+            line: 21,
             blankText: '_________',
             hint: 'Write concern value: majority ensures replication to majority of nodes',
             answer: 'majority',
           },
         ],
       },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
+        code: `// Same write concern test in mongosh
+use ingest_test;
+
+const testDocs = Array.from({ length: 20000 }, (_, i) => ({
+  index: i,
+  timestamp: new Date(),
+  data: 'x'.repeat(1000)
+}));
+
+// Test w: 1
+const start1 = new Date();
+db.wc1.insertMany(testDocs, { ordered: false, writeConcern: { w: 1 } });
+print('w: 1 rate: ' + (testDocs.length / ((new Date() - start1) / 1000)).toFixed(0) + ' docs/sec');
+
+// Test w: 'majority'
+const start2 = new Date();
+db.wc2.insertMany(testDocs, { ordered: false, writeConcern: { w: 'majority' } });
+print('w: majority rate: ' + (testDocs.length / ((new Date() - start2) / 1000)).toFixed(0) + ' docs/sec');`,
+      },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'w: 1 is fastest but provides no replication guarantee.',
       'w: "majority" ensures data is replicated but may be slightly slower.',
       'Choose write concern based on your durability requirements.',
@@ -679,21 +813,38 @@ async function monitorReplication() {
 monitorReplication().catch(console.error);`,
         inlineHints: [
           {
-            line: 7,
+            line: 9,
             blankText: '_________',
             hint: 'Command parameter value (number)',
             answer: '1',
           },
           {
-            line: 15,
+            line: 17,
             blankText: '_________',
             hint: 'Collection name for replication oplog',
             answer: 'oplog.rs',
           },
         ],
       },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
+        code: `// Same replication monitoring in mongosh
+const status = db.getSiblingDB('admin').command({ replSetGetStatus: 1 });
+print('Replica Set Status:');
+print('Primary: ' + (status.members.find(m => m.stateStr === 'PRIMARY') || {}).name);
+status.members.forEach(member => {
+  if (member.stateStr === 'SECONDARY') {
+    const lag = member.optimeDate ? (Date.now() - member.optimeDate.getTime()) / 1000 : 0;
+    print(member.name + ': ' + member.stateStr + ', lag: ' + lag.toFixed(2) + 's');
+  }
+});
+const oplogSize = db.getSiblingDB('local').getCollection('oplog.rs').countDocuments({});
+print('\\nOplog entries: ' + oplogSize);`,
+      },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'Replication lag should stay under 1 second during normal operations.',
       'Use rs.printSlaveReplicationInfo() in mongosh for detailed lag info.',
       'Monitor oplog size to ensure it doesn\'t fill up.',
@@ -777,15 +928,27 @@ async function verifyAllNodes() {
 verifyAllNodes().catch(console.error);`,
         inlineHints: [
           {
-            line: 10,
+            line: 11,
             blankText: '_________',
             hint: 'Read preference to read from secondary nodes',
             answer: 'secondary',
           },
         ],
       },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
+        code: `// Same verification in mongosh (run against primary by default)
+// To check secondary: connect with readPreference secondary in connection string
+use ingest_test;
+
+const primaryCount = db.performance.countDocuments({});
+print('Primary count: ' + primaryCount);
+print('To verify secondary: connect with ?readPreference=secondary and run countDocuments again.');`,
+      },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'Always verify data on all replica set members after high-volume ingestion.',
       'Use readPreference: "secondary" to read from secondary nodes.',
       'Sample random documents to verify data integrity, not just counts.',
@@ -924,8 +1087,45 @@ testFailoverDuringIngestion().catch(console.error);`,
           },
         ],
       },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
+        code: `// Same failover test in mongosh: bulk insert with majority write concern
+// In another shell run rs.stepDown() to trigger failover during ingestion
+use ingest_test;
+
+let inserted = 0;
+const target = 100000;
+const batchSize = 5000;
+const startTime = new Date();
+
+print('Starting ingestion... Run rs.stepDown() in another shell to test failover.');
+
+while (inserted < target) {
+  const docs = [];
+  const remaining = Math.min(batchSize, target - inserted);
+  for (let i = 0; i < remaining; i++) {
+    docs.push({ index: inserted + i, timestamp: new Date(), data: 'x'.repeat(1000), batch: Math.floor(inserted / batchSize) });
+  }
+  try {
+    db.failover_test.insertMany(docs, { ordered: false, writeConcern: { w: 'majority' } });
+    inserted += docs.length;
+  } catch (e) {
+    if (e.message.includes('not master') || e.message.includes('primary')) {
+      print('Primary changed - reconnect and continue from another shell if needed.');
+      break;
+    }
+    throw e;
+  }
+}
+
+const finalCount = db.failover_test.countDocuments({});
+const duration = (new Date() - startTime) / 1000;
+print('Inserted: ' + inserted + ', Final count: ' + finalCount + ', Duration: ' + duration.toFixed(2) + 's');`,
+      },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'Use writeConcern: {w: "majority"} to ensure data survives failover.',
       'Handle "not master" errors gracefully - reconnect after failover.',
       'Ingestion may pause briefly during primary election.',

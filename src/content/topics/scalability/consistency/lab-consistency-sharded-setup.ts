@@ -29,7 +29,12 @@ export const labConsistencyShardedSetupDefinition: WorkshopLabDefinition = {
       description: 'Script to generate 1M person documents',
       type: 'script',
       path: 'generate1Mpeople.py',
-      sizeHint: '5KB',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: '5KB',
     },
     {
       id: 'country-codes',
@@ -60,6 +65,12 @@ export const labConsistencyShardedSetupDefinition: WorkshopLabDefinition = {
       enhancementId: 'consistency.atlas-setup',
       sourceProof: 'proofs/06/README.md',
       sourceSection: 'Setup - Configure Atlas Environment',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-consistency-sharded-setup-step-2',
@@ -73,7 +84,12 @@ export const labConsistencyShardedSetupDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'consistency.shard-config',
       sourceProof: 'proofs/06/README.md',
-      sourceSection: 'Setup - Configure Sharded Database Collection',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup - Configure Sharded Database Collection',
     },
     {
       id: 'lab-consistency-sharded-setup-step-3',
@@ -88,7 +104,12 @@ export const labConsistencyShardedSetupDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'consistency.data-load',
       sourceProof: 'proofs/06/README.md',
-      sourceSection: 'Setup - Generate 1 Million Sample Records',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup - Generate 1 Million Sample Records',
     },
   ],
 };

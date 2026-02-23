@@ -1,15 +1,22 @@
 # Run MongoDB only (for local dev): docker compose up mongo -d
 # Run full stack: docker compose up
+# If localhost:8080 is not reachable, check app logs: docker compose logs -f app
+# To reset app (e.g. after dependency changes): docker compose up app --build --force-recreate
+#
 # Lab "Run" needs MongoDB on localhost:27017 when using "Local" in workshop; mongo service exposes 27017.
 # Queryable Encryption and encrypted collections require a replica set (standalone not supported).
-# (version is obsolete in Compose V2 and is ignored – removed to avoid the warning.)
+#
+# Local dev: app is built from Dockerfile.full (full image from repo). No need to publish to Docker Hub.
+# To use the pre-published image instead: comment out "build", uncomment "image" below.
+# To publish after testing: docker build -f Dockerfile.full -t pierrepetersson/mongodb-workshop-sandbox:latest . && docker push ...
 
 services:
   app:
-    #image: pierrepetersson/mongodb-workshop-sandbox:latest
+    # Pre-published image (use when not testing local image changes):
+    # image: pierrepetersson/mongodb-workshop-sandbox:latest
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.full
     ports:
       - "8080:8080"
     environment:

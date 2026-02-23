@@ -28,7 +28,12 @@ export const labScaleUpSetupDefinition: WorkshopLabDefinition = {
       description: 'Connection string config (params.py)',
       type: 'file',
       path: 'params.py',
-      sizeHint: '1KB',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: '1KB',
     },
     {
       id: 'monitor-py',
@@ -66,6 +71,12 @@ export const labScaleUpSetupDefinition: WorkshopLabDefinition = {
       enhancementId: 'scale-up.laptop-setup',
       sourceProof: 'proofs/08/README.md',
       sourceSection: 'Setup - Configure Laptop',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-scale-up-setup-step-2',
@@ -79,7 +90,12 @@ export const labScaleUpSetupDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'scale-up.atlas-config',
       sourceProof: 'proofs/08/README.md',
-      sourceSection: 'Setup - Configure Atlas Environment',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup - Configure Atlas Environment',
     },
     {
       id: 'lab-scale-up-setup-step-3',
@@ -93,7 +109,12 @@ export const labScaleUpSetupDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'scale-up.params-config',
       sourceProof: 'proofs/08/README.md',
-      sourceSection: 'Setup - Start the Monitoring Script',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup - Start the Monitoring Script',
     },
   ],
 };

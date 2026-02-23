@@ -35,6 +35,12 @@ export const labFullRecoveryRtoSetupDefinition: WorkshopLabDefinition = {
       enhancementId: 'full-recovery-rto.mgeneratejs',
       sourceProof: 'proofs/14/README.md',
       sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-full-recovery-rto-setup-step-2',
@@ -48,7 +54,12 @@ export const labFullRecoveryRtoSetupDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'full-recovery-rto.atlas-setup',
       sourceProof: 'proofs/14/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
     {
       id: 'lab-full-recovery-rto-setup-step-3',
@@ -62,7 +73,12 @@ export const labFullRecoveryRtoSetupDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'full-recovery-rto.load-data',
       sourceProof: 'proofs/14/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
     {
       id: 'lab-full-recovery-rto-setup-step-4',
@@ -76,7 +92,12 @@ export const labFullRecoveryRtoSetupDefinition: WorkshopLabDefinition = {
       points: 5,
       enhancementId: 'full-recovery-rto.enable-backup',
       sourceProof: 'proofs/14/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
   ],
 };

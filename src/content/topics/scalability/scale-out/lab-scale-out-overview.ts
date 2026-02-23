@@ -42,6 +42,12 @@ export const labScaleOutOverviewDefinition: WorkshopLabDefinition = {
       enhancementId: 'scale-out.concepts',
       sourceProof: 'proofs/07/README.md',
       sourceSection: 'Description',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-scale-out-overview-step-2',
@@ -55,7 +61,12 @@ export const labScaleOutOverviewDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'scale-out.sustained-load',
       sourceProof: 'proofs/07/README.md',
-      sourceSection: 'Description',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Description',
     },
     {
       id: 'lab-scale-out-overview-step-3',
@@ -69,7 +80,12 @@ export const labScaleOutOverviewDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'scale-out.metrics',
       sourceProof: 'proofs/07/README.md',
-      sourceSection: 'Measurement',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Measurement',
     },
   ],
 };

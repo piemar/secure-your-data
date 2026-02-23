@@ -41,6 +41,12 @@ export const labFullRecoveryRtoOverviewDefinition: WorkshopLabDefinition = {
       enhancementId: 'full-recovery-rto.concepts',
       sourceProof: 'proofs/14/README.md',
       sourceSection: 'Description',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-full-recovery-rto-overview-step-2',
@@ -54,7 +60,12 @@ export const labFullRecoveryRtoOverviewDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'full-recovery-rto.flow',
       sourceProof: 'proofs/14/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-full-recovery-rto-overview-step-3',
@@ -68,7 +79,12 @@ export const labFullRecoveryRtoOverviewDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'full-recovery-rto.requirements',
       sourceProof: 'proofs/14/README.md',
-      sourceSection: 'Measurement',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Measurement',
     },
   ],
 };

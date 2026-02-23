@@ -36,6 +36,12 @@ export const labAnalyticsOverviewDefinition: WorkshopLabDefinition = {
       estimatedTimeMinutes: 10,
       points: 5,
       enhancementId: 'in-place-analytics.overview-intro',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-analytics-overview-step-build-report',
@@ -46,7 +52,12 @@ export const labAnalyticsOverviewDefinition: WorkshopLabDefinition = {
         'Using a sample dataset (e.g., `sales` or `orders`), write an aggregation pipeline that groups by day and computes total revenue and average order value. Run it in mongosh and verify the shape of the result. Think about how this could be extended to report on encrypted customer segments.',
       estimatedTimeMinutes: 10,
       points: 10,
-      enhancementId: 'in-place-analytics.overview-report',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      enhancementId: 'in-place-analytics.overview-report',
     },
     {
       id: 'lab-analytics-overview-step-time-series',
@@ -57,7 +68,12 @@ export const labAnalyticsOverviewDefinition: WorkshopLabDefinition = {
         'Review how you would model a time-series collection for application or security metrics (for example, login attempts or encryption key usage). Sketch an aggregation that produces a time-bucketed view and identify how you would visualize it in Atlas Charts or another BI tool.',
       estimatedTimeMinutes: 10,
       points: 10,
-      enhancementId: 'in-place-analytics.overview-time-series',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      enhancementId: 'in-place-analytics.overview-time-series',
     },
   ],
   // Demo mode can use all steps as talking points; lab mode is for actually

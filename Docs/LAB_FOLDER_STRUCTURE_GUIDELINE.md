@@ -181,4 +181,4 @@ The LabRunner or setup wizard can use `dataRequirements` to:
 3. Copy script templates to a workspace
 4. Validate that required collections exist
 
-Implementation is deferred to a future phase; this document defines the structure and metadata.
+**Implementation:** See **`Docs/LAB_SAMPLE_DATA_PLAN.md`** for the approach (Load Sample Data button, Start disabled until loaded, reset = restore original dataset). When a lab requires pre-loaded data, include at least one `dataRequirements` entry with `type: 'collection'` (and `namespace`) or `type: 'script'` (and `path` to seed script).

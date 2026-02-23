@@ -11,7 +11,29 @@ export interface LeaderboardEntry {
 const LEADERBOARD_STORAGE_KEY = 'workshop_leaderboard';
 
 /**
+ * Sync leaderboard from MongoDB (via /api/leaderboard) into localStorage.
+ * Call this on app init and periodically so UI shows server-backed data.
+ * Does not overwrite localStorage when API returns empty (keeps local progress if server/DB unavailable).
+ */
+export async function syncLeaderboardFromApi(): Promise<void> {
+  try {
+    const { fetchLeaderboardFromApi } = await import('@/services/leaderboardApi');
+    const entries = await fetchLeaderboardFromApi();
+    if (entries.length > 0) {
+      try {
+        localStorage.setItem(LEADERBOARD_STORAGE_KEY, JSON.stringify(entries));
+      } catch {
+        // Ignore quota or disabled localStorage
+      }
+    }
+  } catch {
+    // API unavailable; keep using existing localStorage
+  }
+}
+
+/**
  * Get all leaderboard entries from localStorage
+ * (synced from MongoDB via syncLeaderboardFromApi / after each write).
  */
 export function getLeaderboardEntries(): LeaderboardEntry[] {
   try {
@@ -93,13 +115,19 @@ function updateEntry(email: string, updates: Partial<LeaderboardEntry>): void {
 
 /**
  * Add points to a user's score
+ * Writes to MongoDB via /api/leaderboard/add-points, then updates localStorage.
  */
 export function addPoints(email: string, points: number, labNumber: number): void {
   if (!email) return;
-  
+
   const entry = getOrCreateEntry(email);
   const newScore = entry.score + points;
-  
+
+  // Persist to MongoDB (Atlas) via server API
+  import('@/services/leaderboardApi').then(({ postAddPoints }) => {
+    postAddPoints(email, `step-${labNumber}`, labNumber, points, false);
+  });
+
   updateEntry(email, {
     score: newScore
   });
@@ -107,15 +135,21 @@ export function addPoints(email: string, points: number, labNumber: number): voi
 
 /**
  * Mark a lab as completed
+ * Writes to MongoDB via /api/leaderboard/complete-lab, then updates localStorage.
  */
 export function completeLab(email: string, labNumber: number, score: number): void {
   if (!email) return;
-  
+
   const entry = getOrCreateEntry(email);
   const completedLabs = entry.completedLabs.includes(labNumber)
     ? entry.completedLabs
     : [...entry.completedLabs, labNumber];
-  
+
+  // Persist to MongoDB (Atlas) via server API (score = total score)
+  import('@/services/leaderboardApi').then(({ postCompleteLab }) => {
+    postCompleteLab(email, labNumber, score);
+  });
+
   // Calculate lab time from LabContext's labStartTimes
   const labTimes = { ...entry.labTimes };
   try {
@@ -132,7 +166,7 @@ export function completeLab(email: string, labNumber: number, score: number): vo
   } catch (error) {
     console.error('Failed to read lab start times:', error);
   }
-  
+
   updateEntry(email, {
     completedLabs,
     score: Math.max(entry.score, score), // Use the higher score
@@ -142,12 +176,16 @@ export function completeLab(email: string, labNumber: number, score: number): vo
 
 /**
  * Record when a lab is started
+ * Writes to MongoDB via /api/leaderboard/start-lab, then updates localStorage.
  */
 export function startLab(email: string, labNumber: number): void {
   if (!email) return;
-  
+
+  import('@/services/leaderboardApi').then(({ postStartLab }) => {
+    postStartLab(email, labNumber);
+  });
+
   const entry = getOrCreateEntry(email);
-  // Initialize lab time if not exists
   if (!entry.labTimes[labNumber]) {
     updateEntry(email, {
       labTimes: { ...entry.labTimes, [labNumber]: 0 }
@@ -157,15 +195,20 @@ export function startLab(email: string, labNumber: number): void {
 
 /**
  * Send heartbeat to update lastActive timestamp and track lab time
+ * Writes to MongoDB via /api/leaderboard/heartbeat, then updates localStorage.
  */
 export function heartbeat(email: string, labNumber?: number): void {
   if (!email) return;
-  
+
+  import('@/services/leaderboardApi').then(({ postHeartbeat }) => {
+    postHeartbeat(email, labNumber);
+  });
+
   const entry = getOrCreateEntry(email);
   const updates: Partial<LeaderboardEntry> = {
     lastActive: Date.now()
   };
-  
+
   // If labNumber is provided, update the lab time
   if (labNumber !== undefined) {
     try {
@@ -176,17 +219,16 @@ export function heartbeat(email: string, labNumber?: number): void {
           const start = startTimes[labNumber];
           const now = Date.now();
           const elapsed = now - start;
-          // Add elapsed time to existing lab time
           const labTimes = { ...entry.labTimes };
           labTimes[labNumber] = (labTimes[labNumber] || 0) + elapsed;
           updates.labTimes = labTimes;
         }
       }
     } catch (error) {
-      console.error('Failed to update lab time:', error);
+      console.error('Failed to read lab start times:', error);
     }
   }
-  
+
   updateEntry(email, updates);
 }
 

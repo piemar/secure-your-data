@@ -95,6 +95,7 @@ with connection.start_session(causal_consistency=_________) as session:
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script (or run mongosh commands in editor).',
       'retryableWrites automatically retries transient failures.',
       'Causal consistency requires passing the session to both write and read.',
       'wtimeout prevents indefinite blocking if majority is unreachable.',
@@ -206,6 +207,7 @@ sh._________()`,
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the commands (mongosh-style).',
       'Pre-splitting ensures even chunk distribution before data load.',
       'Shard key (process, index) matches the data generation pattern.',
       'sh.status() shows chunks per shard—should be roughly equal.',

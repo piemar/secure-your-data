@@ -23,6 +23,12 @@ export const labGraphFraudDetectionDefinition: WorkshopLabDefinition = {
       estimatedTimeMinutes: 12,
       verificationId: 'graph.verifyFraudModel',
       points: 10,
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-graph-fraud-step-2',
@@ -33,6 +39,12 @@ export const labGraphFraudDetectionDefinition: WorkshopLabDefinition = {
         '- Build aggregations that traverse from a suspicious account outwards.\n- Flag patterns such as many accounts sharing one device or IP.\n- Return sets of entities that merit manual review.',
       estimatedTimeMinutes: 12,
       verificationId: 'graph.verifyFraudQueries',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
       points: 10,
     },
     {
@@ -44,6 +56,12 @@ export const labGraphFraudDetectionDefinition: WorkshopLabDefinition = {
         '- Document steps analysts should follow with your queries.\n- Show example query outputs and how to interpret them.\n- Capture limits and follow-up actions for production hardening.',
       estimatedTimeMinutes: 11,
       verificationId: 'graph.verifyFraudPlaybook',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
       points: 10,
     },
   ],

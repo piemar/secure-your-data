@@ -29,7 +29,12 @@ export const labConsistencyVerifyDefinition: WorkshopLabDefinition = {
       description: 'Consistency verification script (update + read from secondary)',
       type: 'script',
       path: 'updateAndCheckPeople.py',
-      sizeHint: '5KB',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: '5KB',
     },
     {
       id: 'people-collection',
@@ -53,6 +58,12 @@ export const labConsistencyVerifyDefinition: WorkshopLabDefinition = {
       enhancementId: 'consistency.run-script',
       sourceProof: 'proofs/06/README.md',
       sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-consistency-verify-step-2',
@@ -67,7 +78,12 @@ export const labConsistencyVerifyDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'consistency.verify-log',
       sourceProof: 'proofs/06/README.md',
-      sourceSection: 'Measurement',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Measurement',
     },
     {
       id: 'lab-consistency-verify-step-3',
@@ -81,7 +97,12 @@ export const labConsistencyVerifyDefinition: WorkshopLabDefinition = {
       points: 20,
       enhancementId: 'consistency.failover-test',
       sourceProof: 'proofs/06/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
   ],
 };

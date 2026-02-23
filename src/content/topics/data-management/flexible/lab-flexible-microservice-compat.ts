@@ -32,7 +32,12 @@ export const labFlexibleMicroserviceCompatDefinition: WorkshopLabDefinition = {
       description: 'Python scripts for microservice compatibility demo',
       type: 'script',
       path: 'microservice_one.py',
-      sizeHint: 'proof 02 scripts',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: 'proof 02 scripts',
     },
   ],
   steps: [
@@ -50,6 +55,12 @@ export const labFlexibleMicroserviceCompatDefinition: WorkshopLabDefinition = {
       enhancementId: 'flexible.microservice-one',
       sourceProof: 'proofs/02/README.md',
       sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-flexible-microservice-compat-step-2',
@@ -64,7 +75,12 @@ export const labFlexibleMicroserviceCompatDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'flexible.schema-evolution',
       sourceProof: 'proofs/02/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-flexible-microservice-compat-step-3',
@@ -79,7 +95,12 @@ export const labFlexibleMicroserviceCompatDefinition: WorkshopLabDefinition = {
       points: 20,
       enhancementId: 'flexible.microservice-two',
       sourceProof: 'proofs/02/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
   ],
 };

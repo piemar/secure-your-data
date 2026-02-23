@@ -35,6 +35,12 @@ export const labRollingUpdatesSetupDefinition: WorkshopLabDefinition = {
       enhancementId: 'rolling-updates.python-setup',
       sourceProof: 'proofs/12/README.md',
       sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-rolling-updates-setup-step-2',
@@ -48,7 +54,12 @@ export const labRollingUpdatesSetupDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'rolling-updates.atlas-setup',
       sourceProof: 'proofs/12/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
     {
       id: 'lab-rolling-updates-setup-step-3',
@@ -62,7 +73,12 @@ export const labRollingUpdatesSetupDefinition: WorkshopLabDefinition = {
       points: 5,
       enhancementId: 'rolling-updates.scripts',
       sourceProof: 'proofs/12/README.md',
-      sourceSection: 'Setup',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup',
     },
   ],
 };

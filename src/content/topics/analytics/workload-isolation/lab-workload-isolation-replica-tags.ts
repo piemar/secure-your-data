@@ -29,7 +29,12 @@ export const labWorkloadIsolationReplicaTagsDefinition: WorkshopLabDefinition = 
       description: 'mgeneratejs template for 1M customer documents',
       type: 'file',
       path: 'CustomerSingleView.json',
-      sizeHint: '2KB',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: '2KB',
     },
     {
       id: 'print-repset-conf',
@@ -61,6 +66,12 @@ export const labWorkloadIsolationReplicaTagsDefinition: WorkshopLabDefinition = 
       enhancementId: 'workload-isolation.data-load',
       sourceProof: 'proofs/05/README.md',
       sourceSection: 'Setup - Load Data',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-workload-isolation-replica-tags-step-2',
@@ -75,7 +86,12 @@ export const labWorkloadIsolationReplicaTagsDefinition: WorkshopLabDefinition = 
       points: 15,
       enhancementId: 'workload-isolation.print-repset-conf',
       sourceProof: 'proofs/05/README.md',
-      sourceSection: 'Setup - View Replica Set Topology',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup - View Replica Set Topology',
     },
     {
       id: 'lab-workload-isolation-replica-tags-step-3',
@@ -89,7 +105,12 @@ export const labWorkloadIsolationReplicaTagsDefinition: WorkshopLabDefinition = 
       points: 10,
       enhancementId: 'workload-isolation.inspect-tags',
       sourceProof: 'proofs/05/README.md',
-      sourceSection: 'Setup - View Replica Set Topology',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup - View Replica Set Topology',
     },
   ],
 };

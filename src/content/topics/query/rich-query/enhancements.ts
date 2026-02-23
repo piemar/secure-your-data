@@ -14,28 +14,33 @@ export const enhancements: EnhancementMetadataRegistry = {
     sourceSection: 'Execution - TEST 1',
     codeBlocks: [
       {
-        filename: 'compound-query.js',
+        filename: 'compound-query.cjs',
         language: 'javascript',
-        code: `// Find customers who are:
-// - Female
-// - Born in 1990
-// - Living in Utah
-// - Have at least one life insurance policy where the insured person is a smoker
+        code: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
 
-db.customers.find({
-  gender: 'Female',
-  dob: {
-    $gte: ISODate('1990-01-01'),
-    $lte: ISODate('1990-12-31')
-  },
-  'address.state': 'UT',
-  policies: {
-    $elemMatch: {
-      policyType: 'life',
-      'insured_person.smoking': true
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("test");
+  const results = await db.collection("customers").find({
+    gender: 'Female',
+    dob: {
+      $gte: new Date('1990-01-01'),
+      $lte: new Date('1990-12-31')
+    },
+    'address.state': 'UT',
+    policies: {
+      $elemMatch: {
+        policyType: 'life',
+        'insured_person.smoking': true
+      }
     }
-  }
-});`,
+  }).toArray();
+  console.log(JSON.stringify(results, null, 2));
+  await client.close();
+}
+run().catch(console.dir);`,
         competitorEquivalents: {
           postgresql: {
             language: 'sql',
@@ -55,6 +60,76 @@ WHERE c.gender = 'Female'
             workaroundNote: 'Requires JSONB and jsonb_array_elements for array subdocuments; no native nested document query like MongoDB $elemMatch.',
           },
         },
+        skeleton: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
+
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("test");
+  const results = await db.collection("customers").find({
+    gender: '_________',
+    dob: {
+      $gte: new Date('1990-01-01'),
+      $lte: new Date('__________')
+    },
+    'address.state': 'UT',
+    policies: {
+      $elemMatch: {
+        policyType: 'life',
+        'insured_person.________': true
+      }
+    }
+  }).toArray();
+  console.log(JSON.stringify(results, null, 2));
+  await client.close();
+}
+run().catch(console.dir);`,
+        inlineHints: [
+          {
+            line: 9,
+            blankText: '_________',
+            hint: "Filter by the customer's gender using a string literal.",
+            answer: 'Female',
+          },
+          {
+            line: 12,
+            blankText: '__________',
+            hint: 'Use the last day of 1990 as the upper bound for the date of birth.',
+            answer: '1990-12-31',
+          },
+          {
+            line: 18,
+            blankText: '________',
+            hint: 'This nested field indicates whether the insured person is a smoker.',
+            answer: 'smoking',
+          },
+        ],
+      },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
+        code: `// Find customers who are:
+// - Female
+// - Born in 1990
+// - Living in Utah
+// - Have at least one life insurance policy where the insured person is a smoker
+
+db.customers.find({
+  gender: 'Female',
+  dob: {
+    $gte: ISODate('1990-01-01'),
+    $lte: ISODate('1990-12-31')
+  },
+  'address.state': 'UT',
+  policies: {
+    $elemMatch: {
+      policyType: 'life',
+      'insured_person.smoking': true
+    }
+  }
+});
+print("Query completed.");`,
         skeleton: `// Find customers who are:
 // - Female
 // - Born in 1990
@@ -74,30 +149,17 @@ db.customers.find({
       'insured_person.________': true
     }
   }
-});`,
+});
+print("Query completed.");`,
         inlineHints: [
-          {
-            line: 8,
-            blankText: '_________',
-            hint: "Filter by the customer's gender using a string literal.",
-            answer: 'Female',
-          },
-          {
-            line: 11,
-            blankText: '__________',
-            hint: 'Use the last day of 1990 as the upper bound for the date of birth.',
-            answer: '1990-12-31',
-          },
-          {
-            line: 15,
-            blankText: '________',
-            hint: 'This nested field indicates whether the insured person is a smoker.',
-            answer: 'smoking',
-          },
+          { line: 8, blankText: '_________', hint: "Filter by the customer's gender using a string literal.", answer: 'Female' },
+          { line: 11, blankText: '__________', hint: 'Use the last day of 1990 as the upper bound for the date of birth.', answer: '1990-12-31' },
+          { line: 17, blankText: '________', hint: 'This nested field indicates whether the insured person is a smoker.', answer: 'smoking' },
         ],
       },
     ],
     tips: [
+      'Use the node tab to run with the MongoDB Node driver (.cjs), or the mongosh tab to run the same logic in the shell.',
       'This query mirrors the RICH-QUERY proof exercise compound criteria.',
       'Explain to the audience that all filtering happens server-side in MongoDB.',
     ],
@@ -110,8 +172,78 @@ db.customers.find({
     sourceSection: 'Execution - TEST 1',
     codeBlocks: [
       {
-        filename: 'projection-and-sort.js',
+        filename: 'projection-and-sort.cjs',
         language: 'javascript',
+        code: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
+
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("test");
+  const results = await db.collection("customers")
+    .find(
+      {
+        gender: 'Female',
+        dob: { $gte: new Date('1990-01-01'), $lte: new Date('1990-12-31') },
+        'address.state': 'UT',
+        policies: { $elemMatch: { policyType: 'life', 'insured_person.smoking': true } }
+      },
+      { projection: { _id: 0, firstName: 1, lastName: 1, dob: 1 } }
+    )
+    .sort({ dob: 1 })
+    .toArray();
+  console.log(JSON.stringify(results, null, 2));
+  await client.close();
+}
+run().catch(console.dir);`,
+        skeleton: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
+
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("test");
+  const results = await db.collection("customers")
+    .find(
+      {
+        gender: 'Female',
+        dob: { $gte: new Date('1990-01-01'), $lte: new Date('1990-12-31') },
+        'address.state': 'UT',
+        policies: { $elemMatch: { policyType: 'life', 'insured_person.smoking': true } }
+      },
+      { projection: { _id: 0, _________: 1, _________: 1, dob: 1 } }
+    )
+    .sort({ _______: 1 })
+    .toArray();
+  console.log(JSON.stringify(results, null, 2));
+  await client.close();
+}
+run().catch(console.dir);`,
+        inlineHints: [
+          {
+            line: 16,
+            blankText: '_________',
+            hint: 'Include the given name field in the projection.',
+            answer: 'firstName',
+          },
+          {
+            line: 16,
+            blankText: '_________',
+            hint: 'Include the family name field in the projection.',
+            answer: 'lastName',
+          },
+          {
+            line: 18,
+            blankText: '_______',
+            hint: 'Sort by the same date field you projected.',
+            answer: 'dob',
+          },
+        ],
+      },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
         code: `// Same filter, but only return the fields the application needs
 // and order by date of birth.
 
@@ -138,7 +270,8 @@ db.customers
       dob: 1
     }
   )
-  .sort({ dob: 1 });`,
+  .sort({ dob: 1 });
+print("Query completed.");`,
         skeleton: `// Same filter, but only return the fields the application needs
 // and order by date of birth.
 
@@ -165,30 +298,17 @@ db.customers
       dob: 1
     }
   )
-  .sort({ _______: 1 });`,
+  .sort({ _______: 1 });
+print("Query completed.");`,
         inlineHints: [
-          {
-            line: 27,
-            blankText: '_________',
-            hint: 'Include the given name field in the projection.',
-            answer: 'firstName',
-          },
-          {
-            line: 28,
-            blankText: '_________',
-            hint: 'Include the family name field in the projection.',
-            answer: 'lastName',
-          },
-          {
-            line: 31,
-            blankText: '_______',
-            hint: 'Sort by the same date field you projected.',
-            answer: 'dob',
-          },
+          { line: 22, blankText: '_________', hint: 'Include the given name field in the projection.', answer: 'firstName' },
+          { line: 23, blankText: '_________', hint: 'Include the family name field in the projection.', answer: 'lastName' },
+          { line: 27, blankText: '_______', hint: 'Sort by the same date field you projected.', answer: 'dob' },
         ],
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the query.',
       'Show how projections reduce network payload compared to returning full documents.',
       'Sorting on an indexed field will later benefit from the compound index you create.',
     ],
@@ -201,8 +321,58 @@ db.customers
     sourceSection: 'Execution - TEST 1',
     codeBlocks: [
       {
-        filename: 'pagination.js',
+        filename: 'pagination.cjs',
         language: 'javascript',
+        code: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
+
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("test");
+  const pageSize = 20;
+  const page = 2; // zero-based page index
+  const results = await db.collection("customers")
+    .find({ 'address.state': 'UT' })
+    .sort({ lastName: 1, firstName: 1 })
+    .skip(page * pageSize)
+    .limit(pageSize)
+    .toArray();
+  console.log(JSON.stringify(results, null, 2));
+  await client.close();
+}
+run().catch(console.dir);`,
+        skeleton: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
+
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("test");
+  const pageSize = 20;
+  const page = ______; // zero-based page index
+  const results = await db.collection("customers")
+    .find({ 'address.state': 'UT' })
+    .sort({ lastName: 1, firstName: 1 })
+    .skip(page * pageSize)
+    .limit(pageSize)
+    .toArray();
+  console.log(JSON.stringify(results, null, 2));
+  await client.close();
+}
+run().catch(console.dir);`,
+        inlineHints: [
+          {
+            line: 9,
+            blankText: '______',
+            hint: 'Remember that the first page is page 0 in zero-based indexing.',
+            answer: '2',
+          },
+        ],
+      },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
         code: `// Simple offset-based pagination using limit() and skip().
 // In production, prefer range-based pagination for large collections.
 
@@ -213,7 +383,8 @@ db.customers
   .find({ 'address.state': 'UT' })
   .sort({ lastName: 1, firstName: 1 })
   .skip(page * pageSize)
-  .limit(pageSize);`,
+  .limit(pageSize);
+print("Query completed.");`,
         skeleton: `// Simple offset-based pagination using limit() and skip().
 // In production, prefer range-based pagination for large collections.
 
@@ -224,18 +395,15 @@ db.customers
   .find({ 'address.state': 'UT' })
   .sort({ lastName: 1, firstName: 1 })
   .skip(page * pageSize)
-  .limit(pageSize);`,
+  .limit(pageSize);
+print("Query completed.");`,
         inlineHints: [
-          {
-            line: 6,
-            blankText: '______',
-            hint: 'Remember that the first page is page 0 in zero-based indexing.',
-            answer: '2',
-          },
+          { line: 5, blankText: '______', hint: 'Remember that the first page is page 0 in zero-based indexing.', answer: '2' },
         ],
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the query.',
       'Discuss trade-offs of skip/limit vs range-based pagination.',
       'Explain that skip gets slower on very high offsets, motivating alternative patterns.',
     ],
@@ -248,8 +416,30 @@ db.customers
     sourceSection: 'Execution - TEST 1',
     codeBlocks: [
       {
-        filename: 'create-index.js',
+        filename: 'create-index.cjs',
         language: 'javascript',
+        code: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
+
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("test");
+  await db.collection("customers").createIndex({
+    'address.state': 1,
+    'policies.policyType': 1,
+    'policies.insured_person.smoking': 1,
+    gender: 1,
+    dob: 1
+  });
+  console.log("Index created.");
+  await client.close();
+}
+run().catch(console.dir);`,
+      },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
         code: `// Create a compound index that matches the query shape:
 // equality fields first, range field last.
 
@@ -259,12 +449,37 @@ db.customers.createIndex({
   'policies.insured_person.smoking': 1,
   gender: 1,
   dob: 1
-});`,
+});
+print("Index created.");`,
       },
       {
-        filename: 'explain-query.js',
+        filename: 'explain-query.cjs',
         language: 'javascript',
+        code: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
+
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("test");
+  const explain = await db.collection("customers")
+    .find({
+      gender: 'Female',
+      dob: { $gte: new Date('1990-01-01'), $lte: new Date('1990-12-31') },
+      'address.state': 'UT',
+      policies: { $elemMatch: { policyType: 'life', 'insured_person.smoking': true } }
+    })
+    .explain('executionStats');
+  console.log(JSON.stringify(explain, null, 2));
+  await client.close();
+}
+run().catch(console.dir);`,
+      },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
         code: `// Compare COLLSCAN vs IXSCAN using explain().
+// Run createIndex first, then run this.
 
 db.customers
   .find({
@@ -281,10 +496,12 @@ db.customers
       }
     }
   })
-  .explain('executionStats');`,
+  .explain('executionStats');
+print("Explain completed.");`,
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the query.',
       'Highlight the difference in docsExamined and executionTimeMillis before/after the index.',
       'Use screenshots from Compass Explain Plan to reinforce the IXSCAN vs COLLSCAN change.',
     ],
@@ -297,8 +514,70 @@ db.customers
     sourceSection: 'Execution - Aggregation',
     codeBlocks: [
       {
-        filename: 'basic-aggregation.js',
+        filename: 'basic-aggregation.cjs',
         language: 'javascript',
+        code: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
+
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("test");
+  const results = await db.collection("customers").aggregate([
+    { $match: { 'address.state': 'UT', status: 'active' } },
+    { $group: { _id: '$address.state', totalCustomers: { $sum: 1 }, totalValue: { $sum: '$accountBalance' } } },
+    { $sort: { totalValue: -1 } }
+  ]).toArray();
+  console.log(JSON.stringify(results, null, 2));
+  await client.close();
+}
+run().catch(console.dir);`,
+        skeleton: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
+
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("test");
+  const results = await db.collection("customers").aggregate([
+    { $match: { 'address.state': 'UT', status: '_________' } },
+    { $group: { _id: '$address.state', totalCustomers: { $sum: _________ }, totalValue: { $sum: '$_________' } } },
+    { $sort: { totalValue: _________ } }
+  ]).toArray();
+  console.log(JSON.stringify(results, null, 2));
+  await client.close();
+}
+run().catch(console.dir);`,
+        inlineHints: [
+          {
+            line: 9,
+            blankText: '_________',
+            hint: 'Filter for customers with active status.',
+            answer: 'active',
+          },
+          {
+            line: 10,
+            blankText: '_________',
+            hint: 'Use 1 to count each document in the group.',
+            answer: '1',
+          },
+          {
+            line: 10,
+            blankText: '$_________',
+            hint: 'Sum the account balance field for each customer.',
+            answer: 'accountBalance',
+          },
+          {
+            line: 11,
+            blankText: '_________',
+            hint: 'Sort in descending order (highest value first).',
+            answer: '-1',
+          },
+        ],
+      },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
         code: `// Build a simple aggregation pipeline with $match and $group
 // Compute counts and totals over a filtered subset of documents
 
@@ -319,7 +598,8 @@ db.customers.aggregate([
   {
     $sort: { totalValue: -1 }
   }
-]);`,
+]);
+print("Aggregation completed.");`,
         skeleton: `// Build a simple aggregation pipeline with $match and $group
 // Compute counts and totals over a filtered subset of documents
 
@@ -340,36 +620,18 @@ db.customers.aggregate([
   {
     $sort: { totalValue: _________ }
   }
-]);`,
+]);
+print("Aggregation completed.");`,
         inlineHints: [
-          {
-            line: 6,
-            blankText: '_________',
-            hint: 'Filter for customers with active status.',
-            answer: 'active',
-          },
-          {
-            line: 11,
-            blankText: '_________',
-            hint: 'Use 1 to count each document in the group.',
-            answer: '1',
-          },
-          {
-            line: 12,
-            blankText: '$_________',
-            hint: 'Sum the account balance field for each customer.',
-            answer: 'accountBalance',
-          },
-          {
-            line: 16,
-            blankText: '_________',
-            hint: 'Sort in descending order (highest value first).',
-            answer: '-1',
-          },
+          { line: 8, blankText: '_________', hint: 'Filter for customers with active status.', answer: 'active' },
+          { line: 14, blankText: '_________', hint: 'Use 1 to count each document in the group.', answer: '1' },
+          { line: 15, blankText: '$_________', hint: 'Sum the account balance field for each customer.', answer: 'accountBalance' },
+          { line: 19, blankText: '_________', hint: 'Sort in descending order (highest value first).', answer: '-1' },
         ],
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the query.',
       'The $match stage filters documents before grouping, improving performance.',
       'Use $group to compute aggregations like counts, sums, and averages.',
       'Add $sort to order results by aggregated values.',
@@ -383,8 +645,64 @@ db.customers.aggregate([
     sourceSection: 'Execution - Aggregation',
     codeBlocks: [
       {
-        filename: 'projection-aggregation.js',
+        filename: 'projection-aggregation.cjs',
         language: 'javascript',
+        code: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
+
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("test");
+  const results = await db.collection("customers").aggregate([
+    { $match: { status: 'active' } },
+    { $group: { _id: '$address.state', count: { $sum: 1 }, avgBalance: { $avg: '$accountBalance' } } },
+    { $project: { _id: 0, state: '$_id', customerCount: '$count', averageBalance: { $round: ['$avgBalance', 2] }, status: 'active' } }
+  ]).toArray();
+  console.log(JSON.stringify(results, null, 2));
+  await client.close();
+}
+run().catch(console.dir);`,
+        skeleton: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
+
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("test");
+  const results = await db.collection("customers").aggregate([
+    { $match: { status: 'active' } },
+    { $group: { _id: '$address.state', count: { $sum: 1 }, avgBalance: { $avg: '$_________' } } },
+    { $project: { _id: 0, state: '$_id', customerCount: '$count', averageBalance: { $round: ['$_________', 2] }, status: '_________' } }
+  ]).toArray();
+  console.log(JSON.stringify(results, null, 2));
+  await client.close();
+}
+run().catch(console.dir);`,
+        inlineHints: [
+          {
+            line: 10,
+            blankText: '$_________',
+            hint: 'Calculate the average of the account balance field.',
+            answer: 'accountBalance',
+          },
+          {
+            line: 11,
+            blankText: '$_________',
+            hint: 'Round the average balance value.',
+            answer: 'avgBalance',
+          },
+          {
+            line: 11,
+            blankText: '_________',
+            hint: 'Add a static status field with the value "active".',
+            answer: 'active',
+          },
+        ],
+      },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
         code: `// Use $project to rename and compute derived fields
 // Prepare results for downstream consumers like dashboards or APIs
 
@@ -408,7 +726,8 @@ db.customers.aggregate([
       status: 'active'
     }
   }
-]);`,
+]);
+print("Aggregation completed.");`,
         skeleton: `// Use $project to rename and compute derived fields
 // Prepare results for downstream consumers like dashboards or APIs
 
@@ -432,30 +751,17 @@ db.customers.aggregate([
       status: '_________'
     }
   }
-]);`,
+]);
+print("Aggregation completed.");`,
         inlineHints: [
-          {
-            line: 10,
-            blankText: '$_________',
-            hint: 'Calculate the average of the account balance field.',
-            answer: 'accountBalance',
-          },
-          {
-            line: 17,
-            blankText: '$_________',
-            hint: 'Round the average balance value.',
-            answer: 'avgBalance',
-          },
-          {
-            line: 18,
-            blankText: '_________',
-            hint: 'Add a static status field with the value "active".',
-            answer: 'active',
-          },
+          { line: 12, blankText: '$_________', hint: 'Calculate the average of the account balance field.', answer: 'accountBalance' },
+          { line: 20, blankText: '$_________', hint: 'Round the average balance value.', answer: 'avgBalance' },
+          { line: 21, blankText: '_________', hint: 'Add a static status field with the value "active".', answer: 'active' },
         ],
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the query.',
       'Use $project to reshape output documents for your application.',
       'Computed fields can use expressions like $round, $cond, and $divide.',
       'Hide internal fields by setting _id: 0 or excluding fields.',
@@ -469,8 +775,92 @@ db.customers.aggregate([
     sourceSection: 'Execution - Aggregation',
     codeBlocks: [
       {
-        filename: 'facet-aggregation.js',
+        filename: 'facet-aggregation.cjs',
         language: 'javascript',
+        code: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
+
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("test");
+  const results = await db.collection("customers").aggregate([
+    { $match: { status: 'active' } },
+    {
+      $facet: {
+        byRegion: [
+          { $group: { _id: '$address.state', count: { $sum: 1 }, totalValue: { $sum: '$accountBalance' } } },
+          { $sort: { count: -1 } }
+        ],
+        byProduct: [
+          { $unwind: '$policies' },
+          { $group: { _id: '$policies.policyType', count: { $sum: 1 }, avgPremium: { $avg: '$policies.premium' } } },
+          { $sort: { count: -1 } }
+        ]
+      }
+    }
+  ]).toArray();
+  console.log(JSON.stringify(results, null, 2));
+  await client.close();
+}
+run().catch(console.dir);`,
+        skeleton: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
+
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("test");
+  const results = await db.collection("customers").aggregate([
+    { $match: { status: 'active' } },
+    {
+      $facet: {
+        byRegion: [
+          { $group: { _id: '$address.state', count: { $sum: 1 }, totalValue: { $sum: '$_________' } } },
+          { $sort: { count: _________ } }
+        ],
+        byProduct: [
+          { $unwind: '$_________' },
+          { $group: { _id: '$policies.policyType', count: { $sum: 1 }, avgPremium: { $avg: '$policies._________' } } },
+          { $sort: { count: -1 } }
+        ]
+      }
+    }
+  ]).toArray();
+  console.log(JSON.stringify(results, null, 2));
+  await client.close();
+}
+run().catch(console.dir);`,
+        inlineHints: [
+          {
+            line: 13,
+            blankText: '$_________',
+            hint: 'Sum the account balance field.',
+            answer: 'accountBalance',
+          },
+          {
+            line: 14,
+            blankText: '_________',
+            hint: 'Sort in descending order (highest count first).',
+            answer: '-1',
+          },
+          {
+            line: 17,
+            blankText: '$_________',
+            hint: 'Unwind the policies array to process each policy separately.',
+            answer: 'policies',
+          },
+          {
+            line: 18,
+            blankText: '$policies._________',
+            hint: 'Calculate the average premium for each policy type.',
+            answer: 'premium',
+          },
+        ],
+      },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
         code: `// Run multiple aggregations in a single pipeline using $facet
 // Feed multiple dashboards from one query
 
@@ -505,7 +895,8 @@ db.customers.aggregate([
       ]
     }
   }
-]);`,
+]);
+print("Facet aggregation completed.");`,
         skeleton: `// Run multiple aggregations in a single pipeline using $facet
 // Feed multiple dashboards from one query
 
@@ -540,36 +931,18 @@ db.customers.aggregate([
       ]
     }
   }
-]);`,
+]);
+print("Facet aggregation completed.");`,
         inlineHints: [
-          {
-            line: 12,
-            blankText: '$_________',
-            hint: 'Sum the account balance field.',
-            answer: 'accountBalance',
-          },
-          {
-            line: 14,
-            blankText: '_________',
-            hint: 'Sort in descending order (highest count first).',
-            answer: '-1',
-          },
-          {
-            line: 19,
-            blankText: '$_________',
-            hint: 'Unwind the policies array to process each policy separately.',
-            answer: 'policies',
-          },
-          {
-            line: 24,
-            blankText: '$policies._________',
-            hint: 'Calculate the average premium for each policy type.',
-            answer: 'premium',
-          },
+          { line: 15, blankText: '$_________', hint: 'Sum the account balance field.', answer: 'accountBalance' },
+          { line: 18, blankText: '_________', hint: 'Sort in descending order (highest count first).', answer: '-1' },
+          { line: 22, blankText: '$_________', hint: 'Unwind the policies array to process each policy separately.', answer: 'policies' },
+          { line: 28, blankText: '$policies._________', hint: 'Calculate the average premium for each policy type.', answer: 'premium' },
         ],
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the query.',
       '$facet allows you to run multiple independent aggregation pipelines in one pass.',
       'Each facet produces a separate output array in the result document.',
       'This is more efficient than running separate queries for each dashboard.',
@@ -596,6 +969,7 @@ db.customers.find(
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the query.',
       'Reuse collections from CSFLE and QE labs.',
       'Plain collection for baseline comparison.',
       'Review indexes before querying encrypted fields.',
@@ -623,6 +997,7 @@ db.employees.find({ 'encryptedField': { $gte: value } });
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the query.',
       'CSFLE deterministic: equality queries only.',
       'QE supports equality and range when properly indexed.',
       'Document limitations for customer playbook.',
@@ -651,6 +1026,7 @@ db.customers.find(
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the query.',
       'Keep PII encrypted; leave queryable fields plain.',
       'Document trade-offs: security vs query flexibility.',
       'One working end-to-end query demonstrates pattern.',

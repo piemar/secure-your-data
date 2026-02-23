@@ -31,6 +31,12 @@ export const labDataChangeStreamsDefinition: WorkshopLabDefinition = {
         'Review the documentation for MongoDB change streams. Identify which fields in a change stream event will still be visible when the underlying document fields are encrypted client-side.',
       estimatedTimeMinutes: 10,
       points: 5,
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-data-change-streams-step-listen',
@@ -40,6 +46,12 @@ export const labDataChangeStreamsDefinition: WorkshopLabDefinition = {
       instructions:
         'Using your preferred language (Node.js or mongosh), open a change stream on the collection used in the CSFLE or QE labs. Insert or update a few sample documents and observe the emitted change events. Note which parts of the event payload are visible and which remain encrypted.',
       estimatedTimeMinutes: 15,
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
       points: 15,
     },
     {
@@ -50,6 +62,12 @@ export const labDataChangeStreamsDefinition: WorkshopLabDefinition = {
       instructions:
         'Sketch an architecture where your change stream listener forwards events to another system (such as Kafka or a serverless function) without exposing plaintext PII. Identify which event fields you would use for routing and which remain opaque ciphertext.',
       estimatedTimeMinutes: 5,
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
       points: 10,
     },
   ],

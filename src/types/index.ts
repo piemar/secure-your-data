@@ -224,6 +224,13 @@ export interface EncryptionDemoPreviewConfig {
   mode?: 'insert' | 'query' | 'both';
   /** Fields to show as encrypted vs decrypted */
   fields?: string[];
+  /**
+   * Demo variant for Preview tab:
+   * - csfle-toggle: toggle "CSFLE on/off" to show query results as ciphertext vs decrypted
+   * - crypto-shredding: illustrates DEK delete → ciphertext unrecoverable
+   * - key-rotation: shows rewrapManyDataKey is metadata-only (ciphertext unchanged)
+   */
+  variant?: 'csfle-toggle' | 'crypto-shredding' | 'key-rotation' | 'default';
 }
 
 export interface DiagramPreviewConfig {

@@ -1,8 +1,10 @@
 import React from 'react';
 import {
   CryptoShreddingDiagram,
+  CSFLEArchitectureDiagram,
   PITRFlowDiagram,
   LiveMigrationFlowDiagram,
+  QEArchitectureDiagram,
   RollingUpgradeDiagram,
   RTOFlowDiagram,
   ScaleOutDiagram,
@@ -38,6 +40,14 @@ export const labIntroComponents: Record<
   }),
   'lab-workload-isolation-overview': () => ({
     architectureDiagram: <WorkloadIsolationDiagram />,
+  }),
+  'lab-csfle-fundamentals': () => ({
+    architectureDiagram: <CSFLEArchitectureDiagram />,
+    showEncryptionFlow: true,
+    encryptionFlowType: 'csfle',
+  }),
+  'lab-queryable-encryption': () => ({
+    architectureDiagram: <QEArchitectureDiagram />,
   }),
   'lab-right-to-erasure': () => ({
     whatYouWillBuild: [

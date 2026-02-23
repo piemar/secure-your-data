@@ -96,7 +96,7 @@ export function LabViewWithTabs({
   competitorIds,
   labMongoUri,
 }: LabViewWithTabsProps) {
-  const { startLab, completeLab, userEmail } = useLab();
+  const { startLab, completeLab, completeStep, userEmail } = useLab();
   const storageKey = `lab${labNumber}-progress`;
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const stepToolbarRef = useRef<{ reset: () => void; openHelp: () => void } | null>(null);
@@ -106,6 +106,12 @@ export function LabViewWithTabs({
     const saved = localStorage.getItem(storageKey);
     return saved ? JSON.parse(saved) : [];
   });
+
+  // When switching to a different lab, always show overview and step 0 (not the step index from the previous lab)
+  useEffect(() => {
+    setCurrentStepIndex(0);
+    setActiveTab('overview');
+  }, [labNumber]);
 
   // Start lab tracking on mount and send heartbeat
   useEffect(() => {
@@ -131,9 +137,13 @@ export function LabViewWithTabs({
   }, [completedSteps, storageKey, steps.length, labNumber, completeLab]);
 
   const handleStepComplete = (stepIndex: number) => {
+    const step = steps[stepIndex];
     setCompletedSteps((prev) =>
       prev.includes(stepIndex) ? prev : [...prev, stepIndex]
     );
+    if (step?.id) {
+      completeStep(step.id, false);
+    }
   };
 
   const handleStartLab = () => {

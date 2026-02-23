@@ -34,14 +34,17 @@ Successfully transformed step enhancements from code-based factory functions to 
 
 ### 3. Migrated Existing Enhancements ✅
 
-**Files Created:**
-- `src/labs/enhancements/metadata/rich-query.ts` - 4 enhancements
-- `src/labs/enhancements/metadata/flexible.ts` - 9 enhancements
-- `src/labs/enhancements/metadata/ingest-rate.ts` - 9 enhancements
-- `src/labs/enhancements/metadata/csfle.ts` - Stub (ready for migration)
-- `src/labs/enhancements/metadata/queryable-encryption.ts` - Stub (ready for migration)
+**Enhancement metadata lives under the topic/POV folder** (see `Docs/LAB_FOLDER_STRUCTURE_GUIDELINE.md` and `Docs/LAB_MIGRATION_GUIDE.md`):
 
-**Total:** 22 enhancements migrated to metadata format
+- `src/content/topics/query/rich-query/enhancements.ts` – rich-query enhancements
+- `src/content/topics/data-management/flexible/enhancements.ts` – flexible schema
+- `src/content/topics/scalability/ingest-rate/enhancements.ts` – ingest-rate
+- `src/content/topics/encryption/csfle/enhancements.ts` – **CSFLE (Lab 1)** – full content
+- `src/content/topics/encryption/queryable-encryption/enhancements.ts` – **Queryable Encryption (Lab 2)** – full content
+- `src/content/topics/encryption/right-to-erasure/enhancements.ts` – right-to-erasure (Lab 3)
+- … plus other POVs under `src/content/topics/<topic>/<pov>/enhancements.ts`
+
+The loader (`src/labs/enhancements/loader.ts`) maps enhancementId **prefix** (e.g. `csfle`, `queryable-encryption`) to these modules via `moduleMap`. Lab definitions live in `src/content/topics/<topic>/<pov>/lab-*.ts`.
 
 ### 4. Component Registry ✅
 
@@ -81,15 +84,15 @@ Successfully transformed step enhancements from code-based factory functions to 
 
 ### 7. CSFLE/QE Lab Updates ✅
 
-**Updated:** `src/content/labs/lab-csfle-fundamentals.ts`
-- Added `enhancementId` references to all 7 steps
-- Added `sourceProof` and `sourceSection` to all steps
+**Lab definitions** (structure) live under topics:
+- `src/content/topics/encryption/csfle/lab-csfle-fundamentals.ts` – 7 steps, each with `enhancementId`, `sourceProof`, `sourceSection`
+- `src/content/topics/encryption/queryable-encryption/lab-queryable-encryption.ts` – 4 steps, same pattern
 
-**Updated:** `src/content/labs/lab-queryable-encryption.ts`
-- Added `enhancementId` references to all 4 steps
-- Added `sourceProof` and `sourceSection` to all steps
+**Step content** (code blocks, skeletons, hints, tips) lives in enhancement files:
+- `src/content/topics/encryption/csfle/enhancements.ts` – all 7 CSFLE step enhancements (full content)
+- `src/content/topics/encryption/queryable-encryption/enhancements.ts` – all 4 QE step enhancements (full content)
 
-**Note:** Full content migration (extracting code blocks from TSX components) can be done incrementally. The infrastructure is ready.
+Labs 1 and 2 are rendered via `LabRunner` with `labId`; enhancements are loaded by `enhancementId` from these files. See `Docs/LAB_IMPLEMENTATION_PATHS.md`.
 
 ### 8. Authoring Tools ✅
 
@@ -110,19 +113,19 @@ node scripts/validate-enhancements.js
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Lab Definition (TS)                       │
+│  Path: src/content/topics/<topic>/<pov>/lab-*.ts             │
 │  - Step structure (id, title, narrative, instructions)      │
 │  - enhancementId: "rich-query.compound-query"                │
-│  - sourceProof: "proofs/01/README.md"                        │
-│  - sourceSection: "Execution - TEST 1"                      │
+│  - sourceProof, sourceSection, verificationId                │
 └──────────────────────┬──────────────────────────────────────┘
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              Enhancement Metadata Registry                    │
-│  (TS files: enhancements/metadata/rich-query.ts)             │
-│  - Code blocks (full code, skeletons, inline hints)         │
-│  - Tips, troubleshooting, exercises                         │
-│  - Component references (for dynamic content)                │
+│              Enhancement Metadata (per POV)                  │
+│  Path: src/content/topics/<topic>/<pov>/enhancements.ts      │
+│  - Code blocks (full code, skeletons, inline hints)          │
+│  - Tips, troubleshooting, competitorEquivalents               │
+│  - Loaded by enhancementId prefix via loader moduleMap       │
 └──────────────────────┬──────────────────────────────────────┘
                        │
                        ▼
@@ -165,12 +168,14 @@ node scripts/validate-enhancements.js
 - `src/labs/enhancements/loader.ts`
 - `src/labs/enhancements/components/registry.ts`
 
-### Metadata Files
-- `src/labs/enhancements/metadata/rich-query.ts`
-- `src/labs/enhancements/metadata/flexible.ts`
-- `src/labs/enhancements/metadata/ingest-rate.ts`
-- `src/labs/enhancements/metadata/csfle.ts` (stub)
-- `src/labs/enhancements/metadata/queryable-encryption.ts` (stub)
+### Enhancement metadata (topic-based)
+- `src/content/topics/query/rich-query/enhancements.ts`
+- `src/content/topics/data-management/flexible/enhancements.ts`
+- `src/content/topics/scalability/ingest-rate/enhancements.ts`
+- `src/content/topics/encryption/csfle/enhancements.ts`
+- `src/content/topics/encryption/queryable-encryption/enhancements.ts`
+- `src/content/topics/encryption/right-to-erasure/enhancements.ts`
+- … and other POVs under `src/content/topics/<topic>/<pov>/enhancements.ts`
 
 ### Tools
 - `scripts/create-enhancement.js`
@@ -182,22 +187,17 @@ node scripts/validate-enhancements.js
 
 - `src/labs/stepEnhancementRegistry.ts` - Refactored to support metadata loading
 - `src/types/index.ts` - Added `sourceProof` and `sourceSection` to `WorkshopLabStep`
-- `src/content/labs/lab-rich-query-basics.ts` - Added proof references
-- `src/content/labs/lab-flexible-*.ts` (3 files) - Added proof references
-- `src/content/labs/lab-ingest-rate-*.ts` (3 files) - Added proof references
-- `src/content/labs/lab-csfle-fundamentals.ts` - Added enhancementId and proof references
-- `src/content/labs/lab-queryable-encryption.ts` - Added enhancementId and proof references
+- Lab definition files under `src/content/topics/**/lab-*.ts` – enhancementId, sourceProof, sourceSection
 - `src/test/labs/*.test.ts` (3 files) - Updated to use `getStepEnhancementSync`
 
 ---
 
 ## Next Steps (Future Work)
 
-1. **Migrate CSFLE Content**: Extract code blocks from `Lab1CSFLE.tsx` to `metadata/csfle.ts`
-2. **Migrate QE Content**: Extract code blocks from `Lab2QueryableEncryption.tsx` to `metadata/queryable-encryption.ts`
-3. **YAML Migration**: Convert TypeScript metadata files to YAML for easier editing
-4. **Component Extraction**: Move more reusable patterns to component registry
-5. **Validation**: Enhance validation script to check code block completeness
+1. **CSFLE/QE content**: Lab 1 and Lab 2 are now content-driven; step content lives in `src/content/topics/encryption/csfle/enhancements.ts` and `queryable-encryption/enhancements.ts`. Legacy components `Lab1CSFLE.tsx` / `Lab2QueryableEncryption.tsx` can be removed or kept as reference.
+2. **YAML Migration**: Convert TypeScript enhancement files to YAML for easier editing (optional).
+3. **Component Extraction**: Move more reusable patterns to component registry.
+4. **Validation**: Use `Docs/VALIDATE_LABS_MASTER_PROMPT.md` and `node scripts/validate-content.js` for quality and schema checks.
 
 ---
 
@@ -210,9 +210,9 @@ node scripts/validate-enhancements.js
 node scripts/create-enhancement.js --id "text-search.basic" --pov TEXT-SEARCH --proof proofs/36/README.md
 ```
 
-2. **Edit the generated file:**
+2. **Edit the generated file** (under the topic/POV folder; loader must map prefix to this path):
 ```typescript
-// src/labs/enhancements/metadata/text-search.ts
+// e.g. src/content/topics/query/text-search/enhancements.ts
 export const enhancements: EnhancementMetadataRegistry = {
   'text-search.basic': {
     id: 'text-search.basic',
@@ -235,14 +235,15 @@ export const enhancements: EnhancementMetadataRegistry = {
 };
 ```
 
-3. **Reference in lab definition:**
+3. **Reference in lab definition** (in the same or appropriate topic POV folder, e.g. `src/content/topics/query/text-search/lab-*.ts`):
 ```typescript
 {
   id: 'lab-text-search-step-1',
   title: 'Step 1: Basic Text Search',
-  enhancementId: 'text-search.basic',
+  enhancementId: 'text-search.basic',  // prefix matches loader moduleMap
   sourceProof: 'proofs/36/README.md',
   sourceSection: 'Execution - TEST 1',
+  verificationId: 'textSearch.verifyStep1',  // when step has verification
   // ...
 }
 ```
@@ -267,4 +268,9 @@ node scripts/validate-enhancements.js
 
 **Status:** ✅ **ALL TODOS COMPLETE**
 
-The metadata-driven enhancement system is fully implemented and ready for use. New labs can be added primarily through configuration, with code blocks, skeletons, hints, and tips defined in metadata files rather than TypeScript factory functions.
+The metadata-driven enhancement system is fully implemented and ready for use. New labs can be added primarily through configuration, with code blocks, skeletons, hints, and tips defined in **topic-based enhancement files** (`src/content/topics/<topic>/<pov>/enhancements.ts`) rather than TypeScript factory functions.
+
+**See also:**
+- `Docs/LAB_MIGRATION_GUIDE.md` – How to migrate or add labs (content definition + enhancements).
+- `Docs/LAB_IMPLEMENTATION_PATHS.md` – Component vs content-driven rendering; all encryption labs now use content-driven path.
+- `Docs/VALIDATE_LABS_MASTER_PROMPT.md` – Audit labs against ADD_LAB_MASTER_PROMPT quality bar.

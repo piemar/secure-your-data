@@ -29,7 +29,12 @@ export const labScaleUpExecuteDefinition: WorkshopLabDefinition = {
       description: 'Collection for insert/verify proof (created by insert_data.py)',
       type: 'collection',
       namespace: 'mydb.records',
-      sizeHint: 'grows during run',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: 'grows during run',
     },
   ],
   steps: [
@@ -46,6 +51,12 @@ export const labScaleUpExecuteDefinition: WorkshopLabDefinition = {
       enhancementId: 'scale-up.run-insert',
       sourceProof: 'proofs/08/README.md',
       sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-scale-up-execute-step-2',
@@ -59,7 +70,12 @@ export const labScaleUpExecuteDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'scale-up.run-scale',
       sourceProof: 'proofs/08/README.md',
-      sourceSection: 'Execution',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution',
     },
     {
       id: 'lab-scale-up-execute-step-3',
@@ -73,7 +89,12 @@ export const labScaleUpExecuteDefinition: WorkshopLabDefinition = {
       points: 20,
       enhancementId: 'scale-up.verify',
       sourceProof: 'proofs/08/README.md',
-      sourceSection: 'Measurement',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Measurement',
     },
   ],
 };

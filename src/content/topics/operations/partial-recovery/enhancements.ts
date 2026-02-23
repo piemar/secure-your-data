@@ -186,6 +186,7 @@ db.customers.find({ firstname: { $exists: true } }).count()  // 100
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the commands (mongosh-style).',
       'Keep this Mongo Shell session open for verification after import.',
       'Convert your noted time to UTC for PITR restore.',
     ],
@@ -206,6 +207,7 @@ db.customers.count()  // still > 0 (continuous insert continues)`,
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the commands (mongosh-style).',
       'Only the 100 customer documents (with firstname) are removed.',
       'Continuous-insert script keeps adding other documents.',
     ],

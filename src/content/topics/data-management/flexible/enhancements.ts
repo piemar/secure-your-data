@@ -93,6 +93,7 @@ print(f"Inserted {len(result.inserted_ids)} employees")`,
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'Use your actual Atlas connection string including username and password.',
       'The database name "FLEXIBLE" matches the proof exercise convention.',
       'Start with 5-10 employees for testing, then scale up if needed.',
@@ -156,13 +157,13 @@ alice = collection.find_one({"name": "Alice Johnson"})
 print(f"Alice's document: {alice}")`,
         inlineHints: [
           {
-            line: 7,
+            line: 9,
             blankText: '_________',
             hint: 'Method to update multiple documents',
             answer: 'update_many',
           },
           {
-            line: 9,
+            line: 11,
             blankText: '_________',
             hint: 'Department name (e.g., Engineering, Sales, Marketing)',
             answer: 'Engineering',
@@ -171,6 +172,7 @@ print(f"Alice's document: {alice}")`,
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'The $set operator adds or updates fields without overwriting the entire document.',
       'You can add fields to a subset of documents - MongoDB handles mixed schemas gracefully.',
       'Existing fields remain unchanged when using $set.',
@@ -232,13 +234,13 @@ without_new_fields = list(collection.find({
 }))`,
         inlineHints: [
           {
-            line: 7,
+            line: 8,
             blankText: '_________',
             hint: 'Method to find documents',
             answer: 'find',
           },
           {
-            line: 10,
+            line: 11,
             blankText: '_________',
             hint: 'Boolean value to check if field exists',
             answer: 'True',
@@ -247,6 +249,7 @@ without_new_fields = list(collection.find({
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'MongoDB queries work seamlessly across documents with different schemas.',
       'Use $exists: True to find documents that have a specific field.',
       'Documents without queried fields are simply not returned (not an error).',
@@ -329,6 +332,7 @@ alice = collection.find_one({"contact.city": "_________"})`,
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'Nested documents are stored as embedded objects in MongoDB.',
       'Use dot notation (contact.city) to query nested fields.',
       'You can add nested structures to existing documents without affecting other fields.',
@@ -403,6 +407,7 @@ readers = list(collection.find({"hobbies": {"$in": ["reading", "writing"]}}))`,
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'Arrays can have different lengths and contents per document.',
       'Query arrays directly: {"hobbies": "hiking"} finds documents where hobbies array contains "hiking".',
       'Use $in to find documents where array contains any of the specified values.',
@@ -484,6 +489,7 @@ collection.update_one(
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'Use dot notation to query nested fields: "contact.address.city".',
       'Query arrays directly: {"hobbies": "photography"} finds documents containing that value.',
       'Projections work with nested fields: {"contact.city": 1} returns only that nested field.',
@@ -568,6 +574,7 @@ while True:
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'This microservice only reads fields it knows about (name, email, salary).',
       'It will continue working even after new fields are added to documents.',
       'Use projections to limit which fields are returned from the database.',
@@ -669,6 +676,7 @@ result4 = collection.update_many(
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'Run this script while microservice_one.py is still running.',
       'The existing microservice will continue working because it only reads fields it knows about.',
       'This demonstrates zero-downtime schema evolution.',
@@ -756,6 +764,7 @@ while True:
       },
     ],
     tips: [
+      'Use Run all or Run selection in the editor to run the script.',
       'This microservice uses the newly added fields (department, hobbies, contact).',
       'It handles documents that may not have these fields using .get() with defaults.',
       'Both microservices can run simultaneously, each reading the fields they need.',

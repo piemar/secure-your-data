@@ -30,7 +30,12 @@ export const labInPlaceAnalyticsBasicsDefinition: WorkshopLabDefinition = {
       description: 'Bank customer dataset (1M or 10M records). Restore from customers.bson.gz (download link in proof README)',
       type: 'collection',
       namespace: 'FAST-ANALYTICS.customers',
-      sizeHint: '64MB (1M) or 628MB (10M)',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sizeHint: '64MB (1M) or 628MB (10M)',
     },
   ],
   steps: [
@@ -48,6 +53,12 @@ export const labInPlaceAnalyticsBasicsDefinition: WorkshopLabDefinition = {
       enhancementId: 'in-place-analytics.data-setup',
       sourceProof: 'proofs/04/README.md',
       sourceSection: 'Setup - Import Sample Data',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],
     },
     {
       id: 'lab-in-place-analytics-basics-step-2',
@@ -62,7 +73,12 @@ export const labInPlaceAnalyticsBasicsDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'in-place-analytics.index-creation',
       sourceProof: 'proofs/04/README.md',
-      sourceSection: 'Setup - Create Index',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Setup - Create Index',
     },
     {
       id: 'lab-in-place-analytics-basics-step-3',
@@ -77,7 +93,12 @@ export const labInPlaceAnalyticsBasicsDefinition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'in-place-analytics.basic-aggregation',
       sourceProof: 'proofs/04/README.md',
-      sourceSection: 'Execution - Aggregation 1',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Execution - Aggregation 1',
     },
     {
       id: 'lab-in-place-analytics-basics-step-4',
@@ -92,7 +113,12 @@ export const labInPlaceAnalyticsBasicsDefinition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'in-place-analytics.explain-performance',
       sourceProof: 'proofs/04/README.md',
-      sourceSection: 'Measurement',
+
+      hints: [
+        'Review the step instructions and narrative above for what to do.',
+        'Check the lab folder path or source proof document for detailed guidance.',
+        'Use "Check my progress" or verification when available to confirm completion.',
+      ],      sourceSection: 'Measurement',
     },
   ],
 };
