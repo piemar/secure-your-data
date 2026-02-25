@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLab } from '@/context/LabContext';
-import { getWorkshopSession } from '@/utils/workshopUtils';
+import { getWorkshopSession, updateWorkshopSession } from '@/utils/workshopUtils';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,7 @@ const PREREQUISITES: Prerequisite[] = [
     { id: 'mongosh', label: 'mongosh', description: 'MongoDB Shell for database operations', installCommand: 'brew install mongodb-community-shell', downloadUrl: 'https://www.mongodb.com/try/download/shell', required: true },
     { id: 'node', label: 'Node.js v18+', description: 'JavaScript runtime', installCommand: 'brew install node', downloadUrl: 'https://nodejs.org/', required: true },
     { id: 'npm', label: 'npm', description: 'Package manager (comes with Node.js)', installCommand: 'Included with Node.js', required: true },
-    { id: 'mongoCryptShared', label: 'mongo_crypt_shared', description: 'Required for Lab 2 (Queryable Encryption)', installCommand: 'Download from MongoDB', downloadUrl: 'https://www.mongodb.com/docs/manual/core/queryable-encryption/reference/shared-library/', required: false },
+    { id: 'mongoCryptShared', label: 'mongo_crypt_shared', description: 'Required for Lab 2 (Queryable Encryption)', installCommand: 'Download from MongoDB', downloadUrl: 'https://www.mongodb.com/docs/manual/core/queryable-encryption/reference/shared-library/', required: true },
 ];
 
 export const LabSetupWizard: React.FC = () => {
@@ -50,10 +50,16 @@ export const LabSetupWizard: React.FC = () => {
     const [localUri, setLocalUri] = useState(mongoUri || 'mongodb://mongo:27017');
     const [uriFromWorkshop, setUriFromWorkshop] = useState(false);
     const [isCheckingPrereqs, setIsCheckingPrereqs] = useState(false);
-    const [prereqResults, setPrereqResults] = useState<Record<string, { verified: boolean; message: string; path?: string }>>({});
+    const [prereqResults, setPrereqResults] = useState<Record<string, { verified: boolean; message: string; path?: string; detectedLocation?: string }>>({});
     const [showPrereqDetails, setShowPrereqDetails] = useState(false);
     const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
     const [bypassPrereqs, setBypassPrereqs] = useState(false);
+    const [cryptSharedManualPath, setCryptSharedManualPath] = useState(
+        () => localStorage.getItem('crypt_shared_lib_path') || localStorage.getItem('mongo_crypt_shared_path') || ''
+    );
+    const [showMongoCryptInput, setShowMongoCryptInput] = useState(false);
+    const [isVerifyingCryptPath, setIsVerifyingCryptPath] = useState(false);
+    const [mongoshPathInput, setMongoshPathInput] = useState(() => localStorage.getItem('workshop_mongosh_path') || '');
 
     // Get attendee name from localStorage (set during registration)
     const attendeeName = localStorage.getItem('workshop_attendee_name') || '';
@@ -97,6 +103,36 @@ export const LabSetupWizard: React.FC = () => {
         setTimeout(() => setCopiedCommand(null), 2000);
     };
 
+    const verifyCryptSharedPath = async () => {
+        const pathToCheck = cryptSharedManualPath.trim();
+        if (!pathToCheck) {
+            toast.error('Enter the path to mongo_crypt_v1.dylib (or .so)');
+            return;
+        }
+        setIsVerifyingCryptPath(true);
+        try {
+            localStorage.setItem('crypt_shared_lib_path', pathToCheck);
+            const result = await validatorUtils.checkFilePath(pathToCheck, 'mongoCryptShared');
+            if (result.success) {
+                setPrereqResults(prev => ({
+                    ...prev,
+                    mongoCryptShared: { verified: true, message: result.message || 'File found', path: pathToCheck, detectedLocation: result.detectedLocation },
+                }));
+                setVerifiedTool('mongoCryptShared', true, pathToCheck, result.detectedLocation);
+                toast.success(result.detectedLocation ? `✓ Found in ${result.detectedLocation}` : 'mongo_crypt_shared path verified');
+                setShowMongoCryptInput(false);
+            } else {
+                setPrereqResults(prev => ({ ...prev, mongoCryptShared: { verified: false, message: result.message || 'File not found' } }));
+                setVerifiedTool('mongoCryptShared', false, '');
+                toast.error(result.message || 'File not found at that path');
+            }
+        } catch (e) {
+            toast.error('Verification failed');
+        } finally {
+            setIsVerifyingCryptPath(false);
+        }
+    };
+
     const checkAllPrerequisites = async () => {
         setIsCheckingPrereqs(true);
         setShowPrereqDetails(true);
@@ -104,14 +140,38 @@ export const LabSetupWizard: React.FC = () => {
 
         for (const prereq of PREREQUISITES) {
             try {
-                const result = await validatorUtils.checkToolInstalled(prereq.label.replace(' v2', '').replace(' v18+', ''));
-                if (result.success) {
-                    const version = result.message?.replace('System Scan: ', '') || result.path || '';
-                    results[prereq.id] = { verified: true, message: version, path: result.path };
-                    setVerifiedTool(prereq.id, true, result.path || version);
+                // mongo_crypt_shared: user path first, then auto-detect; use checkMongoCryptShared for detectedLocation
+                if (prereq.id === 'mongoCryptShared') {
+                    const storedPath = (localStorage.getItem('crypt_shared_lib_path') || localStorage.getItem('mongo_crypt_shared_path') || '').trim();
+                    const result = await validatorUtils.checkMongoCryptShared(storedPath || undefined);
+                    if (result.success && result.path) {
+                        if (!storedPath) localStorage.setItem('crypt_shared_lib_path', result.path);
+                        results[prereq.id] = {
+                            verified: true,
+                            message: result.message || 'File found',
+                            path: result.path,
+                            detectedLocation: result.detectedLocation,
+                        };
+                        setVerifiedTool(prereq.id, true, result.path, result.detectedLocation);
+                    } else {
+                        results[prereq.id] = { verified: false, message: result.message || 'Not found' };
+                        setVerifiedTool(prereq.id, false, '');
+                    }
                 } else {
-                    results[prereq.id] = { verified: false, message: result.message || 'Not found' };
-                    setVerifiedTool(prereq.id, false, '');
+                    const result = await validatorUtils.checkToolInstalled(prereq.label.replace(' v2', '').replace(' v18+', ''));
+                    if (result.success) {
+                        const version = result.message?.replace('System Scan: ', '') || result.path || '';
+                        results[prereq.id] = { verified: true, message: version, path: result.path, detectedLocation: result.detectedLocation };
+                        setVerifiedTool(prereq.id, true, result.path || version, result.detectedLocation);
+                        if (prereq.id === 'mongosh' && result.path) {
+                            localStorage.setItem('workshop_mongosh_path', result.path);
+                            setMongoshPathInput(result.path);
+                            toast.success('mongosh path saved for lab Run');
+                        }
+                    } else {
+                        results[prereq.id] = { verified: false, message: result.message || 'Not found' };
+                        setVerifiedTool(prereq.id, false, '');
+                    }
                 }
             } catch (e) {
                 results[prereq.id] = { verified: false, message: 'Verification failed' };
@@ -141,6 +201,13 @@ export const LabSetupWizard: React.FC = () => {
         setPrereqResults(results);
         setIsCheckingPrereqs(false);
 
+        // Ensure detected mongosh path is always used for lab Run (persist so Run in lab uses it)
+        const mongoshPath = results['mongosh']?.path || verifiedTools['mongosh']?.path;
+        if (mongoshPath) {
+            localStorage.setItem('workshop_mongosh_path', mongoshPath);
+            setMongoshPathInput(mongoshPath);
+        }
+
         const requiredPassed = PREREQUISITES.filter(p => p.required).every(p => results[p.id]?.verified);
         if (requiredPassed) {
             toast.success('All required prerequisites verified!');
@@ -169,13 +236,18 @@ export const LabSetupWizard: React.FC = () => {
         toast.info("Progress Reset.");
     };
 
-    const handleFinalize = () => {
+    const handleFinalize = async () => {
         const savedEmail = userEmail || localStorage.getItem('userEmail') || '';
         if (!savedEmail || !savedEmail.includes('@')) {
             toast.error('Please provide a valid email address during registration');
             return;
         }
         setMongoUri(localUri);
+        const isAtlas = /^mongodb\+srv:\/\//i.test(localUri.trim());
+        await updateWorkshopSession({
+            mongodbSource: isAtlas ? 'atlas' : 'local',
+            ...(isAtlas && { atlasConnectionString: localUri.trim() }),
+        });
         setAwsCredentials({
             accessKeyId: '',
             secretAccessKey: '',
@@ -305,6 +377,40 @@ export const LabSetupWizard: React.FC = () => {
                             );
                         })}
                     </div>
+
+                    {/* Detected tool paths (shown after check) */}
+                    {showPrereqDetails && hasCheckedPrereqs && (
+                        <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1.5">
+                            <p className="text-xs font-medium text-muted-foreground mb-2">Detected tools</p>
+                            {PREREQUISITES.map((prereq) => {
+                                const result = prereqResults[prereq.id];
+                                const verified = result?.verified ?? verifiedTools[prereq.id]?.verified;
+                                const path = result?.path ?? verifiedTools[prereq.id]?.path;
+                                const detectedLocation = result?.detectedLocation ?? verifiedTools[prereq.id]?.detectedLocation;
+                                const message = result?.message ?? verifiedTools[prereq.id]?.path ?? '';
+                                return (
+                                    <div key={prereq.id} className="flex items-baseline gap-2 text-xs font-mono">
+                                        <span className="text-foreground min-w-[120px]">{prereq.label}</span>
+                                        {verified ? (
+                                            <>
+                                                <CheckCircle2 className="w-3 h-3 text-green-500 flex-shrink-0" />
+                                                <span className="text-muted-foreground truncate" title={path || message}>
+                                                    {detectedLocation ? `✓ Found in ${detectedLocation}` : (path || message || 'OK')}
+                                                </span>
+                                            </>
+                                        ) : result ? (
+                                            <>
+                                                <AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                                                <span className="text-muted-foreground">{message || 'Not found'}</span>
+                                            </>
+                                        ) : (
+                                            <span className="text-muted-foreground">—</span>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
 
                     {/* Expandable details for missing prerequisites */}
                     {showPrereqDetails && hasCheckedPrereqs && (
@@ -465,6 +571,97 @@ export const LabSetupWizard: React.FC = () => {
                             </div>
                         </CollapsibleContent>
                     </Collapsible>
+                </div>
+
+                {/* mongo_crypt_shared Library (below MongoDB URI) - always visible */}
+                <div className="space-y-3">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-primary" />
+                        mongo_crypt_shared Library
+                    </h3>
+                    <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                        {(verifiedTools['mongoCryptShared']?.verified || prereqResults['mongoCryptShared']?.verified) ? (
+                            <div className="flex flex-col gap-1 text-xs">
+                                <div className="flex items-center gap-2 text-green-600">
+                                    <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                                    <span className="font-medium">Library detected</span>
+                                </div>
+                                {(verifiedTools['mongoCryptShared']?.detectedLocation ?? prereqResults['mongoCryptShared']?.detectedLocation) && (
+                                    <span className="text-muted-foreground">
+                                        ✓ Found in {verifiedTools['mongoCryptShared']?.detectedLocation ?? prereqResults['mongoCryptShared']?.detectedLocation}
+                                    </span>
+                                )}
+                                <span className="font-mono text-muted-foreground truncate" title={verifiedTools['mongoCryptShared']?.path ?? prereqResults['mongoCryptShared']?.path}>
+                                    {verifiedTools['mongoCryptShared']?.path ?? prereqResults['mongoCryptShared']?.path}
+                                </span>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex items-center gap-2 text-xs text-amber-600">
+                                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                                    <span>Library not found. Required for Lab 2 (Queryable Encryption).</span>
+                                </div>
+                                {!showMongoCryptInput ? (
+                                    <Button variant="outline" size="sm" onClick={() => setShowMongoCryptInput(true)}>
+                                        Provide Library Path
+                                    </Button>
+                                ) : (
+                                    <div className="space-y-2">
+                                        <p className="text-xs text-muted-foreground">
+                                            Full path to <code className="bg-background px-1 rounded">mongo_crypt_v1.dylib</code> (macOS) or <code className="bg-background px-1 rounded">mongo_crypt_v1.so</code> (Linux).
+                                        </p>
+                                        <div className="flex gap-2 flex-wrap">
+                                            <Input
+                                                placeholder="/path/to/mongo_crypt_v1.dylib"
+                                                value={cryptSharedManualPath}
+                                                onChange={(e) => setCryptSharedManualPath(e.target.value)}
+                                                className="font-mono text-xs flex-1 min-w-[200px]"
+                                            />
+                                            <Button size="sm" onClick={verifyCryptSharedPath} disabled={isVerifyingCryptPath || !cryptSharedManualPath.trim()}>
+                                                {isVerifyingCryptPath ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify'}
+                                            </Button>
+                                            <Button variant="ghost" size="sm" onClick={() => setShowMongoCryptInput(false)}>Cancel</Button>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                </div>
+
+                {/* Path to mongosh: set automatically by Check Prerequisites; override here if needed */}
+                <div className="space-y-3">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <Terminal className="w-4 h-4 text-primary" />
+                        Path to mongosh
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                        Set automatically when you run <strong>Check Prerequisites</strong> (e.g. <code className="bg-muted px-1 rounded">/opt/homebrew/bin/mongosh</code>). Lab Run uses this path. Override below only if Run still fails.
+                    </p>
+                    <div className="flex gap-2">
+                        <Input
+                            placeholder="/opt/homebrew/bin/mongosh"
+                            value={mongoshPathInput}
+                            onChange={(e) => setMongoshPathInput(e.target.value)}
+                            className="font-mono text-xs"
+                        />
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                                const v = mongoshPathInput.trim();
+                                if (v) {
+                                    localStorage.setItem('workshop_mongosh_path', v);
+                                    toast.success('mongosh path saved. Try Run in the lab again.');
+                                } else {
+                                    localStorage.removeItem('workshop_mongosh_path');
+                                    toast.success('Cleared. Using auto-detect.');
+                                }
+                            }}
+                        >
+                            Save
+                        </Button>
+                    </div>
                 </div>
 
             </CardContent>

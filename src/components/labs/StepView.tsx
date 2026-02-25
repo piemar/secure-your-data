@@ -1101,10 +1101,11 @@ export function StepView({
             summary: 'URI required',
           };
         } else {
+          const mongoshPath = typeof localStorage !== 'undefined' ? localStorage.getItem('workshop_mongosh_path') : null;
           const res = await fetch('/api/run-mongosh', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, uri: labMongoUri }),
+            body: JSON.stringify({ code, uri: labMongoUri, ...(mongoshPath && { mongoshPath }) }),
           });
           const data = await res.json();
           const out = [data.stdout, data.stderr].filter(Boolean).join('\n') || data.message || '(no output)';
@@ -1190,10 +1191,11 @@ export function StepView({
         labMongoUri &&
         (code.includes('db.') || code.includes('.aggregate') || code.includes('$search') || code.includes('$find'))
       ) {
+        const mongoshPath = typeof localStorage !== 'undefined' ? localStorage.getItem('workshop_mongosh_path') : null;
         const res = await fetch('/api/run-mongosh', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code, uri: labMongoUri }),
+          body: JSON.stringify({ code, uri: labMongoUri, ...(mongoshPath && { mongoshPath }) }),
         });
         const data = await res.json();
         const out = [data.stdout, data.stderr].filter(Boolean).join('\n') || data.message || '(no output)';
@@ -1281,7 +1283,8 @@ export function StepView({
       try {
         if (language === 'mongosh' && code.trim().length > 0) {
           if (labMongoUri?.trim()) {
-            const res = await fetch('/api/run-mongosh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, uri: labMongoUri }) });
+            const mongoshPath = typeof localStorage !== 'undefined' ? localStorage.getItem('workshop_mongosh_path') : null;
+            const res = await fetch('/api/run-mongosh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, uri: labMongoUri, ...(mongoshPath && { mongoshPath }) }) });
             const data = await res.json();
             const out = [data.stdout, data.stderr].filter(Boolean).join('\n') || data.message || '(no output)';
             outputs.push(out);

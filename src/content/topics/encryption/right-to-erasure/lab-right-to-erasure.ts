@@ -62,7 +62,7 @@ export const lab3Definition: WorkshopLabDefinition = {
       id: 'lab-right-to-erasure-step-explicit-encryption',
       title: 'Step 1: Explicit Encryption for Migration',
       narrative: 'When migrating existing plaintext data to CSFLE, you cannot use automatic encryption because the driver expects to find ciphertext. You must use the "Explicit Encryption" API to encrypt each field manually. This step demonstrates migrating data from a legacy collection to a secure, encrypted collection.',
-      instructions: 'Create a migration script that reads plaintext data from a legacy collection, encrypts each field explicitly using ClientEncryption.encrypt(), and writes the encrypted data to a new secure collection. Use Run all or Run selection in the editor to run the script.',
+      instructions: 'Create a migration script (migrateToCSFLE.cjs) that reads plaintext from medical.patients_legacy, encrypts each SSN with ClientEncryption.encrypt(), and writes to medical.patients_secure. Run the script until you see "Migration complete!" then click Next to verify.',
       estimatedTimeMinutes: 15,
       modes: ['demo', 'lab', 'challenge'],
       verificationId: 'csfle.verifyMigration',

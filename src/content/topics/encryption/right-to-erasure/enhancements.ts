@@ -180,6 +180,14 @@ async function run() {
 
   const legacyCollection = client.db("medical").collection("patients_legacy");
   const secureCollection = client.db("medical").collection("patients_secure");
+  const legacyCount = await legacyCollection.countDocuments();
+  if (legacyCount === 0) {
+    await legacyCollection.insertMany([
+      { name: "John Doe", ssn: "111-22-3333", dob: "1980-01-01" },
+      { name: "Jane Smith", ssn: "444-55-6666", dob: "1985-05-15" },
+      { name: "Bob Johnson", ssn: "777-88-9999", dob: "1990-10-20" }
+    ]);
+  }
   await secureCollection.drop().catch(() => {});
   const legacyDocs = await legacyCollection.find({}).toArray();
 
@@ -190,20 +198,21 @@ async function run() {
     });
     await secureCollection.insertOne({ ...doc, ssn: encryptedSSN });
   }
+  console.log("Migration complete!");
   await client.close();
 }
 run().catch(console.error);`,
         inlineHints: [
           { line: 20, blankText: '______', hint: 'Method to retrieve a single document', answer: 'findOne' },
           { line: 25, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
-          { line: 36, blankText: '_________', hint: 'Method to encrypt a value manually', answer: 'encrypt' },
-          { line: 37, blankText: '____________', hint: 'Algorithm suffix for deterministic encryption', answer: 'Deterministic' },
+          { line: 44, blankText: '_________', hint: 'Method to encrypt a value manually', answer: 'encrypt' },
+          { line: 45, blankText: '____________', hint: 'Algorithm suffix for deterministic encryption', answer: 'Deterministic' },
         ],
       },
     ],
     tips: [
-      'Replace placeholders in the script, then use Run all or Run selection to execute. Expected: Migration complete! Migrated 3 documents.',
-      'Replace YOUR_MONGO_URI and YOUR_SUFFIX with values from the Setup Wizard.',
+      'Replace placeholders in the script (e.g. YOUR_SUFFIX from Lab Setup), then Run until you see "Migration complete!" before clicking Next.',
+      'The script creates medical.patients_legacy (with sample data if empty), then migrates to medical.patients_secure with encrypted SSN. Verification checks that medical.patients_secure exists and has encrypted documents.',
       'Use explicit encryption for migration - automatic encryption expects ciphertext.',
       'Deterministic encryption preserves query capabilities on PII.',
       'Verify: Query secure collection without CSFLE to see Binary ciphertext.',

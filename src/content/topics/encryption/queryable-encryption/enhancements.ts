@@ -308,6 +308,7 @@ const { fromSSO } = require("@aws-sdk/credential-providers");
 
 const uri = process.env.MONGODB_URI;
 if (!uri) throw new Error("MONGODB_URI not set");
+const cryptSharedLibPath = "CRYPT_SHARED_LIB_PATH";
 
 async function run() {
   const credentials = await fromSSO()();
@@ -343,7 +344,8 @@ async function run() {
     autoEncryption: {
       keyVaultNamespace: "encryption.__keyVault",
       kmsProviders,
-      encryptedFieldsMap: { "hr.employees": encryptedFields }
+      encryptedFieldsMap: { "hr.employees": encryptedFields },
+      ...(cryptSharedLibPath ? { extraOptions: { cryptSharedLibPath, mongocryptdBypassSpawn: true } } : {})
     }
   });
 
@@ -367,6 +369,7 @@ const { fromSSO } = require("@aws-sdk/credential-providers");
 
 const uri = process.env.MONGODB_URI;
 if (!uri) throw new Error("MONGODB_URI not set");
+const cryptSharedLibPath = "CRYPT_SHARED_LIB_PATH";
 
 async function run() {
   const credentials = await fromSSO()();
@@ -402,7 +405,8 @@ async function run() {
     _______________: {
       keyVaultNamespace: "encryption.__keyVault",
       kmsProviders,
-      encryptedFieldsMap: { "hr.employees": encryptedFields }
+      encryptedFieldsMap: { "hr.employees": encryptedFields },
+      ...(cryptSharedLibPath ? { extraOptions: { cryptSharedLibPath, mongocryptdBypassSpawn: true } } : {})
     }
   });
 
@@ -416,12 +420,12 @@ async function run() {
 }
 run().catch(console.error);`,
         inlineHints: [
-          { line: 23, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
-          { line: 27, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
-          { line: 36, blankText: '___', hint: 'BSON type for integer values', answer: 'int' },
-          { line: 37, blankText: '______', hint: 'Field name for tax identification', answer: 'taxId' },
-          { line: 42, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
-          { line: 51, blankText: '___________', hint: 'Method to insert multiple documents', answer: 'insertMany' }
+          { line: 24, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
+          { line: 28, blankText: '____________', hint: 'The keyAltName for the taxId DEK', answer: 'qe-taxid-dek' },
+          { line: 37, blankText: '___', hint: 'BSON type for integer values', answer: 'int' },
+          { line: 38, blankText: '______', hint: 'Field name for tax identification', answer: 'taxId' },
+          { line: 43, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
+          { line: 53, blankText: '___________', hint: 'Method to insert multiple documents', answer: 'insertMany' }
         ],
         competitorEquivalents: {
           postgresql: {
@@ -439,7 +443,8 @@ run().catch(console.error);`,
     ],
     tips: [
       'Use a QE-enabled client to insert; fields in encryptedFields are auto-encrypted. Use Run all or Run selection to execute.',
-      'Insert at least 3-5 documents to test queries.'
+      'Insert at least 3-5 documents to test queries.',
+      'If you see "Unable to connect to mongocryptd", set the path to mongo_crypt_shared in Lab Setup (Prerequisites) so the driver uses it instead of mongocryptd.'
     ]
   },
 
@@ -457,6 +462,7 @@ const { fromSSO } = require("@aws-sdk/credential-providers");
 
 const uri = process.env.MONGODB_URI;
 if (!uri) throw new Error("MONGODB_URI not set");
+const cryptSharedLibPath = "CRYPT_SHARED_LIB_PATH";
 
 async function run() {
   const credentials = await fromSSO()();
@@ -498,7 +504,8 @@ async function run() {
     autoEncryption: {
       keyVaultNamespace: "encryption.__keyVault",
       kmsProviders,
-      encryptedFieldsMap: { "hr.employees": encryptedFields }
+      encryptedFieldsMap: { "hr.employees": encryptedFields },
+      ...(cryptSharedLibPath ? { extraOptions: { cryptSharedLibPath, mongocryptdBypassSpawn: true } } : {})
     }
   });
 
@@ -522,6 +529,7 @@ const { fromSSO } = require("@aws-sdk/credential-providers");
 
 const uri = process.env.MONGODB_URI;
 if (!uri) throw new Error("MONGODB_URI not set");
+const cryptSharedLibPath = "CRYPT_SHARED_LIB_PATH";
 
 async function run() {
   const credentials = await fromSSO()();
@@ -566,7 +574,8 @@ async function run() {
     _______________: {
       keyVaultNamespace: "encryption.__keyVault",
       kmsProviders,
-      encryptedFieldsMap: { "hr.employees": encryptedFields }
+      encryptedFieldsMap: { "hr.employees": encryptedFields },
+      ...(cryptSharedLibPath ? { extraOptions: { cryptSharedLibPath, mongocryptdBypassSpawn: true } } : {})
     }
   });
 
@@ -581,15 +590,15 @@ async function run() {
 }
 run().catch(console.error);`,
         inlineHints: [
-          { line: 22, blankText: '___________', hint: 'The MongoDB client class', answer: 'MongoClient' },
-          { line: 23, blankText: '_______', hint: 'Method to establish a connection', answer: 'connect' },
-          { line: 25, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
-          { line: 32, blankText: '______', hint: 'Same method to find a DEK document', answer: 'findOne' },
-          { line: 36, blankText: '____________', hint: 'The keyAltName for taxId DEK', answer: 'qe-taxid-dek' },
-          { line: 45, blankText: '___', hint: 'BSON type for integer', answer: 'int' },
-          { line: 46, blankText: '______', hint: 'BSON type for text values', answer: 'string' },
-          { line: 51, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
-          { line: 63, blankText: '______', hint: 'Method to find a document by encrypted field', answer: 'findOne' }
+          { line: 23, blankText: '___________', hint: 'The MongoDB client class', answer: 'MongoClient' },
+          { line: 24, blankText: '_______', hint: 'Method to establish a connection', answer: 'connect' },
+          { line: 26, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
+          { line: 33, blankText: '______', hint: 'Same method to find a DEK document', answer: 'findOne' },
+          { line: 37, blankText: '____________', hint: 'The keyAltName for taxId DEK', answer: 'qe-taxid-dek' },
+          { line: 46, blankText: '___', hint: 'BSON type for integer', answer: 'int' },
+          { line: 47, blankText: '______', hint: 'BSON type for text values', answer: 'string' },
+          { line: 52, blankText: '_______________', hint: 'Config property to enable automatic encryption', answer: 'autoEncryption' },
+          { line: 65, blankText: '______', hint: 'Method to find a document by encrypted field', answer: 'findOne' }
         ],
         competitorEquivalents: {
           postgresql: {

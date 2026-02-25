@@ -8,6 +8,8 @@ export interface ValidationResult {
     success: boolean;
     message: string;
     path?: string;
+    /** Human-readable location e.g. "project folder (lib/mongo_crypt_v1.dylib)" */
+    detectedLocation?: string;
 }
 
 export const validatorUtils = {
@@ -348,6 +350,8 @@ export const validatorUtils = {
             queryLabel = 'node';
         } else if (toolLower.includes('npm')) {
             queryLabel = 'npm';
+        } else if (toolLower.includes('mongo_crypt') || toolLower.includes('crypt_shared')) {
+            queryLabel = 'mongo_crypt_shared';
         } else {
             queryLabel = 'atlas';
         }
@@ -357,18 +361,66 @@ export const validatorUtils = {
             const data = await response.json();
 
             if (data.success) {
-                // Return version in message, path in path field
                 const version = data.version || '';
-                const path = data.path || '';
+                const pathVal = data.path || '';
                 return {
                     success: true,
-                    message: `System Scan: ${version}`,
-                    path: path
+                    message: data.message || `System Scan: ${version}`,
+                    path: pathVal,
+                    detectedLocation: data.detectedLocation,
                 };
             }
             return { success: false, message: data.message };
         } catch (error) {
             return { success: false, message: `Connection to setup bridge failed. Ensure npm run dev is active.` };
         }
-    }
+    },
+
+    /**
+     * Check mongo_crypt_shared with optional user path (highest priority), then auto-detect.
+     */
+    checkMongoCryptShared: async (userPath?: string): Promise<ValidationResult> => {
+        try {
+            const url = new URL('/api/check-tool', window.location.origin);
+            url.searchParams.set('tool', 'mongo_crypt_shared');
+            if (userPath?.trim()) url.searchParams.set('userPath', userPath.trim());
+            const response = await fetch(url.toString());
+            const data = await response.json();
+            if (data.success) {
+                return {
+                    success: true,
+                    message: data.message || `✓ Found in ${data.detectedLocation || data.path}`,
+                    path: data.path,
+                    detectedLocation: data.detectedLocation,
+                };
+            }
+            return { success: false, message: data.message };
+        } catch (error) {
+            return { success: false, message: 'Connection to setup bridge failed. Ensure npm run dev is active.' };
+        }
+    },
+
+    /**
+     * Verify a file path (e.g. mongo_crypt_shared); returns detectedLocation when type is mongoCryptShared.
+     */
+    checkFilePath: async (filePath: string, fileType: 'mongoCryptShared' | 'general' = 'general'): Promise<ValidationResult> => {
+        try {
+            const url = new URL('/api/check-file', window.location.origin);
+            url.searchParams.set('path', filePath);
+            if (fileType) url.searchParams.set('type', fileType);
+            const response = await fetch(url.toString());
+            const data = await response.json();
+            if (data.exists) {
+                return {
+                    success: true,
+                    message: data.message || 'File found',
+                    path: filePath,
+                    detectedLocation: data.detectedLocation,
+                };
+            }
+            return { success: false, message: data.message || 'File not found' };
+        } catch (error) {
+            return { success: false, message: 'Failed to verify file path.' };
+        }
+    },
 };

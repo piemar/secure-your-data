@@ -16,7 +16,7 @@ interface Prerequisite {
 
 interface PrerequisitesChecklistProps {
   prerequisites: Prerequisite[];
-  verifiedTools: Record<string, { verified: boolean; path: string }>;
+  verifiedTools: Record<string, { verified: boolean; path: string; detectedLocation?: string }>;
 }
 
 const STORAGE_KEY = 'workshop_prereq_checklist';
@@ -108,7 +108,7 @@ const EXTENDED_PREREQUISITES: Prerequisite[] = [
     id: 'mongoCryptShared', 
     label: 'mongo_crypt_shared', 
     description: 'Shared library for Queryable Encryption (Lab 2)',
-    required: false,
+    required: true,
     downloadUrl: 'https://www.mongodb.com/docs/manual/core/queryable-encryption/reference/shared-library/',
     setupInstructions: [
       '1. Go to MongoDB Download Center',
@@ -182,7 +182,16 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
                 {prereq.label}
               </label>
               {isVerified && (
-                <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                  {(verifiedTools[prereq.id]?.detectedLocation || verifiedTools[prereq.id]?.path) && (
+                    <span className="text-xs text-muted-foreground truncate max-w-[280px]" title={verifiedTools[prereq.id].path}>
+                      {verifiedTools[prereq.id].detectedLocation
+                        ? `✓ Found in ${verifiedTools[prereq.id].detectedLocation}`
+                        : verifiedTools[prereq.id].path}
+                    </span>
+                  )}
+                </>
               )}
               {prereq.downloadUrl && (
                 <a

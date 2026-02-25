@@ -567,6 +567,7 @@ const { fromSSO } = require("@aws-sdk/credential-providers");
 const uri = process.env.MONGODB_URI;
 if (!uri) throw new Error("MONGODB_URI not set");
 const keyAltName = "user-YOUR_SUFFIX-ssn-key";
+const cryptSharedLibPath = "CRYPT_SHARED_LIB_PATH";
 
 async function run() {
   const credentials = await fromSSO()();
@@ -620,7 +621,8 @@ async function run() {
     autoEncryption: {
       keyVaultNamespace: "encryption.__keyVault",
       kmsProviders,
-      schemaMap
+      schemaMap,
+      ...(cryptSharedLibPath ? { extraOptions: { cryptSharedLibPath, mongocryptdBypassSpawn: true } } : {})
     }
   });
   await clientEncrypted.connect();
@@ -648,6 +650,7 @@ const { fromSSO } = require("@aws-sdk/credential-providers");
 const uri = process.env.MONGODB_URI;
 if (!uri) throw new Error("MONGODB_URI not set");
 const keyAltName = "user-YOUR_SUFFIX-ssn-key";
+const cryptSharedLibPath = "CRYPT_SHARED_LIB_PATH";
 
 async function run() {
   const credentials = await fromSSO()();
@@ -700,7 +703,8 @@ async function run() {
     ______________: {
       keyVaultNamespace: "encryption.__keyVault",
       kmsProviders,
-      schemaMap
+      schemaMap,
+      ...(cryptSharedLibPath ? { extraOptions: { cryptSharedLibPath, mongocryptdBypassSpawn: true } } : {})
     }
   });
   await clientEncrypted.connect();
@@ -723,10 +727,10 @@ async function run() {
 }
 run().catch(console.error);`,
         inlineHints: [
-          { line: 21, blankText: '_____________', hint: 'The field in __keyVault that stores human-readable key names', answer: 'keyAltNames' },
-          { line: 30, blankText: '_______', hint: 'Schema map keyword to specify field should be encrypted', answer: 'encrypt' },
-          { line: 32, blankText: '___________', hint: 'Algorithm suffix for fields that need equality queries', answer: 'Deterministic' },
-          { line: 56, blankText: '______________', hint: 'MongoClient option that enables automatic encryption', answer: 'autoEncryption' },
+          { line: 22, blankText: '_____________', hint: 'The field in __keyVault that stores human-readable key names', answer: 'keyAltNames' },
+          { line: 31, blankText: '_______', hint: 'Schema map keyword to specify field should be encrypted', answer: 'encrypt' },
+          { line: 33, blankText: '___________', hint: 'Algorithm suffix for fields that need equality queries', answer: 'Deterministic' },
+          { line: 57, blankText: '______________', hint: 'MongoClient option that enables automatic encryption', answer: 'autoEncryption' },
         ],
         competitorEquivalents: {
           postgresql: { language: 'sql', code: `-- PostgreSQL: No automatic field encryption. Encrypt in application before insert.`, workaroundNote: 'Application must encrypt/decrypt; no transparent CSFLE.' },
@@ -737,6 +741,7 @@ run().catch(console.error);`,
     tips: [
       'Use Run all or Run selection to execute the Node script.',
       'Use keyAltNames instead of keyId for better maintainability and key rotation support.',
+      'If you see "Unable to connect to mongocryptd", set the path to mongo_crypt_shared in Lab Setup (Prerequisites) so the driver uses it instead of mongocryptd.',
     ],
   },
 
@@ -756,6 +761,7 @@ const uri = process.env.MONGODB_URI;
 if (!uri) throw new Error("MONGODB_URI not set");
 const keyVaultNamespace = "encryption.__keyVault";
 const keyAltName = "user-YOUR_SUFFIX-ssn-key";
+const cryptSharedLibPath = "CRYPT_SHARED_LIB_PATH";
 
 async function main() {
   const credentials = await fromSSO()();
@@ -793,7 +799,8 @@ async function main() {
     autoEncryption: {
       keyVaultNamespace,
       kmsProviders,
-      schemaMap
+      schemaMap,
+      ...(cryptSharedLibPath ? { extraOptions: { cryptSharedLibPath, mongocryptdBypassSpawn: true } } : {})
     }
   });
 
@@ -819,6 +826,7 @@ const uri = process.env.MONGODB_URI;
 if (!uri) throw new Error("MONGODB_URI not set");
 const keyVaultNamespace = "encryption.__keyVault";
 const keyAltName = "user-YOUR_SUFFIX-ssn-key";
+const cryptSharedLibPath = "CRYPT_SHARED_LIB_PATH";
 
 async function main() {
   const credentials = await fromSSO()();
@@ -856,7 +864,8 @@ async function main() {
     autoEncryption: {
       keyVaultNamespace,
       _____________,
-      schemaMap
+      schemaMap,
+      ...(cryptSharedLibPath ? { extraOptions: { cryptSharedLibPath, mongocryptdBypassSpawn: true } } : {})
     }
   });
 
@@ -876,10 +885,10 @@ async function main() {
 }
 main().catch(console.error);`,
         inlineHints: [
-          { line: 21, blankText: '_____', hint: 'JavaScript string method to divide into array of substrings', answer: 'split' },
-          { line: 23, blankText: '_____', hint: 'MongoDB document field that stores the primary key', answer: '_id' },
-          { line: 28, blankText: '_______', hint: 'JSON Schema keyword to specify the BSON type', answer: 'bsonType' },
-          { line: 44, blankText: '_____________', hint: 'Object that contains AWS KMS credentials configuration', answer: 'kmsProviders' },
+          { line: 22, blankText: '_____', hint: 'JavaScript string method to divide into array of substrings', answer: 'split' },
+          { line: 24, blankText: '_____', hint: 'MongoDB document field that stores the primary key', answer: '_id' },
+          { line: 29, blankText: '_______', hint: 'JSON Schema keyword to specify the BSON type', answer: 'bsonType' },
+          { line: 45, blankText: '_____________', hint: 'Object that contains AWS KMS credentials configuration', answer: 'kmsProviders' },
         ],
         competitorEquivalents: {
           postgresql: { language: 'sql', code: `-- PostgreSQL: Full app = manual encrypt on write, decrypt on read.`, workaroundNote: 'Complete application must implement encryption pipeline manually.' },

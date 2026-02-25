@@ -15,7 +15,7 @@ interface LabState {
     currentScore: number;
     completedSteps: string[];
     assistedSteps: string[];
-    verifiedTools: Record<string, { verified: boolean; path: string }>;
+    verifiedTools: Record<string, { verified: boolean; path: string; detectedLocation?: string }>;
     userSuffix: string;
     userEmail: string;
     completedLabs: number[]; // Track which labs are completed
@@ -27,7 +27,7 @@ interface LabContextType extends LabState {
     setAwsCredentials: (creds: { accessKeyId: string; secretAccessKey: string; keyArn: string; region: string }) => void;
     setAwsKeyArn: (arn: string) => void;
     completeStep: (stepId: string, assisted: boolean) => void;
-    setVerifiedTool: (tool: string, verified: boolean, path: string) => void;
+    setVerifiedTool: (tool: string, verified: boolean, path: string, detectedLocation?: string) => void;
     setUserSuffix: (suffix: string) => void;
     setUserEmail: (email: string) => void;
     completeLab: (labNumber: number) => void;
@@ -69,7 +69,7 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [currentScore, setCurrentScore] = useState(0);
     const [completedSteps, setCompletedSteps] = useState<string[]>([]);
     const [assistedSteps, setAssistedSteps] = useState<string[]>([]);
-    const [verifiedTools, setVerifiedTools] = useState<Record<string, { verified: boolean; path: string }>>({
+    const [verifiedTools, setVerifiedTools] = useState<Record<string, { verified: boolean; path: string; detectedLocation?: string }>>({
         awsCli: { verified: false, path: '' },
         mongosh: { verified: false, path: '' },
         atlas: { verified: false, path: '' },
@@ -232,14 +232,14 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
     };
 
-    const setVerifiedTool = (tool: string, verified: boolean, path: string) => {
+    const setVerifiedTool = (tool: string, verified: boolean, path: string, detectedLocation?: string) => {
         if (tool === 'suffix' && path) {
             localStorage.setItem('lab_user_suffix', path);
             setUserSuffixState(path);
         }
         setVerifiedTools(prev => ({
             ...prev,
-            [tool]: { verified, path }
+            [tool]: { verified, path, ...(detectedLocation !== undefined && { detectedLocation }) }
         }));
     };
 

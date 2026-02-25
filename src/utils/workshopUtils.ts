@@ -83,9 +83,10 @@ async function syncWorkshopSessionToAtlas(session: WorkshopSession): Promise<voi
 }
 
 /**
- * Load workshop session from Atlas (with localStorage fallback)
+ * Load workshop session from API (Atlas) and cache in localStorage.
+ * Call on app load so attendees see the moderator's session and labs-enabled state.
  */
-async function loadWorkshopSessionFromAtlas(): Promise<WorkshopSession | null> {
+export async function loadWorkshopSessionFromAtlas(): Promise<WorkshopSession | null> {
   try {
     const response = await fetch('/api/workshop-session');
     if (!response.ok) {
@@ -301,20 +302,30 @@ export function getParticipantCount(): number {
 }
 
 /**
- * Update the current workshop session details
+ * Update the current workshop session details.
+ * If no session exists (e.g. user went straight to Lab Setup), creates a minimal session so lab Run gets the URI.
  */
 export async function updateWorkshopSession(
   updates: Partial<Pick<WorkshopSession, 'customerName' | 'workshopDate' | 'mongodbSource' | 'atlasConnectionString' | 'salesforceWorkloadName' | 'technicalChampionName' | 'technicalChampionEmail' | 'currentDatabase' | 'mode' | 'programmingLanguage' | 'templateId' | 'labIds'>>
 ): Promise<void> {
-  const session = getWorkshopSession();
-  if (session) {
-    const updatedSession = {
-      ...session,
-      ...updates,
-      ...(updates.mongodbSource === 'local' ? { atlasConnectionString: undefined } : {})
+  let session = getWorkshopSession();
+  if (!session) {
+    session = {
+      id: generateSessionId(),
+      customerName: '',
+      workshopDate: new Date().toISOString().slice(0, 10),
+      startedAt: Date.now(),
+      labsEnabled: true,
+      archivedLeaderboards: [],
+      mongodbSource: 'local',
     };
-    await saveWorkshopSession(updatedSession);
   }
+  const updatedSession = {
+    ...session,
+    ...updates,
+    ...(updates.mongodbSource === 'local' ? { atlasConnectionString: undefined } : {})
+  };
+  await saveWorkshopSession(updatedSession);
 }
 
 /**

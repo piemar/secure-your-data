@@ -5,7 +5,7 @@ import os from "os";
 import { createRequire } from "module";
 import { componentTagger } from "lovable-tagger";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
-import { exec, execFile } from "child_process";
+import { exec, execFile, execSync } from "child_process";
 import { writeFileSync, readFileSync, existsSync, statSync, unlinkSync } from "fs";
 import { MongoClient } from "mongodb";
 
@@ -15,6 +15,92 @@ try {
   nodePty = requireFromModule("node-pty");
 } catch {
   nodePty = null;
+}
+
+/** PATH suffix so which/spawn can find mongosh when server has limited env (e.g. started from IDE). */
+const MONGOSH_PATH_SUFFIX = ":/opt/homebrew/bin:/usr/local/bin";
+
+/** Resolve mongosh executable path. Dev server often has limited PATH (e.g. when started from IDE) and may not see /opt/homebrew/bin. */
+function getMongoshPath(): string {
+  const envWithPath = { ...process.env, PATH: (process.env.PATH || "") + MONGOSH_PATH_SUFFIX };
+  try {
+    const out = execSync("which mongosh", { encoding: "utf8", env: envWithPath }).trim();
+    if (out && existsSync(out)) return out;
+  } catch {
+    /* which failed, try known paths */
+  }
+  const candidates = [
+    "/opt/homebrew/bin/mongosh",  // Apple Silicon Homebrew
+    "/usr/local/bin/mongosh",     // Intel Homebrew / Linux
+  ];
+  for (const c of candidates) {
+    if (existsSync(c)) return c;
+  }
+  return "mongosh";
+}
+
+/** Result of mongo_crypt_shared detection: path and human-readable location. */
+function detectMongoCryptShared(userPath?: string): { path: string; detectedLocation: string } | null {
+  const home = os.homedir();
+  const cwd = process.cwd();
+  const toLabel = (p: string): string => {
+    if (p.startsWith(cwd)) return `project folder (${path.relative(cwd, p)})`;
+    if (p.startsWith(home)) return `home directory (${path.relative(home, p)})`;
+    return `system path (${p})`;
+  };
+  if (userPath && userPath.trim()) {
+    const p = path.resolve(userPath.trim());
+    if (existsSync(p) && statSync(p).isFile()) return { path: p, detectedLocation: toLabel(p) };
+  }
+  const ext = process.platform === "darwin" ? "dylib" : "so";
+  const name = `mongo_crypt_v1.${ext}`;
+  const candidates: { path: string; label: string }[] = [
+    // MongoDB standard installation directories (various architectures)
+    { path: path.join(home, "mongodb", "arm1", "mongo_crypt_v1.dylib"), label: "home directory (mongodb/arm1/...)" },
+    { path: path.join(home, "mongodb", "arm1", "mongo_crypt_v1.so"), label: "home directory (mongodb/arm1/...)" },
+    { path: path.join(home, "mongodb", "arm64", "mongo_crypt_v1.dylib"), label: "home directory (mongodb/arm64/...)" },
+    { path: path.join(home, "mongodb", "arm64", "mongo_crypt_v1.so"), label: "home directory (mongodb/arm64/...)" },
+    { path: path.join(home, "mongodb", "x86_64", "mongo_crypt_v1.dylib"), label: "home directory (mongodb/x86_64/...)" },
+    { path: path.join(home, "mongodb", "x86_64", "mongo_crypt_v1.so"), label: "home directory (mongodb/x86_64/...)" },
+    { path: path.join(home, "mongodb", "x64", "mongo_crypt_v1.dylib"), label: "home directory (mongodb/x64/...)" },
+    { path: path.join(home, "mongodb", "x64", "mongo_crypt_v1.so"), label: "home directory (mongodb/x64/...)" },
+    { path: path.join(home, "mongodb", "aarch64", "mongo_crypt_v1.dylib"), label: "home directory (mongodb/aarch64/...)" },
+    { path: path.join(home, "mongodb", "aarch64", "mongo_crypt_v1.so"), label: "home directory (mongodb/aarch64/...)" },
+    { path: path.join(home, "mongodb", "lib", "mongo_crypt_v1.dylib"), label: "home directory (mongodb/lib/...)" },
+    { path: path.join(home, "mongodb", "lib", "mongo_crypt_v1.so"), label: "home directory (mongodb/lib/...)" },
+    // CSFLE/QE library installations
+    { path: path.join(home, "csfle-qe-lib", "lib", "mongo_crypt_v1.dylib"), label: "home directory (csfle-qe-lib/lib/...)" },
+    { path: path.join(home, "csfle-qe-lib", "lib", "mongo_crypt_v1.so"), label: "home directory (csfle-qe-lib/lib/...)" },
+    { path: path.join(home, "csfle-qe-lib", "mongo_crypt_v1.dylib"), label: "home directory (csfle-qe-lib/...)" },
+    { path: path.join(home, "csfle-qe-lib", "mongo_crypt_v1.so"), label: "home directory (csfle-qe-lib/...)" },
+    { path: path.join(home, "SA_ENABLEMENT", "csfle-qe-lib", "lib", "mongo_crypt_v1.dylib"), label: "home directory (SA_ENABLEMENT/csfle-qe-lib/lib/...)" },
+    { path: path.join(home, "SA_ENABLEMENT", "csfle-qe-lib", "lib", "mongo_crypt_v1.so"), label: "home directory (SA_ENABLEMENT/csfle-qe-lib/lib/...)" },
+    // Standard system paths
+    { path: path.join("/usr/local/lib", name), label: "system path (/usr/local/lib/...)" },
+    { path: path.join("/usr/local/lib", "mongo_crypt_v1.dylib"), label: "system path (/usr/local/lib/...)" },
+    { path: path.join("/usr/local/lib", "mongo_crypt_v1.so"), label: "system path (/usr/local/lib/...)" },
+    { path: path.join("/usr/lib", "mongo_crypt_v1.so"), label: "system path (/usr/lib/...)" },
+    { path: "/opt/mongodb/lib/mongo_crypt_v1.so", label: "system path (/opt/mongodb/lib/...)" },
+    { path: path.join("/opt/homebrew/lib", name), label: "system path (/opt/homebrew/lib/...)" },
+    // Home directory root and common locations
+    { path: path.join(home, "mongo_crypt_v1.dylib"), label: "home directory (mongo_crypt_v1.dylib)" },
+    { path: path.join(home, "mongo_crypt_v1.so"), label: "home directory (mongo_crypt_v1.so)" },
+    { path: path.join(home, "Downloads", "mongo_crypt_v1.dylib"), label: "home directory (Downloads/...)" },
+    { path: path.join(home, "Downloads", "mongo_crypt_v1.so"), label: "home directory (Downloads/...)" },
+    { path: path.join(home, "lib", name), label: "home directory (lib/...)" },
+    // Project directory
+    { path: path.join(cwd, name), label: `project folder (${name})` },
+    { path: path.join(cwd, "mongo_crypt_v1.dylib"), label: "project folder (mongo_crypt_v1.dylib)" },
+    { path: path.join(cwd, "mongo_crypt_v1.so"), label: "project folder (mongo_crypt_v1.so)" },
+    { path: path.join(cwd, "lib", name), label: `project folder (lib/${name})` },
+    { path: path.join(cwd, "lib", "mongo_crypt_v1.dylib"), label: "project folder (lib/mongo_crypt_v1.dylib)" },
+    { path: path.join(cwd, "lib", "mongo_crypt_v1.so"), label: "project folder (lib/mongo_crypt_v1.so)" },
+    { path: path.join(cwd, "vendor", name), label: `project folder (vendor/${name})` },
+  ];
+  for (const { path: p, label } of candidates) {
+    if (existsSync(p)) return { path: p, detectedLocation: label };
+  }
+  return null;
 }
 
 // Obfuscated MongoDB connection string for leaderboard storage (for GitHub safety).
@@ -105,22 +191,29 @@ async function updateLeaderboardEntry(email: string, updates: Partial<Leaderboar
     const client = await getLeaderboardMongoClient();
     const db = client.db(LEADERBOARD_DB);
     const collection = db.collection<LeaderboardEntry>(LEADERBOARD_COLLECTION);
-    
+
+    // $set: apply updates and always refresh lastActive
+    const setPayload = { ...updates, lastActive: Date.now() };
+
+    // $setOnInsert: only default fields that are NOT in updates (MongoDB forbids same path in both)
+    const setOnInsertPayload: Record<string, unknown> = {
+      email,
+      score: 0,
+      completedLabs: [],
+      labTimes: {},
+      lastActive: Date.now()
+    };
+    for (const key of Object.keys(updates)) {
+      delete setOnInsertPayload[key];
+    }
+    delete setOnInsertPayload.lastActive; // always set via $set
+
     const result = await collection.findOneAndUpdate(
       { email },
-      { 
-        $set: { ...updates, lastActive: Date.now() },
-        $setOnInsert: {
-          email,
-          score: 0,
-          completedLabs: [],
-          labTimes: {},
-          lastActive: Date.now()
-        }
-      },
+      { $set: setPayload, $setOnInsert: setOnInsertPayload },
       { upsert: true, returnDocument: 'after' }
     );
-    
+
     return result || { email, score: 0, completedLabs: [], labTimes: {}, lastActive: Date.now() };
   } catch (error) {
     console.error('Error updating leaderboard entry:', error);
@@ -198,6 +291,29 @@ export default defineConfig(({ mode }) => ({
             const url = new URL(req.url, `http://${req.headers.host}`);
             const tool = url.searchParams.get('tool');
 
+            // mongo_crypt_shared: user path first, then auto-detect; return detectedLocation
+            if (tool === 'mongo_crypt_shared') {
+              const userPath = url.searchParams.get('userPath') || undefined;
+              const result = detectMongoCryptShared(userPath);
+              res.setHeader('Content-Type', 'application/json');
+              if (result) {
+                res.end(JSON.stringify({
+                  success: true,
+                  version: 'Found',
+                  path: result.path,
+                  detectedLocation: result.detectedLocation,
+                  message: `✓ Found in ${result.detectedLocation}`,
+                }));
+              } else {
+                res.end(JSON.stringify({
+                  success: false,
+                  message: 'mongo_crypt_v1 library not found. You can:\n1. Download from MongoDB Download Center\n2. Provide the path manually in the setup wizard\n3. Place the file in the project folder (e.g. lib/mongo_crypt_v1.dylib)',
+                  detectedLocation: 'not found',
+                }));
+              }
+              return;
+            }
+
             // Allow only specific tools for security
             const allowedTools: Record<string, string> = {
               'aws': 'aws --version',
@@ -214,21 +330,36 @@ export default defineConfig(({ mode }) => ({
               return;
             }
 
-            const pathCommand = tool === 'atlas' ? 'echo "Cloud"' : `which ${tool}`;
+            // Use resolved path for mongosh so check works when server has limited PATH (e.g. IDE)
+            const resolvedBinary = tool === 'mongosh' ? getMongoshPath() : null;
+            const runCommand = resolvedBinary
+              ? `${resolvedBinary} --version`
+              : (tool === 'atlas' ? 'echo "Cloud"' : `${command} && which ${tool}`);
+            const explicitPath = resolvedBinary || null;
 
-            exec(`${command} && ${pathCommand}`, (error: any, stdout: any, stderr: any) => {
+            exec(runCommand, (error: any, stdout: any, stderr: any) => {
               if (error) {
                 res.statusCode = 500;
                 res.end(JSON.stringify({
                   success: false,
-                  message: `${tool} not found in PATH or error: ${stderr || error.message}`
+                  message: `${tool} not found or error: ${stderr || error.message}`
                 }));
                 return;
               }
 
-              const lines = stdout.trim().split('\n');
-              const version = lines[0];
-              const binaryPath = lines[lines.length - 1];
+              let version: string;
+              let binaryPath: string;
+              if (explicitPath) {
+                version = (stdout || '').trim().split('\n')[0] || (stdout || '').trim();
+                binaryPath = explicitPath;
+              } else if (tool === 'atlas') {
+                version = (stdout || '').trim();
+                binaryPath = 'Cloud';
+              } else {
+                const lines = (stdout || '').trim().split('\n');
+                version = lines[0];
+                binaryPath = lines[lines.length - 1] || '';
+              }
 
               res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify({
@@ -780,17 +911,17 @@ export default defineConfig(({ mode }) => ({
                 } else if (!result.exists) {
                   res.end(JSON.stringify({
                     success: false,
-                    message: `Collection ${dbName}.${collName} does not exist. Run migrateToCSFLE.cjs first.`
+                    message: `Collection ${dbName}.${collName} does not exist. In Step 1, run the full migrateToCSFLE.cjs script (fill all placeholders or show Solution), then Run until you see "Migration complete!" before clicking Next.`
                   }));
                 } else if (!result.hasDocuments) {
                   res.end(JSON.stringify({
                     success: false,
-                    message: `Collection exists but has no documents. Run migrateToCSFLE.cjs to migrate data.`
+                    message: `Collection ${dbName}.${collName} exists but has no documents. Run the full migrateToCSFLE.cjs script until you see "Migration complete!"`
                   }));
                 } else {
                   res.end(JSON.stringify({
                     success: false,
-                    message: `Documents exist but SSN field is not encrypted. Ensure you used explicit encryption.`
+                    message: `Documents exist but SSN field is not encrypted. Ensure you used explicit encryption (encryption.encrypt()) when writing to ${collName}.`
                   }));
                 }
               } catch (e: any) {
@@ -1362,7 +1493,13 @@ export default defineConfig(({ mode }) => ({
                   const out = (stdout || '').trim();
                   const err = (stderr || '').trim();
                   // When failed, prefer stderr/stdout so the Console shows the real Node error (e.g. module not found, connection refused)
-                  const failedMessage = [err, out].filter(Boolean).join('\n') || error?.message || 'Command failed';
+                  let failedMessage = [err, out].filter(Boolean).join('\n').trim();
+                  if (!failedMessage) {
+                    failedMessage = error?.message || 'Command failed';
+                    if (exitCode !== 0 && exitCode !== undefined) {
+                      failedMessage += ` (exit code ${exitCode}). Check that MongoDB is running and the URI is set in Lab Setup.`;
+                    }
+                  }
                   res.setHeader('Content-Type', 'application/json');
                   res.end(JSON.stringify({
                     success: exitCode === 0,
@@ -1382,13 +1519,13 @@ export default defineConfig(({ mode }) => ({
             return;
           }
 
-          // Run mongosh script. Requires URI in body.
+          // Run mongosh script. Requires URI in body. Optional mongoshPath from client (e.g. /opt/homebrew/bin/mongosh) when server auto-detect fails.
           if (req.url && req.url.startsWith('/api/run-mongosh') && req.method === 'POST') {
             let body = '';
             req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
             req.on('end', () => {
               try {
-                const { code, uri } = JSON.parse(body || '{}');
+                const { code, uri, mongoshPath: clientMongoshPath } = JSON.parse(body || '{}');
                 if (typeof code !== 'string' || !code.trim()) {
                   res.statusCode = 400;
                   res.setHeader('Content-Type', 'application/json');
@@ -1401,6 +1538,10 @@ export default defineConfig(({ mode }) => ({
                   res.end(JSON.stringify({ success: false, stdout: '', stderr: 'MongoDB URI required', message: 'MongoDB URI required' }));
                   return;
                 }
+                const rawPath = typeof clientMongoshPath === 'string' ? clientMongoshPath.trim() : '';
+                const isAbsolutePath = rawPath.length > 0 && (rawPath.startsWith("/") || /^[A-Za-z]:[\\/]/.test(rawPath));
+                const useClientPath = isAbsolutePath && (existsSync(rawPath) ? statSync(rawPath).isFile() : true);
+                const mongoshPathToUse = useClientPath ? rawPath : getMongoshPath();
                 // When client sends localhost/127.0.0.1/mongo and server has MONGODB_URI (e.g. Docker with auth), use env so connection works
                 const isLocalOrDockerHost = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
                 const effectiveUri = (isLocalOrDockerHost && process.env.MONGODB_URI) ? process.env.MONGODB_URI : uri;
@@ -1418,36 +1559,46 @@ export default defineConfig(({ mode }) => ({
                   }));
                 };
 
-                // Prefer PTY so all mongosh shell commands (show dbs, show collections, use, help, etc.) work and print output
-                if (nodePty) {
-                  const RUN_TIMEOUT_MS = 15000;
-                  const PROMPT_WAIT_MS = 2500;
-                  let output = '';
-                  let sent = false;
-                  const finish = (out: string, code: number) => {
-                    if (sent) return;
-                    sent = true;
-                    const clean = out.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\r\n/g, '\n').trim();
-                    sendResult(clean, '', code);
-                  };
-                  const pty = nodePty.spawn('mongosh', [effectiveUri], {
-                    name: 'xterm-256color',
-                    cols: 80,
-                    rows: 24,
-                    cwd: process.cwd(),
-                  });
-                  pty.onData((data: string) => { output += data; });
-                  const timeout = setTimeout(() => {
-                    try { pty.kill(); } catch (_) { /* ignore */ }
-                    finish(output, 143);
-                  }, RUN_TIMEOUT_MS);
-                  pty.onExit(({ exitCode }) => {
-                    clearTimeout(timeout);
-                    finish(output, exitCode ?? 0);
-                  });
-                  setTimeout(() => {
-                    pty.write(code.trimEnd() + '\nexit\n');
-                  }, PROMPT_WAIT_MS);
+                const mongoshNotFoundMessage = 'mongosh not found. Set the path in Lab Setup (e.g. /opt/homebrew/bin/mongosh) or install MongoDB Shell: https://www.mongodb.com/docs/mongodb-shell/install/';
+
+                // Use execFile whenever we have an absolute path (avoids node-pty posix_spawnp issues when running without Docker). Otherwise use PTY.
+                const hasAbsoluteMongoshPath = /^(\/|[A-Za-z]:[\\/])/.test(mongoshPathToUse);
+                if (nodePty && !hasAbsoluteMongoshPath) {
+                  try {
+                    const RUN_TIMEOUT_MS = 15000;
+                    const PROMPT_WAIT_MS = 2500;
+                    let output = '';
+                    let sent = false;
+                    const finish = (out: string, code: number) => {
+                      if (sent) return;
+                      sent = true;
+                      const clean = out.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\r\n/g, '\n').trim();
+                      sendResult(clean, '', code);
+                    };
+                    const envWithPath = { ...process.env, PATH: (process.env.PATH || "") + MONGOSH_PATH_SUFFIX };
+                    const pty = nodePty.spawn(mongoshPathToUse, [effectiveUri], {
+                      name: 'xterm-256color',
+                      cols: 80,
+                      rows: 24,
+                      cwd: process.cwd(),
+                      env: envWithPath,
+                    });
+                    pty.onData((data: string) => { output += data; });
+                    const timeout = setTimeout(() => {
+                      try { pty.kill(); } catch (_) { /* ignore */ }
+                      finish(output, 143);
+                    }, RUN_TIMEOUT_MS);
+                    pty.onExit(({ exitCode }) => {
+                      clearTimeout(timeout);
+                      finish(output, exitCode ?? 0);
+                    });
+                    setTimeout(() => {
+                      pty.write(code.trimEnd() + '\nexit\n');
+                    }, PROMPT_WAIT_MS);
+                  } catch (spawnErr: any) {
+                    const isNotFound = spawnErr?.code === 'ENOENT' || /posix_spawnp|not found|ENOENT/i.test(spawnErr?.message || '');
+                    sendResult(isNotFound ? mongoshNotFoundMessage : (spawnErr?.message || 'Failed to run mongosh'), '', 1, spawnErr);
+                  }
                   return;
                 }
 
@@ -1473,7 +1624,9 @@ export default defineConfig(({ mode }) => ({
                     }
                     if (i < lines.length) group.push(lines[i]);
                     i += 1;
-                    wrappedLines.push('print(' + group.join('\n') + ')');
+                    let inner = group.join('\n');
+                    inner = inner.replace(/\s*\)\s*;\s*$/, ')');
+                    wrappedLines.push('print(' + inner + ')');
                     continue;
                   }
                   if (!t || t.startsWith('//') || t.startsWith('/*') || t.startsWith('print(') || t.startsWith('printjson(') ||
@@ -1502,10 +1655,12 @@ export default defineConfig(({ mode }) => ({
                   res.end(JSON.stringify({ success: false, stdout: '', stderr: writeErr?.message || 'Failed to write script', message: writeErr?.message }));
                   return;
                 }
-                execFile('mongosh', [effectiveUri, '--file', tempPath], { timeout: 15000, maxBuffer: 512 * 1024 }, (error: any, stdout: string, stderr: string) => {
+                const envWithPath = { ...process.env, PATH: (process.env.PATH || "") + MONGOSH_PATH_SUFFIX };
+                execFile(mongoshPathToUse, [effectiveUri, '--file', tempPath], { timeout: 15000, maxBuffer: 512 * 1024, env: envWithPath }, (error: any, stdout: string, stderr: string) => {
                   try { unlinkSync(tempPath); } catch (_) { /* ignore */ }
                   const exitCode = error?.code ?? (error ? 1 : 0);
-                  const out = [stdout || '', stderr || ''].filter(Boolean).join('\n').trim() || (error?.message || '');
+                  const isMongoshNotFound = error && (error.code === 'ENOENT' || /posix_spawnp|not found|ENOENT/i.test(error.message || ''));
+                  const out = isMongoshNotFound ? mongoshNotFoundMessage : ([stdout || '', stderr || ''].filter(Boolean).join('\n').trim() || (error?.message || ''));
                   sendResult(out, '', exitCode, error);
                 });
               } catch (e: any) {
@@ -1521,6 +1676,7 @@ export default defineConfig(({ mode }) => ({
             try {
               const url = new URL(req.url, `http://${req.headers.host}`);
               let filePath = decodeURIComponent(url.searchParams.get('path') || '');
+              const fileType = url.searchParams.get('type') || 'general';
               
               if (!filePath) {
                 res.setHeader('Content-Type', 'application/json');
@@ -1587,17 +1743,34 @@ export default defineConfig(({ mode }) => ({
                   }));
                 }
               } else if (stats.isFile()) {
-                // Verify it's the correct file
                 const filename = path.basename(filePath);
-                if (filename === 'mongo_crypt_v1.dylib' || filename.endsWith('.dylib')) {
+                const isCryptShared = filename === 'mongo_crypt_v1.dylib' || filename === 'mongo_crypt_v1.so' || filename.endsWith('.dylib') || filename.endsWith('.so');
+                if (isCryptShared || fileType !== 'mongoCryptShared') {
+                  let detectedLocation: string | undefined;
+                  if (fileType === 'mongoCryptShared' && isCryptShared) {
+                    const cwd = process.cwd();
+                    const home = os.homedir();
+                    const absPath = path.resolve(filePath);
+                    if (absPath.startsWith(cwd)) detectedLocation = `project folder (${path.relative(cwd, absPath)})`;
+                    else if (absPath.startsWith(home)) detectedLocation = `home directory (${path.relative(home, absPath)})`;
+                    else detectedLocation = `system path (${absPath})`;
+                  }
+                  const message = detectedLocation
+                    ? `✓ File found and verified in ${detectedLocation}`
+                    : 'File found and verified';
                   res.setHeader('Content-Type', 'application/json');
-                  res.end(JSON.stringify({ success: true, exists: true, message: 'File found and verified' }));
+                  res.end(JSON.stringify({
+                    success: true,
+                    exists: true,
+                    message,
+                    ...(detectedLocation && { detectedLocation }),
+                  }));
                 } else {
                   res.setHeader('Content-Type', 'application/json');
                   res.end(JSON.stringify({ 
                     success: false, 
                     exists: false, 
-                    message: `File exists but doesn't appear to be mongo_crypt_v1.dylib. Found: ${filename}` 
+                    message: `File exists but doesn't appear to be mongo_crypt_v1. Found: ${filename}` 
                   }));
                 }
               } else {

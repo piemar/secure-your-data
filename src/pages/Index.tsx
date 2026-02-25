@@ -17,23 +17,31 @@ import { LabRunner } from '@/labs/LabRunner';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { useRole } from '@/contexts/RoleContext';
 import { useLab } from '@/context/LabContext';
-import { areLabsEnabled } from '@/utils/workshopUtils';
+import { areLabsEnabled, loadWorkshopSessionFromAtlas } from '@/utils/workshopUtils';
 import { Lock, AlertCircle, Check } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useLocation } from 'react-router-dom';
 import { getContentService } from '@/services/contentService';
 import type { WorkshopLabDefinition } from '@/types';
+import { defaultEncryptionWorkshopTemplate } from '@/content/workshop-templates/default-encryption-workshop';
 
 function ContentRouter() {
   const { currentSection, setSection } = useNavigation();
   const { isLabAccessible, isLabCompleted, completedLabs } = useLab();
   const { isModerator } = useRole();
-  const { currentMode, activeTemplate, currentLabId, setCurrentLabId } = useWorkshopSession();
+  const { currentMode, activeTemplate, currentLabId, setCurrentLabId, setActiveTemplate } = useWorkshopSession();
   const location = useLocation();
   const labsEnabled = areLabsEnabled();
   const [templateLabs, setTemplateLabs] = useState<WorkshopLabDefinition[] | null>(null);
   const [templateLabsLoading, setTemplateLabsLoading] = useState(false);
+
+  // Force attendees (non-moderators) to use the encryption workshop
+  useEffect(() => {
+    if (!isModerator) {
+      setActiveTemplate(defaultEncryptionWorkshopTemplate);
+    }
+  }, [isModerator, setActiveTemplate]);
 
   // Sync URL with navigation context
   useEffect(() => {
@@ -368,6 +376,13 @@ const Index = () => {
   const { userEmail, resetProgress } = useLab();
   const [showPresenterLogin, setShowPresenterLogin] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
+  // After first load, re-render so attendees see workshop session (and labs enabled) from API
+  const [sessionLoadAttempted, setSessionLoadAttempted] = useState(false);
+
+  // Fetch workshop session from API on load so attendees get moderator's session (labs enabled, template, etc.)
+  useEffect(() => {
+    loadWorkshopSessionFromAtlas().finally(() => setSessionLoadAttempted(true));
+  }, []);
 
   // Check if user is already registered
   useEffect(() => {
