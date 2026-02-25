@@ -5,6 +5,8 @@ import { useWorkshopSession } from '@/contexts/WorkshopSessionContext';
 import { useWorkshopConfig } from '@/context/WorkshopConfigContext';
 import { getWorkshopSession } from '@/utils/workshopUtils';
 import { getMetricsService } from '@/services/metricsService';
+import { clearLabWorkspace } from '@/services/labWorkspaceStorage';
+import { trackSolutionReveal } from '@/utils/leaderboardUtils';
 
 interface LabState {
     mongoUri: string;
@@ -20,6 +22,8 @@ interface LabState {
     userEmail: string;
     completedLabs: number[]; // Track which labs are completed
     labStartTimes: Record<number, number>; // Track when each lab was started
+    /** Increments when resetProgress() is called; StepView uses it to clear hints and reload workspace */
+    resetProgressCount: number;
 }
 
 interface LabContextType extends LabState {
@@ -35,6 +39,8 @@ interface LabContextType extends LabState {
     isLabCompleted: (labNumber: number) => boolean;
     isLabAccessible: (labNumber: number) => boolean;
     resetProgress: () => void;
+    /** Subtract points (e.g. for solution reveal) and update leaderboard; updates currentScore for UI */
+    subtractPoints: (penalty: number) => void;
 }
 
 const LabContext = createContext<LabContextType | undefined>(undefined);
@@ -91,6 +97,7 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const saved = localStorage.getItem('labStartTimes');
         return saved ? JSON.parse(saved) : {};
     });
+    const [resetProgressCount, setResetProgressCount] = useState(0);
 
     // Load email and lab suffix (firstname-lastname for KMS alias) from localStorage on mount
     useEffect(() => {
@@ -159,7 +166,16 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
         setUserSuffixState('');
         if (typeof localStorage !== 'undefined') localStorage.removeItem('lab_user_suffix');
+        clearLabWorkspace(userEmail || (typeof localStorage !== 'undefined' ? localStorage.getItem('userEmail') : null));
+        setResetProgressCount((c) => c + 1);
         // Don't reset email - keep it persistent
+    };
+
+    const subtractPoints = (penalty: number) => {
+        if (penalty <= 0) return;
+        setCurrentScore((prev) => prev - penalty);
+        const email = userEmail || (typeof localStorage !== 'undefined' ? localStorage.getItem('userEmail') : null);
+        if (email) trackSolutionReveal(email, penalty);
     };
 
     const setAwsCredentials = (creds: { accessKeyId: string; secretAccessKey: string; keyArn: string; region: string }) => {
@@ -306,6 +322,7 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             userEmail,
             completedLabs,
             labStartTimes,
+            resetProgressCount,
             setMongoUri,
             setAwsCredentials,
             setAwsKeyArn,
@@ -317,7 +334,8 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             startLab,
             isLabCompleted,
             isLabAccessible,
-            resetProgress
+            resetProgress,
+            subtractPoints
         }}>
             {children}
         </LabContext.Provider>

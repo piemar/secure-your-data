@@ -20,6 +20,12 @@ try {
 /** PATH suffix so which/spawn can find mongosh when server has limited env (e.g. started from IDE). */
 const MONGOSH_PATH_SUFFIX = ":/opt/homebrew/bin:/usr/local/bin";
 
+/** Resolve AWS profile: use request param if non-empty, else AWS_PROFILE env, else "default". */
+function getEffectiveAwsProfile(profileParam: string | null): string {
+  const p = (profileParam ?? "").trim();
+  return p !== "" ? p : (process.env.AWS_PROFILE || "default");
+}
+
 /** Resolve mongosh executable path. Dev server often has limited PATH (e.g. when started from IDE) and may not see /opt/homebrew/bin. */
 function getMongoshPath(): string {
   const envWithPath = { ...process.env, PATH: (process.env.PATH || "") + MONGOSH_PATH_SUFFIX };
@@ -286,6 +292,8 @@ export default defineConfig(({ mode }) => ({
               deploymentMode,
               runningInContainer: process.env.WORKSHOP_RUNNING_IN_CONTAINER === 'true',
               awsDefaultRegion: process.env.WORKSHOP_AWS_DEFAULT_REGION || 'eu-central-1',
+              /** Effective profile when user does not override: AWS_PROFILE env or "default". */
+              awsDefaultProfile: process.env.AWS_PROFILE || 'default',
               azureKeyVaultSuffix: process.env.WORKSHOP_AZURE_KEY_VAULT_SUFFIX || '.vault.azure.net',
               gcpDefaultLocation: process.env.WORKSHOP_GCP_DEFAULT_LOCATION || 'global',
             };
@@ -381,7 +389,7 @@ export default defineConfig(({ mode }) => ({
           if (req.url && req.url.startsWith('/api/verify-kms')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
             const alias = url.searchParams.get('alias') || '';
-            const profile = url.searchParams.get('profile') || 'default';
+            const profile = getEffectiveAwsProfile(url.searchParams.get('profile'));
             // Sanitize
             const safeAlias = alias.replace(/[^a-zA-Z0-9_\-\/]/g, '');
             const safeProfile = profile.replace(/[^a-zA-Z0-9_\-]/g, '');
@@ -445,7 +453,7 @@ export default defineConfig(({ mode }) => ({
           if (req.url && req.url.startsWith('/api/verify-policy')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
             const alias = url.searchParams.get('alias') || '';
-            const profile = url.searchParams.get('profile') || 'default';
+            const profile = getEffectiveAwsProfile(url.searchParams.get('profile'));
             const safeAlias = alias.replace(/[^a-zA-Z0-9_\-\/]/g, '');
             const safeProfile = profile.replace(/[^a-zA-Z0-9_\-]/g, '');
 
@@ -459,38 +467,51 @@ export default defineConfig(({ mode }) => ({
               }
 
               const safeKeyId = keyId.trim();
-              // 2. Get Policy
-              const getPolicyCmd = `aws kms get-key-policy --key-id ${safeKeyId} --policy-name default --profile ${safeProfile} --output json`;
-
-              exec(getPolicyCmd, (pErr: any, policyOutput: string, pStderr: any) => {
-                if (pErr) {
-                  res.end(JSON.stringify({ success: false, message: `Failed to read policy. Do you have 'kms:GetKeyPolicy'?` }));
+              // 2. Get current IAM identity ARN (so we require the policy to explicitly allow this principal)
+              const getCallerCmd = `aws sts get-caller-identity --profile ${safeProfile} --query Arn --output text`;
+              exec(getCallerCmd, (callerErr: any, callerArn: string, callerStderr: any) => {
+                if (callerErr || !(callerArn && callerArn.trim())) {
+                  res.end(JSON.stringify({ success: false, message: `Could not get caller identity. Run: aws sts get-caller-identity --profile ${safeProfile}` }));
                   return;
                 }
-
-                try {
-                  // AWS CLI returns { "Policy": "stringified-json" } or just text depending on version/flags
-                  let policyText = policyOutput;
-                  try {
-                    const outer = JSON.parse(policyOutput);
-                    if (outer.Policy) {
-                      policyText = outer.Policy;
-                    }
-                  } catch (ignore) { /* it might be raw text already */ }
-
-                  // Robust check for Allow and kms:*
-                  // We check aggressively for the strings to avoid deep parsing issues
-                  const hasAllow = policyText.includes('Allow');
-                  const hasKms = policyText.includes('kms:*');
-
-                  if (hasAllow && hasKms) {
-                    res.end(JSON.stringify({ success: true, message: `Verified Policy on ${safeKeyId}` }));
-                  } else {
-                    res.end(JSON.stringify({ success: false, message: `Policy too restrictive on ${safeKeyId}` }));
+                const callerArnTrimmed = callerArn.trim();
+                // 3. Get Policy
+                const getPolicyCmd = `aws kms get-key-policy --key-id ${safeKeyId} --policy-name default --profile ${safeProfile} --output json`;
+                exec(getPolicyCmd, (pErr: any, policyOutput: string, pStderr: any) => {
+                  if (pErr) {
+                    res.end(JSON.stringify({ success: false, message: `Failed to read policy. Do you have 'kms:GetKeyPolicy'?` }));
+                    return;
                   }
-                } catch (e: any) {
-                  res.end(JSON.stringify({ success: false, message: `Policy parsing error: ${e.message}` }));
-                }
+                  try {
+                    let policyText = policyOutput;
+                    try {
+                      const outer = JSON.parse(policyOutput);
+                      if (outer.Policy) {
+                        policyText = outer.Policy;
+                      }
+                    } catch (ignore) { /* might be raw text */ }
+
+                    const hasAllow = policyText.includes('Allow');
+                    const hasKms = policyText.includes('kms:*');
+                    // Default key policy (from create-key) only has arn:aws:iam::ACCOUNT:root; it does NOT
+                    // contain the IAM user or SSO role ARN. Require that the policy explicitly allows the
+                    // current caller so we only pass when the user has applied a policy (e.g. put-key-policy).
+                    const allowsCaller = policyText.includes(callerArnTrimmed);
+
+                    if (hasAllow && hasKms && allowsCaller) {
+                      res.end(JSON.stringify({ success: true, message: `Verified Policy on ${safeKeyId}` }));
+                    } else if (!allowsCaller) {
+                      res.end(JSON.stringify({
+                        success: false,
+                        message: `Key policy must explicitly allow your IAM identity. Add a statement for your principal (aws sts get-caller-identity), then apply with: aws kms put-key-policy --key-id <key-id> --policy-name default --policy file://policy.json`,
+                      }));
+                    } else {
+                      res.end(JSON.stringify({ success: false, message: `Policy too restrictive on ${safeKeyId}` }));
+                    }
+                  } catch (e: any) {
+                    res.end(JSON.stringify({ success: false, message: `Policy parsing error: ${e.message}` }));
+                  }
+                });
               });
             });
             return;
@@ -499,7 +520,7 @@ export default defineConfig(({ mode }) => ({
           if (req.url && req.url.startsWith('/api/cleanup-resources')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
             const alias = url.searchParams.get('alias') || '';
-            const profile = url.searchParams.get('profile') || 'default';
+            const profile = getEffectiveAwsProfile(url.searchParams.get('profile'));
             // Sanitize
             const safeAlias = alias.replace(/[^a-zA-Z0-9_\-\/]/g, '');
             const safeProfile = profile.replace(/[^a-zA-Z0-9_\-]/g, '');
@@ -1415,7 +1436,7 @@ export default defineConfig(({ mode }) => ({
             req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
             req.on('end', () => {
               try {
-                const { command, commands: rawCommands } = JSON.parse(body || '{}');
+                const { command, commands: rawCommands, profile: profileOverride } = JSON.parse(body || '{}');
                 const commands = Array.isArray(rawCommands)
                   ? rawCommands
                   : typeof command === 'string'
@@ -1445,7 +1466,9 @@ export default defineConfig(({ mode }) => ({
                   return;
                 }
                 const script = toRun.join('\n');
-                exec(script, { timeout: 30000, maxBuffer: 1024 * 1024 }, (error: any, stdout: string, stderr: string) => {
+                const profileVal = (profileOverride != null && String(profileOverride).trim() !== '') ? String(profileOverride).trim() : null;
+                const runEnv = profileVal !== null ? { ...process.env, AWS_PROFILE: profileVal } : process.env;
+                exec(script, { timeout: 30000, maxBuffer: 1024 * 1024, env: runEnv }, (error: any, stdout: string, stderr: string) => {
                   const exitCode = error?.code ?? (error ? 1 : 0);
                   res.setHeader('Content-Type', 'application/json');
                   res.end(JSON.stringify({

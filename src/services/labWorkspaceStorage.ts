@@ -26,6 +26,19 @@ function getStorageKey(userEmail?: string | null): string {
 }
 
 /**
+ * Clear all lab workspace data for the current user (editors + log entries).
+ * Used when user resets progress so labs start fresh.
+ */
+export function clearLabWorkspace(userEmail?: string | null): void {
+  try {
+    const key = getStorageKey(userEmail);
+    localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
+/**
  * Load full workspace state for the current user from localStorage.
  */
 export function loadWorkspaceState(userEmail?: string | null): LabWorkspaceState {

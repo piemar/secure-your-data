@@ -47,8 +47,9 @@ export const validatorUtils = {
     /**
      * Verifies a KMS Alias exists in the user's AWS account.
      * Uses the real /api/verify-kms endpoint to check via AWS CLI.
+     * @param profile Optional. If omitted or empty, server uses AWS_PROFILE env or "default".
      */
-    checkKmsAlias: async (alias: string, profile: string = 'default'): Promise<ValidationResult> => {
+    checkKmsAlias: async (alias: string, profile?: string): Promise<ValidationResult> => {
         if (!alias || alias.trim() === '') {
             return { success: false, message: 'KMS alias is required.' };
         }
@@ -58,7 +59,7 @@ export const validatorUtils = {
         }
 
         try {
-            const response = await fetch(`/api/verify-kms?alias=${encodeURIComponent(alias)}&profile=${encodeURIComponent(profile)}`);
+            const response = await fetch(`/api/verify-kms?alias=${encodeURIComponent(alias)}&profile=${encodeURIComponent(profile ?? '')}`);
             const data = await response.json();
             return { success: data.success, message: data.message };
         } catch (error) {
@@ -69,14 +70,15 @@ export const validatorUtils = {
     /**
      * Verifies that the KMS Key Policy allows the current user.
      * Uses the real /api/verify-policy endpoint to check via AWS CLI.
+     * @param profile Optional. If omitted or empty, server uses AWS_PROFILE env or "default".
      */
-    checkKeyPolicy: async (alias: string, profile: string = 'default'): Promise<ValidationResult> => {
+    checkKeyPolicy: async (alias: string, profile?: string): Promise<ValidationResult> => {
         if (!alias || alias.trim() === '') {
             return { success: false, message: 'KMS alias is required.' };
         }
 
         try {
-            const response = await fetch(`/api/verify-policy?alias=${encodeURIComponent(alias)}&profile=${encodeURIComponent(profile)}`);
+            const response = await fetch(`/api/verify-policy?alias=${encodeURIComponent(alias)}&profile=${encodeURIComponent(profile ?? '')}`);
             const data = await response.json();
             return { success: data.success, message: data.message };
         } catch (error) {
@@ -87,10 +89,11 @@ export const validatorUtils = {
     /**
      * Triggers the cleanup of AWS resources (Delete Alias + Schedule Key Deletion).
      * Uses the real /api/cleanup-resources endpoint.
+     * @param profile Optional. If omitted or empty, server uses AWS_PROFILE env or "default".
      */
-    cleanupAwsResources: async (alias: string, profile: string = 'default'): Promise<ValidationResult> => {
+    cleanupAwsResources: async (alias: string, profile?: string): Promise<ValidationResult> => {
         try {
-            const response = await fetch(`/api/cleanup-resources?alias=${encodeURIComponent(alias)}&profile=${encodeURIComponent(profile)}`);
+            const response = await fetch(`/api/cleanup-resources?alias=${encodeURIComponent(alias)}&profile=${encodeURIComponent(profile ?? '')}`);
             const data = await response.json();
             return { success: data.success, message: data.message };
         } catch (error) {

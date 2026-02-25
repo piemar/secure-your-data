@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LabIntroTab } from './LabIntroTab';
 import { StepView } from './StepView';
@@ -96,7 +96,7 @@ export function LabViewWithTabs({
   competitorIds,
   labMongoUri,
 }: LabViewWithTabsProps) {
-  const { startLab, completeLab, completeStep, userEmail } = useLab();
+  const { startLab, completeLab, completeStep, userEmail, resetProgressCount } = useLab();
   const storageKey = `lab${labNumber}-progress`;
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const stepToolbarRef = useRef<{ reset: () => void; openHelp: () => void } | null>(null);
@@ -145,6 +145,10 @@ export function LabViewWithTabs({
       completeStep(step.id, false);
     }
   };
+
+  const handleResetStep = useCallback((stepIndex: number) => {
+    setCompletedSteps((prev) => prev.filter((i) => i !== stepIndex));
+  }, []);
 
   const handleStartLab = () => {
     setActiveTab('steps');
@@ -259,6 +263,8 @@ export function LabViewWithTabs({
             competitorIds={competitorIds}
             labMongoUri={labMongoUri}
             stepToolbarRef={stepToolbarRef}
+            resetProgressCount={resetProgressCount}
+            onResetStep={handleResetStep}
           />
         </TabsContent>
 

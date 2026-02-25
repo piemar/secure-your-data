@@ -149,15 +149,16 @@ export function InlineHintEditor({
 
   const editorValue = isReadOnly ? displayCode : (controlledValue ?? code);
 
-  // Update blank positions when code or hints change
+  // Update blank positions from current editor content so markers disappear when user replaces a blank
   useEffect(() => {
     if (inlineHints && inlineHints.length > 0 && hasSkeleton && !isSolutionRevealed) {
-      const positions = findBlankPositions(code, inlineHints);
+      const content = controlledValue ?? code;
+      const positions = findBlankPositions(content, inlineHints);
       setBlankPositions(positions);
     } else {
       setBlankPositions([]);
     }
-  }, [code, inlineHints, hasSkeleton, isSolutionRevealed, findBlankPositions]);
+  }, [controlledValue, code, inlineHints, hasSkeleton, isSolutionRevealed, findBlankPositions]);
 
   // Handle editor mount
   const handleEditorMount = useCallback((editor: any, monaco: Monaco) => {

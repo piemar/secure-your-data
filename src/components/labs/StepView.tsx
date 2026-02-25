@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2, BookOpen, Clock, Lock, Eye, Unlock, GitCompare, Play, RotateCcw, FileCode, Save, PlayCircle, Layout, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2, BookOpen, Clock, Lock, Eye, Unlock, GitCompare, Play, RotateCcw, FileCode, PlayCircle, Layout, RefreshCw } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -12,7 +12,7 @@ import { StepContextDrawer } from './StepContextDrawer';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { trackHintUsage, trackSolutionReveal } from '@/utils/leaderboardUtils';
+import { trackHintUsage } from '@/utils/leaderboardUtils';
 import { type InlineHint, type SkeletonTier } from './InlineHintMarker';
 import { InlineHintEditor } from './InlineHintEditor';
 import { getCompetitorProductLabel } from '@/content/competitor-products';
@@ -113,6 +113,10 @@ interface StepViewProps {
   labMongoUri?: string;
   /** When set, StepView assigns reset/check/openHelp so parent can render toolbar on same line as Overview/Steps */
   stepToolbarRef?: React.MutableRefObject<{ reset: () => void; openHelp: () => void } | null>;
+  /** Increments when user resets progress; StepView clears hints and reloads workspace when this changes */
+  resetProgressCount?: number;
+  /** Called when user resets the current step so parent can uncomplete it (e.g. remove from completedSteps) */
+  onResetStep?: (stepIndex: number) => void;
 }
 
 // Generate realistic MongoDB output based on code content with structured formatting
@@ -606,8 +610,10 @@ export function StepView({
   competitorIds,
   labMongoUri,
   stepToolbarRef,
+  resetProgressCount = 0,
+  onResetStep,
 }: StepViewProps) {
-  const { userEmail, userSuffix } = useLab();
+  const { userEmail, userSuffix, subtractPoints } = useLab();
   const [helpOpen, setHelpOpen] = useState(false);
   const [previewPanelTab, setPreviewPanelTab] = useState<'preview' | 'compete'>('compete');
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
@@ -623,6 +629,8 @@ export function StepView({
   const [logEntries, setLogEntries] = useState<Array<{ time: Date; output: string }>>([]);
   const [outputSummary, setOutputSummary] = useState<string>('');
   const [outputSuccess, setOutputSuccess] = useState<boolean>(true);
+  /** Per-step: true if validation (Verify/Next) failed for that step index; used to show step indicator red. */
+  const [validationFailedByStep, setValidationFailedByStep] = useState<Record<number, boolean>>({});
   const [isRunning, setIsRunning] = useState(false);
   const [expandedLogIndex, setExpandedLogIndex] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -815,8 +823,9 @@ export function StepView({
               ? fillAllBlanksInSkeleton(block.skeleton, block.inlineHints)
               : (block.code ?? '');
         } else if (hasAnySkeleton(block) && block.inlineHints?.length) {
-          // Always derive from skeleton + current revealed answers so we show _____ until user clicks "Show answer"
-          next[blockKey] = applyRevealedAnswersToCode(baseSkeleton, block.inlineHints, revealed);
+          // Use current editor content as base when present so manual input in non-revealed blanks is preserved
+          const base = (saved != null && saved !== '' && !hasOldHardcodedUri(saved)) ? saved : baseSkeleton;
+          next[blockKey] = applyRevealedAnswersToCode(base, block.inlineHints, revealed);
         } else if (saved != null && saved !== '' && hasOldHardcodedUri(saved)) {
           next[blockKey] = baseSkeleton;
         } else if (saved == null || saved === '') {
@@ -844,7 +853,7 @@ export function StepView({
               ? fillAllBlanksInSkeleton(block.skeleton, block.inlineHints)
               : (block.code ?? '');
         } else if (revealed.length > 0 && block.inlineHints?.length) {
-          const baseCode = getDisplayCode(block, tier, false);
+          const baseCode = (prev[blockKey] != null && prev[blockKey] !== '') ? prev[blockKey] : getDisplayCode(block, tier, false);
           next[blockKey] = applyRevealedAnswersToCode(baseCode, block.inlineHints, revealed);
         }
       });
@@ -862,11 +871,37 @@ export function StepView({
     }
   }, [labNumber, userEmail]);
 
-  // Load console logs for current step from central workspace (continuity on refresh/return)
+  // When user resets progress, clear hints and reload workspace (so labs start fresh without reload)
+  useEffect(() => {
+    if (resetProgressCount <= 0) return;
+    setRevealedAnswers({});
+    setRevealedHints({});
+    setShowSolution({});
+    setValidationFailedByStep({});
+    const w = loadLabWorkspace(labNumber, userEmail);
+    setEditableCodeByBlock(w.editors || {});
+    const entries = w.logEntriesByStep[currentStepIndex] || [];
+    setLogEntries(storedToLogEntries(entries));
+    setLastOutput('');
+    setOutputSummary('');
+    setOutputSuccess(true);
+  }, [resetProgressCount, labNumber, userEmail, currentStepIndex]);
+
+  // Load console logs and last output for current step so each step shows only its own output
   useEffect(() => {
     const w = loadLabWorkspace(labNumber, userEmail);
-    const entries = w.logEntriesByStep[currentStepIndex];
-    setLogEntries(storedToLogEntries(entries || []));
+    const entries = w.logEntriesByStep[currentStepIndex] || [];
+    setLogEntries(storedToLogEntries(entries));
+    const last = entries[entries.length - 1];
+    if (last && last.output) {
+      setLastOutput(last.output);
+      setOutputSummary(last.output.trim().split('\n')[0].slice(0, 80) || 'Step output');
+      setOutputSuccess(true); // success not stored per entry; neutral when switching
+    } else {
+      setLastOutput('');
+      setOutputSummary('');
+      setOutputSuccess(true);
+    }
   }, [labNumber, currentStepIndex, userEmail]);
 
   // Persist all editor content for this lab to central storage (autosave for all editors)
@@ -956,63 +991,61 @@ export function StepView({
 
   // Helper to reveal an inline hint (conceptual)
   const revealInlineHint = useCallback((blockKey: string, hintIdx: number, tier: SkeletonTier) => {
+    const alreadyRevealed = (revealedHints[blockKey] || []).includes(hintIdx);
     setRevealedHints(prev => {
       const existing = prev[blockKey] || [];
       if (existing.includes(hintIdx)) return prev;
       return { ...prev, [blockKey]: [...existing, hintIdx] };
     });
-    // Deduct points for hint based on tier
+    if (alreadyRevealed) return;
+    // Deduct points for hint based on tier and update displayed score
     const hintPenalty = tier === 'expert' ? 3 : tier === 'challenge' ? 2 : 1;
     setPointsDeducted(prev => ({
       ...prev,
       [blockKey]: (prev[blockKey] || 0) + hintPenalty
     }));
-    
+    subtractPoints(hintPenalty);
     // Track in leaderboard
     const email = localStorage.getItem('userEmail') || '';
     if (email) {
       trackHintUsage(email, hintPenalty);
     }
-  }, []);
+  }, [subtractPoints, revealedHints]);
 
   // Helper to reveal an inline answer (direct answer)
   const revealInlineAnswer = useCallback((blockKey: string, hintIdx: number, tier: SkeletonTier) => {
+    const alreadyRevealed = (revealedAnswers[blockKey] || []).includes(hintIdx);
     setRevealedAnswers(prev => {
       const existing = prev[blockKey] || [];
       if (existing.includes(hintIdx)) return prev;
       return { ...prev, [blockKey]: [...existing, hintIdx] };
     });
-    // Deduct points for answer based on tier
+    if (alreadyRevealed) return;
+    // Deduct points for answer based on tier and update displayed score
     const answerPenalty = tier === 'expert' ? 5 : tier === 'challenge' ? 3 : 2;
     setPointsDeducted(prev => ({
       ...prev,
       [blockKey]: (prev[blockKey] || 0) + answerPenalty
     }));
-    
+    subtractPoints(answerPenalty);
     // Track in leaderboard
     const email = localStorage.getItem('userEmail') || '';
     if (email) {
       trackHintUsage(email, answerPenalty);
     }
-  }, []);
+  }, [subtractPoints, revealedAnswers]);
 
 
   // Helper to reveal full solution
   const revealSolution = useCallback((blockKey: string, tier: SkeletonTier) => {
     setShowSolution(prev => ({ ...prev, [blockKey]: true }));
-    // Deduct points for revealing solution based on tier
     const penalty = getSolutionPenalty(tier);
     setPointsDeducted(prev => ({
       ...prev,
       [blockKey]: (prev[blockKey] || 0) + penalty
     }));
-    
-    // Track in leaderboard
-    const email = localStorage.getItem('userEmail') || '';
-    if (email) {
-      trackSolutionReveal(email, penalty);
-    }
-  }, []);
+    subtractPoints(penalty);
+  }, [subtractPoints]);
 
   // Copy button should always copy full solution (even if skeleton shown)
   const handleCopyCode = useCallback(async (blockIdx: number = 0) => {
@@ -1075,10 +1108,16 @@ export function StepView({
     setLogEntries(prev => [...prev, { time: now, output }]);
     setOutputSummary(summary);
     setOutputSuccess(success);
+    setValidationFailedByStep(prev => ({ ...prev, [currentStepIndex]: !success })); // red when failed, cleared when passed
     setConsolePanelCollapsed(false);
+    // Persist validation result to this step's console log so it's kept when advancing and when returning to this step
+    const w = loadLabWorkspace(labNumber, userEmail);
+    const existing = w.logEntriesByStep[currentStepIndex] || [];
+    const newStored = logEntriesToStored([{ time: now, output }]);
+    saveLabWorkspace(labNumber, { logEntriesByStep: { ...w.logEntriesByStep, [currentStepIndex]: [...existing, ...newStored] } }, userEmail);
     setIsRunning(false);
     return success;
-  }, [currentStep.onVerify, currentStep.verificationId, labMongoUri, userSuffix]);
+  }, [currentStep.onVerify, currentStep.verificationId, labMongoUri, userSuffix, currentStepIndex, labNumber, userEmail]);
 
   /** Run a single code block: uses current editor content (editable code). Tries real /api/run-* when URI and language match, else simulated output. */
   const handleRunBlock = useCallback(async (blockIdx: number) => {
@@ -1140,10 +1179,11 @@ export function StepView({
             let lastSuccess = true;
             const beforeNode = commands.slice(0, nodeCmdIndex);
             if (beforeNode.length > 0) {
+              const awsProfile = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
               const res = await fetch('/api/run-bash', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ commands: beforeNode }),
+                body: JSON.stringify({ commands: beforeNode, ...(awsProfile && { profile: awsProfile }) }),
               });
               const data = await res.json();
               outputs.push([data.stdout, data.stderr].filter(Boolean).join('\n') || '(no output)');
@@ -1168,10 +1208,11 @@ export function StepView({
               summary: lastSuccess ? 'Node completed' : (data.message?.split('\n')[0] || 'Node failed'),
             };
           } else {
+            const awsProfile = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
             const res = await fetch('/api/run-bash', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ commands }),
+              body: JSON.stringify({ commands, ...(awsProfile && { profile: awsProfile }) }),
             });
             const data = await res.json();
             const out = [data.stdout, data.stderr].filter(Boolean).join('\n') || '(no output)';
@@ -1315,7 +1356,8 @@ export function StepView({
             if (hasNodeSubstitution) {
               const beforeNode = commands.slice(0, nodeCmdIndex);
               if (beforeNode.length > 0) {
-                const res = await fetch('/api/run-bash', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ commands: beforeNode }) });
+                const awsProfile = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
+                const res = await fetch('/api/run-bash', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ commands: beforeNode, ...(awsProfile && { profile: awsProfile }) }) });
                 const data = await res.json();
                 outputs.push([data.stdout, data.stderr].filter(Boolean).join('\n') || '(no output)');
               }
@@ -1326,7 +1368,8 @@ export function StepView({
               lastSuccess = data.success === true;
               lastSummary = data.success ? 'Node completed' : (data.message?.split('\n')[0] || 'Node failed');
             } else {
-              const res = await fetch('/api/run-bash', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ commands }) });
+              const awsProfile = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
+              const res = await fetch('/api/run-bash', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ commands, ...(awsProfile && { profile: awsProfile }) }) });
               const data = await res.json();
               outputs.push([data.stdout, data.stderr].filter(Boolean).join('\n') || '(no output)');
             }
@@ -1362,8 +1405,10 @@ export function StepView({
     setIsRunning(false);
   }, [currentStep?.codeBlocks, currentStep?.title, currentStepIndex, labMongoUri, editableCodeByBlock, skeletonTier, showSolution, alwaysShowSolutions, displaySlots, nodeMongoshViewByKey]);
 
-  /** Reset current step: clear output and collapse panel; clear persisted logs for this step */
+  /** Reset current step: clear console, reset inline editors to original skeleton (as on first load), clear persisted logs and solution state */
   const handleResetStep = useCallback(() => {
+    // Uncomplete the step in parent first so the step indicator updates immediately
+    onResetStep?.(currentStepIndex);
     setLastOutput('');
     setLastOutputTime(null);
     setLogEntries([]);
@@ -1374,7 +1419,49 @@ export function StepView({
     const w = loadLabWorkspace(labNumber, userEmail);
     const updated = { ...w.logEntriesByStep, [currentStepIndex]: [] };
     saveLabWorkspace(labNumber, { logEntriesByStep: updated }, userEmail);
-  }, [labNumber, currentStepIndex, userEmail]);
+    // Reset inline editors to original skeleton and clear solution/revealed state so sync effects don't overwrite
+    if (currentStep?.codeBlocks?.length) {
+      const newEditors: Record<string, string> = { ...w.editors };
+      currentStep.codeBlocks!.forEach((block, idx) => {
+        const blockKey = `${currentStepIndex}-${idx}`;
+        const tier = skeletonTier[blockKey] || 'guided';
+        const skeletonCode = getDisplayCode(block, tier, false);
+        newEditors[blockKey] = skeletonCode;
+      });
+      saveLabWorkspace(labNumber, { editors: newEditors }, userEmail);
+      setEditableCodeByBlock((prev) => {
+        const next = { ...prev };
+        currentStep.codeBlocks!.forEach((block, idx) => {
+          const blockKey = `${currentStepIndex}-${idx}`;
+          const tier = skeletonTier[blockKey] || 'guided';
+          next[blockKey] = getDisplayCode(block, tier, false);
+        });
+        return next;
+      });
+      setShowSolution((prev) => {
+        const next = { ...prev };
+        currentStep.codeBlocks!.forEach((_, idx) => {
+          next[`${currentStepIndex}-${idx}`] = false;
+        });
+        return next;
+      });
+      setRevealedAnswers((prev) => {
+        const next = { ...prev };
+        currentStep.codeBlocks!.forEach((_, idx) => {
+          next[`${currentStepIndex}-${idx}`] = [];
+        });
+        return next;
+      });
+      setRevealedHints((prev) => {
+        const next = { ...prev };
+        currentStep.codeBlocks!.forEach((_, idx) => {
+          next[`${currentStepIndex}-${idx}`] = [];
+        });
+        return next;
+      });
+    }
+    setValidationFailedByStep((prev) => ({ ...prev, [currentStepIndex]: false }));
+  }, [labNumber, currentStepIndex, userEmail, currentStep?.codeBlocks, skeletonTier, onResetStep]);
 
   useEffect(() => {
     if (!stepToolbarRef) return;
@@ -1385,11 +1472,13 @@ export function StepView({
     return () => { stepToolbarRef.current = null; };
   }, [stepToolbarRef, handleResetStep]);
 
+  /** Next Step: ONLY runs validation (handleCheckProgress). Does NOT execute any code; user must use Run/Run all to run code. */
   const handleNextStep = async () => {
-    // Validate current step before allowing advance
     if (currentStepIndex < steps.length - 1 && currentStep.codeBlocks?.length) {
       const passed = await handleCheckProgress();
-      if (!passed) return; // Stay on step until check passes
+      if (!passed) return; // Stay on step until validation passes
+      // Brief delay so the user sees the validation output in the console for this step before advancing
+      await new Promise((r) => setTimeout(r, 500));
     }
     if (!isCompleted) {
       onComplete(currentStepIndex);
@@ -1445,7 +1534,7 @@ export function StepView({
           {currentStep.codeBlocks && currentStep.codeBlocks.length > 0 ? (
             <ResizablePanelGroup direction="horizontal" className="h-full">
               {/* Left column: Editor (cjs/shell etc.) and Console stacked — vertical resizer between them */}
-              <ResizablePanel defaultSize={55} minSize={30} className="min-h-0">
+              <ResizablePanel defaultSize={80} minSize={30} className="min-h-0">
                 <ResizablePanelGroup ref={editorConsoleGroupRef} direction="vertical" className="h-full min-h-0" id="step-editor-console">
                   {/* Editor panel: collapsible; code blocks; shell blocks show "Terminal" header + Run all/Run selection; content always scrollable */}
                   <ResizablePanel defaultSize={94} minSize={25} className="min-h-0">
@@ -1465,17 +1554,12 @@ export function StepView({
                           || ['python', 'py'].includes((firstBlock.language || '').toLowerCase())
                           || firstBlock.filename?.toLowerCase().endsWith('.py')
                         );
-                        const firstIsCjs = firstDisplayFilename.toLowerCase().endsWith('.cjs');
                         const firstIsShell = ['shell', 'bash', 'sh'].includes((firstBlock.language || '').toLowerCase());
                         const firstTier = skeletonTier[firstKey] || 'guided';
                         const firstHasSkeleton = hasAnySkeleton(firstBlock);
                         const firstSolutionRevealed = alwaysShowSolutions || !!showSolution[firstKey] || !firstHasSkeleton;
                         const firstPenalty = getSolutionPenalty(firstTier);
                         const firstDisplayCode = getDisplayCode(firstBlock, firstTier, firstSolutionRevealed);
-                        const handleFirstSaveCjs = () => {
-                          const value = editableCodeByBlock[firstKey] ?? firstDisplayCode;
-                          // persisted via central labWorkspaceStorage when editableCodeByBlock changes
-                        };
                         return (
                           <div className="flex-shrink-0 flex items-center justify-between gap-1.5 border border-border border-b bg-muted px-2 py-1 min-w-0 shadow-[0_1px_0_0_var(--border)]">
                             <div className="flex items-center gap-1.5 min-w-0 truncate">
@@ -1521,13 +1605,6 @@ export function StepView({
                                     </Button>
                                   </TooltipTrigger><TooltipContent side="bottom">Run selection</TooltipContent></Tooltip></TooltipProvider>
                                 </>
-                              )}
-                              {firstIsCjs && (
-                                <TooltipProvider><Tooltip><TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm" onClick={handleFirstSaveCjs} className="h-3.5 gap-0.5 px-1 text-[8px]">
-                                    <Save className="w-2 h-2" /><span className="hidden xs:inline">Save</span>
-                                  </Button>
-                                </TooltipTrigger><TooltipContent side="bottom">Save</TooltipContent></Tooltip></TooltipProvider>
                               )}
                               <TooltipProvider><Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" onClick={() => stepToolbarRef?.current?.reset()} className="h-3.5 gap-0.5 px-1 text-[8px]" title="Reset step">
@@ -1575,7 +1652,6 @@ export function StepView({
                         const value = v ?? '';
                         setEditableCodeByBlock((prev) => ({ ...prev, [activeKey]: value }));
                       };
-                      const handleSaveCjs = () => { /* persisted via labWorkspaceStorage */ };
                       return (
                         <div key={`node-mongosh-${nodeIndex}`} className={cn("flex flex-col flex-1 min-h-0", slotIndex > 0 && "border-t border-border")}>
                           <div className="sticky top-0 z-10 flex-shrink-0 flex items-center justify-between gap-1.5 border border-border border-b bg-muted px-2 py-1 min-w-0 shadow-[0_1px_0_0_var(--border)]">
@@ -1617,11 +1693,6 @@ export function StepView({
                                   {isRunning ? <Loader2 className="w-2 h-2 animate-spin" /> : <Play className="w-2 h-2" />}
                                 </Button>
                               </TooltipTrigger><TooltipContent side="bottom">Run selection</TooltipContent></Tooltip></TooltipProvider>
-                              {view === 'node' && (
-                                <TooltipProvider><Tooltip><TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm" onClick={handleSaveCjs} className="h-3.5 gap-0.5 px-1 text-[8px]"><Save className="w-2 h-2" /><span className="hidden xs:inline">Save</span></Button>
-                                </TooltipTrigger><TooltipContent side="bottom">Save</TooltipContent></Tooltip></TooltipProvider>
-                              )}
                               <TooltipProvider><Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" onClick={() => stepToolbarRef?.current?.reset()} className="h-3.5 gap-0.5 px-1 text-[8px]" title="Reset step"><RotateCcw className="w-2 h-2" /><span className="hidden sm:inline">Reset</span></Button>
                               </TooltipTrigger><TooltipContent side="bottom">Reset step</TooltipContent></Tooltip></TooltipProvider>
@@ -1671,7 +1742,6 @@ export function StepView({
                       const base = block.filename.includes(' (') ? block.filename.split(' (')[0].trim() : block.filename;
                       return base.replace(/^\d+\.\s*/, '').trim() || base;
                     })();
-                    const isCjs = displayFilename.toLowerCase().endsWith('.cjs');
                     const isShellBlock = ['shell', 'bash', 'sh'].includes((block.language || '').toLowerCase());
                     const isNodeBlock = (block.filename?.toLowerCase().endsWith('.cjs') || block.filename?.toLowerCase().endsWith('.js')) && ['javascript', 'typescript'].includes((block.language || '').toLowerCase());
                     const isDriverOnlyBlock = isNodeBlock || ['python', 'py'].includes((block.language || '').toLowerCase()) || (block.filename?.toLowerCase().endsWith('.py'));
@@ -1705,11 +1775,6 @@ export function StepView({
                                   {isRunning ? <Loader2 className="w-2 h-2 animate-spin" /> : <Play className="w-2 h-2" />}
                                 </Button>
                               </TooltipTrigger><TooltipContent side="bottom">Run selection</TooltipContent></Tooltip></TooltipProvider>
-                              {isCjs && (
-                                <TooltipProvider><Tooltip><TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm" onClick={() => {}} className="h-3.5 gap-0.5 px-1 text-[8px]"><Save className="w-2 h-2" /><span className="hidden xs:inline">Save</span></Button>
-                                </TooltipTrigger><TooltipContent side="bottom">Save</TooltipContent></Tooltip></TooltipProvider>
-                              )}
                               <TooltipProvider><Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" onClick={() => stepToolbarRef?.current?.reset()} className="h-3.5 gap-0.5 px-1 text-[8px]" title="Reset step"><RotateCcw className="w-2 h-2" /><span className="hidden sm:inline">Reset</span></Button>
                               </TooltipTrigger><TooltipContent side="bottom">Reset step</TooltipContent></Tooltip></TooltipProvider>
@@ -1751,11 +1816,6 @@ export function StepView({
                       const value = v ?? '';
                       setEditableCodeByBlock((prev) => ({ ...prev, [blockKey]: value }));
                       // all editors persisted via central labWorkspaceStorage
-                    };
-
-                    const handleSaveCjs = () => {
-                      const value = editableCodeByBlock[blockKey] ?? displayCode;
-                      // persisted via central labWorkspaceStorage
                     };
 
                     return (
@@ -1818,19 +1878,6 @@ export function StepView({
                                 </TooltipProvider>
                               </>
                             )}
-                            {isCjs ? (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="sm" onClick={handleSaveCjs} className="h-3.5 gap-0.5 px-1 text-[8px]">
-                                      <Save className="w-2 h-2" />
-                                      <span className="hidden xs:inline">Save</span>
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="bottom">Save (autosave also enabled)</TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            ) : null}
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -2039,8 +2086,8 @@ export function StepView({
 
               <ResizableHandle withHandle className="bg-border hover:bg-primary/50 transition-colors" />
 
-              {/* Preview panel: right column — same width as left column via horizontal slider */}
-              <ResizablePanel defaultSize={45} minSize={20}>
+              {/* Preview panel: right column — starts narrow so editor/console get most space */}
+              <ResizablePanel defaultSize={20} minSize={15}>
                 <div className="h-full flex flex-col bg-background/95 border-l border-border">
                   <div className="flex-shrink-0 flex items-center gap-1.5 px-1.5 py-0.5 border border-border border-b bg-muted/40">
                     <Tabs value={previewPanelTab} onValueChange={(v) => setPreviewPanelTab(v as 'preview' | 'compete')} className="flex-shrink-0">
@@ -2181,7 +2228,9 @@ export function StepView({
                     className={cn(
                       'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all',
                       index === currentStepIndex
-                        ? 'bg-primary text-primary-foreground ring-2 ring-primary/30'
+                        ? validationFailedByStep[index]
+                          ? 'bg-destructive text-destructive-foreground ring-2 ring-destructive/50'
+                          : 'bg-primary text-primary-foreground ring-2 ring-primary/30'
                         : completedSteps.includes(index)
                         ? 'bg-primary/20 text-primary'
                         : 'bg-muted text-muted-foreground hover:bg-muted/80'
@@ -2204,6 +2253,11 @@ export function StepView({
                         <span className="text-green-500 flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3" />
                           Done
+                        </span>
+                      )}
+                      {index === currentStepIndex && validationFailedByStep[index] && (
+                        <span className="text-destructive flex items-center gap-1">
+                          Validation failed
                         </span>
                       )}
                     </div>

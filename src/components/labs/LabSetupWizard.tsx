@@ -60,6 +60,7 @@ export const LabSetupWizard: React.FC = () => {
     const [showMongoCryptInput, setShowMongoCryptInput] = useState(false);
     const [isVerifyingCryptPath, setIsVerifyingCryptPath] = useState(false);
     const [mongoshPathInput, setMongoshPathInput] = useState(() => localStorage.getItem('workshop_mongosh_path') || '');
+    const [awsProfileInput, setAwsProfileInput] = useState(() => localStorage.getItem('lab_aws_profile') || '');
 
     // Get attendee name from localStorage (set during registration)
     const attendeeName = localStorage.getItem('workshop_attendee_name') || '';
@@ -222,7 +223,8 @@ export const LabSetupWizard: React.FC = () => {
         const suffix = verifiedTools['suffix']?.path;
         if (suffix && window.confirm(`Do you also want to delete the AWS KMS Key & Alias (alias/mongodb-lab-key-${suffix})? \n\nThis will apply a 7-day deletion window.`)) {
             const toastId = toast.loading('Cleaning up AWS resources...');
-            const result = await validatorUtils.cleanupAwsResources(`alias/mongodb-lab-key-${suffix}`);
+            const profile = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') ?? '') : '';
+            const result = await validatorUtils.cleanupAwsResources(`alias/mongodb-lab-key-${suffix}`, profile || undefined);
             toast.dismiss(toastId);
             if (result.success) {
                 toast.success('AWS Resources cleaned up.');
@@ -656,6 +658,41 @@ export const LabSetupWizard: React.FC = () => {
                                 } else {
                                     localStorage.removeItem('workshop_mongosh_path');
                                     toast.success('Cleared. Using auto-detect.');
+                                }
+                            }}
+                        >
+                            Save
+                        </Button>
+                    </div>
+                </div>
+
+                {/* AWS profile (optional override) */}
+                <div className="space-y-3">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <Cloud className="w-4 h-4 text-primary" />
+                        AWS profile (optional)
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                        Leave empty to use <code className="bg-muted px-1 rounded">AWS_PROFILE</code> from the environment or <code className="bg-muted px-1 rounded">default</code>. Set a profile name to override (e.g. <code className="bg-muted px-0.5 rounded">workshop</code> or your SSO profile).
+                    </p>
+                    <div className="flex gap-2">
+                        <Input
+                            placeholder="default (or leave empty for auto)"
+                            value={awsProfileInput}
+                            onChange={(e) => setAwsProfileInput(e.target.value)}
+                            className="font-mono text-xs"
+                        />
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                                const v = awsProfileInput.trim();
+                                if (v) {
+                                    localStorage.setItem('lab_aws_profile', v);
+                                    toast.success(`Using AWS profile: ${v}`);
+                                } else {
+                                    localStorage.removeItem('lab_aws_profile');
+                                    toast.success('Cleared. Using server default (AWS_PROFILE or default).');
                                 }
                             }}
                         >

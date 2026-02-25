@@ -241,7 +241,7 @@ export function trackHintUsage(email: string, hintPenalty: number): void {
   const entry = getOrCreateEntry(email);
   updateEntry(email, {
     hintsUsed: (entry.hintsUsed || 0) + 1,
-    score: Math.max(0, entry.score - hintPenalty)
+    score: entry.score - hintPenalty
   });
 }
 
@@ -254,7 +254,7 @@ export function trackSolutionReveal(email: string, solutionPenalty: number = 5):
   const entry = getOrCreateEntry(email);
   updateEntry(email, {
     solutionsRevealed: (entry.solutionsRevealed || 0) + 1,
-    score: Math.max(0, entry.score - solutionPenalty)
+    score: entry.score - solutionPenalty
   });
 }
 
