@@ -125,11 +125,17 @@ export const WorkshopSettings: React.FC = () => {
     }
   };
 
-  const handleResetLeaderboard = () => {
+  const handleResetLeaderboard = async () => {
     if (!window.confirm('Are you sure you want to reset the leaderboard? This will clear all participant scores but keep the workshop session active.')) {
       return;
     }
-    
+    try {
+      const { postResetLeaderboardAll } = await import('@/services/leaderboardApi');
+      await postResetLeaderboardAll();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to reset leaderboard on server. Check that the server is running and MongoDB is configured.');
+      return;
+    }
     resetLeaderboard();
     setParticipantCount(0);
     toast.success('Leaderboard has been reset');

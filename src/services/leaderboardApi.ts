@@ -103,3 +103,19 @@ export async function postResetProgress(email: string): Promise<void> {
     throw new Error(`Reset progress failed: ${res.status}`);
   }
 }
+
+/**
+ * Reset the full leaderboard (moderator only). Clears all entries in MongoDB.
+ * Call from Workshop Settings when moderator clicks "Reset Leaderboard".
+ */
+export async function postResetLeaderboardAll(): Promise<void> {
+  const res = await fetch(`${API_BASE}/reset-all`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || `Reset leaderboard failed: ${res.status}`);
+  }
+}

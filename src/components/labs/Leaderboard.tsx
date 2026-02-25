@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Trophy, Clock, Award, Users, TrendingUp, Medal } from 'lucide-react';
+import { Trophy, Award, Users, TrendingUp, Medal } from 'lucide-react';
 import { useLab } from '@/context/LabContext';
 import { heartbeat, type LeaderboardEntry } from '@/utils/leaderboardUtils';
 
@@ -51,10 +51,6 @@ export function Leaderboard() {
     return `${minutes}m`;
   };
 
-  const getTotalTime = (entry: LeaderboardEntry) => {
-    return Object.values(entry.labTimes || {}).reduce((sum, time) => sum + time, 0);
-  };
-
   const getMedalIcon = (index: number) => {
     if (index === 0) return <Medal className="w-6 h-6 text-yellow-500" />;
     if (index === 1) return <Medal className="w-6 h-6 text-gray-400" />;
@@ -90,7 +86,7 @@ export function Leaderboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Score</p>
                   <p className="text-2xl font-bold">{sortedLeaderboard[userRank - 1]?.score || 0}</p>
@@ -98,12 +94,6 @@ export function Leaderboard() {
                 <div>
                   <p className="text-sm text-muted-foreground">Completed Labs</p>
                   <p className="text-2xl font-bold">{sortedLeaderboard[userRank - 1]?.completedLabs.length || 0}/3</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Time</p>
-                  <p className="text-2xl font-bold">
-                    {formatTime(getTotalTime(sortedLeaderboard[userRank - 1] as LeaderboardEntry))}
-                  </p>
                 </div>
               </div>
             </CardContent>
@@ -133,7 +123,6 @@ export function Leaderboard() {
               <div className="space-y-2">
                 {sortedLeaderboard.map((entry, index) => {
                   const isCurrentUser = entry.email === userEmail;
-                  const totalTime = getTotalTime(entry);
                   
                   return (
                     <div
@@ -170,10 +159,6 @@ export function Leaderboard() {
                             <span className="flex items-center gap-1">
                               <Award className="w-4 h-4" />
                               {entry.completedLabs.length}/3 labs
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-4 h-4" />
-                              {formatTime(totalTime)}
                             </span>
                           </div>
                         </div>

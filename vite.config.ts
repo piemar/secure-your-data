@@ -221,6 +221,13 @@ async function updateLeaderboardEntry(email: string, updates: Partial<Leaderboar
   }
 }
 
+async function clearAllLeaderboardEntries(): Promise<void> {
+  const client = await getLeaderboardMongoClient();
+  const db = client.db(LEADERBOARD_DB);
+  const collection = db.collection(LEADERBOARD_COLLECTION);
+  await collection.deleteMany({});
+}
+
 async function addPointEntry(email: string, stepId: string, labNumber: number, points: number, assisted: boolean): Promise<void> {
   try {
     const client = await getLeaderboardMongoClient();
@@ -1293,7 +1300,7 @@ export default defineConfig(({ mode }) => ({
                   }
                   
                   // Reset progress: only this user's leaderboard entry (score 0, no completed labs, no lab times). Other users are unchanged.
-                  if (req.url?.includes('/reset')) {
+                  if (req.url?.includes('/reset') && !req.url?.includes('/reset-all')) {
                     const { email } = data;
                     if (!email || typeof email !== 'string') {
                       res.statusCode = 400;
@@ -1307,6 +1314,19 @@ export default defineConfig(({ mode }) => ({
                     });
                     res.setHeader('Content-Type', 'application/json');
                     res.end(JSON.stringify({ success: true }));
+                    return;
+                  }
+                  
+                  // Reset full leaderboard (moderator): clear all entries in MongoDB.
+                  if (req.url?.includes('/reset-all')) {
+                    try {
+                      await clearAllLeaderboardEntries();
+                      res.setHeader('Content-Type', 'application/json');
+                      res.end(JSON.stringify({ success: true }));
+                    } catch (e: any) {
+                      res.statusCode = 500;
+                      res.end(JSON.stringify({ success: false, message: e?.message || 'Failed to reset leaderboard' }));
+                    }
                     return;
                   }
                   
