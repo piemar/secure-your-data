@@ -18,26 +18,37 @@ import { cn } from '@/lib/utils';
 
 export function NewPresentationView() {
   const [currentSlide, setCurrentSlide] = useState(1);
+  const [stepIndex, setStepIndex] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
   const [isGeneratingTemplate, setIsGeneratingTemplate] = useState(false);
 
   const totalSlides = pptxSlides.length;
   const slide = pptxSlides[currentSlide - 1];
+  const stepCount = slide?.stepCount ?? 0;
 
   const handleNext = useCallback(() => {
-    if (currentSlide < totalSlides) {
+    if (stepCount > 0 && stepIndex < stepCount - 1) {
+      setStepIndex((prev) => prev + 1);
+    } else if (currentSlide < totalSlides) {
       setCurrentSlide((prev) => prev + 1);
+      setStepIndex(0);
     }
-  }, [currentSlide, totalSlides]);
+  }, [currentSlide, totalSlides, stepCount, stepIndex]);
 
   const handlePrevious = useCallback(() => {
-    if (currentSlide > 1) {
+    if (stepCount > 0 && stepIndex > 0) {
+      setStepIndex((prev) => prev - 1);
+    } else if (currentSlide > 1) {
+      const prevSlide = pptxSlides[currentSlide - 2];
+      const prevStepCount = prevSlide?.stepCount ?? 0;
       setCurrentSlide((prev) => prev - 1);
+      setStepIndex(prevStepCount > 0 ? prevStepCount - 1 : 0);
     }
-  }, [currentSlide]);
+  }, [currentSlide, stepCount, stepIndex]);
 
   const handleGoToSlide = useCallback((slideNumber: number) => {
     setCurrentSlide(slideNumber);
+    setStepIndex(0);
   }, []);
 
   const handleExport = async () => {
@@ -137,6 +148,8 @@ export function NewPresentationView() {
           speakerNotes={slide.speakerNotes}
           slideTitle={slide.title}
           section={slide.section}
+          stepIndex={stepIndex}
+          stepCount={stepCount}
           onNext={handleNext}
           onPrevious={handlePrevious}
           onGoToSlide={handleGoToSlide}

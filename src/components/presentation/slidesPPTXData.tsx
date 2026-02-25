@@ -1,12 +1,13 @@
 import { ReactNode } from 'react';
 import { CodeBlock } from '@/components/ui/code-block';
-import { 
-  Shield, Lock, Database, Key, AlertTriangle, CheckCircle, 
+import {
+  Shield, Lock, Database, Key, AlertTriangle, CheckCircle,
   XCircle, Cloud, Server, Users, Building, Gamepad2, Target,
   BarChart3, RefreshCw, FileCheck, HelpCircle, BookOpen,
   Zap, ArrowRight, Layers
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { RevealStep } from './RevealStep';
 
 export interface SlideData {
   id: number;
@@ -14,6 +15,8 @@ export interface SlideData {
   section: string;
   sectionNumber: number;
   content: ReactNode;
+  /** When set, content can use RevealStep; Next/Previous advance step-by-step within the slide first. */
+  stepCount?: number;
   speakerNotes: string;
   // For PPTX export
   exportContent: {
@@ -245,27 +248,68 @@ By the end of this session, you'll be able to:
     title: "Today's Session",
     section: 'Agenda',
     sectionNumber: 0,
+    stepCount: 5,
     content: (
       <div className="max-w-3xl mx-auto">
-        <SlideTitle>Today's Session</SlideTitle>
+        <RevealStep step={0}>
+          <SlideTitle>Today's Session</SlideTitle>
+        </RevealStep>
         <div className="grid grid-cols-2 gap-4">
           {[
             { num: '01', title: 'The Challenge', desc: 'Why customers need this' },
             { num: '02', title: 'Use Cases', desc: 'Where this wins deals' },
+          ].map((item, i) => (
+            <RevealStep key={i} step={1}>
+              <div className="flex items-start gap-4 p-4 rounded-lg bg-card border border-border hover:border-primary/50 transition-colors">
+                <div className="text-2xl font-bold text-primary">{item.num}</div>
+                <div>
+                  <div className="font-semibold">{item.title}</div>
+                  <div className="text-sm text-muted-foreground">{item.desc}</div>
+                </div>
+              </div>
+            </RevealStep>
+          ))}
+          {[
             { num: '03', title: 'Architecture Deep Dive', desc: 'How it works under the hood' },
             { num: '04', title: 'CSFLE vs Queryable Encryption', desc: 'When to use which' },
+          ].map((item, i) => (
+            <RevealStep key={i} step={2}>
+              <div className="flex items-start gap-4 p-4 rounded-lg bg-card border border-border hover:border-primary/50 transition-colors">
+                <div className="text-2xl font-bold text-primary">{item.num}</div>
+                <div>
+                  <div className="font-semibold">{item.title}</div>
+                  <div className="text-sm text-muted-foreground">{item.desc}</div>
+                </div>
+              </div>
+            </RevealStep>
+          ))}
+          {[
             { num: '05', title: 'Key Management & KMS', desc: 'Envelope encryption, rotation' },
             { num: '06', title: 'Competitive Positioning', desc: 'vs Oracle, PostgreSQL, cloud DBs' },
+          ].map((item, i) => (
+            <RevealStep key={i} step={3}>
+              <div className="flex items-start gap-4 p-4 rounded-lg bg-card border border-border hover:border-primary/50 transition-colors">
+                <div className="text-2xl font-bold text-primary">{item.num}</div>
+                <div>
+                  <div className="font-semibold">{item.title}</div>
+                  <div className="text-sm text-muted-foreground">{item.desc}</div>
+                </div>
+              </div>
+            </RevealStep>
+          ))}
+          {[
             { num: '07', title: 'Discovery & Objection Handling', desc: 'Questions to ask, FAQs' },
             { num: '08', title: 'Hands-On Lab', desc: '3 Labs with AWS KMS' },
           ].map((item, i) => (
-            <div key={i} className="flex items-start gap-4 p-4 rounded-lg bg-card border border-border hover:border-primary/50 transition-colors">
-              <div className="text-2xl font-bold text-primary">{item.num}</div>
-              <div>
-                <div className="font-semibold">{item.title}</div>
-                <div className="text-sm text-muted-foreground">{item.desc}</div>
+            <RevealStep key={i} step={4}>
+              <div className="flex items-start gap-4 p-4 rounded-lg bg-card border border-border hover:border-primary/50 transition-colors">
+                <div className="text-2xl font-bold text-primary">{item.num}</div>
+                <div>
+                  <div className="font-semibold">{item.title}</div>
+                  <div className="text-sm text-muted-foreground">{item.desc}</div>
+                </div>
               </div>
-            </div>
+            </RevealStep>
           ))}
         </div>
       </div>
@@ -293,45 +337,54 @@ By the end of this session, you'll be able to:
     title: 'The Challenge',
     section: 'The Challenge',
     sectionNumber: 1,
+    stepCount: 4,
     content: (
       <div className="max-w-4xl mx-auto">
-        <SectionHeader number="01" title="The Challenge" />
-        <SlideTitle subtitle="Why customers need this">Why Should You Care?</SlideTitle>
-        <div className="grid grid-cols-2 gap-6 mb-8">
-          <StatCard value="$4.88M" label="Average breach cost" icon={AlertTriangle} />
-          <StatCard value="277 days" label="To identify & contain" icon={BarChart3} />
-        </div>
-        <div className="p-6 rounded-lg bg-card border border-border mb-6">
-          <h3 className="font-semibold text-lg mb-3">The Encryption Gap</h3>
-          <p className="text-muted-foreground">
-            Traditional encryption protects data at rest and in transit. But DBAs, cloud admins, 
-            and backup systems still see plaintext. When the database is compromised, so is your data.
-          </p>
-        </div>
-        <div className="p-4 rounded-lg bg-muted/30 border border-border">
-          <h4 className="font-semibold mb-2 flex items-center gap-2">
-            <Target className="w-4 h-4 text-primary" />
-            Customer triggers to listen for:
-          </h4>
-          <ul className="grid grid-cols-2 gap-2 text-sm">
-            <li className="flex items-center gap-2">
-              <span className="text-primary">•</span>
-              "We're moving to cloud but security won't approve"
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="text-primary">•</span>
-              "Our DBAs shouldn't see PII"
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="text-primary">•</span>
-              "We need to meet GDPR / HIPAA / PCI-DSS"
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="text-primary">•</span>
-              "Insider threat is a board-level concern"
-            </li>
-          </ul>
-        </div>
+        <RevealStep step={0}>
+          <SectionHeader number="01" title="The Challenge" />
+          <SlideTitle subtitle="Why customers need this">Why Should You Care?</SlideTitle>
+        </RevealStep>
+        <RevealStep step={1}>
+          <div className="grid grid-cols-2 gap-6 mb-8">
+            <StatCard value="$4.88M" label="Average breach cost" icon={AlertTriangle} />
+            <StatCard value="277 days" label="To identify & contain" icon={BarChart3} />
+          </div>
+        </RevealStep>
+        <RevealStep step={2}>
+          <div className="p-6 rounded-lg bg-card border border-border mb-6">
+            <h3 className="font-semibold text-lg mb-3">The Encryption Gap</h3>
+            <p className="text-muted-foreground">
+              Traditional encryption protects data at rest and in transit. But DBAs, cloud admins,
+              and backup systems still see plaintext. When the database is compromised, so is your data.
+            </p>
+          </div>
+        </RevealStep>
+        <RevealStep step={3}>
+          <div className="p-4 rounded-lg bg-muted/30 border border-border">
+            <h4 className="font-semibold mb-2 flex items-center gap-2">
+              <Target className="w-4 h-4 text-primary" />
+              Customer triggers to listen for:
+            </h4>
+            <ul className="grid grid-cols-2 gap-2 text-sm">
+              <li className="flex items-center gap-2">
+                <span className="text-primary">•</span>
+                "We're moving to cloud but security won't approve"
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-primary">•</span>
+                "Our DBAs shouldn't see PII"
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-primary">•</span>
+                "We need to meet GDPR / HIPAA / PCI-DSS"
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-primary">•</span>
+                "Insider threat is a board-level concern"
+              </li>
+            </ul>
+          </div>
+        </RevealStep>
       </div>
     ),
     speakerNotes: `The average data breach costs $4.88M and takes 277 days to identify and contain.
@@ -361,33 +414,44 @@ Listen for these customer triggers:
     title: 'Use Cases',
     section: 'Use Cases',
     sectionNumber: 2,
+    stepCount: 5,
     content: (
       <div className="max-w-4xl mx-auto">
-        <SectionHeader number="02" title="Use Cases" />
-        <SlideTitle>Where This Wins Deals</SlideTitle>
+        <RevealStep step={0}>
+          <SectionHeader number="02" title="Use Cases" />
+          <SlideTitle>Where This Wins Deals</SlideTitle>
+        </RevealStep>
         <div className="grid grid-cols-3 gap-6 mb-6">
-          <UseCaseCard
-            icon="🏥"
-            title="Healthcare"
-            items={['PHI protection, HIPAA compliance', 'Patient records encryption', 'SSN, DOB, diagnosis codes']}
-            regulation="HIPAA"
-          />
-          <UseCaseCard
-            icon="💳"
-            title="Financial Services"
-            items={['PCI-DSS compliance', 'Account numbers, balances', 'Trading data privacy']}
-            regulation="PCI-DSS, SOX"
-          />
-          <UseCaseCard
-            icon="🎰"
-            title="Gaming & Gambling"
-            items={['Regulatory compliance', 'Fraud detection', 'Player privacy, betting patterns']}
-            regulation="Gaming Regulations"
-          />
+          <RevealStep step={1}>
+            <UseCaseCard
+              icon="🏥"
+              title="Healthcare"
+              items={['PHI protection, HIPAA compliance', 'Patient records encryption', 'SSN, DOB, diagnosis codes']}
+              regulation="HIPAA"
+            />
+          </RevealStep>
+          <RevealStep step={2}>
+            <UseCaseCard
+              icon="💳"
+              title="Financial Services"
+              items={['PCI-DSS compliance', 'Account numbers, balances', 'Trading data privacy']}
+              regulation="PCI-DSS, SOX"
+            />
+          </RevealStep>
+          <RevealStep step={3}>
+            <UseCaseCard
+              icon="🎰"
+              title="Gaming & Gambling"
+              items={['Regulatory compliance', 'Fraud detection', 'Player privacy, betting patterns']}
+              regulation="Gaming Regulations"
+            />
+          </RevealStep>
         </div>
-        <CalloutBox type="info" title="Common Thread">
-          <p>Separation of duties between app owners and infrastructure operators</p>
-        </CalloutBox>
+        <RevealStep step={4}>
+          <CalloutBox type="info" title="Common Thread">
+            <p>Separation of duties between app owners and infrastructure operators</p>
+          </CalloutBox>
+        </RevealStep>
       </div>
     ),
     speakerNotes: `These are the industries where CSFLE/QE wins deals.
@@ -417,49 +481,58 @@ The common thread is separation of duties - the infrastructure team shouldn't se
     title: 'The Solution',
     section: 'Architecture',
     sectionNumber: 3,
+    stepCount: 4,
     content: (
       <div className="max-w-4xl mx-auto">
-        <SectionHeader number="03" title="Architecture" />
-        <SlideTitle>Client-Side Encryption</SlideTitle>
-        <div className="p-6 rounded-lg bg-primary/10 border border-primary mb-6">
-          <h3 className="font-bold text-xl mb-2">The Core Principle</h3>
-          <p className="text-lg">Data is encrypted by the application <strong>BEFORE</strong> it reaches MongoDB. The database never sees plaintext for protected fields.</p>
-        </div>
+        <RevealStep step={0}>
+          <SectionHeader number="03" title="Architecture" />
+          <SlideTitle>Client-Side Encryption</SlideTitle>
+        </RevealStep>
+        <RevealStep step={1}>
+          <div className="p-6 rounded-lg bg-primary/10 border border-primary mb-6">
+            <h3 className="font-bold text-xl mb-2">The Core Principle</h3>
+            <p className="text-lg">Data is encrypted by the application <strong>BEFORE</strong> it reaches MongoDB. The database never sees plaintext for protected fields.</p>
+          </div>
+        </RevealStep>
         <div className="grid grid-cols-2 gap-8 mb-6">
-          <div className="p-4 rounded-lg bg-card border border-border">
-            <h4 className="font-semibold mb-3 flex items-center gap-2">
-              <XCircle className="w-5 h-5 text-red-500" />
-              Who can't see the data:
-            </h4>
-            <ul className="space-y-2">
-              {['Database Admins', 'Cloud Operators', 'Backup Systems', 'Network Sniffers'].map((item, i) => (
-                <li key={i} className="flex items-center gap-2 text-sm">
-                  <XCircle className="w-4 h-4 text-red-500" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="space-y-4">
+          <RevealStep step={2}>
             <div className="p-4 rounded-lg bg-card border border-border">
-              <h4 className="font-semibold flex items-center gap-2">
-                <Lock className="w-5 h-5 text-primary" />
-                CSFLE
+              <h4 className="font-semibold mb-3 flex items-center gap-2">
+                <XCircle className="w-5 h-5 text-red-500" />
+                Who can't see the data:
               </h4>
-              <p className="text-sm text-muted-foreground mt-1">
-                Deterministic or random encryption. Equality queries only. Available since MongoDB 4.2.
-              </p>
+              <ul className="space-y-2">
+                {['Database Admins', 'Cloud Operators', 'Backup Systems', 'Network Sniffers'].map((item, i) => (
+                  <li key={i} className="flex items-center gap-2 text-sm">
+                    <XCircle className="w-4 h-4 text-red-500" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
             </div>
-            <div className="p-4 rounded-lg bg-card border border-primary">
-              <h4 className="font-semibold flex items-center gap-2">
-                <Shield className="w-5 h-5 text-primary" />
-                Queryable Encryption
-              </h4>
-              <p className="text-sm text-muted-foreground mt-1">
-                Equality, range, prefix, suffix queries. Stronger security. GA in MongoDB 8.0.
-              </p>
+          </RevealStep>
+          <RevealStep step={3}>
+            <div className="space-y-4">
+              <div className="p-4 rounded-lg bg-card border border-border">
+                <h4 className="font-semibold flex items-center gap-2">
+                  <Lock className="w-5 h-5 text-primary" />
+                  CSFLE
+                </h4>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Deterministic or random encryption. Equality queries only. Available since MongoDB 4.2.
+                </p>
+              </div>
+              <div className="p-4 rounded-lg bg-card border border-primary">
+                <h4 className="font-semibold flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-primary" />
+                  Queryable Encryption
+                </h4>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Equality, range, prefix, suffix queries. Stronger security. GA in MongoDB 8.0.
+                </p>
+              </div>
             </div>
-          </div>
+          </RevealStep>
         </div>
       </div>
     ),
@@ -488,24 +561,29 @@ Two approaches:
     title: 'Architecture',
     section: 'Architecture',
     sectionNumber: 3,
+    stepCount: 3,
     content: (
       <div className="max-w-4xl mx-auto">
-        <SlideTitle subtitle="How encryption flows through the system">How It Works</SlideTitle>
-        <ArchitectureDiagram />
-        <div className="grid grid-cols-2 gap-4 mt-6">
-          <div className="p-4 rounded-lg bg-card border border-border">
+        <RevealStep step={0}>
+          <SlideTitle subtitle="How encryption flows through the system">How It Works</SlideTitle>
+          <ArchitectureDiagram />
+        </RevealStep>
+        <RevealStep step={1}>
+          <div className="p-4 rounded-lg bg-card border border-border mt-6">
             <h4 className="font-semibold mb-2">Key Vault Collection</h4>
             <p className="text-sm text-muted-foreground">
               Stores encrypted Data Encryption Keys (DEKs). DEKs are wrapped by CMK in KMS.
             </p>
           </div>
-          <div className="p-4 rounded-lg bg-card border border-primary">
+        </RevealStep>
+        <RevealStep step={2}>
+          <div className="p-4 rounded-lg bg-card border border-primary mt-4">
             <h4 className="font-semibold mb-2">Customer-Controlled Keys</h4>
             <p className="text-sm text-muted-foreground">
               You keep the master keys. Even MongoDB/Atlas can never see your plaintext data.
             </p>
           </div>
-        </div>
+        </RevealStep>
       </div>
     ),
     speakerNotes: `The architecture flow:

@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { SessionTimer } from '@/components/ui/session-timer';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
+import { RevealStepContext } from './RevealStep';
 
 interface SlideViewerProps {
   currentSlide: number;
@@ -12,6 +13,8 @@ interface SlideViewerProps {
   speakerNotes: string;
   slideTitle: string;
   section: string;
+  stepIndex?: number;
+  stepCount?: number;
   onNext: () => void;
   onPrevious: () => void;
   onGoToSlide: (slide: number) => void;
@@ -24,6 +27,8 @@ export function SlideViewer({
   speakerNotes,
   slideTitle,
   section,
+  stepIndex = 0,
+  stepCount = 0,
   onNext,
   onPrevious,
 }: SlideViewerProps) {
@@ -65,7 +70,12 @@ export function SlideViewer({
         </div>
         <div className="flex items-center gap-3">
           <SessionTimer targetMinutes={45} compact />
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            {stepCount > 0 && (
+              <span className="font-mono text-primary">
+                Step {stepIndex + 1}/{stepCount}
+              </span>
+            )}
             <span className="font-mono">{currentSlide}</span>
             <span>/</span>
             <span className="font-mono">{totalSlides}</span>
@@ -101,7 +111,13 @@ export function SlideViewer({
           showNotes ? 'w-2/3' : 'w-full'
         )}>
           <div className="flex-1 overflow-y-auto p-8">
-            {slideContent}
+            {stepCount > 0 ? (
+              <RevealStepContext.Provider value={{ stepIndex }}>
+                {slideContent}
+              </RevealStepContext.Provider>
+            ) : (
+              slideContent
+            )}
           </div>
 
           {/* Navigation Footer */}
