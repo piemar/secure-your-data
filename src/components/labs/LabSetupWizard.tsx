@@ -535,7 +535,6 @@ export const LabSetupWizard: React.FC = () => {
                                 setLocalUri(e.target.value);
                                 setUriFromWorkshop(false);
                             }}
-                            disabled={hasAtlasConnection}
                             className="font-mono text-xs"
                         />
                         {uriFromWorkshop && (
@@ -552,7 +551,7 @@ export const LabSetupWizard: React.FC = () => {
                         {hasAtlasConnection && (
                             <div className="flex items-center gap-2 text-xs text-green-600">
                                 <CheckCircle2 className="w-3 h-3" />
-                                <span>Atlas connection verified</span>
+                                <span>Atlas connection verified. You can change the URI anytime and run Check Prerequisites again to re-verify.</span>
                             </div>
                         )}
                     </div>
