@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Database, Key, Shield, Cloud, Server, Lock, Unlock, ArrowRight } from 'lucide-react';
+import { Database, Key, Shield, Cloud, Server, Lock, Unlock, ArrowRight, Layers, Search } from 'lucide-react';
 
 interface ArchitectureDiagramProps {
   variant?: 'csfle' | 'qe' | 'overview';
@@ -32,93 +32,134 @@ export function ArchitectureDiagram({ variant = 'overview' }: ArchitectureDiagra
         initial="hidden"
         animate="visible"
       >
-        <h3 className="text-lg font-semibold mb-6 text-center">MongoDB Encryption Architecture</h3>
-        
-        <div className="flex items-center justify-between gap-4 relative">
-          {/* Application Layer */}
+        <h3 className="text-lg font-semibold mb-4 text-center">MongoDB Encryption Architecture</h3>
+
+        {/* Two-zone: Your environment | Cloud services */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Left: Your environment */}
           <motion.div
             variants={itemVariants}
-            className="flex flex-col items-center gap-2 z-10"
+            className="rounded-xl border-2 border-primary/30 bg-primary/5 p-4"
           >
-            <div className="w-20 h-20 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center">
-              <Server className="w-10 h-10 text-primary" />
+            <div className="text-xs font-semibold uppercase tracking-wider text-primary mb-4">Your environment</div>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-background border border-border">
+                <Server className="w-8 h-8 text-primary shrink-0" />
+                <div>
+                  <div className="text-sm font-medium">Application</div>
+                  <div className="text-xs text-muted-foreground">Node.js / Python</div>
+                </div>
+              </div>
+              <div className="flex justify-center">
+                <ArrowRight className="w-5 h-5 text-muted-foreground rotate-90" />
+              </div>
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-background border border-border">
+                <Shield className="w-8 h-8 text-green-500 shrink-0" />
+                <div>
+                  <div className="text-sm font-medium">MongoDB Driver</div>
+                  <div className="text-xs text-muted-foreground">Encrypt / Decrypt</div>
+                </div>
+              </div>
+              <div className="flex justify-center">
+                <ArrowRight className="w-5 h-5 text-muted-foreground rotate-90" />
+              </div>
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-green-500/10 border border-green-500/30">
+                <Lock className="w-8 h-8 text-green-500 shrink-0" />
+                <div>
+                  <div className="text-sm font-medium">libmongocrypt</div>
+                  <div className="text-xs text-muted-foreground">C library used by the driver for all crypto: key management, encrypt/decrypt, QE metadata. Required for both explicit and automatic encryption.</div>
+                </div>
+              </div>
+              <div className="flex justify-center">
+                <ArrowRight className="w-5 h-5 text-muted-foreground rotate-90" />
+              </div>
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                <Search className="w-8 h-8 text-amber-500 shrink-0" />
+                <div>
+                  <div className="text-sm font-medium">crypt_shared / mongocryptd</div>
+                  <div className="text-xs text-muted-foreground">Automatic encryption only: query analysis (crypt_shared recommended; mongocryptd legacy)</div>
+                </div>
+              </div>
             </div>
-            <span className="text-sm font-medium">Application</span>
-            <span className="text-xs text-muted-foreground">Node.js / Python</span>
           </motion.div>
 
-          {/* Arrow */}
+          {/* Right: Cloud services */}
           <motion.div
             variants={itemVariants}
-            className="flex items-center text-muted-foreground"
+            className="rounded-xl border-2 border-blue-500/30 bg-blue-500/5 p-4"
           >
-            <ArrowRight className="w-6 h-6" />
-          </motion.div>
-
-          {/* Driver Layer */}
-          <motion.div
-            variants={itemVariants}
-            className="flex flex-col items-center gap-2 z-10"
-          >
-            <div className="w-20 h-20 rounded-xl bg-green-500/10 border border-green-500/30 flex items-center justify-center">
-              <Shield className="w-10 h-10 text-green-500" />
+              <div className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-4">Cloud services</div>
+            <p className="text-xs text-muted-foreground mb-3">Driver uses KMS + Key Vault first to get DEKs, then encrypts and stores ciphertext in Atlas.</p>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-background border border-border">
+                <Key className="w-8 h-8 text-amber-500 shrink-0" />
+                <div>
+                  <div className="text-sm font-medium">KMS</div>
+                  <div className="text-xs text-muted-foreground">AWS / Azure / GCP • Customer Master Key (CMK)</div>
+                </div>
+              </div>
+              <div className="flex justify-center">
+                <ArrowRight className="w-5 h-5 text-muted-foreground rotate-90" />
+              </div>
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/10 border border-primary/30">
+                <Layers className="w-8 h-8 text-primary shrink-0" />
+                <div>
+                  <div className="text-sm font-medium">Envelope encryption</div>
+                  <div className="text-xs text-muted-foreground">CMK wraps DEKs; DEKs encrypt your data</div>
+                </div>
+              </div>
+              <div className="flex justify-center">
+                <ArrowRight className="w-5 h-5 text-muted-foreground rotate-90" />
+              </div>
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-violet-500/10 border border-violet-500/30">
+                <Lock className="w-8 h-8 text-violet-500 shrink-0" />
+                <div>
+                  <div className="text-sm font-medium">Key Vault collection</div>
+                  <div className="text-xs text-muted-foreground">Encrypted DEKs stored here. Driver fetches DEKs, unwraps via KMS, then encrypts/decrypts.</div>
+                </div>
+              </div>
+              <div className="flex justify-center">
+                <ArrowRight className="w-5 h-5 text-muted-foreground rotate-90" />
+              </div>
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-background border border-border">
+                <Database className="w-8 h-8 text-blue-500 shrink-0" />
+                <div>
+                  <div className="text-sm font-medium">MongoDB Atlas</div>
+                  <div className="text-xs text-muted-foreground">Encrypted data storage. Ciphertext only; driver writes after encrypting, reads then decrypts.</div>
+                </div>
+              </div>
             </div>
-            <span className="text-sm font-medium">MongoDB Driver</span>
-            <span className="text-xs text-muted-foreground">Encrypt/Decrypt</span>
-          </motion.div>
-
-          {/* Arrow */}
-          <motion.div
-            variants={itemVariants}
-            className="flex items-center text-muted-foreground"
-          >
-            <ArrowRight className="w-6 h-6" />
-          </motion.div>
-
-          {/* KMS Layer */}
-          <motion.div
-            variants={itemVariants}
-            className="flex flex-col items-center gap-2 z-10"
-          >
-            <div className="w-20 h-20 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
-              <Key className="w-10 h-10 text-amber-500" />
-            </div>
-            <span className="text-sm font-medium">KMS</span>
-            <span className="text-xs text-muted-foreground">AWS / Azure / GCP</span>
-          </motion.div>
-
-          {/* Arrow */}
-          <motion.div
-            variants={itemVariants}
-            className="flex items-center text-muted-foreground"
-          >
-            <ArrowRight className="w-6 h-6" />
-          </motion.div>
-
-          {/* MongoDB Atlas */}
-          <motion.div
-            variants={itemVariants}
-            className="flex flex-col items-center gap-2 z-10"
-          >
-            <div className="w-20 h-20 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center">
-              <Database className="w-10 h-10 text-blue-500" />
-            </div>
-            <span className="text-sm font-medium">MongoDB Atlas</span>
-            <span className="text-xs text-muted-foreground">Encrypted Data</span>
           </motion.div>
         </div>
 
-        {/* Legend */}
-        <div className="mt-6 flex items-center justify-center gap-6 text-xs text-muted-foreground">
+        {/* Connection + legend */}
+        <motion.div
+          variants={itemVariants}
+          className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-4 text-xs text-muted-foreground"
+        >
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border">
+            <Lock className="w-3.5 h-3.5 text-green-500" />
+            <span>TLS 1.3 – encrypted connection</span>
+          </div>
           <div className="flex items-center gap-2">
-            <Lock className="w-3 h-3 text-green-500" />
+            <Lock className="w-3.5 h-3.5 text-green-500" />
             <span>Data encrypted in transit</span>
           </div>
           <div className="flex items-center gap-2">
-            <Lock className="w-3 h-3 text-blue-500" />
+            <Lock className="w-3.5 h-3.5 text-blue-500" />
             <span>Data encrypted at rest</span>
           </div>
-        </div>
+        </motion.div>
+
+        {/* Customer-controlled keys callout */}
+        <motion.div
+          variants={itemVariants}
+          className="mt-4 p-3 rounded-lg bg-primary/10 border border-primary text-center"
+        >
+          <p className="text-sm font-medium text-primary">
+            You keep the master keys. Even MongoDB/Atlas can never see your plaintext data.
+          </p>
+        </motion.div>
       </motion.div>
     );
   }

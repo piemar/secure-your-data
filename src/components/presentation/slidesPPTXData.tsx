@@ -4,12 +4,12 @@ import {
   Shield, Lock, Database, Key, AlertTriangle, CheckCircle,
   XCircle, Cloud, Server, Users, Building, Gamepad2, Target,
   BarChart3, RefreshCw, FileCheck, HelpCircle, BookOpen,
-  Zap, ArrowRight, Layers
+  Zap, ArrowRight, Layers, FileText, FileLock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { RevealStep, RevealStepContext } from './RevealStep';
 import { ArchitectureDiagram } from '@/components/workshop/ArchitectureDiagram';
-import { CSFLEArchitectureDiagram, QEArchitectureDiagram, type CSFLEHighlightStep, type QEHighlightStep } from '@/components/labs/LabArchitectureDiagrams';
+import { CSFLEArchitectureDiagram, QEArchitectureDiagram, CryptoShreddingDiagram, type CSFLEHighlightStep, type QEHighlightStep } from '@/components/labs/LabArchitectureDiagrams';
 
 export interface SlideData {
   id: number;
@@ -151,26 +151,59 @@ function UseCaseCard({ icon, title, items, regulation }: { icon: string; title: 
   );
 }
 
-function EnvelopeDiagram() {
+/** Horizontal envelope flow: CMK → Encrypts → DEK → Encrypts → Plain text → Creates → Cipher text. 0 = no highlight, 1 = CMK, 2 = DEK, 3 = Data */
+function EnvelopeEncryptionDiagram({ highlightStep = 0 }: { highlightStep?: 0 | 1 | 2 | 3 }) {
+  const dim = (step: number) => (highlightStep > 0 && highlightStep !== step ? 0.25 : 1);
+  const focused = (step: number) => highlightStep === step;
+  const node = (step: number, icon: ReactNode, title: string, subtitle: string) => (
+    <div
+      className={cn(
+        'flex flex-col items-center justify-center p-4 rounded-xl text-center min-w-[120px] max-w-[160px] transition-all duration-300 border-2',
+        focused(step) ? 'bg-primary/20 border-primary ring-2 ring-primary/50' : 'bg-card border-border',
+        dim(step) < 1 && 'opacity-25'
+      )}
+      style={highlightStep > 0 ? { opacity: dim(step) } : undefined}
+    >
+      <div className={cn('mb-2', focused(step) ? 'text-primary' : 'text-foreground')}>{icon}</div>
+      <div className={cn('font-bold text-sm', focused(step) ? 'text-primary' : 'text-foreground')}>{title}</div>
+      <div className="text-xs text-muted-foreground mt-0.5">{subtitle}</div>
+    </div>
+  );
+  const arrow = (label: string, opacity?: number) => (
+    <div className="flex flex-col items-center justify-center px-2 shrink-0" style={opacity !== undefined ? { opacity } : undefined}>
+      <ArrowRight className="w-8 h-8 text-green-500 shrink-0" />
+      <span className="text-xs font-semibold text-green-600 dark:text-green-400 mt-0.5">{label}</span>
+    </div>
+  );
   return (
-    <div className="flex flex-col items-center gap-4 my-8">
-      <div className="p-4 rounded-lg bg-primary/20 border-2 border-primary text-center w-72">
-        <Key className="w-6 h-6 text-primary mx-auto mb-2" />
-        <div className="font-bold text-primary">Customer Master Key (CMK)</div>
-        <div className="text-xs text-muted-foreground">Never leaves KMS • Customer controlled</div>
-      </div>
-      <div className="text-muted-foreground">↓ wraps</div>
-      <div className="p-4 rounded-lg bg-card border border-border text-center w-72">
-        <Lock className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
-        <div className="font-semibold">Data Encryption Key (DEK)</div>
-        <div className="text-xs text-muted-foreground">Stored encrypted in Key Vault</div>
-      </div>
-      <div className="text-muted-foreground">↓ encrypts</div>
-      <div className="p-4 rounded-lg bg-card border border-border text-center w-72">
-        <Shield className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
-        <div className="font-semibold">Your Sensitive Data</div>
-        <div className="text-xs text-muted-foreground">SSN, PII, PHI, card numbers</div>
-      </div>
+    <div className="flex flex-wrap items-center justify-center gap-1 my-6 px-2">
+      {node(1, <Key className="w-10 h-10" />, 'Customer Master Key (CMK)', 'KMS · never leaves HSM')}
+      {arrow('Encrypts', dim(2))}
+      {node(2, <Lock className="w-10 h-10" />, 'Data Encryption Key (DEK)', 'Stored encrypted in Key Vault')}
+      {arrow('Encrypts', dim(3))}
+      {node(3, <FileText className="w-10 h-10 text-green-600 dark:text-green-400" />, 'Plain text', 'Your sensitive data')}
+      {arrow('Creates', dim(3))}
+      {node(3, <FileLock className="w-10 h-10 text-primary" />, 'Cipher text', 'Encrypted · stored in MongoDB')}
+    </div>
+  );
+}
+
+function EnvelopeSlideWithSteps() {
+  const { stepIndex } = useContext(RevealStepContext);
+  const highlightStep: 0 | 1 | 2 | 3 = stepIndex >= 1 && stepIndex <= 3 ? (stepIndex as 1 | 2 | 3) : 0;
+  const tooltips: Record<number, string> = {
+    1: 'The root key. Lives only in your KMS. Used only to wrap and unwrap DEKs.',
+    2: 'Each DEK is encrypted by the CMK and stored in MongoDB. The driver unwraps DEKs to encrypt/decrypt your data.',
+    3: 'Field values are encrypted in application memory with the DEK; only ciphertext is sent to and stored in MongoDB.',
+  };
+  return (
+    <div>
+      <EnvelopeEncryptionDiagram highlightStep={highlightStep} />
+      {stepIndex >= 1 && stepIndex <= 3 && (
+        <div className="mt-4 p-4 rounded-xl border-2 border-primary bg-primary/10 text-center max-w-md mx-auto">
+          <p className="text-sm text-muted-foreground">{tooltips[stepIndex]}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -182,25 +215,32 @@ const CSFLE_STEP_TOOLTIPS: Record<number, { title: string; body: string }> = {
   },
   2: {
     title: '2. MongoDB Driver + libmongocrypt',
-    body: 'Encrypts fields before data leaves the app. Encryption happens on the client – MongoDB never sees plaintext.',
+    body: 'To encrypt, the driver first needs a DEK. It will fetch the encrypted DEK from the Key Vault and unwrap it using the CMK from KMS, then use the DEK to encrypt fields before data leaves the app. MongoDB never sees plaintext.',
   },
   3: {
-    title: '3. MongoDB Atlas',
-    body: 'Stores only ciphertext (e.g. BinData). The database and backups never contain plaintext sensitive fields.',
+    title: '3. AWS KMS – Customer Master Key (CMK)',
+    body: 'The driver uses the CMK in KMS to unwrap (decrypt) the DEK. The CMK never leaves KMS. You control access.',
   },
   4: {
-    title: '4. AWS KMS – Customer Master Key (CMK)',
-    body: 'Root key; never leaves KMS. Used only to wrap and unwrap Data Encryption Keys. You control access.',
+    title: '4. Key Vault (encryption.__keyVault)',
+    body: 'The driver fetches the encrypted DEK from the Key Vault collection. After unwrapping via KMS, it uses the DEK to encrypt or decrypt field values.',
   },
   5: {
-    title: '5. Key Vault (encryption.__keyVault)',
-    body: 'Stores encrypted DEKs. Each DEK is wrapped by the CMK. The driver fetches DEKs to encrypt/decrypt field values.',
+    title: '5. MongoDB Atlas',
+    body: 'The driver sends only ciphertext to Atlas. It writes after encrypting with the DEK; on read, it decrypts with the DEK before returning to the application. Database and backups never contain plaintext.',
   },
 };
 
+/** Map narrative order (1 App, 2 Driver, 3 KMS, 4 Key Vault, 5 Atlas) to diagram box indices (1 App, 2 Driver, 3 Atlas, 4 KMS, 5 Key Vault). */
+function csfleStepToDiagramHighlight(stepIndex: number): CSFLEHighlightStep {
+  if (stepIndex < 1 || stepIndex > 5) return 0;
+  const map: Record<number, CSFLEHighlightStep> = { 1: 1, 2: 2, 3: 4, 4: 5, 5: 3 };
+  return map[stepIndex];
+}
+
 function CSFLEDiagramWithTooltips() {
   const { stepIndex } = useContext(RevealStepContext);
-  const highlightStep: CSFLEHighlightStep = stepIndex >= 1 && stepIndex <= 5 ? (stepIndex as CSFLEHighlightStep) : 0;
+  const highlightStep = csfleStepToDiagramHighlight(stepIndex);
   const tooltip = stepIndex >= 1 && stepIndex <= 5 ? CSFLE_STEP_TOOLTIPS[stepIndex] : null;
   return (
     <div className="relative">
@@ -211,8 +251,8 @@ function CSFLEDiagramWithTooltips() {
             'mt-4 p-4 rounded-xl border-2 bg-card text-left',
             stepIndex === 1 && 'border-primary bg-primary/10',
             stepIndex === 2 && 'border-border',
-            stepIndex === 3 && 'border-border',
-            stepIndex === 4 && 'border-amber-500/50 bg-amber-500/10',
+            stepIndex === 3 && 'border-amber-500/50 bg-amber-500/10',
+            stepIndex === 4 && 'border-violet-500/50 bg-violet-500/10',
             stepIndex === 5 && 'border-border'
           )}
         >
@@ -224,24 +264,43 @@ function CSFLEDiagramWithTooltips() {
   );
 }
 
-const QE_STEP_TOOLTIPS: Record<number, { title: string; body: string }> = {
+const QE_STEP_TOOLTIPS: Record<number, { title: string; body: string; takeaway?: string }> = {
   1: {
-    title: '1. Application – query on encrypted field',
-    body: 'e.g. salary > 50k. The app sends the query; the driver turns it into encrypted query tokens.',
+    title: '1. Query from client',
+    body: 'Client sends e.g. find({ ssn: "S1234567C" }). Plaintext never leaves the client.',
+    takeaway: 'Plaintext stays in your environment.',
   },
   2: {
-    title: '2. Driver – generates query tokens',
-    body: 'Tokens allow the server to match encrypted values without ever seeing plaintext. One DEK per encrypted field.',
+    title: '2. Driver + KMS → cryptographic token',
+    body: 'Driver gets keys from your KMS, produces a token for the query value. Server can match it without seeing plaintext.',
+    takeaway: 'Token = encrypted representation of the search value.',
   },
   3: {
-    title: '3. Server – search without decrypt',
-    body: 'MongoDB uses tokens to search encrypted indexes. Supports equality, range, prefix, suffix – server never sees plaintext.',
+    title: '3. Token to server; 4. Server search',
+    body: 'Token goes to MongoDB. Server searches encrypted indexes (equality, range, prefix, suffix). Returns encrypted results.',
+    takeaway: 'Server processes ciphertext only.',
   },
   4: {
-    title: '4. .esc and .ecoc – encrypted metadata',
-    body: 'System catalog (.esc) and content cache (.ecoc) store encrypted state for queryable encryption. Stored in Atlas with your data.',
+    title: '5. Results back; 6. Decrypt to client',
+    body: 'Encrypted results return; driver decrypts for the app. .esc/.ecoc store encrypted metadata.',
+    takeaway: 'Stored, transmitted, processed, and queried as ciphertext. Server never sees plaintext.',
   },
 };
+
+function QEPlaintextVsCiphertextStrip() {
+  return (
+    <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+      <div className="rounded-lg border border-border bg-card/50 p-3">
+        <div className="font-semibold text-primary mb-2">Client view (plaintext)</div>
+        <pre className="font-mono text-[10px] text-muted-foreground overflow-x-auto whitespace-pre-wrap">{'{ "payer": "Acme", "ssn": "S1234567C", "email": "j@ex.com" }'}</pre>
+      </div>
+      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+        <div className="font-semibold text-amber-600 dark:text-amber-400 mb-2">Server view (ciphertext)</div>
+        <pre className="font-mono text-[10px] text-muted-foreground overflow-x-auto whitespace-pre-wrap">{'{ "payer": "Acme", "ssn": "r6EaUcgZ...", "email": "iu233oh..." }'}</pre>
+      </div>
+    </div>
+  );
+}
 
 function QEDiagramWithTooltips() {
   const { stepIndex } = useContext(RevealStepContext);
@@ -262,8 +321,12 @@ function QEDiagramWithTooltips() {
         >
           <h4 className="font-semibold mb-1">{tooltip.title}</h4>
           <p className="text-sm text-muted-foreground">{tooltip.body}</p>
+          {tooltip.takeaway && (
+            <p className="text-sm font-medium text-primary mt-2 border-t border-border pt-2">{tooltip.takeaway}</p>
+          )}
         </div>
       )}
+      {stepIndex >= 1 && <QEPlaintextVsCiphertextStrip />}
     </div>
   );
 }
@@ -628,20 +691,20 @@ Two approaches:
     content: (
       <div className="max-w-4xl mx-auto">
         <RevealStep step={0}>
-          <SlideTitle subtitle="How encryption flows through the system">How It Works</SlideTitle>
+          <SlideTitle subtitle="How encryption flows through the system">MongoDB Encryption Architecture</SlideTitle>
           <ArchitectureDiagram variant="overview" />
         </RevealStep>
         <RevealStep step={1}>
-          <div className="p-4 rounded-lg bg-card border border-border mt-6">
-            <h4 className="font-semibold mb-2">Key Vault Collection</h4>
+          <div className="p-4 rounded-lg bg-violet-500/10 border border-violet-500/30 mt-4">
+            <h4 className="font-semibold mb-1">Key Vault collection</h4>
             <p className="text-sm text-muted-foreground">
-              Stores encrypted Data Encryption Keys (DEKs). DEKs are wrapped by CMK in KMS.
+              Encrypted DEKs are stored in a MongoDB collection. The driver fetches and unwraps them via KMS to encrypt/decrypt your data.
             </p>
           </div>
         </RevealStep>
         <RevealStep step={2}>
-          <div className="p-4 rounded-lg bg-card border border-primary mt-4">
-            <h4 className="font-semibold mb-2">Customer-Controlled Keys</h4>
+          <div className="p-4 rounded-lg bg-primary/10 border border-primary mt-4">
+            <h4 className="font-semibold mb-1">Customer-controlled keys</h4>
             <p className="text-sm text-muted-foreground">
               You keep the master keys. Even MongoDB/Atlas can never see your plaintext data.
             </p>
@@ -649,23 +712,74 @@ Two approaches:
         </RevealStep>
       </div>
     ),
-    speakerNotes: `The architecture flow:
-1. Application with MongoDB Driver + libmongocrypt handles encryption
-2. MongoDB stores only ciphertext - never sees plaintext
-3. KMS Provider (AWS/Azure/GCP/KMIP) stores and protects the master key
-4. Key Vault Collection stores encrypted DEKs
-
-Key talking point: "You keep the master keys. Even MongoDB/Atlas can never see your plaintext data."`,
+    speakerNotes: `MongoDB Encryption Architecture:
+1. Your environment: Application → MongoDB Driver → libmongocrypt (all crypto). For automatic encryption, crypt_shared (recommended) or mongocryptd does query analysis.
+2. Cloud: KMS holds CMK; Key Vault collection stores encrypted DEKs; MongoDB Atlas stores ciphertext only.
+3. Key talking point: "You keep the master keys. Even MongoDB/Atlas can never see your plaintext data."`,
     exportContent: {
-      title: 'Architecture - How It Works',
+      title: 'MongoDB Encryption Architecture',
       bullets: [
-        'Application: MongoDB Driver + libmongocrypt handles encryption/decryption',
+        'Your environment: Application, Driver, libmongocrypt (crypto), crypt_shared/mongocryptd (automatic encryption: query analysis only)',
         'MongoDB: Stores ciphertext only, never sees plaintext',
         'KMS Provider: AWS/Azure/GCP/KMIP stores master key',
         'Key Vault: Stores encrypted DEKs',
         'Customer-controlled keys: Even MongoDB/Atlas never sees plaintext',
       ],
-      notes: 'The architecture flow shows encryption happening at the application layer.',
+      notes: 'Architecture shows encryption at the application layer; crypt_shared or mongocryptd for automatic encryption query analysis.',
+    },
+  },
+
+  // Slide 13: Envelope Encryption – after Architecture, before How CSFLE (key concept first)
+  {
+    id: 13,
+    title: 'Envelope Encryption',
+    section: 'Architecture',
+    sectionNumber: 3,
+    stepCount: 5,
+    content: (
+      <div className="max-w-4xl mx-auto">
+        <SectionHeader number="03" title="Architecture" />
+        <RevealStep step={0}>
+          <SlideTitle subtitle="Keys are layered: CMK wraps DEKs; DEKs encrypt your data">Envelope Encryption</SlideTitle>
+          <p className="text-sm text-muted-foreground text-center mb-4">Click Next to highlight each layer. All three are always visible.</p>
+        </RevealStep>
+        <RevealStep step={1}>
+          <div className="mt-2">
+            <EnvelopeSlideWithSteps />
+          </div>
+        </RevealStep>
+        <RevealStep step={4}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+            <div className="p-4 rounded-lg bg-card border border-border">
+              <h4 className="font-semibold text-sm mb-2">Why Envelope Encryption?</h4>
+              <ul className="text-xs space-y-1 text-muted-foreground">
+                <li>• CMK rotation only re-wraps DEKs; no need to re-encrypt data</li>
+                <li>• Different DEKs for different classifications or tenants</li>
+                <li>• Full audit trail in KMS for key access</li>
+              </ul>
+            </div>
+            <div className="p-4 rounded-lg bg-primary/10 border border-primary md:col-span-2">
+              <h4 className="font-semibold text-sm mb-2 text-primary">Customer Talking Point</h4>
+              <p className="text-sm">"You keep the master keys. Even MongoDB/Atlas can never see your plaintext data."</p>
+            </div>
+          </div>
+        </RevealStep>
+      </div>
+    ),
+    speakerNotes: `Envelope encryption – show one container at a time:
+1. CMK – never leaves KMS, wraps DEKs
+2. DEK – stored encrypted in Key Vault, encrypts data
+3. Data – ciphertext in MongoDB
+4. Why envelope + talking point: You keep the master keys.`,
+    exportContent: {
+      title: 'Envelope Encryption',
+      bullets: [
+        'CMK: Never leaves KMS, customer controlled; wraps DEKs only',
+        'DEK: Stored encrypted in Key Vault; encrypts field values',
+        'Data: Ciphertext in MongoDB; plaintext never in DB or backups',
+        'Benefits: CMK rotation without re-encrypting data; audit trail in KMS',
+      ],
+      notes: 'Customer talking point: You keep the master keys.',
     },
   },
 
@@ -680,7 +794,7 @@ Key talking point: "You keep the master keys. Even MongoDB/Atlas can never see y
       <div className="max-w-4xl mx-auto">
         <RevealStep step={0}>
           <SlideTitle subtitle="Click Next to highlight each part and see its description">How CSFLE Works</SlideTitle>
-          <p className="text-sm text-muted-foreground text-center mb-6">Application → Driver (libmongocrypt) → Atlas. KMS holds CMK; Key Vault holds encrypted DEKs.</p>
+          <p className="text-sm text-muted-foreground text-center mb-6">Application → Driver. Driver uses KMS + Key Vault to get DEK, then encrypts and sends ciphertext to Atlas.</p>
         </RevealStep>
         <RevealStep step={1}>
           <div className="mt-4">
@@ -689,27 +803,26 @@ Key talking point: "You keep the master keys. Even MongoDB/Atlas can never see y
         </RevealStep>
       </div>
     ),
-    speakerNotes: `How CSFLE works – walk through one container at a time:
-1. Your Application – plaintext data
-2. MongoDB Driver + libmongocrypt – encrypts before data leaves
-3. MongoDB Atlas – stores ciphertext only
-4. AWS KMS – CMK never leaves KMS
-5. Key Vault – encrypted DEKs
-Then show the full diagram. Same visuals as in the lab overview.`,
+    speakerNotes: `How CSFLE works – walk through in logical order:
+1. Your Application – plaintext data to the driver
+2. MongoDB Driver + libmongocrypt – needs a DEK to encrypt; will fetch from Key Vault and unwrap via KMS
+3. AWS KMS – driver uses CMK to unwrap the DEK (CMK never leaves KMS)
+4. Key Vault – driver fetches encrypted DEK from here
+5. MongoDB Atlas – driver sends ciphertext only; on read, decrypts with DEK then returns to app`,
     exportContent: {
       title: 'How CSFLE Works',
       bullets: [
         'Application: plaintext data',
-        'Driver + libmongocrypt: encrypts before data leaves',
+        'Driver: gets DEK from Key Vault, unwraps via KMS, then encrypts/decrypts',
+        'KMS: CMK unwraps DEKs; never leaves KMS',
+        'Key Vault: stores encrypted DEKs; driver fetches here',
         'Atlas: ciphertext only',
-        'KMS: CMK wraps DEKs',
-        'Key Vault: stores encrypted DEKs',
       ],
-      notes: 'Same architecture diagram as in the lab overview.',
+      notes: 'Flow: driver uses KMS + Key Vault to get DEK, then encrypts and sends to Atlas.',
     },
   },
 
-  // Slide 8: How Queryable Encryption works – diagram with step-highlight and tooltips on Next (same pattern as CSFLE)
+  // Slide 8: How Queryable Encryption works – 1–6 flow, cryptographic token, plaintext vs ciphertext (MongoDB-style)
   {
     id: 8,
     title: 'How Queryable Encryption Works',
@@ -719,8 +832,13 @@ Then show the full diagram. Same visuals as in the lab overview.`,
     content: (
       <div className="max-w-4xl mx-auto">
         <RevealStep step={0}>
-          <SlideTitle subtitle="Click Next to highlight each part and see its description">How Queryable Encryption Works</SlideTitle>
-          <p className="text-sm text-muted-foreground text-center mb-6">Query tokens, .esc/.ecoc metadata; server searches encrypted data without decrypting.</p>
+          <SlideTitle subtitle="Find all bills tied to this person's ID – server never sees plaintext">How Queryable Encryption Works</SlideTitle>
+          <ul className="text-sm text-muted-foreground text-center mb-4 space-y-1 list-none">
+            <li>• Fast searchable encryption scheme</li>
+            <li>• Server-side processing of encrypted data</li>
+            <li>• Server knows nothing about the data</li>
+          </ul>
+          <p className="text-sm text-muted-foreground text-center mb-6">Click Next to follow the flow: client query → cryptographic token → server search → encrypted results back.</p>
         </RevealStep>
         <RevealStep step={1}>
           <div className="mt-4">
@@ -729,21 +847,21 @@ Then show the full diagram. Same visuals as in the lab overview.`,
         </RevealStep>
       </div>
     ),
-    speakerNotes: `How Queryable Encryption works – walk through one container at a time:
-1. Application – query on encrypted field
-2. Driver – query tokens
-3. Server – search without decrypt
-4. .esc / .ecoc – encrypted metadata
-Then show full diagram. Same visuals as in the lab overview.`,
+    speakerNotes: `How Queryable Encryption works (1–6 flow):
+1. Query from client – e.g. find({ ssn: "S1234567C" })
+2. Driver + KMS – produces cryptographic token
+3. Token to server; server searches encrypted indexes
+4. Encrypted results back; driver decrypts for client
+5. .esc/.ecoc store encrypted metadata. Encrypted fields are stored, transmitted, processed, and retrieved as ciphertext – including queries. Server never sees plaintext.`,
     exportContent: {
       title: 'How Queryable Encryption Works',
       bullets: [
-        'Application: query on encrypted field',
-        'Driver: generates query tokens',
-        'Server: searches without decrypting',
-        '.esc/.ecoc: encrypted metadata',
+        'Query from client; Driver + KMS produce cryptographic token',
+        'Token sent to server; server searches without decrypting',
+        'Encrypted results back; driver decrypts for client',
+        'Server knows nothing about the data',
       ],
-      notes: 'Same architecture diagram as in the lab overview.',
+      notes: '1–6 flow with cryptographic token; plaintext vs ciphertext strip.',
     },
   },
 
@@ -851,7 +969,7 @@ Recommendation: QE for new projects on 8.0+, CSFLE for older versions.`,
             <p className="text-sm text-primary mb-4">Enterprise Advanced / Atlas required</p>
             <div className="mb-4">
               <h4 className="font-semibold text-sm mb-2">How it works</h4>
-              <p className="text-sm text-muted-foreground">Schema defines which fields to encrypt. Driver handles encryption/decryption transparently.</p>
+              <p className="text-sm text-muted-foreground">Schema defines which fields to encrypt. Driver handles encryption/decryption transparently. Uses libmongocrypt (crypto) plus query analysis: Automatic Encryption Shared Library (crypt_shared, recommended) or legacy mongocryptd.</p>
             </div>
             <div className="space-y-2">
               <h4 className="font-semibold text-sm">Pros</h4>
@@ -872,7 +990,7 @@ Recommendation: QE for new projects on 8.0+, CSFLE for older versions.`,
             <p className="text-sm text-muted-foreground mb-4">Community Edition compatible</p>
             <div className="mb-4">
               <h4 className="font-semibold text-sm mb-2">How it works</h4>
-              <p className="text-sm text-muted-foreground">Application code explicitly calls encrypt/decrypt methods on specific fields.</p>
+              <p className="text-sm text-muted-foreground">Application code explicitly calls encrypt/decrypt methods on specific fields. Uses libmongocrypt + ClientEncryption API only; no crypt_shared or mongocryptd.</p>
             </div>
             <div className="space-y-2">
               <h4 className="font-semibold text-sm">Pros</h4>
@@ -895,26 +1013,26 @@ Recommendation: QE for new projects on 8.0+, CSFLE for older versions.`,
 
 Automatic Encryption:
 - Requires Enterprise/Atlas
-- Schema defines fields, driver handles transparently
-- Minimal code changes, reduced developer error
+- Driver uses libmongocrypt for crypto and crypt_shared (recommended) or mongocryptd for query analysis
+- Schema defines fields, driver handles transparently; minimal code changes
 
 Explicit Encryption:
-- Works with Community Edition
-- Application code calls encrypt/decrypt
-- More control but more code changes
-- Required when migrating existing plaintext data into CSFLE (read plaintext, encrypt with ClientEncryption, write to new collection)`,
+- libmongocrypt + ClientEncryption API only; no query-analysis helper (no crypt_shared or mongocryptd)
+- Works with Community Edition; application code calls encrypt/decrypt
+- Required when migrating existing plaintext data (read plaintext, encrypt with ClientEncryption, write to new collection)`,
     exportContent: {
       title: 'Automatic vs Explicit Encryption',
       table: {
         headers: ['Aspect', 'Automatic', 'Explicit'],
         rows: [
           ['Requirements', 'Enterprise/Atlas', 'Community Edition OK'],
+          ['Components', 'libmongocrypt + crypt_shared or mongocryptd (query analysis)', 'libmongocrypt + ClientEncryption API only'],
           ['Code Changes', 'Minimal', 'More required'],
           ['Control', 'Schema-driven', 'Full control'],
           ['Error Risk', 'Lower', 'Higher'],
         ],
       },
-      notes: 'Two implementation approaches with different tradeoffs.',
+      notes: 'Automatic: libmongocrypt + crypt_shared or mongocryptd. Explicit: libmongocrypt + ClientEncryption API only; no crypt_shared/mongocryptd.',
     },
   },
 
@@ -928,52 +1046,69 @@ Explicit Encryption:
       <div className="max-w-4xl mx-auto">
         <SlideTitle subtitle="Queryable Encryption capabilities">Query Capabilities</SlideTitle>
         <ComparisonTable
-          headers={['Equality', 'Range', 'Prefix', 'Suffix']}
+          headers={['Equality', 'Range', 'Prefix / Suffix / Substring']}
           rows={[
-            ['$eq, $ne, $in, $nin', '$gt, $gte, $lt, $lte', 'Starts with matching', 'Ends with matching'],
-            ['{ ssn: "123-45-6789" }', '{ salary: { $gte: 50000 } }', '{ email: /^john/ }', '{ domain: /@corp.com$/ }'],
+            ['$eq, $ne, $in, $nin', '$gt, $gte, $lt, $lte (and $eq, $ne)', 'Preview only (8.2): $encStrStartsWith, $encStrEndsWith, $encStrContains – not for production'],
+            ['queryType: "equality" or use range index', 'queryType: "range" – int32, int64, double, decimal128, date', 'GA behavior will be incompatible with preview'],
           ]}
         />
-        <div className="mt-8">
-          <h3 className="font-semibold mb-4">Supported Data Types</h3>
-          <div className="flex flex-wrap gap-2">
-            {['String', 'Int (32/64)', 'Double', 'Decimal128', 'Date', 'ObjectId', 'UUID', 'BinData'].map((type, i) => (
-              <span key={i} className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-mono">
-                {type}
-              </span>
-            ))}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <h3 className="font-semibold mb-2 text-sm">Equality index</h3>
+            <p className="text-xs text-muted-foreground mb-2">Supports all BSON types except: array, object, double (Binary64), decimal128. Double/decimal128 can use equality when field has a range index.</p>
+            <div className="flex flex-wrap gap-1">
+              {['String', 'Int32/64', 'Date', 'ObjectId', 'UUID', 'BinData', 'Bool'].map((t, i) => (
+                <span key={i} className="px-2 py-0.5 rounded bg-primary/10 text-primary text-xs font-mono">{t}</span>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h3 className="font-semibold mb-2 text-sm">Range index</h3>
+            <p className="text-xs text-muted-foreground mb-2">Supports: int32, int64, double, decimal128, date. Supports both range operators ($lt, $lte, $gt, $gte) and equality ($eq, $ne).</p>
+            <div className="flex flex-wrap gap-1">
+              {['int32', 'int64', 'double', 'decimal128', 'date'].map((t, i) => (
+                <span key={i} className="px-2 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-mono">{t}</span>
+              ))}
+            </div>
           </div>
         </div>
-        <div className="mt-6 p-4 rounded-lg bg-muted/30 border border-border">
-          <p className="text-sm text-muted-foreground">
-            <strong>Note:</strong> Range, prefix, and suffix queries require Queryable Encryption. CSFLE only supports equality on deterministic fields.
-          </p>
+        <div className="mt-4 p-3 rounded-lg bg-muted/30 border border-border text-xs text-muted-foreground">
+          <strong>Encryptable:</strong> Most BSON types. Automatic QE does not support encrypting MaxKey, MinKey, null, undefined as fields.
+        </div>
+        <CalloutBox type="warning" title="Atlas Search + QE">
+          <p className="text-sm">Atlas Search cannot run over QE-encrypted fields. For QE + Search: use a separate non-encrypted (or differently protected) field for Search, or derived/tokenized data that is safe to index.</p>
+        </CalloutBox>
+        <div className="mt-4 p-3 rounded-lg bg-primary/10 border border-primary text-xs">
+          <strong>CSFLE:</strong> Only equality on deterministic fields. Range, prefix, and suffix require Queryable Encryption.
         </div>
       </div>
     ),
     speakerNotes: `Queryable Encryption query capabilities:
 
-Equality: $eq, $ne, $in, $nin
-Range: $gt, $gte, $lt, $lte - This is the breakthrough!
-Prefix: Starts with matching
-Suffix: Ends with matching
+Equality index: All BSON types except array, object, double, decimal128. Double/decimal128 can still use equality when field has range index.
+Range index: int32, int64, double, decimal128, date – supports both range ($lt, $gte, etc.) and equality ($eq, $ne).
+Prefix/suffix/substring: Preview in MongoDB 8.2 ($encStrStartsWith, etc.) – not for production; GA will be incompatible with preview.
 
-Supported types: String, Int32/64, Double, Decimal128, Date, ObjectId, UUID, BinData
+Atlas Search: Not compatible with QE-encrypted fields. Use separate field for Search or derived/tokenized data.
+Encryptable: Most BSON types; automatic QE does not support MaxKey, MinKey, null, undefined as encrypted fields.
 
-Note: CSFLE only supports equality on deterministic fields.`,
+CSFLE only supports equality on deterministic fields.`,
     exportContent: {
       title: 'Supported Query Types',
       table: {
-        headers: ['Equality', 'Range', 'Prefix', 'Suffix'],
+        headers: ['Equality', 'Range', 'Prefix/Suffix/Substring'],
         rows: [
-          ['$eq, $ne, $in, $nin', '$gt, $gte, $lt, $lte', 'Starts with', 'Ends with'],
+          ['$eq, $ne, $in, $nin; all types except array, object, double, decimal128', '$gt, $gte, $lt, $lte + $eq, $ne; int32, int64, double, decimal128, date', 'Preview 8.2 only; not for production'],
         ],
       },
       bullets: [
-        'Supported types: String, Int32/64, Double, Decimal128, Date, ObjectId, UUID, BinData',
-        'Range/prefix/suffix require Queryable Encryption',
+        'Equality index: excludes array, object, double, decimal128 (double/decimal128 can use equality via range index)',
+        'Range index: int32, int64, double, decimal128, date; supports equality and range',
+        'Prefix/suffix/substring: preview in 8.2, not production',
+        'Atlas Search: not compatible with QE-encrypted fields',
+        'CSFLE: equality only on deterministic fields',
       ],
-      notes: 'Query capabilities for encrypted fields.',
+      notes: 'QE query types and supported BSON types per MongoDB docs; Atlas Search not compatible with QE.',
     },
   },
 
@@ -1057,87 +1192,6 @@ Key message: Know these before the customer discovers them!`,
         'Index and driver version limitations',
       ],
       notes: 'Know limitations before customer discovers them.',
-    },
-  },
-
-  // Slide 13: Envelope Encryption (one container at a time, clearer)
-  {
-    id: 13,
-    title: 'Envelope Encryption',
-    section: 'Key Management',
-    sectionNumber: 5,
-    stepCount: 5,
-    content: (
-      <div className="max-w-4xl mx-auto">
-        <SectionHeader number="05" title="Key Management" />
-        <RevealStep step={0}>
-          <SlideTitle subtitle="Keys are layered: CMK wraps DEKs; DEKs encrypt your data">Envelope Encryption</SlideTitle>
-          <p className="text-sm text-muted-foreground text-center mb-6">Click Next to see each layer one at a time.</p>
-        </RevealStep>
-        <div className="flex flex-col items-center gap-4 my-6">
-          <RevealStep step={1}>
-            <div className="p-5 rounded-xl bg-primary/20 border-2 border-primary text-center w-80">
-              <Key className="w-8 h-8 text-primary mx-auto mb-2" />
-              <div className="font-bold text-primary text-lg">1. Customer Master Key (CMK)</div>
-              <div className="text-xs text-muted-foreground mt-2">Lives in KMS (AWS / Azure / GCP). Never leaves the HSM. You control who can use it.</div>
-              <div className="text-xs text-primary font-medium mt-2">→ Used only to wrap and unwrap DEKs, never to encrypt data directly.</div>
-            </div>
-          </RevealStep>
-          <RevealStep step={2}>
-            <>
-              <div className="text-muted-foreground font-medium">↓ wraps (encrypts) DEKs</div>
-              <div className="p-5 rounded-xl bg-card border-2 border-border text-center w-80">
-                <Lock className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                <div className="font-bold text-lg">2. Data Encryption Key (DEK)</div>
-                <div className="text-xs text-muted-foreground mt-2">Stored in MongoDB in the Key Vault collection – but encrypted by the CMK. The driver fetches DEKs to encrypt/decrypt field values.</div>
-                <div className="text-xs font-medium mt-2">→ One DEK per field (QE) or shared across fields (CSFLE).</div>
-              </div>
-            </>
-          </RevealStep>
-          <RevealStep step={3}>
-            <>
-              <div className="text-muted-foreground font-medium">↓ encrypts</div>
-              <div className="p-5 rounded-xl bg-card border-2 border-border text-center w-80">
-                <Shield className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                <div className="font-bold text-lg">3. Your Sensitive Data</div>
-                <div className="text-xs text-muted-foreground mt-2">SSN, PII, PHI, salary. Encrypted in app memory with the DEK; stored in MongoDB as ciphertext (BinData).</div>
-                <div className="text-xs font-medium mt-2">→ MongoDB and backups never see plaintext.</div>
-              </div>
-            </>
-          </RevealStep>
-        </div>
-        <RevealStep step={4}>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-            <div className="p-4 rounded-lg bg-card border border-border">
-              <h4 className="font-semibold text-sm mb-2">Why Envelope Encryption?</h4>
-              <ul className="text-xs space-y-1 text-muted-foreground">
-                <li>• CMK rotation only re-wraps DEKs; no need to re-encrypt data</li>
-                <li>• Different DEKs for different classifications or tenants</li>
-                <li>• Full audit trail in KMS for key access</li>
-              </ul>
-            </div>
-            <div className="p-4 rounded-lg bg-primary/10 border border-primary md:col-span-2">
-              <h4 className="font-semibold text-sm mb-2 text-primary">Customer Talking Point</h4>
-              <p className="text-sm">"You keep the master keys. Even MongoDB/Atlas can never see your plaintext data."</p>
-            </div>
-          </div>
-        </RevealStep>
-      </div>
-    ),
-    speakerNotes: `Envelope encryption – show one container at a time:
-1. CMK – never leaves KMS, wraps DEKs
-2. DEK – stored encrypted in Key Vault, encrypts data
-3. Data – ciphertext in MongoDB
-4. Why envelope + talking point: You keep the master keys.`,
-    exportContent: {
-      title: 'Envelope Encryption',
-      bullets: [
-        'CMK: Never leaves KMS, customer controlled; wraps DEKs only',
-        'DEK: Stored encrypted in Key Vault; encrypts field values',
-        'Data: Ciphertext in MongoDB; plaintext never in DB or backups',
-        'Benefits: CMK rotation without re-encrypting data; audit trail in KMS',
-      ],
-      notes: 'Customer talking point: You keep the master keys.',
     },
   },
 
@@ -1286,20 +1340,22 @@ Best practice: Prefer keyAltNames over raw keyId for rotation and readability.`,
     sectionNumber: 5,
     content: (
       <div className="max-w-4xl mx-auto">
-        <SlideTitle>Right to Erasure (GDPR Art. 17) & Crypto-Shredding</SlideTitle>
-        <div className="grid grid-cols-1 gap-6 mb-6">
+        <SlideTitle subtitle="One DEK per user or tenant → delete DEK to make data unrecoverable everywhere">Right to Erasure (GDPR Art. 17) & Crypto-Shredding</SlideTitle>
+        <div className="rounded-xl bg-card/50 border border-border p-4 mb-4">
+          <CryptoShreddingDiagram className="max-w-full" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <CalloutBox type="warning" title="The problem">
-            <p>Deleting user data from the database does not remove it from backups, replicas, or logs. True &quot;right to erasure&quot; requires making data unrecoverable everywhere.</p>
+            <p className="text-sm">Deleting rows does not remove data from backups, replicas, or logs. True erasure = make data unrecoverable everywhere.</p>
           </CalloutBox>
-          <div className="p-6 rounded-lg bg-card border border-primary">
-            <h3 className="text-xl font-bold mb-3">Solution: One DEK per user or tenant</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Store encrypted data with a DEK that is unique to that user or tenant. To erase: delete the DEK from the key vault. All ciphertext protected by that DEK becomes permanently unrecoverable (crypto-shredding).
+          <div className="p-4 rounded-lg bg-primary/10 border border-primary">
+            <h3 className="font-bold mb-2 text-sm">Solution: One DEK per user or tenant</h3>
+            <p className="text-xs text-muted-foreground mb-2">
+              Delete the DEK from the key vault → all ciphertext protected by that DEK becomes permanently unreadable (crypto-shredding). No need to overwrite every backup.
             </p>
-            <ul className="space-y-2 text-sm">
-              <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-primary" />No need to overwrite every backup or replica</li>
-              <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-primary" />Multi-tenant isolation: one DEK per tenant enables per-tenant erasure</li>
-              <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-primary" />Lab 3 implements migration, per-tenant DEKs, and crypto-shredding</li>
+            <ul className="space-y-1 text-xs">
+              <li className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-primary shrink-0" />Multi-tenant: one DEK per tenant → per-tenant erasure</li>
+              <li className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-primary shrink-0" />Lab 3: migration, per-tenant DEKs, crypto-shredding</li>
             </ul>
           </div>
         </div>
@@ -1948,9 +2004,9 @@ Action items:
 export const sections = [
   { number: 1, title: 'The Challenge', slides: [3] },
   { number: 2, title: 'Use Cases', slides: [4] },
-  { number: 3, title: 'Architecture', slides: [5, 6] },
-  { number: 4, title: 'Comparison', slides: [7, 8, 9, 10] },
-  { number: 5, title: 'Key Management', slides: [11, 12, 13, 14, 15, 16] },
+  { number: 3, title: 'Architecture', slides: [5, 6, 13, 7, 8] },
+  { number: 4, title: 'Comparison', slides: [9, 10] },
+  { number: 5, title: 'Key Management', slides: [11, 12, 14, 15, 16] },
   { number: 6, title: 'Competitive', slides: [17] },
   { number: 7, title: 'Sales Enablement', slides: [18, 19, 20] },
   { number: 8, title: 'Labs', slides: [21, 22] },

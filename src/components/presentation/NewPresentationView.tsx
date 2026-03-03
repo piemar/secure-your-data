@@ -46,8 +46,10 @@ export function NewPresentationView() {
     }
   }, [currentSlide, stepCount, stepIndex]);
 
-  const handleGoToSlide = useCallback((slideNumber: number) => {
-    setCurrentSlide(slideNumber);
+  const handleGoToSlide = useCallback((slideIdOrIndex: number) => {
+    const idx = pptxSlides.findIndex((s) => s.id === slideIdOrIndex);
+    const position = idx >= 0 ? idx + 1 : slideIdOrIndex;
+    setCurrentSlide(position);
     setStepIndex(0);
   }, []);
 

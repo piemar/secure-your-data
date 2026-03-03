@@ -107,7 +107,7 @@ const EXTENDED_PREREQUISITES: Prerequisite[] = [
   { 
     id: 'mongoCryptShared', 
     label: 'mongo_crypt_shared', 
-    description: 'Shared library for Queryable Encryption (Lab 2)',
+    description: 'Automatic Encryption Shared Library (crypt_shared). Required for automatic encryption in Lab 1 (CSFLE) and Lab 2 (QE).',
     required: true,
     downloadUrl: 'https://www.mongodb.com/docs/manual/core/queryable-encryption/reference/shared-library/',
     setupInstructions: [

@@ -83,6 +83,8 @@ Implement Client-Side Field Level Encryption (CSFLE) in a Node.js environment us
 ---
 
 ## Step 4: Troubleshooting crypt_shared (12 min)
+The Automatic Encryption Shared Library (crypt_shared) is the recommended way to perform query analysis for automatic encryption and replaces mongocryptd.
+
 1.  **Intentional Break**: Omit the `cryptSharedLibPath` in your configuration.
 2.  **Observe the error**: Run the app. It should fail with an error about missing the shared library.
 3.  **Fix**: Specify the absolute path to the library:

@@ -159,8 +159,8 @@ export function QEArchitectureDiagram({ className, highlightStep = 0 }: QEDiagra
           <rect x="20" y="40" width="120" height="80" rx="8" fill="hsl(220, 13%, 12%)" stroke="hsl(145, 100%, 46%)" strokeWidth={focused(1) ? 3 : 2} />
           <text x="80" y="65" textAnchor="middle" fill="hsl(145, 100%, 46%)" fontSize="10" fontWeight="600">Application</text>
           <text x="80" y="80" textAnchor="middle" fill="hsl(215, 15%, 55%)" fontSize="8">Query: salary {'>'} 50k</text>
-          <text x="80" y="95" textAnchor="middle" fill="hsl(200, 100%, 70%)" fontSize="8">→ Encrypted query</text>
-          <text x="80" y="110" textAnchor="middle" fill="hsl(145, 100%, 46%)" fontSize="7">with QE tokens</text>
+          <text x="80" y="95" textAnchor="middle" fill="hsl(200, 100%, 70%)" fontSize="8">→ Cryptographic</text>
+          <text x="80" y="110" textAnchor="middle" fill="hsl(145, 100%, 46%)" fontSize="7">token to server</text>
         </motion.g>
 
         {/* Arrow */}
@@ -175,13 +175,18 @@ export function QEArchitectureDiagram({ className, highlightStep = 0 }: QEDiagra
           {focused(2) && <rect x="174" y="34" width="112" height="92" rx="10" fill="none" stroke="hsl(280, 80%, 75%)" strokeWidth="4" strokeDasharray="8 5" />}
           <rect x="180" y="40" width="100" height="80" rx="8" fill="hsl(220, 13%, 12%)" stroke="hsl(280, 80%, 70%)" strokeWidth={focused(2) ? 3 : 2} />
           <text x="230" y="65" textAnchor="middle" fill="hsl(280, 80%, 70%)" fontSize="10" fontWeight="600">Driver</text>
-          <text x="230" y="82" textAnchor="middle" fill="hsl(215, 15%, 55%)" fontSize="8">Generates</text>
-          <text x="230" y="95" textAnchor="middle" fill="hsl(145, 100%, 46%)" fontSize="8">query tokens</text>
-          <text x="230" y="110" textAnchor="middle" fill="hsl(215, 15%, 55%)" fontSize="7">for server</text>
+          <text x="230" y="82" textAnchor="middle" fill="hsl(215, 15%, 55%)" fontSize="8">Gets keys from</text>
+          <text x="230" y="95" textAnchor="middle" fill="hsl(145, 100%, 46%)" fontSize="8">KMS; emits token</text>
+          <text x="230" y="110" textAnchor="middle" fill="hsl(215, 15%, 55%)" fontSize="7">for server search</text>
         </motion.g>
 
-        {/* Arrow */}
-        <motion.path d="M 280 80 L 310 80" stroke="hsl(215, 15%, 55%)" strokeWidth="2" markerEnd="url(#qe-arrow)" initial={{ opacity: 0 }} animate={{ opacity: dim(3) }} transition={{ delay: 0.3 }} />
+        {/* Arrow + cryptographic token callout */}
+        <motion.g initial={{ opacity: 0 }} animate={{ opacity: dim(3) }} transition={{ delay: 0.3 }}>
+          <path d="M 280 80 L 310 80" stroke="hsl(215, 15%, 55%)" strokeWidth="2" markerEnd="url(#qe-arrow)" />
+          <rect x="268" y="58" width="64" height="28" rx="4" fill="hsl(220, 13%, 18%)" stroke="hsl(45, 100%, 50%)" strokeWidth="1" strokeDasharray="2" />
+          <text x="300" y="68" textAnchor="middle" fill="hsl(45, 100%, 50%)" fontSize="6" fontWeight="600">cryptographic</text>
+          <text x="300" y="77" textAnchor="middle" fill="hsl(45, 100%, 50%)" fontSize="6" fontWeight="600">token</text>
+        </motion.g>
 
         {/* MongoDB Atlas with Collections */}
         <motion.g

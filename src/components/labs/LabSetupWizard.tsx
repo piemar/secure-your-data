@@ -33,7 +33,7 @@ const PREREQUISITES: Prerequisite[] = [
     { id: 'mongosh', label: 'mongosh', description: 'MongoDB Shell for database operations', installCommand: 'brew install mongodb-community-shell', downloadUrl: 'https://www.mongodb.com/try/download/shell', required: true },
     { id: 'node', label: 'Node.js v18+', description: 'JavaScript runtime', installCommand: 'brew install node', downloadUrl: 'https://nodejs.org/', required: true },
     { id: 'npm', label: 'npm', description: 'Package manager (comes with Node.js)', installCommand: 'Included with Node.js', required: true },
-    { id: 'mongoCryptShared', label: 'mongo_crypt_shared', description: 'Required for Lab 2 (Queryable Encryption)', installCommand: 'Download from MongoDB', downloadUrl: 'https://www.mongodb.com/docs/manual/core/queryable-encryption/reference/shared-library/', required: true },
+    { id: 'mongoCryptShared', label: 'mongo_crypt_shared', description: 'Required for automatic encryption (Lab 1 CSFLE and Lab 2 QE). Not needed for explicit-only (e.g. Lab 3 migration).', installCommand: 'Download from MongoDB', downloadUrl: 'https://www.mongodb.com/docs/manual/core/queryable-encryption/reference/shared-library/', required: true },
 ];
 
 export const LabSetupWizard: React.FC = () => {
@@ -593,7 +593,7 @@ export const LabSetupWizard: React.FC = () => {
 
                 {/* mongo_crypt_shared Library (below MongoDB URI) - always visible */}
                 <div className="space-y-3">
-                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <h3 className="text-sm font-semibold flex items-center gap-2" title="Also called crypt_shared; replaces mongocryptd for query analysis when using automatic encryption.">
                         <Layers className="w-4 h-4 text-primary" />
                         mongo_crypt_shared Library
                     </h3>
@@ -617,7 +617,7 @@ export const LabSetupWizard: React.FC = () => {
                             <>
                                 <div className="flex items-center gap-2 text-xs text-amber-600">
                                     <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                                    <span>Library not found. Required for Lab 2 (Queryable Encryption).</span>
+                                    <span>Library not found. Required for automatic encryption (Labs 1 and 2).</span>
                                 </div>
                                 {!showMongoCryptInput ? (
                                     <Button variant="outline" size="sm" onClick={() => setShowMongoCryptInput(true)}>

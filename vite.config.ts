@@ -1962,9 +1962,9 @@ export default defineConfig(({ mode }) => ({
                           const hasLibmongocrypt = !libError && libStdout.includes('ok');
                           results.libmongocrypt = {
                             verified: hasLibmongocrypt,
-                            message: hasLibmongocrypt 
-                              ? 'Automatic Encryption Shared Library (libmongocrypt) is available. Automatic encryption is enabled.'
-                              : 'libmongocrypt not found. Automatic encryption requires libmongocrypt. Install: npm install mongodb-client-encryption',
+message: hasLibmongocrypt
+                              ? 'libmongocrypt (driver encryption support) is available. For automatic encryption you also need the Automatic Encryption Shared Library (crypt_shared) or mongocryptd.'
+                              : 'libmongocrypt not found. Install: npm install mongodb-client-encryption',
                             path: libInfo.found ? libInfo.modulePath : undefined,
                             libPath: libInfo.libPath
                           };
