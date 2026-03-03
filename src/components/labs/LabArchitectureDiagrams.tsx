@@ -5,18 +5,29 @@ interface DiagramProps {
   className?: string;
 }
 
+/** 0 = no highlight, 1 = Application, 2 = Driver, 3 = Atlas, 4 = KMS, 5 = Key Vault */
+export type CSFLEHighlightStep = 0 | 1 | 2 | 3 | 4 | 5;
+
+interface CSFLEDiagramProps extends DiagramProps {
+  /** When set (1-5), dims other parts and highlights this one for presentation step-through */
+  highlightStep?: CSFLEHighlightStep;
+}
+
 // Lab 1: CSFLE Architecture - shows CMK → DEK → Encrypted Fields flow
-export function CSFLEArchitectureDiagram({ className }: DiagramProps) {
+export function CSFLEArchitectureDiagram({ className, highlightStep = 0 }: CSFLEDiagramProps) {
+  const dim = (step: number) => (highlightStep > 0 && highlightStep !== step ? 0.22 : 1);
+  const focused = (step: number) => highlightStep === step;
   return (
     <div className={cn('w-full py-4', className)}>
       <svg viewBox="0 0 700 280" className="w-full h-auto">
         {/* Your Application */}
         <motion.g
           initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
+          animate={{ opacity: dim(1), x: 0 }}
           transition={{ delay: 0.1 }}
         >
-          <rect x="20" y="80" width="140" height="120" rx="8" fill="hsl(220, 13%, 12%)" stroke="hsl(145, 100%, 46%)" strokeWidth="2" />
+          {focused(1) && <rect x="14" y="74" width="152" height="132" rx="10" fill="none" stroke="hsl(145, 100%, 60%)" strokeWidth="4" />}
+          <rect x="20" y="80" width="140" height="120" rx="8" fill="hsl(220, 13%, 12%)" stroke="hsl(145, 100%, 46%)" strokeWidth={focused(1) ? 3 : 2} />
           <text x="90" y="105" textAnchor="middle" fill="hsl(145, 100%, 46%)" fontSize="11" fontWeight="600">Your Application</text>
           <rect x="30" y="115" width="120" height="75" rx="4" fill="hsl(220, 15%, 8%)" />
           <text x="45" y="135" fill="hsl(200, 100%, 70%)" fontSize="9" fontFamily="monospace">{"{"}</text>
@@ -28,7 +39,7 @@ export function CSFLEArchitectureDiagram({ className }: DiagramProps) {
         {/* Arrow to Driver */}
         <motion.g
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          animate={{ opacity: dim(2) }}
           transition={{ delay: 0.3 }}
         >
           <path d="M 160 140 L 200 140" stroke="hsl(215, 15%, 55%)" strokeWidth="2" markerEnd="url(#csfle-arrow)" />
@@ -37,10 +48,11 @@ export function CSFLEArchitectureDiagram({ className }: DiagramProps) {
         {/* MongoDB Driver with libmongocrypt */}
         <motion.g
           initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          animate={{ opacity: dim(2), y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <rect x="200" y="80" width="140" height="120" rx="8" fill="hsl(220, 13%, 12%)" stroke="hsl(280, 80%, 70%)" strokeWidth="2" />
+          {focused(2) && <rect x="194" y="74" width="152" height="132" rx="10" fill="none" stroke="hsl(280, 80%, 75%)" strokeWidth="4" strokeDasharray="8 5" />}
+          <rect x="200" y="80" width="140" height="120" rx="8" fill="hsl(220, 13%, 12%)" stroke="hsl(280, 80%, 70%)" strokeWidth={focused(2) ? 3 : 2} strokeDasharray={focused(2) ? '6 4' : undefined} />
           <text x="270" y="105" textAnchor="middle" fill="hsl(280, 80%, 70%)" fontSize="11" fontWeight="600">MongoDB Driver</text>
           <text x="270" y="120" textAnchor="middle" fill="hsl(215, 15%, 55%)" fontSize="9">libmongocrypt</text>
           <rect x="210" y="130" width="120" height="60" rx="4" fill="hsl(280, 80%, 20%)" fillOpacity="0.3" stroke="hsl(280, 80%, 50%)" strokeDasharray="3" />
@@ -52,7 +64,7 @@ export function CSFLEArchitectureDiagram({ className }: DiagramProps) {
         {/* Arrow to Atlas */}
         <motion.g
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          animate={{ opacity: dim(3) }}
           transition={{ delay: 0.5 }}
         >
           <path d="M 340 140 L 380 140" stroke="hsl(215, 15%, 55%)" strokeWidth="2" markerEnd="url(#csfle-arrow)" />
@@ -61,10 +73,11 @@ export function CSFLEArchitectureDiagram({ className }: DiagramProps) {
         {/* MongoDB Atlas */}
         <motion.g
           initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
+          animate={{ opacity: dim(3), x: 0 }}
           transition={{ delay: 0.4 }}
         >
-          <rect x="380" y="80" width="140" height="120" rx="8" fill="hsl(220, 13%, 12%)" stroke="hsl(30, 100%, 65%)" strokeWidth="2" />
+          {focused(3) && <rect x="374" y="74" width="152" height="132" rx="10" fill="none" stroke="hsl(30, 100%, 70%)" strokeWidth="4" />}
+          <rect x="380" y="80" width="140" height="120" rx="8" fill="hsl(220, 13%, 12%)" stroke="hsl(30, 100%, 65%)" strokeWidth={focused(3) ? 3 : 2} />
           <text x="450" y="105" textAnchor="middle" fill="hsl(30, 100%, 65%)" fontSize="11" fontWeight="600">MongoDB Atlas</text>
           <rect x="390" y="115" width="120" height="75" rx="4" fill="hsl(220, 15%, 8%)" />
           <text x="405" y="135" fill="hsl(200, 100%, 70%)" fontSize="9" fontFamily="monospace">{"{"}</text>
@@ -76,10 +89,11 @@ export function CSFLEArchitectureDiagram({ className }: DiagramProps) {
         {/* AWS KMS */}
         <motion.g
           initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
+          animate={{ opacity: dim(4), y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          <rect x="540" y="30" width="140" height="70" rx="8" fill="hsl(220, 13%, 12%)" stroke="hsl(45, 100%, 50%)" strokeWidth="2" />
+          {focused(4) && <rect x="534" y="24" width="152" height="82" rx="10" fill="none" stroke="hsl(45, 100%, 55%)" strokeWidth="4" />}
+          <rect x="540" y="30" width="140" height="70" rx="8" fill="hsl(220, 13%, 12%)" stroke="hsl(45, 100%, 50%)" strokeWidth={focused(4) ? 3 : 2} />
           <text x="610" y="55" textAnchor="middle" fill="hsl(45, 100%, 50%)" fontSize="11" fontWeight="600">AWS KMS</text>
           <text x="610" y="75" textAnchor="middle" fill="hsl(215, 15%, 55%)" fontSize="9">Customer Master Key</text>
           <text x="610" y="90" textAnchor="middle" fill="hsl(145, 100%, 46%)" fontSize="8">(CMK)</text>
@@ -88,19 +102,20 @@ export function CSFLEArchitectureDiagram({ className }: DiagramProps) {
         {/* Key Vault */}
         <motion.g
           initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          animate={{ opacity: dim(5), y: 0 }}
           transition={{ delay: 0.5 }}
         >
-          <rect x="540" y="180" width="140" height="70" rx="8" fill="hsl(220, 13%, 12%)" stroke="hsl(200, 100%, 70%)" strokeWidth="2" />
+          {focused(5) && <rect x="534" y="174" width="152" height="82" rx="10" fill="none" stroke="hsl(200, 100%, 75%)" strokeWidth="4" />}
+          <rect x="540" y="180" width="140" height="70" rx="8" fill="hsl(220, 13%, 12%)" stroke="hsl(200, 100%, 70%)" strokeWidth={focused(5) ? 3 : 2} />
           <text x="610" y="205" textAnchor="middle" fill="hsl(200, 100%, 70%)" fontSize="11" fontWeight="600">Key Vault</text>
           <text x="610" y="225" textAnchor="middle" fill="hsl(215, 15%, 55%)" fontSize="9">Data Encryption Keys</text>
           <text x="610" y="240" textAnchor="middle" fill="hsl(145, 100%, 46%)" fontSize="8">(DEKs - encrypted)</text>
         </motion.g>
 
-        {/* Connection lines */}
+        {/* Connection lines (KMS / Key Vault) */}
         <motion.g
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          animate={{ opacity: highlightStep === 0 || highlightStep >= 4 ? 1 : 0.22 }}
           transition={{ delay: 0.6 }}
         >
           <path d="M 540 65 L 520 65 L 520 140 L 340 140" stroke="hsl(45, 100%, 50%)" strokeWidth="1.5" strokeDasharray="4" fill="none" />
@@ -119,18 +134,29 @@ export function CSFLEArchitectureDiagram({ className }: DiagramProps) {
   );
 }
 
+/** 0 = no highlight, 1 = Application, 2 = Driver, 3 = Atlas, 4 = QE Difference */
+export type QEHighlightStep = 0 | 1 | 2 | 3 | 4;
+
+interface QEDiagramProps extends DiagramProps {
+  /** When set (1-4), dims other parts and highlights this one for presentation step-through */
+  highlightStep?: QEHighlightStep;
+}
+
 // Lab 2: Queryable Encryption Architecture - shows QE flow with metadata collections
-export function QEArchitectureDiagram({ className }: DiagramProps) {
+export function QEArchitectureDiagram({ className, highlightStep = 0 }: QEDiagramProps) {
+  const dim = (step: number) => (highlightStep > 0 && highlightStep !== step ? 0.22 : 1);
+  const focused = (step: number) => highlightStep === step;
   return (
     <div className={cn('w-full py-4', className)}>
       <svg viewBox="0 0 700 300" className="w-full h-auto">
-        {/* Query Path */}
+        {/* Query Path - Application */}
         <motion.g
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          animate={{ opacity: dim(1) }}
           transition={{ delay: 0.1 }}
         >
-          <rect x="20" y="40" width="120" height="80" rx="8" fill="hsl(220, 13%, 12%)" stroke="hsl(145, 100%, 46%)" strokeWidth="2" />
+          {focused(1) && <rect x="14" y="34" width="132" height="92" rx="10" fill="none" stroke="hsl(145, 100%, 60%)" strokeWidth="4" />}
+          <rect x="20" y="40" width="120" height="80" rx="8" fill="hsl(220, 13%, 12%)" stroke="hsl(145, 100%, 46%)" strokeWidth={focused(1) ? 3 : 2} />
           <text x="80" y="65" textAnchor="middle" fill="hsl(145, 100%, 46%)" fontSize="10" fontWeight="600">Application</text>
           <text x="80" y="80" textAnchor="middle" fill="hsl(215, 15%, 55%)" fontSize="8">Query: salary {'>'} 50k</text>
           <text x="80" y="95" textAnchor="middle" fill="hsl(200, 100%, 70%)" fontSize="8">→ Encrypted query</text>
@@ -138,15 +164,16 @@ export function QEArchitectureDiagram({ className }: DiagramProps) {
         </motion.g>
 
         {/* Arrow */}
-        <motion.path d="M 140 80 L 180 80" stroke="hsl(215, 15%, 55%)" strokeWidth="2" markerEnd="url(#qe-arrow)" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} />
+        <motion.path d="M 140 80 L 180 80" stroke="hsl(215, 15%, 55%)" strokeWidth="2" markerEnd="url(#qe-arrow)" initial={{ opacity: 0 }} animate={{ opacity: dim(2) }} transition={{ delay: 0.2 }} />
 
         {/* MongoDB Driver */}
         <motion.g
           initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
+          animate={{ opacity: dim(2), y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <rect x="180" y="40" width="100" height="80" rx="8" fill="hsl(220, 13%, 12%)" stroke="hsl(280, 80%, 70%)" strokeWidth="2" />
+          {focused(2) && <rect x="174" y="34" width="112" height="92" rx="10" fill="none" stroke="hsl(280, 80%, 75%)" strokeWidth="4" strokeDasharray="8 5" />}
+          <rect x="180" y="40" width="100" height="80" rx="8" fill="hsl(220, 13%, 12%)" stroke="hsl(280, 80%, 70%)" strokeWidth={focused(2) ? 3 : 2} />
           <text x="230" y="65" textAnchor="middle" fill="hsl(280, 80%, 70%)" fontSize="10" fontWeight="600">Driver</text>
           <text x="230" y="82" textAnchor="middle" fill="hsl(215, 15%, 55%)" fontSize="8">Generates</text>
           <text x="230" y="95" textAnchor="middle" fill="hsl(145, 100%, 46%)" fontSize="8">query tokens</text>
@@ -154,15 +181,16 @@ export function QEArchitectureDiagram({ className }: DiagramProps) {
         </motion.g>
 
         {/* Arrow */}
-        <motion.path d="M 280 80 L 310 80" stroke="hsl(215, 15%, 55%)" strokeWidth="2" markerEnd="url(#qe-arrow)" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} />
+        <motion.path d="M 280 80 L 310 80" stroke="hsl(215, 15%, 55%)" strokeWidth="2" markerEnd="url(#qe-arrow)" initial={{ opacity: 0 }} animate={{ opacity: dim(3) }} transition={{ delay: 0.3 }} />
 
         {/* MongoDB Atlas with Collections */}
         <motion.g
           initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
+          animate={{ opacity: dim(3), x: 0 }}
           transition={{ delay: 0.3 }}
         >
-          <rect x="310" y="20" width="240" height="260" rx="8" fill="hsl(220, 13%, 12%)" stroke="hsl(30, 100%, 65%)" strokeWidth="2" />
+          {focused(3) && <rect x="304" y="14" width="252" height="272" rx="10" fill="none" stroke="hsl(30, 100%, 70%)" strokeWidth="4" />}
+          <rect x="310" y="20" width="240" height="260" rx="8" fill="hsl(220, 13%, 12%)" stroke="hsl(30, 100%, 65%)" strokeWidth={focused(3) ? 3 : 2} />
           <text x="430" y="45" textAnchor="middle" fill="hsl(30, 100%, 65%)" fontSize="11" fontWeight="600">MongoDB Atlas</text>
           
           {/* Main Collection */}
@@ -194,10 +222,11 @@ export function QEArchitectureDiagram({ className }: DiagramProps) {
         {/* Key difference callout */}
         <motion.g
           initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          animate={{ opacity: dim(4), y: 0 }}
           transition={{ delay: 0.5 }}
         >
-          <rect x="570" y="80" width="110" height="120" rx="6" fill="hsl(220, 13%, 15%)" stroke="hsl(45, 100%, 50%)" strokeWidth="1.5" />
+          {focused(4) && <rect x="564" y="74" width="122" height="132" rx="8" fill="none" stroke="hsl(45, 100%, 55%)" strokeWidth="4" />}
+          <rect x="570" y="80" width="110" height="120" rx="6" fill="hsl(220, 13%, 15%)" stroke="hsl(45, 100%, 50%)" strokeWidth={focused(4) ? 3 : 1.5} />
           <text x="625" y="105" textAnchor="middle" fill="hsl(45, 100%, 50%)" fontSize="9" fontWeight="600">QE Difference</text>
           <text x="625" y="125" textAnchor="middle" fill="hsl(215, 15%, 55%)" fontSize="7">• Range queries ✓</text>
           <text x="625" y="140" textAnchor="middle" fill="hsl(215, 15%, 55%)" fontSize="7">• 1 DEK per field</text>
