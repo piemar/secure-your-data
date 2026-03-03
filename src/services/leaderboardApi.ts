@@ -98,6 +98,25 @@ export async function postHeartbeat(
 }
 
 /**
+ * Persist step-level progress for a lab to the server (so it can be restored on login / other devices).
+ */
+export async function postStepProgress(
+  email: string,
+  labNumber: number,
+  completedSteps: number[]
+): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/step-progress`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, labNumber, completedSteps }),
+    });
+  } catch {
+    // Ignore
+  }
+}
+
+/**
  * Reset only the current user's leaderboard entry (score 0, no completed labs, no lab times).
  * Other participants' data is not modified.
  */

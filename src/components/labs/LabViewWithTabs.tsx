@@ -4,6 +4,7 @@ import { LabIntroTab } from './LabIntroTab';
 import { StepView } from './StepView';
 import { useLab } from '@/context/LabContext';
 import { getLeaderboardEntries, heartbeat } from '@/utils/leaderboardUtils';
+import { postStepProgress } from '@/services/leaderboardApi';
 import { DifficultyLevel } from './DifficultyBadge';
 import { Lightbulb, BookOpen } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -99,7 +100,7 @@ export function LabViewWithTabs({
   labMongoUri,
   onLabCompleted,
 }: LabViewWithTabsProps) {
-  const { startLab, completeLab, completeStep, userEmail, resetProgressCount } = useLab();
+  const { startLab, completeLab, completeStep, userEmail, completedLabs, resetProgressCount } = useLab();
   const storageKey = `lab${labNumber}-progress`;
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const stepToolbarRef = useRef<{ reset: () => void; openHelp: () => void } | null>(null);
@@ -134,6 +135,13 @@ export function LabViewWithTabs({
     prevCompletedCountRef.current = null;
   }, [labNumber]);
 
+  // When completedLabs is hydrated from server (after login) and includes this lab, seed step progress so UI shows all done
+  useEffect(() => {
+    if (completedLabs.includes(labNumber) && completedSteps.length === 0 && steps.length > 0) {
+      setCompletedSteps(Array.from({ length: steps.length }, (_, i) => i));
+    }
+  }, [completedLabs, labNumber, steps.length, completedSteps.length]);
+
   // Start lab tracking on mount and send heartbeat
   useEffect(() => {
     startLab(labNumber);
@@ -151,6 +159,10 @@ export function LabViewWithTabs({
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify(completedSteps));
 
+    if (userEmail) {
+      postStepProgress(userEmail, labNumber, completedSteps);
+    }
+
     const allComplete = completedSteps.length === steps.length;
     if (allComplete) {
       completeLab(labNumber);
@@ -160,7 +172,7 @@ export function LabViewWithTabs({
       }
     }
     prevCompletedCountRef.current = completedSteps.length;
-  }, [completedSteps, storageKey, steps.length, labNumber, completeLab, onLabCompleted]);
+  }, [completedSteps, storageKey, steps.length, labNumber, completeLab, onLabCompleted, userEmail]);
 
   const handleStepComplete = (stepIndex: number) => {
     const step = steps[stepIndex];

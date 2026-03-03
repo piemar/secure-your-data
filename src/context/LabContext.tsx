@@ -65,7 +65,22 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return createGamificationService(config);
     }, [activeTemplate]);
 
-    const [mongoUri, setMongoUri] = useState('');
+    const [mongoUri, setMongoUriState] = useState(() => {
+        if (typeof localStorage === 'undefined') return '';
+        return localStorage.getItem('lab_mongo_uri') || '';
+    });
+    const setMongoUri = (uri: string) => {
+        setMongoUriState(uri);
+        try {
+            if (uri && uri.trim()) {
+                localStorage.setItem('lab_mongo_uri', uri.trim());
+            } else {
+                localStorage.removeItem('lab_mongo_uri');
+            }
+        } catch {
+            // ignore
+        }
+    };
     const [awsCreds, setAwsCreds] = useState({
         awsAccessKeyId: '',
         awsSecretAccessKey: '',
@@ -138,6 +153,18 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 setLabStartTimes(entry.labTimes);
                 try {
                     localStorage.setItem('labStartTimes', JSON.stringify(entry.labTimes));
+                } catch {
+                    // ignore
+                }
+            }
+            if (entry.completedStepsByLab && typeof entry.completedStepsByLab === 'object') {
+                try {
+                    for (const labNum of [1, 2, 3]) {
+                        const steps = entry.completedStepsByLab[labNum];
+                        if (Array.isArray(steps)) {
+                            localStorage.setItem(`lab${labNum}-progress`, JSON.stringify(steps));
+                        }
+                    }
                 } catch {
                     // ignore
                 }

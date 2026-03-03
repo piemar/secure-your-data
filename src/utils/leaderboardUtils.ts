@@ -4,6 +4,8 @@ export interface LeaderboardEntry {
   lastName?: string;
   score: number;
   completedLabs: number[];
+  /** Per-lab step completion: lab number -> array of completed step indices (synced to server) */
+  completedStepsByLab?: Record<number, number[]>;
   labTimes: Record<number, number>; // lab number -> time spent in ms
   lastActive: number;
   hintsUsed: number; // Total hints revealed

@@ -156,6 +156,7 @@ interface LeaderboardEntry {
   lastName?: string;
   score: number;
   completedLabs: number[];
+  completedStepsByLab?: Record<number, number[]>;
   labTimes: Record<number, number>;
   lastActive: number;
 }
@@ -1379,6 +1380,24 @@ export default defineConfig(({ mode }) => ({
                     return;
                   }
                   
+                  // Step progress: persist per-lab completed step indices for this user (restored on login)
+                  if (req.url?.includes('/step-progress')) {
+                    const { email, labNumber, completedSteps } = data;
+                    if (!email || typeof email !== 'string' || typeof labNumber !== 'number' || !Array.isArray(completedSteps)) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ success: false, message: 'email, labNumber, and completedSteps (array) required' }));
+                      return;
+                    }
+                    const entries = await getLeaderboard();
+                    const currentEntry = entries.find(e => e.email === email);
+                    const existing = currentEntry?.completedStepsByLab || {};
+                    const updated = { ...existing, [labNumber]: completedSteps };
+                    await updateLeaderboardEntry(email, { completedStepsByLab: updated });
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ success: true }));
+                    return;
+                  }
+                  
                   // Reset progress: only this user's leaderboard entry (score 0, no completed labs, no lab times). Other users are unchanged.
                   if (req.url?.includes('/reset') && !req.url?.includes('/reset-all')) {
                     const { email } = data;
@@ -1390,6 +1409,7 @@ export default defineConfig(({ mode }) => ({
                     await updateLeaderboardEntry(email, {
                       score: 0,
                       completedLabs: [],
+                      completedStepsByLab: {},
                       labTimes: {}
                     });
                     res.setHeader('Content-Type', 'application/json');
