@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { NewPresentationView } from '@/components/presentation/NewPresentationView';
 import { LabSetupWizard } from '@/components/labs/LabSetupWizard';
@@ -49,6 +49,16 @@ function ContentRouter() {
       setSection('leaderboard');
     }
   }, [location.pathname, setSection]);
+
+  // When user completes a lab (template-driven), select the next lab in order
+  const handleLabCompleted = useCallback(() => {
+    const labIds = activeTemplate?.labIds;
+    if (!labIds?.length || currentLabId == null) return;
+    const currentIndex = labIds.indexOf(currentLabId);
+    if (currentIndex >= 0 && currentIndex < labIds.length - 1) {
+      setCurrentLabId(labIds[currentIndex + 1]);
+    }
+  }, [activeTemplate?.labIds, currentLabId, setCurrentLabId]);
 
   // Load lab metadata for the active template to power the playlist view.
   useEffect(() => {
@@ -213,6 +223,7 @@ function ContentRouter() {
           labId={currentLabId}
           businessValue={businessValue}
           atlasCapability={atlasCapability}
+          onLabCompleted={handleLabCompleted}
         />
       );
 

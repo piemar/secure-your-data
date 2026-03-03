@@ -349,16 +349,15 @@ run().catch(console.dir);`,
   { unique: true, partialFilterExpression: { keyAltNames: { $exists: true } } }
 );
 print("Key Vault index created.");`,
-        skeleton: `db.getSiblingDB("_________").getCollection("___________").createIndex(
-  { ___________: 1 },
-  { unique: true, partialFilterExpression: { keyAltNames: { $_______: true } } }
+        skeleton: `db.getSiblingDB("____").getCollection("__keyVault").createIndex(
+  { ____: 1 },
+  { unique: true, partialFilterExpression: { keyAltNames: { $____: true } } }
 );
 print("Key Vault index created.");`,
         inlineHints: [
-          { line: 1, blankText: '_________', hint: 'Database name for the key vault', answer: 'encryption' },
-          { line: 1, blankText: '___________', hint: 'Key vault collection name (special MongoDB collection)', answer: '__keyVault' },
-          { line: 2, blankText: '___________', hint: 'Field that stores alternate names for DEKs', answer: 'keyAltNames' },
-          { line: 3, blankText: '$_______', hint: 'Operator to check if a field exists', answer: '$exists' },
+          { line: 1, blankText: '____', hint: 'Database name for the key vault', answer: 'encryption' },
+          { line: 2, blankText: '____', hint: 'Field that stores alternate names for DEKs', answer: 'keyAltNames' },
+          { line: 3, blankText: '$____', hint: 'Operator to check if a field exists', answer: '$exists' },
         ],
       },
     ],
@@ -458,10 +457,10 @@ async function run() {
     return;
   }
 
-  // TASK: Create the Data Encryption Key (fill in the method, provider, and option name)
-  const dekId = await encryption.________________('___', {
+  // TASK: Create the Data Encryption Key (fill in the method and option name)
+  const dekId = await encryption.______('aws', {
     masterKey: { key: "ALIAS_NAME", region: "AWS_REGION" },
-    ___________: [keyAltName]
+    ______: [keyAltName]
   });
 
   console.log("✓ Created new DEK UUID:", dekId.toString());
@@ -469,9 +468,8 @@ async function run() {
 }
 run().catch(console.dir);`,
         inlineHints: [
-          { line: 40, blankText: '________________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
-          { line: 40, blankText: '___', hint: 'KMS provider name (use "aws" for AWS KMS)', answer: 'aws' },
-          { line: 42, blankText: '___________', hint: 'Option to assign a human-readable name to the DEK', answer: 'keyAltNames' },
+          { line: 40, blankText: '______', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
+          { line: 42, blankText: '______', hint: 'Option to assign a human-readable name to the DEK', answer: 'keyAltNames' },
         ],
         competitorEquivalents: {
           postgresql: {

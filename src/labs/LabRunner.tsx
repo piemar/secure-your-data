@@ -29,6 +29,8 @@ interface LabRunnerProps {
   stepEnhancements?: Map<string, Partial<Step>>;
   // Optional: Lab context overlay (for quest/challenge-specific narrative)
   labContextOverlay?: LabContextOverlay;
+  /** Called when the lab just becomes complete (all steps done); use to e.g. select next lab in order */
+  onLabCompleted?: () => void;
 }
 
 /**
@@ -246,6 +248,7 @@ export function LabRunner(props: LabRunnerProps) {
         defaultCompetitorId={defaultCompetitorId}
         competitorIds={competitorIds}
         labMongoUri={getLabMongoUri(runningInContainer)}
+        onLabCompleted={props.onLabCompleted}
       />
     );
   }

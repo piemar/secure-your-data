@@ -680,14 +680,21 @@ export function StepView({
     }
   };
 
-  /** Fill all blanks in skeleton with answers from inlineHints. Use this for "Solution" so the displayed solution is exactly the skeleton with no placeholders (same lines as skeleton). */
+  /** Fill all blanks in skeleton with answers from inlineHints. Use this for "Solution" so the displayed solution is exactly the skeleton with no placeholders (same lines as skeleton).
+   * Replaces in hint order with per-line search-from so the result matches applyRevealedAnswersToCode(skeleton, hints, allRevealed, skeleton). */
   const fillAllBlanksInSkeleton = useCallback((skeleton: string, inlineHints: InlineHint[] | undefined): string => {
     if (!inlineHints?.length) return skeleton;
     const lines = skeleton.split('\n');
+    const searchFromByLine = new Map<number, number>();
     inlineHints.forEach((hint) => {
       const lineIndex = hint.line - 1;
-      if (lineIndex >= 0 && lineIndex < lines.length && lines[lineIndex].includes(hint.blankText)) {
-        lines[lineIndex] = lines[lineIndex].replace(hint.blankText, hint.answer);
+      if (lineIndex < 0 || lineIndex >= lines.length) return;
+      const lineText = lines[lineIndex];
+      const fromIndex = searchFromByLine.get(hint.line) ?? 0;
+      const idx = lineText.indexOf(hint.blankText, fromIndex);
+      if (idx !== -1) {
+        lines[lineIndex] = lineText.slice(0, idx) + hint.answer + lineText.slice(idx + hint.blankText.length);
+        searchFromByLine.set(hint.line, idx + hint.answer.length);
       }
     });
     return lines.join('\n');
@@ -718,19 +725,128 @@ export function StepView({
     return !!(block.skeleton || block.challengeSkeleton || block.expertSkeleton);
   };
 
-  /** Apply revealed answers into code (replace blanks with hint.answer) so editor shows correct values */
-  const applyRevealedAnswersToCode = useCallback((code: string, inlineHints: InlineHint[] | undefined, revealed: number[]): string => {
+  /** Apply revealed answers into code (replace blanks with hint.answer) so editor shows correct values.
+   * Tries in order: (1) exact blankText match, (2) N-th run of 2+ underscores on line, (3) skeleton position if skeleton provided. */
+  const applyRevealedAnswersToCode = useCallback((code: string, inlineHints: InlineHint[] | undefined, revealed: number[], skeleton?: string): string => {
     if (!inlineHints?.length || revealed.length === 0) return code;
     const lines = code.split('\n');
+    const searchFromByLine = new Map<number, number>();
+    const searchFromSkeletonByLine = new Map<number, number>();
+    const skeletonLines = skeleton ? skeleton.split('\n') : [];
+
     inlineHints.forEach((hint, hintIdx) => {
-      if (revealed.includes(hintIdx)) {
-        const lineIndex = hint.line - 1;
-        if (lineIndex >= 0 && lineIndex < lines.length) {
-          const lineText = lines[lineIndex];
-          // Replace the specific blankText so multiple blanks per line work correctly
-          lines[lineIndex] = lineText.includes(hint.blankText)
-            ? lineText.replace(hint.blankText, hint.answer)
-            : lineText.replace(/_{5,}/, hint.answer);
+      if (!revealed.includes(hintIdx)) return;
+      const lineIndex = hint.line - 1;
+      if (lineIndex < 0 || lineIndex >= lines.length) return;
+
+      let lineText = lines[lineIndex];
+      const positionOnLine = inlineHints
+        .map((_, i) => i)
+        .filter((i) => inlineHints[i].line === hint.line)
+        .indexOf(hintIdx);
+
+      // Skeleton start column for this hint (so we can match the correct run when multiple blanks on same line)
+      let skeletonStartCol: number | undefined;
+      if (skeleton && lineIndex < skeletonLines.length) {
+        const skeletonLine = skeletonLines[lineIndex];
+        const skFrom = searchFromSkeletonByLine.get(hint.line) ?? 0;
+        const skIdx = skeletonLine.indexOf(hint.blankText, skFrom);
+        if (skIdx !== -1) skeletonStartCol = skIdx;
+      }
+
+      // Try 1: exact blankText match (respect search from for multiple blanks per line)
+      const fromIndex = searchFromByLine.get(hint.line) ?? 0;
+      const exactIdx = lineText.indexOf(hint.blankText, fromIndex);
+      if (exactIdx !== -1) {
+        lines[lineIndex] = lineText.slice(0, exactIdx) + hint.answer + lineText.slice(exactIdx + hint.blankText.length);
+        searchFromByLine.set(hint.line, exactIdx + hint.answer.length);
+        if (skeletonStartCol !== undefined) searchFromSkeletonByLine.set(hint.line, skeletonStartCol + hint.blankText.length);
+        return;
+      }
+
+      // Try 2: replace the run of 2+ underscores that belongs to this hint (by skeleton position, not run index)
+      const underscoreRuns: { index: number; length: number }[] = [];
+      const re = /_{2,}/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(lineText)) !== null) {
+        underscoreRuns.push({ index: m.index, length: m[0].length });
+      }
+      const overlappingRuns = skeletonStartCol !== undefined
+        ? underscoreRuns.filter((r) => r.index <= skeletonStartCol + 2 && r.index + r.length >= skeletonStartCol - 2)
+        : [];
+      const runBySkeleton = overlappingRuns.length > 0
+        ? overlappingRuns.reduce((best, r) => (Math.abs(r.index - skeletonStartCol!) < Math.abs(best.index - skeletonStartCol!) ? r : best))
+        : undefined;
+      // When we have skeleton, only replace a run that actually overlaps this hint's position; never use positionOnLine
+      // fallback or we can replace the wrong blank (e.g. only run left is the second blank, we'd replace it with the first hint's answer).
+      const run = runBySkeleton ?? (skeletonStartCol === undefined && positionOnLine >= 0 && positionOnLine < underscoreRuns.length ? underscoreRuns[positionOnLine] : undefined);
+      if (run !== undefined) {
+        const alreadyHasAnswerBeforeRun = run.index >= hint.answer.length && lineText.slice(run.index - hint.answer.length, run.index) === hint.answer;
+        lines[lineIndex] = lineText.slice(0, run.index) + (alreadyHasAnswerBeforeRun ? '' : hint.answer) + lineText.slice(run.index + run.length);
+        searchFromByLine.set(hint.line, run.index + (alreadyHasAnswerBeforeRun ? 0 : hint.answer.length));
+        if (skeletonStartCol !== undefined) searchFromSkeletonByLine.set(hint.line, skeletonStartCol + hint.blankText.length);
+        return;
+      }
+
+      // Try 3: position from skeleton (when placeholder fully deleted)
+      // Only replace the underscore run at startCol (or insert if none), so we never eat surrounding chars like ' or \.
+      // If there are no underscores and the answer is already at this position, skip to avoid duplicating on every apply.
+      // If the user typed a suffix of the answer (e.g. "keyVault" when answer is "__keyVault"), replace that segment with the full answer to avoid "__keyVaultkeyVault".
+      if (skeleton && lineIndex < skeletonLines.length) {
+        const skeletonLine = skeletonLines[lineIndex];
+        const skFrom = searchFromSkeletonByLine.get(hint.line) ?? 0;
+        const skIdx = skeletonLine.indexOf(hint.blankText, skFrom);
+        if (skIdx !== -1) {
+          const startCol = skIdx;
+          const maxLength = hint.blankText.length;
+          let runEnd = startCol;
+          while (runEnd < lineText.length && runEnd < startCol + maxLength && lineText[runEnd] === '_') {
+            runEnd++;
+          }
+          const exactMatch = lineText.slice(startCol, startCol + hint.answer.length) === hint.answer;
+          const afterAnswer = lineText[startCol + hint.answer.length];
+          const answerNotFollowedByDuplicate = startCol + hint.answer.length >= lineText.length || !/[_a-zA-Z0-9]/.test(afterAnswer);
+          // Skip if answer is already correct here (e.g. keyDoc._id). Otherwise we'd treat the "_" in "_id" as a 1-char run and replace it -> _idid.
+          const alreadyHasAnswer = exactMatch && answerNotFollowedByDuplicate;
+          if (!alreadyHasAnswer) {
+            if (runEnd > startCol) {
+              lines[lineIndex] = lineText.slice(0, startCol) + hint.answer + lineText.slice(runEnd);
+            } else {
+              const s = lineText.slice(startCol);
+              let replaceLen = 0;
+              // Explicit fix: "_idid" (answer "_id" + duplicate "id") must become "_id" so Show Answer matches Solution.
+              const isIdIdTypo = hint.answer === '_id' && (s === '_idid' || (s.startsWith('_id') && s.length > 3 && /^_id[id]+$/.test(s)));
+              if (isIdIdTypo) {
+                replaceLen = s.length;
+              } else if (exactMatch && !answerNotFollowedByDuplicate) {
+                let endCorrupt = startCol;
+                while (endCorrupt < lineText.length && /[_a-zA-Z0-9]/.test(lineText[endCorrupt])) endCorrupt++;
+                replaceLen = endCorrupt - startCol;
+              } else {
+                for (let len = 1; len <= Math.min(s.length, hint.answer.length); len++) {
+                  if (s.slice(0, len) === hint.answer.slice(-len)) replaceLen = len;
+                }
+                const remainder = replaceLen > 0 ? s.slice(replaceLen) : '';
+                const remainderIsDuplicate = remainder.length > 0 && (
+                  remainder === hint.answer ||
+                  remainder === hint.answer.replace(/^_+/, '') ||
+                  hint.answer.endsWith(remainder)
+                );
+                if (remainderIsDuplicate) {
+                  let endCorrupt = startCol;
+                  while (endCorrupt < lineText.length && /[_a-zA-Z0-9]/.test(lineText[endCorrupt])) endCorrupt++;
+                  replaceLen = endCorrupt - startCol;
+                } else if (replaceLen === 0 && s.length > 0) {
+                  let endCorrupt = startCol;
+                  while (endCorrupt < lineText.length && /[_a-zA-Z0-9]/.test(lineText[endCorrupt])) endCorrupt++;
+                  replaceLen = endCorrupt - startCol;
+                }
+              }
+              lines[lineIndex] = lineText.slice(0, startCol) + hint.answer + lineText.slice(startCol + replaceLen);
+            }
+          }
+          searchFromByLine.set(hint.line, startCol + hint.answer.length);
+          searchFromSkeletonByLine.set(hint.line, skIdx + hint.blankText.length);
         }
       }
     });
@@ -823,9 +939,13 @@ export function StepView({
               ? fillAllBlanksInSkeleton(block.skeleton, block.inlineHints)
               : (block.code ?? '');
         } else if (hasAnySkeleton(block) && block.inlineHints?.length) {
-          // Use current editor content as base when present so manual input in non-revealed blanks is preserved
-          const base = (saved != null && saved !== '' && !hasOldHardcodedUri(saved)) ? saved : baseSkeleton;
-          next[blockKey] = applyRevealedAnswersToCode(base, block.inlineHints, revealed);
+          // When no hints revealed (e.g. fresh browser), always start from skeleton so we never show corrupted persisted content.
+          // When some hints revealed, use saved content as base unless it looks corrupted (e.g. duplicate "keyVault" in collection name).
+          const looksCorrupted = (code: string) =>
+            /keyVaultkeyVault/.test(code) || /getCollection\s*\(\s*["'][^"']*_keyVault[keyVault]+/.test(code) || /\._idid\b/.test(code);
+          const useSaved = revealed.length > 0 && saved != null && saved !== '' && !hasOldHardcodedUri(saved) && !looksCorrupted(saved);
+          const base = useSaved ? saved : baseSkeleton;
+          next[blockKey] = applyRevealedAnswersToCode(base, block.inlineHints, revealed, baseSkeleton);
         } else if (saved != null && saved !== '' && hasOldHardcodedUri(saved)) {
           next[blockKey] = baseSkeleton;
         } else if (saved == null || saved === '') {
@@ -853,8 +973,14 @@ export function StepView({
               ? fillAllBlanksInSkeleton(block.skeleton, block.inlineHints)
               : (block.code ?? '');
         } else if (revealed.length > 0 && block.inlineHints?.length) {
-          const baseCode = (prev[blockKey] != null && prev[blockKey] !== '') ? prev[blockKey] : getDisplayCode(block, tier, false);
-          next[blockKey] = applyRevealedAnswersToCode(baseCode, block.inlineHints, revealed);
+          const skeleton = getDisplayCode(block, tier, false);
+          const prevCode = prev[blockKey];
+          const looksCorrupted = (code: string) =>
+            /keyVaultkeyVault/.test(code) || /getCollection\s*\(\s*["'][^"']*_keyVault[keyVault]+/.test(code) || /\._idid\b/.test(code);
+          const baseCode = (prevCode != null && prevCode !== '' && !looksCorrupted(prevCode))
+            ? prevCode
+            : skeleton;
+          next[blockKey] = applyRevealedAnswersToCode(baseCode, block.inlineHints, revealed, skeleton);
         }
       });
       return next;
@@ -2282,6 +2408,7 @@ export function StepView({
           <Button
             size="sm"
             onClick={handleNextStep}
+            disabled={isRunning}
             className="gap-1"
           >
             {currentStepIndex === steps.length - 1 ? (

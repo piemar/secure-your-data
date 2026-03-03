@@ -79,6 +79,8 @@ interface LabViewWithTabsProps {
   defaultCompetitorId?: string;
   competitorIds?: string[];
   labMongoUri?: string;
+  /** Called when the lab just becomes complete (all steps done); use to e.g. select next lab in order */
+  onLabCompleted?: () => void;
 }
 
 export function LabViewWithTabs({
@@ -95,12 +97,14 @@ export function LabViewWithTabs({
   defaultCompetitorId,
   competitorIds,
   labMongoUri,
+  onLabCompleted,
 }: LabViewWithTabsProps) {
   const { startLab, completeLab, completeStep, userEmail, resetProgressCount } = useLab();
   const storageKey = `lab${labNumber}-progress`;
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const stepToolbarRef = useRef<{ reset: () => void; openHelp: () => void } | null>(null);
   const [activeTab, setActiveTab] = useState<string>('overview');
+  const prevCompletedCountRef = useRef<number | null>(null);
 
   const [completedSteps, setCompletedSteps] = useState<number[]>(() => {
     const saved = localStorage.getItem(storageKey);
@@ -111,6 +115,7 @@ export function LabViewWithTabs({
   useEffect(() => {
     setCurrentStepIndex(0);
     setActiveTab('overview');
+    prevCompletedCountRef.current = null;
   }, [labNumber]);
 
   // Start lab tracking on mount and send heartbeat
@@ -129,12 +134,17 @@ export function LabViewWithTabs({
 
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify(completedSteps));
-    
-    // Check if all steps are completed
-    if (completedSteps.length === steps.length) {
+
+    const allComplete = completedSteps.length === steps.length;
+    if (allComplete) {
       completeLab(labNumber);
+      // Only call onLabCompleted when we just transitioned to complete (not on load when already complete)
+      if (prevCompletedCountRef.current !== null && prevCompletedCountRef.current < steps.length) {
+        onLabCompleted?.();
+      }
     }
-  }, [completedSteps, storageKey, steps.length, labNumber, completeLab]);
+    prevCompletedCountRef.current = completedSteps.length;
+  }, [completedSteps, storageKey, steps.length, labNumber, completeLab, onLabCompleted]);
 
   const handleStepComplete = (stepIndex: number) => {
     const step = steps[stepIndex];
