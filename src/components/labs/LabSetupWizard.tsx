@@ -13,6 +13,9 @@ import { cn } from '@/lib/utils';
 import { ArchitectureDiagram } from '@/components/workshop/ArchitectureDiagram';
 import { LabEnvironmentDiagram } from './LabEnvironmentDiagram';
 import { PrerequisitesChecklist } from './PrerequisitesChecklist';
+import { runResetCleanup } from '@/services/resetCleanup';
+import type { CleanupResult } from '@/services/resetCleanup';
+import { ResetCleanupStatusDialog, type ResetCleanupDialogPhase } from './ResetCleanupStatusDialog';
 
 type SetupPhase = 'onboarding' | 'ready';
 
@@ -50,6 +53,10 @@ export const LabSetupWizard: React.FC = () => {
     const [localUri, setLocalUri] = useState(mongoUri || 'mongodb://mongo:27017');
     const [uriFromWorkshop, setUriFromWorkshop] = useState(false);
     const [isCheckingPrereqs, setIsCheckingPrereqs] = useState(false);
+    const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
+    const [cleanupPhase, setCleanupPhase] = useState<ResetCleanupDialogPhase>('confirm');
+    const [cleanupResults, setCleanupResults] = useState<CleanupResult[]>([]);
+    const [cleanupLoading, setCleanupLoading] = useState(false);
     const [prereqResults, setPrereqResults] = useState<Record<string, { verified: boolean; message: string; path?: string; detectedLocation?: string }>>({});
     const [showPrereqDetails, setShowPrereqDetails] = useState(false);
     const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
@@ -217,25 +224,34 @@ export const LabSetupWizard: React.FC = () => {
         }
     };
 
-    const handleReset = async () => {
-        if (!window.confirm('Are you sure? This will reset your progress and locally verified paths.')) return;
+    const handleReset = () => {
+        setCleanupResults([]);
+        setCleanupPhase('confirm');
+        setCleanupDialogOpen(true);
+    };
 
-        const suffix = verifiedTools['suffix']?.path;
-        if (suffix && window.confirm(`Do you also want to delete the AWS KMS Key & Alias (alias/mongodb-lab-key-${suffix})? \n\nThis will apply a 7-day deletion window.`)) {
-            const toastId = toast.loading('Cleaning up AWS resources...');
-            const profile = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') ?? '') : '';
-            const result = await validatorUtils.cleanupAwsResources(`alias/mongodb-lab-key-${suffix}`, profile || undefined);
-            toast.dismiss(toastId);
-            if (result.success) {
-                toast.success('AWS Resources cleaned up.');
-            } else {
-                toast.error(`Cleanup failed: ${result.message}`);
-            }
-        }
+    const handleConfirmReset = () => {
+        setCleanupPhase('loading');
+        setCleanupLoading(true);
+        setCleanupResults([]);
+        runResetCleanup()
+            .then((results) => {
+                setCleanupResults(results);
+                setCleanupPhase('done');
+                setCleanupLoading(false);
+            })
+            .catch(() => {
+                setCleanupResults([{ item: 'Cleanup', status: 'error', message: 'Unexpected error' }]);
+                setCleanupPhase('done');
+                setCleanupLoading(false);
+            });
+    };
 
+    const handleCleanupDialogClose = () => {
+        setCleanupDialogOpen(false);
         resetProgress();
         setPhase('onboarding');
-        toast.info("Progress Reset.");
+        toast.info('Progress reset.');
     };
 
     const handleFinalize = async () => {
@@ -304,6 +320,7 @@ export const LabSetupWizard: React.FC = () => {
     }
 
     return (
+        <>
         <Card className="max-w-3xl mx-auto mt-6 shadow-xl overflow-hidden border-none bg-background/50 backdrop-blur-sm">
             <div className="h-1.5 bg-primary w-full" />
             <CardHeader className="pb-4">
@@ -720,5 +737,15 @@ export const LabSetupWizard: React.FC = () => {
                 </Button>
             </CardFooter>
         </Card>
+        <ResetCleanupStatusDialog
+            open={cleanupDialogOpen}
+            onOpenChange={setCleanupDialogOpen}
+            phase={cleanupPhase}
+            results={cleanupResults}
+            loading={cleanupLoading}
+            onConfirm={handleConfirmReset}
+            onClose={handleCleanupDialogClose}
+        />
+        </>
     );
 };

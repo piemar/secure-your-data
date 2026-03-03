@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LabIntroTab } from './LabIntroTab';
 import { StepView } from './StepView';
 import { useLab } from '@/context/LabContext';
-import { heartbeat } from '@/utils/leaderboardUtils';
+import { getLeaderboardEntries, heartbeat } from '@/utils/leaderboardUtils';
 import { DifficultyLevel } from './DifficultyBadge';
 import { Lightbulb, BookOpen } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -108,7 +108,23 @@ export function LabViewWithTabs({
 
   const [completedSteps, setCompletedSteps] = useState<number[]>(() => {
     const saved = localStorage.getItem(storageKey);
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {
+        // fall through to seed from leaderboard or empty
+      }
+    }
+    const email = typeof localStorage !== 'undefined' ? localStorage.getItem('userEmail') : null;
+    if (email && steps.length > 0) {
+      const entries = getLeaderboardEntries();
+      const entry = entries.find(e => e.email === email);
+      if (entry?.completedLabs?.includes(labNumber)) {
+        return Array.from({ length: steps.length }, (_, i) => i);
+      }
+    }
+    return [];
   });
 
   // When switching to a different lab, always show overview and step 0 (not the step index from the previous lab)

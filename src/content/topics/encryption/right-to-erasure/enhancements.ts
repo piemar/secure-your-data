@@ -150,6 +150,7 @@ for (const doc of legacyDocs) {
           },
         },
         skeleton: `const { MongoClient, ClientEncryption } = require("mongodb");
+// Migration: plaintext → encrypted (explicit encrypt per document)
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
 const uri = process.env.MONGODB_URI;
@@ -203,10 +204,10 @@ async function run() {
 }
 run().catch(console.error);`,
         inlineHints: [
-          { line: 20, blankText: '______', hint: 'Method to retrieve a single document', answer: 'findOne' },
-          { line: 25, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
-          { line: 44, blankText: '_________', hint: 'Method to encrypt a value manually', answer: 'encrypt' },
-          { line: 45, blankText: '____________', hint: 'Algorithm suffix for deterministic encryption', answer: 'Deterministic' },
+          { line: 21, blankText: '______', hint: 'Method to retrieve a single document', answer: 'findOne' },
+          { line: 26, blankText: '________________', hint: 'Class for manual encryption operations', answer: 'ClientEncryption' },
+          { line: 45, blankText: '_________', hint: 'Method to encrypt a value manually', answer: 'encrypt' },
+          { line: 46, blankText: '____________', hint: 'Algorithm suffix for deterministic encryption', answer: 'Deterministic' },
         ],
       },
     ],
@@ -276,6 +277,7 @@ async function run() {
 }
 run().catch(console.error);`,
         skeleton: `const { MongoClient, ClientEncryption } = require("mongodb");
+// Per-tenant DEK for isolation and per-tenant crypto-shredding
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
 const uri = process.env.MONGODB_URI;
@@ -323,9 +325,9 @@ async function run() {
 }
 run().catch(console.error);`,
         inlineHints: [
-          { line: 30, blankText: '_______', hint: 'Prefix for tenant-specific key names', answer: 'tenant' },
-          { line: 32, blankText: '___________', hint: 'Field to query for existing DEK names', answer: 'keyAltNames' },
-          { line: 35, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
+          { line: 31, blankText: '_______', hint: 'Prefix for tenant-specific key names', answer: 'tenant' },
+          { line: 33, blankText: '___________', hint: 'Field to query for existing DEK names', answer: 'keyAltNames' },
+          { line: 36, blankText: '____________', hint: 'Method to generate a new Data Encryption Key', answer: 'createDataKey' },
         ],
         competitorEquivalents: {
           postgresql: {
@@ -411,6 +413,7 @@ async function run() {
 }
 run().catch(console.error);`,
         skeleton: `const { MongoClient, ClientEncryption } = require("mongodb");
+// Rewrap DEKs with new CMK (metadata-only; data unchanged)
 const { fromSSO } = require("@aws-sdk/credential-providers");
 
 const uri = process.env.MONGODB_URI;
@@ -455,10 +458,10 @@ async function run() {
 }
 run().catch(console.error);`,
         inlineHints: [
-          { line: 25, blankText: '___', hint: 'Field name in keyAltName pattern', answer: 'ssn' },
-          { line: 26, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
-          { line: 33, blankText: '___________________', hint: 'Method to rotate DEKs to a new CMK', answer: 'rewrapManyDataKey' },
-          { line: 34, blankText: '___________', hint: 'Field to filter which DEKs to rotate', answer: 'keyAltNames' },
+          { line: 26, blankText: '___', hint: 'Field name in keyAltName pattern', answer: 'ssn' },
+          { line: 27, blankText: '______', hint: 'Method to find a single document', answer: 'findOne' },
+          { line: 34, blankText: '___________________', hint: 'Method to rotate DEKs to a new CMK', answer: 'rewrapManyDataKey' },
+          { line: 35, blankText: '___________', hint: 'Field to filter which DEKs to rotate', answer: 'keyAltNames' },
         ],
         competitorEquivalents: {
           postgresql: {

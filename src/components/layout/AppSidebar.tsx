@@ -26,6 +26,9 @@ import type { Section } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useState, useEffect } from 'react';
+import { runResetCleanup } from '@/services/resetCleanup';
+import type { CleanupResult } from '@/services/resetCleanup';
+import { ResetCleanupStatusDialog, type ResetCleanupDialogPhase } from '@/components/labs/ResetCleanupStatusDialog';
 
 interface NavItem {
   id: Section;
@@ -94,6 +97,10 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
   const [userRank, setUserRank] = useState<number>(0);
   const [totalParticipants, setTotalParticipants] = useState<number>(0);
   const [labsEnabled, setLabsEnabled] = useState<boolean>(areLabsEnabled());
+  const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
+  const [cleanupPhase, setCleanupPhase] = useState<ResetCleanupDialogPhase>('confirm');
+  const [cleanupResults, setCleanupResults] = useState<CleanupResult[]>([]);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -104,32 +111,51 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
     window.location.reload();
   };
 
-  const handleResetProgress = () => {
-    if (window.confirm('Are you sure you want to reset all lab progress? This will clear completed steps, scores, and start fresh.')) {
-      (async () => {
-        try {
-          // Reset only this user's leaderboard entry in the database; other users are unchanged
-          if (userEmail) {
-            const { postResetProgress } = await import('@/services/leaderboardApi');
-            await postResetProgress(userEmail);
-          }
-        } catch {
-          // Proceed with local reset even if API fails
+  const finishResetAfterCleanup = () => {
+    (async () => {
+      try {
+        if (userEmail) {
+          const { postResetProgress } = await import('@/services/leaderboardApi');
+          await postResetProgress(userEmail);
         }
-        localStorage.removeItem('workshop_leaderboard');
-        resetProgress();
-        // Clear only this browser's lab progress (per-user in single-user-per-browser usage)
-        localStorage.removeItem('lab1-progress');
-        localStorage.removeItem('lab2-progress');
-        localStorage.removeItem('lab3-progress');
-        localStorage.removeItem('completedLabs');
-        localStorage.removeItem('labStartTimes');
-        localStorage.removeItem('lab_mongo_uri');
-        localStorage.removeItem('lab_aws_profile');
-        localStorage.removeItem('lab_kms_alias');
-        window.location.reload();
-      })();
-    }
+      } catch {
+        // Proceed with local reset even if API fails
+      }
+      localStorage.removeItem('workshop_leaderboard');
+      resetProgress();
+      localStorage.removeItem('lab1-progress');
+      localStorage.removeItem('lab2-progress');
+      localStorage.removeItem('lab3-progress');
+      localStorage.removeItem('completedLabs');
+      localStorage.removeItem('labStartTimes');
+      localStorage.removeItem('lab_mongo_uri');
+      localStorage.removeItem('lab_aws_profile');
+      localStorage.removeItem('lab_kms_alias');
+      window.location.reload();
+    })();
+  };
+
+  const handleResetProgress = () => {
+    setCleanupResults([]);
+    setCleanupPhase('confirm');
+    setCleanupDialogOpen(true);
+  };
+
+  const handleConfirmReset = () => {
+    setCleanupPhase('loading');
+    setCleanupLoading(true);
+    setCleanupResults([]);
+    runResetCleanup()
+      .then((results) => {
+        setCleanupResults(results);
+        setCleanupPhase('done');
+        setCleanupLoading(false);
+      })
+      .catch(() => {
+        setCleanupResults([{ item: 'Cleanup', status: 'error', message: 'Unexpected error' }]);
+        setCleanupPhase('done');
+        setCleanupLoading(false);
+      });
   };
 
   // Calculate user rank, progress, and check lab status (sync from MongoDB periodically)
@@ -412,6 +438,19 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
           </button>
         </div>
       )}
+
+      <ResetCleanupStatusDialog
+        open={cleanupDialogOpen}
+        onOpenChange={setCleanupDialogOpen}
+        phase={cleanupPhase}
+        results={cleanupResults}
+        loading={cleanupLoading}
+        onConfirm={handleConfirmReset}
+        onClose={() => {
+          setCleanupDialogOpen(false);
+          finishResetAfterCleanup();
+        }}
+      />
     </aside>
   );
 }

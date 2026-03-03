@@ -1,5 +1,7 @@
 export interface LeaderboardEntry {
   email: string;
+  firstName?: string;
+  lastName?: string;
   score: number;
   completedLabs: number[];
   labTimes: Record<number, number>; // lab number -> time spent in ms
@@ -72,7 +74,7 @@ function getOrCreateEntry(email: string): LeaderboardEntry {
       labTimes: {},
       lastActive: Date.now(),
       hintsUsed: 0,
-      solutionsRevealed: 0
+      solutionsRevealed: 0,
     };
     entries.push(entry);
     saveLeaderboardEntries(entries);
@@ -98,7 +100,7 @@ function updateEntry(email: string, updates: Partial<LeaderboardEntry>): void {
       lastActive: Date.now(),
       hintsUsed: 0,
       solutionsRevealed: 0,
-      ...updates
+      ...updates,
     };
     entries.push(newEntry);
   } else {
@@ -200,13 +202,20 @@ export function startLab(email: string, labNumber: number): void {
 export function heartbeat(email: string, labNumber?: number): void {
   if (!email) return;
 
+  const attendeeName = typeof localStorage !== 'undefined' ? localStorage.getItem('workshop_attendee_name') || '' : '';
+  const nameParts = attendeeName.trim().split(/\s+/);
+  const firstName = nameParts[0] || undefined;
+  const lastName = nameParts.slice(1).join(' ') || undefined;
+
   import('@/services/leaderboardApi').then(({ postHeartbeat }) => {
-    postHeartbeat(email, labNumber);
+    postHeartbeat(email, labNumber, firstName, lastName);
   });
 
   const entry = getOrCreateEntry(email);
   const updates: Partial<LeaderboardEntry> = {
-    lastActive: Date.now()
+    lastActive: Date.now(),
+    ...(firstName !== undefined && { firstName }),
+    ...(lastName !== undefined && { lastName }),
   };
 
   // If labNumber is provided, update the lab time

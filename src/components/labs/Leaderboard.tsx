@@ -145,13 +145,16 @@ export function Leaderboard() {
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <p className={`font-semibold ${isCurrentUser ? 'text-primary' : ''}`}>
-                              {entry.email}
+                              {[entry.firstName, entry.lastName].filter(Boolean).join(' ') || entry.email}
                             </p>
                             {isCurrentUser && (
                               <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded">You</span>
                             )}
                           </div>
                           <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            {(entry.firstName != null || entry.lastName != null) && (
+                              <span>{entry.email}</span>
+                            )}
                             <span className="flex items-center gap-1">
                               <TrendingUp className="w-4 h-4" />
                               {entry.score} pts

@@ -152,6 +152,8 @@ function getLeaderboardMongoUri(): string {
 
 interface LeaderboardEntry {
   email: string;
+  firstName?: string;
+  lastName?: string;
   score: number;
   completedLabs: number[];
   labTimes: Record<number, number>;
@@ -556,6 +558,55 @@ export default defineConfig(({ mode }) => ({
                   res.end(JSON.stringify({ success: true, message: `Resource Cleanup Complete: Alias deleted, Key ${safeKeyId} scheduled for deletion (7 days).` }));
                 });
               });
+            });
+            return;
+          }
+
+          if (req.url && req.url.startsWith('/api/cleanup-lab-collections') && req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+            req.on('end', () => {
+              const results: { db: string; status: string; message?: string }[] = [];
+              const send = (success: boolean, message?: string) => {
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success, results, message }));
+              };
+              try {
+                const { uri } = JSON.parse(body || '{}');
+                const rawUri = typeof uri === 'string' ? uri.trim() : '';
+                if (!rawUri) {
+                  results.push({ db: 'all', status: 'skipped', message: 'No URI provided' });
+                  send(true);
+                  return;
+                }
+                const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(rawUri);
+                const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : rawUri;
+                const dbsToDrop = ['encryption', 'medical', 'hr'];
+                MongoClient.connect(effectiveUri).then((client) => {
+                  Promise.all(
+                    dbsToDrop.map((dbName) =>
+                      client.db(dbName).dropDatabase()
+                        .then(() => { results.push({ db: dbName, status: 'success', message: 'Dropped' }); })
+                        .catch((err: any) => { results.push({ db: dbName, status: 'error', message: err?.message || 'Failed' }); })
+                    )
+                  )
+                    .then(() => {
+                      client.close();
+                      send(true, `Dropped ${results.filter((r) => r.status === 'success').length} database(s).`);
+                    })
+                    .catch((err: any) => {
+                      try { client.close(); } catch (_) {}
+                      results.push({ db: 'connection', status: 'error', message: err?.message || 'Connection failed' });
+                      send(false, err?.message);
+                    });
+                }).catch((err: any) => {
+                  results.push({ db: 'connection', status: 'error', message: err?.message || 'Connection failed' });
+                  send(false, err?.message);
+                });
+              } catch (parseErr: any) {
+                results.push({ db: 'request', status: 'error', message: parseErr?.message || 'Invalid request' });
+                send(false, parseErr?.message);
+              }
             });
             return;
           }
@@ -1302,18 +1353,26 @@ export default defineConfig(({ mode }) => ({
                     return;
                   }
                   
-                  // Heartbeat endpoint to update active time
+                  // Heartbeat endpoint to update active time (and optional firstName/lastName)
                   if (req.url?.includes('/heartbeat')) {
-                    const { email, labNumber } = data;
+                    const { email, labNumber, firstName, lastName } = data;
                     const entries = await getLeaderboard();
                     const currentEntry = entries.find(e => e.email === email);
+                    const heartbeatUpdates: Partial<LeaderboardEntry> = {};
                     if (currentEntry && currentEntry.labTimes[labNumber] && !currentEntry.completedLabs.includes(labNumber)) {
-                      // Update time spent on this lab
                       const now = Date.now();
                       const labStartTime = currentEntry.labTimes[labNumber];
                       const timeSinceStart = now - labStartTime;
-                      currentEntry.labTimes[labNumber] = timeSinceStart;
-                      await updateLeaderboardEntry(email, { labTimes: currentEntry.labTimes });
+                      heartbeatUpdates.labTimes = { ...currentEntry.labTimes, [labNumber]: timeSinceStart };
+                    }
+                    if (firstName !== undefined && firstName !== null && String(firstName).trim() !== '') {
+                      heartbeatUpdates.firstName = String(firstName).trim();
+                    }
+                    if (lastName !== undefined && lastName !== null && String(lastName).trim() !== '') {
+                      heartbeatUpdates.lastName = String(lastName).trim();
+                    }
+                    if (Object.keys(heartbeatUpdates).length > 0) {
+                      await updateLeaderboardEntry(email, heartbeatUpdates);
                     }
                     res.setHeader('Content-Type', 'application/json');
                     res.end(JSON.stringify({ success: true }));

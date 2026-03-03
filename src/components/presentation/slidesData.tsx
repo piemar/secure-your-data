@@ -730,6 +730,7 @@ Result:
 - All their data becomes undecryptable garbage
 - Including data in backups (backups have encrypted data)
 - Other users completely unaffected (different DEKs)
+- For multi-tenant applications: use one DEK per tenant for isolation and per-tenant crypto-shredding.
 
 This is Lab 3 - you'll implement this pattern hands-on.
 
@@ -918,6 +919,7 @@ Explicit Encryption:
 - Full control over when/what gets encrypted
 - Can encrypt only in specific code paths
 - Best for retrofitting existing applications
+- Required when migrating existing plaintext data into CSFLE: read plaintext, encrypt with ClientEncryption, write to new collection (see Lab 3).
 
 In practice, many customers use both:
 - Automatic for the main path
@@ -1238,6 +1240,7 @@ Why it's fast:
 - 1 million documents? Still just re-encrypting a few DEKs
 
 Best practices:
+- Prefer keyAltNames over raw keyId for rotation and readability.
 - Rotate CMK annually (or per your compliance requirements)
 - Test rotation in staging first
 - Keep old CMK around briefly for rollback
@@ -1662,9 +1665,9 @@ The key: Qualify early. A failed POC is worse than a declined engagement.`,
         </div>
       </div>
     ),
-    speakerNotes: `Here are the three hands-on labs you'll complete after this presentation.
+    speakerNotes: `We've covered architecture and compliance; next you'll do three hands-on labs that implement what we just described.
 
-Lab 1: CSFLE Fundamentals (15 min)
+Lab 1: CSFLE Fundamentals
 - Set up AWS KMS integration
 - Implement automatic encryption
 - Intentionally break crypt_shared to learn debugging

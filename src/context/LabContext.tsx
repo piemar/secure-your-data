@@ -112,7 +112,7 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
     }, []);
 
-    // Hydrate currentScore from leaderboard when userEmail is available so sidebar shows persisted score
+    // Hydrate currentScore, completedLabs, and labStartTimes from leaderboard when userEmail is available so sidebar shows persisted progress
     useEffect(() => {
         const email = userEmail || (typeof localStorage !== 'undefined' ? localStorage.getItem('userEmail') : null);
         if (!email) return;
@@ -122,8 +122,25 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const { getLeaderboardEntries } = await import('@/utils/leaderboardUtils');
             const entries = getLeaderboardEntries();
             const entry = entries.find(e => e.email === email);
-            if (entry != null && typeof entry.score === 'number') {
+            if (entry == null) return;
+            if (typeof entry.score === 'number') {
                 setCurrentScore(entry.score);
+            }
+            if (Array.isArray(entry.completedLabs) && entry.completedLabs.length > 0) {
+                setCompletedLabs(entry.completedLabs);
+                try {
+                    localStorage.setItem('completedLabs', JSON.stringify(entry.completedLabs));
+                } catch {
+                    // ignore
+                }
+            }
+            if (entry.labTimes && typeof entry.labTimes === 'object' && Object.keys(entry.labTimes).length > 0) {
+                setLabStartTimes(entry.labTimes);
+                try {
+                    localStorage.setItem('labStartTimes', JSON.stringify(entry.labTimes));
+                } catch {
+                    // ignore
+                }
             }
         };
         hydrate();

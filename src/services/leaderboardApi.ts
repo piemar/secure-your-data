@@ -77,12 +77,20 @@ export async function postAddPoints(
   }
 }
 
-export async function postHeartbeat(email: string, labNumber?: number): Promise<void> {
+export async function postHeartbeat(
+  email: string,
+  labNumber?: number,
+  firstName?: string,
+  lastName?: string
+): Promise<void> {
   try {
+    const body: Record<string, unknown> = { email, labNumber };
+    if (firstName !== undefined) body.firstName = firstName;
+    if (lastName !== undefined) body.lastName = lastName;
     await fetch(`${API_BASE}/heartbeat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, labNumber }),
+      body: JSON.stringify(body),
     });
   } catch {
     // Ignore

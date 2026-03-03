@@ -648,6 +648,10 @@ Key talking point: "You keep the master keys. Even MongoDB/Atlas can never see y
                 <p className="text-sm">Equality, Range, Prefix, Suffix<br />Rich query capabilities on encrypted data</p>
               </div>
               <div>
+                <h4 className="font-semibold text-sm text-primary">Key per field</h4>
+                <p className="text-sm">One DEK per encrypted field (CSFLE can reuse one DEK for multiple fields)</p>
+              </div>
+              <div>
                 <h4 className="font-semibold text-sm text-primary">Security</h4>
                 <p className="text-sm">No frequency analysis vulnerability</p>
               </div>
@@ -664,11 +668,12 @@ Key talking point: "You keep the master keys. Even MongoDB/Atlas can never see y
 CSFLE (4.2+):
 - Deterministic OR random encryption
 - Only equality queries on deterministic fields
-- Lower overhead
-- Deterministic reveals frequency patterns
+- Can reuse one DEK for multiple fields
+- Lower overhead - deterministic reveals frequency patterns
 
 Queryable Encryption (8.0 GA):
 - Always randomized - more secure
+- Requires a separate DEK per encrypted field (CSFLE can reuse one DEK for multiple fields)
 - Supports range, prefix, suffix queries
 - Higher storage overhead (2-3x)
 - No frequency analysis vulnerability
@@ -681,6 +686,7 @@ Recommendation: QE for new projects on 8.0+, CSFLE for older versions.`,
         rows: [
           ['Availability', 'MongoDB 4.2+', 'MongoDB 8.0 GA'],
           ['Encryption', 'Deterministic or Random', 'Always Randomized'],
+          ['DEK usage', 'One DEK can cover multiple fields', 'One DEK per encrypted field'],
           ['Query Support', 'Equality only', 'Equality, Range, Prefix, Suffix'],
           ['Security', 'Reveals patterns (deterministic)', 'No frequency analysis'],
         ],
@@ -754,7 +760,8 @@ Automatic Encryption:
 Explicit Encryption:
 - Works with Community Edition
 - Application code calls encrypt/decrypt
-- More control but more code changes`,
+- More control but more code changes
+- Required when migrating existing plaintext data into CSFLE (read plaintext, encrypt with ClientEncryption, write to new collection)`,
     exportContent: {
       title: 'Automatic vs Explicit Encryption',
       table: {
@@ -1085,7 +1092,9 @@ CMK Rotation (Low Impact):
 DEK Rotation (Higher Impact):
 - Requires re-encrypting all data
 - When: suspected compromise, compliance mandates, employee departure
-- Use rewrapManyDataKey() for bulk updates`,
+- Use rewrapManyDataKey() for bulk updates
+
+Best practice: Prefer keyAltNames over raw keyId for rotation and readability.`,
     exportContent: {
       title: 'Key Rotation Strategies',
       bullets: [
@@ -1098,9 +1107,53 @@ DEK Rotation (Higher Impact):
     },
   },
 
-  // Slide 14: Performance Considerations
+  // Slide 14: Right to Erasure / Crypto-Shredding
   {
     id: 14,
+    title: 'Right to Erasure / Crypto-Shredding',
+    section: 'Key Management',
+    sectionNumber: 5,
+    content: (
+      <div className="max-w-4xl mx-auto">
+        <SlideTitle>Right to Erasure (GDPR Art. 17) & Crypto-Shredding</SlideTitle>
+        <div className="grid grid-cols-1 gap-6 mb-6">
+          <CalloutBox type="warning" title="The problem">
+            <p>Deleting user data from the database does not remove it from backups, replicas, or logs. True &quot;right to erasure&quot; requires making data unrecoverable everywhere.</p>
+          </CalloutBox>
+          <div className="p-6 rounded-lg bg-card border border-primary">
+            <h3 className="text-xl font-bold mb-3">Solution: One DEK per user or tenant</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Store encrypted data with a DEK that is unique to that user or tenant. To erase: delete the DEK from the key vault. All ciphertext protected by that DEK becomes permanently unrecoverable (crypto-shredding).
+            </p>
+            <ul className="space-y-2 text-sm">
+              <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-primary" />No need to overwrite every backup or replica</li>
+              <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-primary" />Multi-tenant isolation: one DEK per tenant enables per-tenant erasure</li>
+              <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-primary" />Lab 3 implements migration, per-tenant DEKs, and crypto-shredding</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    ),
+    speakerNotes: `Right to Erasure (GDPR Art. 17): Users can request deletion of their data. The challenge is that deleting rows doesn't remove data from backups or replicas.
+
+Crypto-shredding: Use one DEK per user or tenant. To erase, delete the DEK from the key vault. All ciphertext protected by that DEK becomes permanently unrecoverable - no need to hunt through backups.
+
+Multi-tenant isolation: One DEK per tenant gives you per-tenant erasure and isolation. Lab 3 covers migration, per-tenant DEKs, CMK rotation with rewrapManyDataKey, and right to erasure.`,
+    exportContent: {
+      title: 'Right to Erasure / Crypto-Shredding',
+      bullets: [
+        'Problem: Deleting data does not remove it from backups or replicas',
+        'Solution: One DEK per user/tenant - delete DEK to make ciphertext unrecoverable',
+        'Multi-tenant: Per-tenant DEK enables per-tenant erasure and isolation',
+        'Lab 3: Migration, per-tenant DEKs, CMK rotation, GDPR right to erasure',
+      ],
+      notes: 'Crypto-shredding: delete the DEK to make all associated ciphertext permanently unrecoverable.',
+    },
+  },
+
+  // Slide 15: Performance Considerations (was 14)
+  {
+    id: 15,
     title: 'Performance Considerations',
     section: 'Operations',
     sectionNumber: 5,
@@ -1166,9 +1219,9 @@ Optimization: DEK caching, contention factor tuning, KMS proximity`,
     },
   },
 
-  // Slide 15: Compliance Mapping
+  // Slide 16: Compliance Mapping
   {
-    id: 15,
+    id: 16,
     title: 'Regulatory Alignment',
     section: 'Compliance',
     sectionNumber: 5,
@@ -1215,9 +1268,9 @@ Key message: CSFLE/QE addresses "zero trust" - even infrastructure operators can
     },
   },
 
-  // Slide 16: Competitive Positioning
+  // Slide 17: Competitive Positioning
   {
-    id: 16,
+    id: 17,
     title: 'Competitive Positioning',
     section: 'Competitive',
     sectionNumber: 6,
@@ -1297,9 +1350,9 @@ Key differentiator: Only document DB with production-ready searchable encryption
     },
   },
 
-  // Slide 17: Discovery Questions
+  // Slide 18: Discovery Questions
   {
-    id: 17,
+    id: 18,
     title: 'Discovery Questions',
     section: 'Sales Enablement',
     sectionNumber: 7,
@@ -1388,9 +1441,9 @@ Pro tip: Listen for "zero trust", "data sovereignty", "separation of duties"`,
     },
   },
 
-  // Slide 18: Objection Handling
+  // Slide 19: Objection Handling
   {
-    id: 18,
+    id: 19,
     title: 'Objection Handling',
     section: 'Sales Enablement',
     sectionNumber: 7,
@@ -1447,9 +1500,9 @@ Pro tip: Listen for "zero trust", "data sovereignty", "separation of duties"`,
     },
   },
 
-  // Slide 19: When NOT to Use
+  // Slide 20: When NOT to Use
   {
-    id: 19,
+    id: 20,
     title: 'When NOT to Use',
     section: 'Guidance',
     sectionNumber: 7,
@@ -1524,9 +1577,9 @@ Alternatives:
     },
   },
 
-  // Slide 20: Lab Overview
+  // Slide 21: Lab Overview
   {
-    id: 20,
+    id: 21,
     title: 'Hands-On Lab',
     section: 'Labs',
     sectionNumber: 8,
@@ -1605,7 +1658,9 @@ Alternatives:
         </div>
       </div>
     ),
-    speakerNotes: `Lab overview:
+    speakerNotes: `We've covered architecture and compliance; next you'll do three hands-on labs that implement what we just described.
+
+Lab overview:
 
 Lab 1: CSFLE with AWS KMS (15 min)
 - Configure AWS KMS, create CMK
@@ -1638,9 +1693,9 @@ Prerequisites: Atlas M10+, AWS account with KMS, Node.js 18+, mongosh 2.0+`,
     },
   },
 
-  // Slide 21: Resources & Next Steps
+  // Slide 22: Resources & Next Steps
   {
-    id: 21,
+    id: 22,
     title: 'Resources & Next Steps',
     section: 'Wrap Up',
     sectionNumber: 8,
@@ -1724,8 +1779,8 @@ export const sections = [
   { number: 2, title: 'Use Cases', slides: [4] },
   { number: 3, title: 'Architecture', slides: [5, 6] },
   { number: 4, title: 'Comparison', slides: [7, 8, 9, 10] },
-  { number: 5, title: 'Key Management', slides: [11, 12, 13, 14, 15] },
-  { number: 6, title: 'Competitive', slides: [16] },
-  { number: 7, title: 'Sales Enablement', slides: [17, 18, 19] },
-  { number: 8, title: 'Labs', slides: [20, 21] },
+  { number: 5, title: 'Key Management', slides: [11, 12, 13, 14, 15, 16] },
+  { number: 6, title: 'Competitive', slides: [17] },
+  { number: 7, title: 'Sales Enablement', slides: [18, 19, 20] },
+  { number: 8, title: 'Labs', slides: [21, 22] },
 ];
