@@ -24,7 +24,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { GenericLabPreview } from './GenericLabPreview';
-import { getReadOnlyLabOptions, defineLabDarkTheme, LAB_EDITOR_THEME } from '@/lib/monacoLabEditorOptions';
+import { getReadOnlyLabOptions, defineLabDarkTheme, getLabEditorTheme } from '@/lib/monacoLabEditorOptions';
+import { useTheme } from 'next-themes';
 import type { LabStepPreviewConfig, LabPreviewData } from '@/types';
 import { useLab } from '@/context/LabContext';
 import {
@@ -117,6 +118,18 @@ interface StepViewProps {
   resetProgressCount?: number;
   /** Called when user resets the current step so parent can uncomplete it (e.g. remove from completedSteps) */
   onResetStep?: (stepIndex: number) => void;
+}
+
+/** Format run-bash API response for display; when stdout/stderr are empty, show a clear explanation. */
+function formatBashRunOutput(data: { stdout?: string; stderr?: string; success?: boolean; exitCode?: number }): string {
+  const stdout = (data.stdout || '').trim();
+  const stderr = (data.stderr || '').trim();
+  const exitCode = data.exitCode ?? (data.success ? 0 : 1);
+  const combined = [stderr, stdout].filter(Boolean).join('\n');
+  if (combined) return combined;
+  return data.success
+    ? `Commands completed successfully (exit code ${exitCode}).\nVariable assignments (e.g. KMS_KEY_ID=...) and heredocs (cat <<EOF > policy.json) produce no stdout—values are stored in the shell.`
+    : `Command failed (exit code ${exitCode}).${stderr ? `\n\n${stderr}` : ''}`;
 }
 
 // Generate realistic MongoDB output based on code content with structured formatting
@@ -614,6 +627,7 @@ export function StepView({
   onResetStep,
 }: StepViewProps) {
   const { userEmail, userSuffix, subtractPoints } = useLab();
+  const { resolvedTheme } = useTheme();
   const [helpOpen, setHelpOpen] = useState(false);
   const [previewPanelTab, setPreviewPanelTab] = useState<'preview' | 'compete'>('compete');
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
@@ -939,11 +953,10 @@ export function StepView({
               ? fillAllBlanksInSkeleton(block.skeleton, block.inlineHints)
               : (block.code ?? '');
         } else if (hasAnySkeleton(block) && block.inlineHints?.length) {
-          // When no hints revealed (e.g. fresh browser), always start from skeleton so we never show corrupted persisted content.
-          // When some hints revealed, use saved content as base unless it looks corrupted (e.g. duplicate "keyVault" in collection name).
+          // Use saved content as base when it exists and is not corrupted, so edits persist when navigating between steps.
           const looksCorrupted = (code: string) =>
             /keyVaultkeyVault/.test(code) || /getCollection\s*\(\s*["'][^"']*_keyVault[keyVault]+/.test(code) || /\._idid\b/.test(code);
-          const useSaved = revealed.length > 0 && saved != null && saved !== '' && !hasOldHardcodedUri(saved) && !looksCorrupted(saved);
+          const useSaved = saved != null && saved !== '' && !hasOldHardcodedUri(saved) && !looksCorrupted(saved);
           const base = useSaved ? saved : baseSkeleton;
           next[blockKey] = applyRevealedAnswersToCode(base, block.inlineHints, revealed, baseSkeleton);
         } else if (saved != null && saved !== '' && hasOldHardcodedUri(saved)) {
@@ -989,11 +1002,23 @@ export function StepView({
 
   // When lab or user changes (not initial mount), load that lab's editors so switching labs or return visit restores state
   const prevLabUserRef = useRef({ labNumber, userEmail });
+  const editorsPersistRef = useRef<Record<string, string>>({});
   useEffect(() => {
     if (prevLabUserRef.current.labNumber !== labNumber || prevLabUserRef.current.userEmail !== userEmail) {
+      const labChanged = prevLabUserRef.current.labNumber !== labNumber;
       prevLabUserRef.current = { labNumber, userEmail };
       const w = loadLabWorkspace(labNumber, userEmail);
-      setEditableCodeByBlock(w.editors || {});
+      const loadedEditors = w.editors || {};
+      setEditableCodeByBlock((prev) => {
+        if (labChanged || Object.keys(loadedEditors).length > 0) return loadedEditors;
+        return prev;
+      });
+      if (w.revealedAnswersByBlock && Object.keys(w.revealedAnswersByBlock).length > 0) {
+        setRevealedAnswers(w.revealedAnswersByBlock);
+      }
+      if (w.revealedHintsByBlock && Object.keys(w.revealedHintsByBlock).length > 0) {
+        setRevealedHints(w.revealedHintsByBlock);
+      }
     }
   }, [labNumber, userEmail]);
 
@@ -1032,8 +1057,17 @@ export function StepView({
 
   // Persist all editor content for this lab to central storage (autosave for all editors)
   useEffect(() => {
+    editorsPersistRef.current = editableCodeByBlock;
     saveLabWorkspace(labNumber, { editors: editableCodeByBlock }, userEmail);
+    return () => {
+      saveLabWorkspace(labNumber, { editors: editorsPersistRef.current }, userEmail);
+    };
   }, [labNumber, editableCodeByBlock, userEmail]);
+
+  // Persist revealed answers and hints so they survive next/previous step and reload
+  useEffect(() => {
+    saveLabWorkspace(labNumber, { revealedAnswersByBlock: revealedAnswers, revealedHintsByBlock: revealedHints }, userEmail);
+  }, [labNumber, revealedAnswers, revealedHints, userEmail]);
 
   // Persist console logs for current step to central storage
   useEffect(() => {
@@ -1041,6 +1075,26 @@ export function StepView({
     const updated = { ...w.logEntriesByStep, [currentStepIndex]: logEntriesToStored(logEntries) };
     saveLabWorkspace(labNumber, { logEntriesByStep: updated }, userEmail);
   }, [labNumber, currentStepIndex, logEntries, userEmail]);
+
+  // Whether any block in this step still has unresolved hint markers (blanks not filled or revealed).
+  // When user clicks "Solution", that block is considered resolved so Run is enabled.
+  const hasUnresolvedHints = useMemo(() => {
+    const blocks = currentStep.codeBlocks ?? [];
+    return blocks.some((block, idx) => {
+      const key = `${currentStepIndex}-${idx}`;
+      const solutionRevealed = alwaysShowSolutions || !!showSolution[key] || !hasAnySkeleton(block);
+      if (solutionRevealed) return false;
+      const hintCount = block.inlineHints?.length ?? 0;
+      if (hintCount === 0) return false;
+      const revealedCount = (revealedAnswers[key] ?? []).length;
+      return revealedCount < hintCount;
+    });
+  }, [currentStep.codeBlocks, currentStepIndex, revealedAnswers, showSolution, alwaysShowSolutions]);
+
+  const runAllDisabled = isRunning || !currentStep.codeBlocks?.length || hasUnresolvedHints;
+  const runAllTooltip = hasUnresolvedHints
+    ? 'Fill in or reveal all blanks in the code before running.'
+    : 'Run all';
 
   // Competitor side-by-side: only in demo mode for moderator when step has competitor equivalents
   const stepCompetitorIds = useMemo(() => {
@@ -1255,6 +1309,7 @@ export function StepView({
     const language = (block?.language || 'javascript').toLowerCase();
     setIsRunning(true);
     let result: { output: string; success: boolean; summary: string };
+    const labAwsRegion = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_region') || '') : '';
 
     try {
       // 1) Explicit mongosh block → run-mongosh (requires URI)
@@ -1312,12 +1367,12 @@ export function StepView({
                 body: JSON.stringify({ commands: beforeNode, ...(awsProfile && { profile: awsProfile }) }),
               });
               const data = await res.json();
-              outputs.push([data.stdout, data.stderr].filter(Boolean).join('\n') || '(no output)');
+              outputs.push(formatBashRunOutput(data));
             }
             const res = await fetch('/api/run-node', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ code: editorCode, uri: labMongoUri || '' }),
+              body: JSON.stringify({ code: editorCode, uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }) }),
             });
             const data = await res.json();
             const stderr = (data.stderr || '').trim();
@@ -1341,7 +1396,7 @@ export function StepView({
               body: JSON.stringify({ commands, ...(awsProfile && { profile: awsProfile }) }),
             });
             const data = await res.json();
-            const out = [data.stdout, data.stderr].filter(Boolean).join('\n') || '(no output)';
+            const out = formatBashRunOutput(data);
             result = {
               output: out,
               success: data.success === true,
@@ -1377,7 +1432,7 @@ export function StepView({
         const res = await fetch('/api/run-node', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code, uri: labMongoUri || '' }),
+          body: JSON.stringify({ code, uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }) }),
         });
         const data = await res.json();
         const stderr = (data.stderr || '').trim();
@@ -1440,6 +1495,7 @@ export function StepView({
     const outputs: string[] = [];
     let lastSuccess = true;
     let lastSummary = '';
+    const labAwsRegion = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_region') || '') : '';
     for (const i of indicesToRun) {
       const block = blocks[i];
       const blockKey = `${currentStepIndex}-${i}`;
@@ -1485,9 +1541,9 @@ export function StepView({
                 const awsProfile = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
                 const res = await fetch('/api/run-bash', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ commands: beforeNode, ...(awsProfile && { profile: awsProfile }) }) });
                 const data = await res.json();
-                outputs.push([data.stdout, data.stderr].filter(Boolean).join('\n') || '(no output)');
+                outputs.push(formatBashRunOutput(data));
               }
-              const res = await fetch('/api/run-node', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: editorCode, uri: labMongoUri || '' }) });
+              const res = await fetch('/api/run-node', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: editorCode, uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }) }) });
               const data = await res.json();
               const out = [(data.stderr || '').trim(), (data.stdout || '').trim()].filter(Boolean).join('\n') || data.message || '(no output)';
               outputs.push(out);
@@ -1497,11 +1553,11 @@ export function StepView({
               const awsProfile = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
               const res = await fetch('/api/run-bash', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ commands, ...(awsProfile && { profile: awsProfile }) }) });
               const data = await res.json();
-              outputs.push([data.stdout, data.stderr].filter(Boolean).join('\n') || '(no output)');
+              outputs.push(formatBashRunOutput(data));
             }
           }
         } else if ((language === 'javascript' || language === 'typescript') && code.trim().length > 0) {
-          const res = await fetch('/api/run-node', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, uri: labMongoUri || '' }) });
+          const res = await fetch('/api/run-node', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }) }) });
           const data = await res.json();
           const out = [(data.stderr || '').trim(), (data.stdout || '').trim()].filter(Boolean).join('\n') || data.message || '(no output)';
           outputs.push(out);
@@ -1718,18 +1774,10 @@ export function StepView({
                                 <>
                                   {firstIsShell && <span className="text-[7px] text-muted-foreground/70 mr-0.5">—</span>}
                                   <TooltipProvider><Tooltip><TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" onClick={handleRunAll} disabled={isRunning || !currentStep.codeBlocks?.length} className="h-3.5 w-3.5 text-primary" title="Run all">
+                                    <Button variant="ghost" size="icon" onClick={handleRunAll} disabled={runAllDisabled} className="h-3.5 w-3.5 text-primary" title={runAllTooltip}>
                                       {isRunning ? <Loader2 className="w-2 h-2 animate-spin" /> : <PlayCircle className="w-2 h-2" />}
                                     </Button>
-                                  </TooltipTrigger><TooltipContent side="bottom">Run all</TooltipContent></Tooltip></TooltipProvider>
-                                  <TooltipProvider><Tooltip><TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" onClick={() => {
-                                      const runIdx = firstIsNodeMongosh && firstSlot.type === 'node-mongosh' ? ((nodeMongoshViewByKey[firstKey] ?? 'mongosh') === 'mongosh' ? firstSlot.mongoshIndex : firstSlot.nodeIndex) : firstIdx;
-                                      handleRunBlock(runIdx);
-                                    }} disabled={isRunning || !currentStep.codeBlocks?.length} className="h-3.5 w-3.5 text-primary" title="Run selection">
-                                      <Play className="w-2 h-2" />
-                                    </Button>
-                                  </TooltipTrigger><TooltipContent side="bottom">Run selection</TooltipContent></Tooltip></TooltipProvider>
+                                  </TooltipTrigger><TooltipContent side="bottom">{runAllTooltip}</TooltipContent></Tooltip></TooltipProvider>
                                 </>
                               )}
                               <TooltipProvider><Tooltip><TooltipTrigger asChild>
@@ -1810,15 +1858,10 @@ export function StepView({
                             </div>
                             <div className="flex items-center gap-0.5 flex-shrink-0">
                               <TooltipProvider><Tooltip><TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={handleRunAll} disabled={isRunning || !currentStep.codeBlocks?.length} className="h-3.5 w-3.5 text-primary" title="Run all">
+                                <Button variant="ghost" size="icon" onClick={handleRunAll} disabled={runAllDisabled} className="h-3.5 w-3.5 text-primary" title={runAllTooltip}>
                                   {isRunning ? <Loader2 className="w-2 h-2 animate-spin" /> : <PlayCircle className="w-2 h-2" />}
                                 </Button>
-                              </TooltipTrigger><TooltipContent side="bottom">Run all</TooltipContent></Tooltip></TooltipProvider>
-                              <TooltipProvider><Tooltip><TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={() => handleRunBlock(activeIndex)} disabled={isRunning || !currentStep.codeBlocks?.length} className="h-3.5 w-3.5 text-primary" title="Run selection">
-                                  {isRunning ? <Loader2 className="w-2 h-2 animate-spin" /> : <Play className="w-2 h-2" />}
-                                </Button>
-                              </TooltipTrigger><TooltipContent side="bottom">Run selection</TooltipContent></Tooltip></TooltipProvider>
+                              </TooltipTrigger><TooltipContent side="bottom">{runAllTooltip}</TooltipContent></Tooltip></TooltipProvider>
                               <TooltipProvider><Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" onClick={() => stepToolbarRef?.current?.reset()} className="h-3.5 gap-0.5 px-1 text-[8px]" title="Reset step"><RotateCcw className="w-2 h-2" /><span className="hidden sm:inline">Reset</span></Button>
                               </TooltipTrigger><TooltipContent side="bottom">Reset step</TooltipContent></Tooltip></TooltipProvider>
@@ -1892,15 +1935,10 @@ export function StepView({
                             </div>
                             <div className="flex items-center gap-0.5 flex-shrink-0">
                               <TooltipProvider><Tooltip><TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={handleRunAll} disabled={isRunning || !currentStep.codeBlocks?.length} className="h-3.5 w-3.5 text-primary" title="Run all">
+                                <Button variant="ghost" size="icon" onClick={handleRunAll} disabled={runAllDisabled} className="h-3.5 w-3.5 text-primary" title={runAllTooltip}>
                                   {isRunning ? <Loader2 className="w-2 h-2 animate-spin" /> : <PlayCircle className="w-2 h-2" />}
                                 </Button>
-                              </TooltipTrigger><TooltipContent side="bottom">Run all</TooltipContent></Tooltip></TooltipProvider>
-                              <TooltipProvider><Tooltip><TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={() => handleRunBlock(originalIndex)} disabled={isRunning || !currentStep.codeBlocks?.length} className="h-3.5 w-3.5 text-primary" title="Run selection">
-                                  {isRunning ? <Loader2 className="w-2 h-2 animate-spin" /> : <Play className="w-2 h-2" />}
-                                </Button>
-                              </TooltipTrigger><TooltipContent side="bottom">Run selection</TooltipContent></Tooltip></TooltipProvider>
+                              </TooltipTrigger><TooltipContent side="bottom">{runAllTooltip}</TooltipContent></Tooltip></TooltipProvider>
                               <TooltipProvider><Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" onClick={() => stepToolbarRef?.current?.reset()} className="h-3.5 gap-0.5 px-1 text-[8px]" title="Reset step"><RotateCcw className="w-2 h-2" /><span className="hidden sm:inline">Reset</span></Button>
                               </TooltipTrigger><TooltipContent side="bottom">Reset step</TooltipContent></Tooltip></TooltipProvider>
@@ -1985,21 +2023,11 @@ export function StepView({
                                 <TooltipProvider>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
-                                      <Button variant="ghost" size="icon" onClick={handleRunAll} disabled={isRunning || !currentStep.codeBlocks?.length} className="h-3.5 w-3.5 text-primary" title="Run all">
+                                      <Button variant="ghost" size="icon" onClick={handleRunAll} disabled={runAllDisabled} className="h-3.5 w-3.5 text-primary" title={runAllTooltip}>
                                         {isRunning ? <Loader2 className="w-2 h-2 animate-spin" /> : <PlayCircle className="w-2 h-2" />}
                                       </Button>
                                     </TooltipTrigger>
-                                    <TooltipContent side="bottom">Run all</TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button variant="ghost" size="icon" onClick={() => handleRunBlock(originalIndex)} disabled={isRunning || !currentStep.codeBlocks?.length} className="h-3.5 w-3.5 text-primary" title="Run selection">
-                                        <Play className="w-2 h-2" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="bottom">Run selection</TooltipContent>
+                                    <TooltipContent side="bottom">{runAllTooltip}</TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
                               </>
@@ -2107,7 +2135,7 @@ export function StepView({
                           <div className="flex-1 min-h-0 overflow-auto">
                             <Editor
                               height="100%"
-                              theme={LAB_EDITOR_THEME}
+                              theme={getLabEditorTheme(resolvedTheme)}
                               beforeMount={defineLabDarkTheme}
                               language={competitorBlockForSelected.equiv.language}
                               value={competitorBlockForSelected.equiv.code}
@@ -2266,7 +2294,7 @@ export function StepView({
                                 <div className="rounded border border-border overflow-hidden min-h-[120px] flex-1">
                                   <Editor
                                     height="180"
-                                    theme={LAB_EDITOR_THEME}
+                                    theme={getLabEditorTheme(resolvedTheme)}
                                     beforeMount={defineLabDarkTheme}
                                     language={competitorBlockForSelected.equiv.language}
                                     value={competitorBlockForSelected.equiv.code}

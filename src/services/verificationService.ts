@@ -1,4 +1,5 @@
 import { ValidationResult, validatorUtils } from "@/utils/validatorUtils";
+import { getKeyVaultNamespace } from "@/labs/stepEnhancementRegistry";
 
 export type VerificationId =
   // CSFLE / key vault
@@ -54,7 +55,7 @@ export class VerificationService {
   async verify(id: VerificationId, ctx: VerificationContext = {}): Promise<ValidationResult> {
     switch (id) {
       case "csfle.verifyKeyVaultIndex":
-        return validatorUtils.checkKeyVault(ctx.mongoUri || "", "encryption.__keyVault");
+        return validatorUtils.checkKeyVault(ctx.mongoUri || "", getKeyVaultNamespace());
 
       case "csfle.verifyCmkExists":
         return validatorUtils.checkKmsAlias(ctx.alias || "", ctx.profile);
@@ -105,7 +106,7 @@ export class VerificationService {
       // Flag verifications
       case "verify-encrypted-collections":
         // Check that key vault has DEKs and collections are using encryption
-        const keyVaultCheck = await validatorUtils.checkKeyVault(ctx.mongoUri || "", "encryption.__keyVault");
+        const keyVaultCheck = await validatorUtils.checkKeyVault(ctx.mongoUri || "", getKeyVaultNamespace());
         if (!keyVaultCheck.success) {
           return { success: false, message: "Key vault not properly configured" };
         }
@@ -127,7 +128,7 @@ export class VerificationService {
 
       case "verify-indexes":
         // Check that critical indexes exist
-        return validatorUtils.checkKeyVault(ctx.mongoUri || "", "encryption.__keyVault"); // Placeholder
+        return validatorUtils.checkKeyVault(ctx.mongoUri || "", getKeyVaultNamespace()); // Placeholder
 
       case "verify-access-control":
         // Verify access control is configured

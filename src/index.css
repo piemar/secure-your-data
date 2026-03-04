@@ -73,6 +73,67 @@
     --background: 220 13% 5%;
     --foreground: 210 20% 85%;
   }
+
+  /* Light theme (when theme is light or system prefers light) – higher contrast for readability */
+  .light {
+    --background: 0 0% 98%;
+    --foreground: 220 13% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 13% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 13% 12%;
+    /* Darker green for clear contrast on white/light gray (was 36% lightness) */
+    --primary: 145 65% 28%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 13% 94%;
+    --secondary-foreground: 220 13% 12%;
+    --muted: 220 13% 94%;
+    --muted-foreground: 220 13% 38%;
+    --accent: 145 65% 28%;
+    --accent-foreground: 0 0% 100%;
+    --border: 220 13% 85%;
+    --input: 220 13% 85%;
+    --ring: 145 65% 28%;
+    --code-bg: 220 13% 96%;
+    --code-border: 220 13% 85%;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 220 13% 12%;
+    --sidebar-primary: 145 65% 28%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 13% 94%;
+    --sidebar-accent-foreground: 220 13% 12%;
+    --sidebar-border: 220 13% 88%;
+    --sidebar-ring: 145 65% 28%;
+    /* Success/verified state – darker green for text and badges on light background */
+    --success: 145 55% 28%;
+  }
+
+  /* Light theme: darker greens for Tailwind green utilities (better contrast on white) */
+  .light .text-green-500 { color: hsl(145 55% 30%); }
+  .light .text-green-600 { color: hsl(145 55% 26%); }
+  .light .text-green-700 { color: hsl(145 50% 22%); }
+  .light .text-green-400 { color: hsl(145 50% 32%); }
+  .light .bg-green-500 { background-color: hsl(145 55% 28%); }
+  .light .bg-green-500\/5 { background-color: hsl(145 55% 28% / 0.06); }
+  .light .bg-green-500\/10 { background-color: hsl(145 55% 28% / 0.12); }
+  .light .bg-green-500\/15 { background-color: hsl(145 55% 28% / 0.15); }
+  .light .bg-green-500\/20 { background-color: hsl(145 55% 28% / 0.18); }
+  .light .border-green-500\/20 { border-color: hsl(145 55% 28% / 0.25); }
+  .light .border-green-500\/30 { border-color: hsl(145 55% 28% / 0.35); }
+  .light .border-green-500\/40 { border-color: hsl(145 55% 28% / 0.45); }
+  .light .border-green-500\/50 { border-color: hsl(145 55% 28% / 0.5); }
+  .light .ring-green-500 { --tw-ring-color: hsl(145 55% 28%); }
+  /* Primary tinted backgrounds and borders – stronger in light so they don’t disappear */
+  .light .bg-primary\/5 { background-color: hsl(145 55% 28% / 0.12); }
+  .light .bg-primary\/10 { background-color: hsl(145 55% 28% / 0.2); }
+  .light .bg-primary\/20 { background-color: hsl(145 55% 28% / 0.28); }
+  .light .border-primary\/20 { border-color: hsl(145 55% 28% / 0.35); }
+  .light .border-primary\/30 { border-color: hsl(145 55% 28% / 0.45); }
+  /* Amber (warnings, business value) – darker in light for contrast */
+  .light .text-amber-600 { color: hsl(38 92% 36%); }
+  .light .text-amber-700 { color: hsl(38 92% 30%); }
+  .light .bg-amber-500\/5 { background-color: hsl(38 92% 40% / 0.12); }
+  .light .border-amber-500\/20 { border-color: hsl(38 92% 40% / 0.3); }
 }
 
 @layer base {
@@ -257,9 +318,17 @@
     }
   }
 
-  /* Gradient text */
+  /* Gradient text (dark theme: bright green) */
   .text-gradient-green {
     background: linear-gradient(135deg, hsl(145 100% 50%) 0%, hsl(145 100% 70%) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Light theme: solid darker green for title – no neon, clear contrast */
+  .light .text-gradient-green {
+    background: linear-gradient(135deg, hsl(145 60% 26%) 0%, hsl(145 55% 32%) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;

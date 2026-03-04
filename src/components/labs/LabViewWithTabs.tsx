@@ -135,6 +135,13 @@ export function LabViewWithTabs({
     prevCompletedCountRef.current = null;
   }, [labNumber]);
 
+  // When user clicks Reset progress, clear step indicator so circles show uncompleted
+  useEffect(() => {
+    if (resetProgressCount > 0) {
+      setCompletedSteps([]);
+    }
+  }, [resetProgressCount]);
+
   // When completedLabs is hydrated from server (after login) and includes this lab, seed step progress so UI shows all done
   useEffect(() => {
     if (completedLabs.includes(labNumber) && completedSteps.length === 0 && steps.length > 0) {

@@ -10,6 +10,20 @@ export interface ValidationResult {
     path?: string;
     /** Human-readable location e.g. "project folder (lib/mongo_crypt_v1.dylib)" */
     detectedLocation?: string;
+    /** Detected AWS region from `aws configure get region` (when checking aws tool). */
+    detectedRegion?: string;
+    /** Detected AWS profile e.g. from env AWS_PROFILE or "default". */
+    detectedProfile?: string;
+}
+
+/** Same per-user key as LabContext; use when no URI is passed to validation. */
+function getStoredMongoUri(): string {
+    if (typeof localStorage === 'undefined') return '';
+    const email = localStorage.getItem('userEmail') || '';
+    const key = email.trim()
+        ? `lab_mongo_uri_${email.replace(/[^a-zA-Z0-9_.-]/g, '_')}`
+        : 'lab_mongo_uri';
+    return localStorage.getItem(key) || localStorage.getItem('lab_mongo_uri') || '';
 }
 
 export const validatorUtils = {
@@ -36,7 +50,9 @@ export const validatorUtils = {
         }
 
         try {
-            const response = await fetch(`/api/verify-index?uri=${encodeURIComponent(uri)}`);
+            const params = new URLSearchParams({ uri });
+            if (ns) params.set('keyVaultNamespace', ns);
+            const response = await fetch(`/api/verify-index?${params.toString()}`);
             const data = await response.json();
             return { success: data.success, message: data.message };
         } catch (error) {
@@ -165,7 +181,7 @@ export const validatorUtils = {
      */
     checkKeyVaultCount: async (expectedCount: number = 1, uri?: string): Promise<ValidationResult> => {
         // Get URI from parameter or try localStorage
-        const mongoUri = uri || localStorage.getItem('lab_mongo_uri') || '';
+        const mongoUri = uri || getStoredMongoUri();
         
         if (!mongoUri) {
             return { success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' };
@@ -186,7 +202,7 @@ export const validatorUtils = {
      */
     checkQEDEKs: async (uri?: string): Promise<ValidationResult> => {
         // Get URI from parameter or try localStorage
-        const mongoUri = uri || localStorage.getItem('lab_mongo_uri') || '';
+        const mongoUri = uri || getStoredMongoUri();
         
         if (!mongoUri) {
             return { success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' };
@@ -211,7 +227,7 @@ export const validatorUtils = {
         }
 
         // Get URI from parameter or try localStorage
-        const mongoUri = uri || localStorage.getItem('lab_mongo_uri') || '';
+        const mongoUri = uri || getStoredMongoUri();
         
         if (!mongoUri) {
             return { success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' };
@@ -236,7 +252,7 @@ export const validatorUtils = {
         }
 
         // Get URI from parameter or try localStorage
-        const mongoUri = uri || localStorage.getItem('lab_mongo_uri') || '';
+        const mongoUri = uri || getStoredMongoUri();
         
         if (!mongoUri) {
             return { success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' };
@@ -261,7 +277,7 @@ export const validatorUtils = {
         }
 
         // Get URI from parameter or try localStorage
-        const mongoUri = uri || localStorage.getItem('lab_mongo_uri') || '';
+        const mongoUri = uri || getStoredMongoUri();
         
         if (!mongoUri) {
             return { success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' };
@@ -371,6 +387,8 @@ export const validatorUtils = {
                     message: data.message || `System Scan: ${version}`,
                     path: pathVal,
                     detectedLocation: data.detectedLocation,
+                    detectedRegion: data.detectedRegion,
+                    detectedProfile: data.detectedProfile,
                 };
             }
             return { success: false, message: data.message };

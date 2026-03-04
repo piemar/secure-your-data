@@ -58,9 +58,19 @@ export function getStepEnhancementSync(enhancementId?: string): Partial<Step> | 
 }
 
 /** Get lab user suffix for placeholder substitution (YOUR_SUFFIX → same key as Lab 1). */
-function getLabUserSuffix(): string {
+export function getLabUserSuffix(): string {
   if (typeof window === 'undefined' || !window.localStorage) return 'default';
   return window.localStorage.getItem('lab_user_suffix') || localStorage.getItem('userEmail')?.split('@')[0] || 'default';
+}
+
+/** Get collection/database prefix for multi-user same cluster (e.g. encryption_<suffix>). */
+export function getLabCollectionPrefix(): string {
+  return 'encryption_' + getLabUserSuffix();
+}
+
+/** Key vault namespace for current user (e.g. encryption_default.__keyVault). */
+export function getKeyVaultNamespace(): string {
+  return getLabCollectionPrefix() + '.__keyVault';
 }
 
 /** Get lab alias name (alias/mongodb-lab-key-<suffix>) for CSFLE/QE labs. */
@@ -87,11 +97,16 @@ function substitutePlaceholders(text: string | undefined): string | undefined {
   const aliasName = getLabAliasName();
   const awsRegion = getLabAwsRegion();
   const cryptPath = getCryptSharedLibPath();
+  const prefix = getLabCollectionPrefix();
   return text
     .replace(/\bYOUR_SUFFIX\b/g, suffix)
     .replace(/\bALIAS_NAME\b/g, aliasName)
     .replace(/(?<!process\.env\.)\bAWS_REGION\b/g, awsRegion)
-    .replace(/\bCRYPT_SHARED_LIB_PATH\b/g, cryptPath);
+    .replace(/\bCRYPT_SHARED_LIB_PATH\b/g, cryptPath)
+    .replace(/encryption\.__keyVault/g, prefix + '.__keyVault')
+    .replace(/\.db\("encryption"\)/g, '.db("' + prefix + '")')
+    .replace(/getSiblingDB\("encryption"\)/g, 'getSiblingDB("' + prefix + '")')
+    .replace(/getSiblingDB\('encryption'\)/g, "getSiblingDB('" + prefix + "')");
 }
 
 /**

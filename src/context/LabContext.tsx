@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useState, useEffect } from 'react';
 import { addPoints, completeLab as updateLeaderboardLab, startLab as updateLeaderboardStart } from '@/utils/leaderboardUtils';
 import { createGamificationService, GamificationEvent } from '@/services/gamificationService';
 import { useWorkshopSession } from '@/contexts/WorkshopSessionContext';
@@ -65,17 +65,25 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return createGamificationService(config);
     }, [activeTemplate]);
 
+    const getUriStorageKey = () => {
+        if (typeof localStorage === 'undefined') return 'lab_mongo_uri';
+        const email = localStorage.getItem('userEmail') || '';
+        return email.trim() ? `lab_mongo_uri_${email.replace(/[^a-zA-Z0-9_.-]/g, '_')}` : 'lab_mongo_uri';
+    };
     const [mongoUri, setMongoUriState] = useState(() => {
         if (typeof localStorage === 'undefined') return '';
-        return localStorage.getItem('lab_mongo_uri') || '';
+        const email = localStorage.getItem('userEmail') || '';
+        const key = email.trim() ? `lab_mongo_uri_${email.replace(/[^a-zA-Z0-9_.-]/g, '_')}` : 'lab_mongo_uri';
+        return localStorage.getItem(key) || localStorage.getItem('lab_mongo_uri') || '';
     });
     const setMongoUri = (uri: string) => {
         setMongoUriState(uri);
         try {
+            const key = getUriStorageKey();
             if (uri && uri.trim()) {
-                localStorage.setItem('lab_mongo_uri', uri.trim());
+                localStorage.setItem(key, uri.trim());
             } else {
-                localStorage.removeItem('lab_mongo_uri');
+                localStorage.removeItem(key);
             }
         } catch {
             // ignore
@@ -114,11 +122,16 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     const [resetProgressCount, setResetProgressCount] = useState(0);
 
-    // Load email and lab suffix (firstname-lastname for KMS alias) from localStorage on mount
+    // Load email and lab suffix (firstname-lastname for KMS alias) from localStorage on mount; load per-user URI when email is set
     useEffect(() => {
         const savedEmail = localStorage.getItem('userEmail');
         if (savedEmail) {
             setUserEmailState(savedEmail);
+            const uriKey = `lab_mongo_uri_${savedEmail.replace(/[^a-zA-Z0-9_.-]/g, '_')}`;
+            const perUserUri = localStorage.getItem(uriKey);
+            if (perUserUri) {
+                setMongoUriState(perUserUri);
+            }
         }
         const savedSuffix = localStorage.getItem('lab_user_suffix');
         if (savedSuffix) {
@@ -175,16 +188,12 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const { runningInContainer } = useWorkshopConfig();
 
-    // Initialize MongoDB URI from workshop session if available
+    // Initialize MongoDB URI from workshop session only for local Docker (no credentials). Atlas URI must be provided per user.
     useEffect(() => {
         const session = getWorkshopSession();
-        if (session && !mongoUri) {
-            if (session.mongodbSource === 'local') {
-                const localUri = runningInContainer ? 'mongodb://mongo:27017' : 'mongodb://127.0.0.1:27017';
-                setMongoUri(localUri);
-            } else if (session.mongodbSource === 'atlas' && session.atlasConnectionString) {
-                setMongoUri(session.atlasConnectionString);
-            }
+        if (session && !mongoUri && session.mongodbSource === 'local') {
+            const localUri = runningInContainer ? 'mongodb://mongo:27017' : 'mongodb://127.0.0.1:27017';
+            setMongoUri(localUri);
         }
     }, [mongoUri, runningInContainer]);
 
@@ -209,7 +218,10 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             mongoCryptShared: { verified: false, path: '' }
         });
         setUserSuffixState('');
-        if (typeof localStorage !== 'undefined') localStorage.removeItem('lab_user_suffix');
+        if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem('lab_user_suffix');
+            [1, 2, 3].forEach((n) => localStorage.removeItem(`lab${n}-progress`));
+        }
         clearLabWorkspace(userEmail || (typeof localStorage !== 'undefined' ? localStorage.getItem('userEmail') : null));
         setResetProgressCount((c) => c + 1);
         // Don't reset email - keep it persistent
@@ -292,7 +304,7 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
     };
 
-    const setVerifiedTool = (tool: string, verified: boolean, path: string, detectedLocation?: string) => {
+    const setVerifiedTool = useCallback((tool: string, verified: boolean, path: string, detectedLocation?: string) => {
         if (tool === 'suffix' && path) {
             localStorage.setItem('lab_user_suffix', path);
             setUserSuffixState(path);
@@ -301,7 +313,7 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ...prev,
             [tool]: { verified, path, ...(detectedLocation !== undefined && { detectedLocation }) }
         }));
-    };
+    }, []);
 
     const setUserSuffix = (suffix: string) => {
         setUserSuffixState(suffix);

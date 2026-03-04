@@ -15,7 +15,10 @@ import {
   Settings,
   Target,
   BarChart3,
+  Moon,
+  Sun,
 } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { useRole } from '@/contexts/RoleContext';
@@ -101,6 +104,12 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
   const [cleanupPhase, setCleanupPhase] = useState<ResetCleanupDialogPhase>('confirm');
   const [cleanupResults, setCleanupResults] = useState<CleanupResult[]>([]);
   const [cleanupLoading, setCleanupLoading] = useState(false);
+  const { setTheme, resolvedTheme } = useTheme();
+
+  const cycleTheme = () => {
+    const next = resolvedTheme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+  };
 
   const handleLogout = () => {
     logout();
@@ -128,6 +137,9 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
       localStorage.removeItem('lab3-progress');
       localStorage.removeItem('completedLabs');
       localStorage.removeItem('labStartTimes');
+      const email = localStorage.getItem('userEmail') || '';
+      const uriKey = email.trim() ? `lab_mongo_uri_${email.replace(/[^a-zA-Z0-9_.-]/g, '_')}` : 'lab_mongo_uri';
+      localStorage.removeItem(uriKey);
       localStorage.removeItem('lab_mongo_uri');
       localStorage.removeItem('lab_aws_profile');
       localStorage.removeItem('lab_kms_alias');
@@ -363,8 +375,21 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
         </div>
       )}
 
-      {/* Settings (Moderator Only), Reset Progress & Logout */}
+      {/* Theme toggle, Settings (Moderator Only), Reset Progress & Logout */}
       <div className="p-2 border-t border-sidebar-border space-y-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={cycleTheme}
+          className={cn(
+            'w-full justify-start gap-2 text-muted-foreground hover:text-primary hover:bg-primary/10',
+            !isExpanded && 'justify-center px-0'
+          )}
+          title={resolvedTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+        >
+          {resolvedTheme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          {isExpanded && <span>{resolvedTheme === 'dark' ? 'Light theme' : 'Dark theme'}</span>}
+        </Button>
         {isModerator && (
           <Button
             variant="ghost"

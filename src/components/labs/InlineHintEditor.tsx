@@ -3,7 +3,8 @@ import Editor, { Monaco } from '@monaco-editor/react';
 import { InlineHintMarker, type InlineHint, type SkeletonTier } from './InlineHintMarker';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { MONACO_LAB_EDITOR_OPTIONS, defineLabDarkTheme, registerMongoshLanguage, LAB_EDITOR_THEME } from '@/lib/monacoLabEditorOptions';
+import { MONACO_LAB_EDITOR_OPTIONS, defineLabDarkTheme, registerMongoshLanguage, getLabEditorTheme } from '@/lib/monacoLabEditorOptions';
+import { useTheme } from 'next-themes';
 
 interface InlineHintEditorProps {
   code: string;
@@ -53,6 +54,7 @@ export function InlineHintEditor({
   equalHeightSplit,
   fillContainer = false,
 }: InlineHintEditorProps) {
+  const { resolvedTheme } = useTheme();
   // Allow editing so users can fill in blanks; skeleton is initial content only
   const isReadOnly = false;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -305,6 +307,8 @@ export function InlineHintEditor({
     : Math.max(200, Math.min(600, effectiveLines * lineHeight + paddingVertical));
 
   const useFillHeight = fillContainer || equalHeightSplit;
+  const visibleLinesApprox = useFillHeight ? 0 : Math.floor((calculatedHeight - paddingVertical) / lineHeight);
+  const showScrollCue = !useFillHeight && lineCount > visibleLinesApprox && visibleLinesApprox > 0;
 
   return (
     <div 
@@ -321,7 +325,7 @@ export function InlineHintEditor({
         language={language === 'bash' ? 'shell' : language}
         value={editorValue}
         onChange={(v) => !isReadOnly && onCodeChange?.(v ?? '')}
-        theme={LAB_EDITOR_THEME}
+        theme={getLabEditorTheme(resolvedTheme)}
         options={{
           ...MONACO_LAB_EDITOR_OPTIONS,
           readOnly: isReadOnly,
@@ -339,6 +343,13 @@ export function InlineHintEditor({
         beforeMount={handleBeforeMount}
         onMount={handleEditorMount}
       />
+      {showScrollCue && (
+        <div className="absolute bottom-2 left-0 right-0 flex justify-center pointer-events-none">
+          <span className="text-[10px] text-muted-foreground bg-background/90 px-2 py-0.5 rounded border border-border">
+            More code below – scroll to view
+          </span>
+        </div>
+      )}
       
       {/* Inline Hint Markers - Positioned at each blank */}
       {showMarkers && visiblePositions.length > 0 && (

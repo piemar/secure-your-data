@@ -26,6 +26,20 @@ function getEffectiveAwsProfile(profileParam: string | null): string {
   return p !== "" ? p : (process.env.AWS_PROFILE || "default");
 }
 
+/** Escape profile for safe use in shell (allows dots, e.g. Solution-Architects.User-123). */
+function shellEscapeProfile(profile: string): string {
+  return "'" + String(profile).replace(/'/g, "'\\''") + "'";
+}
+
+const KMS_PROFILE_NOT_FOUND_FIX =
+  " How to fix: (1) Use the default profile—leave AWS profile empty in Lab Setup or clone your SSO profile as [profile default] in ~/.aws/config. (2) If using a named profile, ensure the name in Lab Setup exactly matches ~/.aws/config (including dots). (3) Run aws sso login and try again.";
+
+const EXPIRED_TOKEN_FIX =
+  "\n\nYour AWS SSO session has expired. How to fix: In your terminal run aws sso login or aws sso login --profile default (or your profile name), then retry this step.";
+
+const QUERY_TYPE_ERROR_FIX =
+  "\n\nHow to fix: queries.queryType must be exactly 'equality' or 'range', not the field name (e.g. not salary). In encryptedFields.fields set queries: { queryType: \"equality\" } or queryType: \"range\" for each field.";
+
 /** Resolve mongosh executable path. Dev server often has limited PATH (e.g. when started from IDE) and may not see /opt/homebrew/bin. */
 function getMongoshPath(): string {
   const envWithPath = { ...process.env, PATH: (process.env.PATH || "") + MONGOSH_PATH_SUFFIX };
@@ -379,12 +393,26 @@ export default defineConfig(({ mode }) => ({
                 binaryPath = lines[lines.length - 1] || '';
               }
 
-              res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({
+              const payload: Record<string, unknown> = {
                 success: true,
                 version: version,
                 path: binaryPath
-              }));
+              };
+
+              if (tool === 'aws') {
+                payload.detectedProfile = process.env.AWS_PROFILE || 'default';
+                exec('aws configure get region', { env: process.env }, (regionErr: any, regionOut: string) => {
+                  if (!regionErr && regionOut && typeof regionOut === 'string') {
+                    const r = regionOut.trim();
+                    if (r) payload.detectedRegion = r;
+                  }
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify(payload));
+                });
+              } else {
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify(payload));
+              }
             });
             return;
           }
@@ -393,16 +421,20 @@ export default defineConfig(({ mode }) => ({
             const url = new URL(req.url, `http://${req.headers.host}`);
             const alias = url.searchParams.get('alias') || '';
             const profile = getEffectiveAwsProfile(url.searchParams.get('profile'));
-            // Sanitize
             const safeAlias = alias.replace(/[^a-zA-Z0-9_\-\/]/g, '');
-            const safeProfile = profile.replace(/[^a-zA-Z0-9_\-]/g, '');
+            const profileArg = shellEscapeProfile(profile);
 
-            const cmd = `aws kms list-aliases --profile ${safeProfile} --query "Aliases[?AliasName=='${safeAlias}'].AliasName" --output text`;
+            const cmd = `aws kms list-aliases --profile ${profileArg} --query "Aliases[?AliasName=='${safeAlias}'].AliasName" --output text`;
 
             exec(cmd, (error: any, stdout: any, stderr: any) => {
               if (error) {
                 res.statusCode = 500;
-                res.end(JSON.stringify({ success: false, message: `KMS Check Failed: ${stderr || error.message}` }));
+                const errMsg = (stderr || error.message || '').trim();
+                const isProfileNotFound = /config profile.*could not be found/i.test(errMsg);
+                const message = isProfileNotFound
+                  ? `KMS check failed: the AWS profile was not found.${KMS_PROFILE_NOT_FOUND_FIX}`
+                  : `KMS Check Failed: ${errMsg}${KMS_PROFILE_NOT_FOUND_FIX}`;
+                res.end(JSON.stringify({ success: false, message }));
                 return;
               }
               const found = stdout.trim() === safeAlias;
@@ -417,8 +449,8 @@ export default defineConfig(({ mode }) => ({
           if (req.url && req.url.startsWith('/api/verify-index')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
             let uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
-            const dbName = 'encryption';
-            const collName = '__keyVault';
+            const keyVaultNs = url.searchParams.get('keyVaultNamespace') || 'encryption.__keyVault';
+            const [dbName, collName] = keyVaultNs.includes('.') ? keyVaultNs.split('.') : [keyVaultNs, '__keyVault'];
             const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
             const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : uri;
 
@@ -443,11 +475,12 @@ export default defineConfig(({ mode }) => ({
               // Parse the boolean output from mongosh
               const isVerified = stdout.trim() === 'true';
 
+              const indexMissingFix = " Run the createIndex block first (the Mongosh or Node block that creates the key vault index on keyAltNames), then run the createKey block. Use Run all only after both blocks are present, or run the first block, then the second.";
               res.end(JSON.stringify({
                 success: isVerified,
                 message: isVerified
                   ? `Verified Unique Index on ${dbName}.${collName}`
-                  : `Index Missing! Run the createIndex command above.`
+                  : `Index Missing! Run the createIndex command above. How to fix:${indexMissingFix}`
               }));
             });
             return;
@@ -458,10 +491,10 @@ export default defineConfig(({ mode }) => ({
             const alias = url.searchParams.get('alias') || '';
             const profile = getEffectiveAwsProfile(url.searchParams.get('profile'));
             const safeAlias = alias.replace(/[^a-zA-Z0-9_\-\/]/g, '');
-            const safeProfile = profile.replace(/[^a-zA-Z0-9_\-]/g, '');
+            const profileArg = shellEscapeProfile(profile);
 
             // 1. Resolve Alias to KeyID
-            const getKeyIdCmd = `aws kms list-aliases --profile ${safeProfile} --query "Aliases[?AliasName=='${safeAlias}'].TargetKeyId" --output text`;
+            const getKeyIdCmd = `aws kms list-aliases --profile ${profileArg} --query "Aliases[?AliasName=='${safeAlias}'].TargetKeyId" --output text`;
 
             exec(getKeyIdCmd, (err: any, keyId: string, stderr: any) => {
               if (err || !keyId.trim()) {
@@ -471,15 +504,15 @@ export default defineConfig(({ mode }) => ({
 
               const safeKeyId = keyId.trim();
               // 2. Get current IAM identity ARN (so we require the policy to explicitly allow this principal)
-              const getCallerCmd = `aws sts get-caller-identity --profile ${safeProfile} --query Arn --output text`;
+              const getCallerCmd = `aws sts get-caller-identity --profile ${profileArg} --query Arn --output text`;
               exec(getCallerCmd, (callerErr: any, callerArn: string, callerStderr: any) => {
                 if (callerErr || !(callerArn && callerArn.trim())) {
-                  res.end(JSON.stringify({ success: false, message: `Could not get caller identity. Run: aws sts get-caller-identity --profile ${safeProfile}` }));
+                  res.end(JSON.stringify({ success: false, message: `Could not get caller identity. Run: aws sts get-caller-identity --profile ${profile}` }));
                   return;
                 }
                 const callerArnTrimmed = callerArn.trim();
                 // 3. Get Policy
-                const getPolicyCmd = `aws kms get-key-policy --key-id ${safeKeyId} --policy-name default --profile ${safeProfile} --output json`;
+                const getPolicyCmd = `aws kms get-key-policy --key-id ${safeKeyId} --policy-name default --profile ${profileArg} --output json`;
                 exec(getPolicyCmd, (pErr: any, policyOutput: string, pStderr: any) => {
                   if (pErr) {
                     res.end(JSON.stringify({ success: false, message: `Failed to read policy. Do you have 'kms:GetKeyPolicy'?` }));
@@ -524,9 +557,8 @@ export default defineConfig(({ mode }) => ({
             const url = new URL(req.url, `http://${req.headers.host}`);
             const alias = url.searchParams.get('alias') || '';
             const profile = getEffectiveAwsProfile(url.searchParams.get('profile'));
-            // Sanitize
             const safeAlias = alias.replace(/[^a-zA-Z0-9_\-\/]/g, '');
-            const safeProfile = profile.replace(/[^a-zA-Z0-9_\-]/g, '');
+            const profileArg = shellEscapeProfile(profile);
 
             if (!safeAlias.startsWith('alias/')) {
               res.end(JSON.stringify({ success: false, message: 'Invalid alias format. Must start with alias/' }));
@@ -534,7 +566,7 @@ export default defineConfig(({ mode }) => ({
             }
 
             // 1. Resolve Alias to KeyID
-            const getKeyIdCmd = `aws kms list-aliases --profile ${safeProfile} --query "Aliases[?AliasName=='${safeAlias}'].TargetKeyId" --output text`;
+            const getKeyIdCmd = `aws kms list-aliases --profile ${profileArg} --query "Aliases[?AliasName=='${safeAlias}'].TargetKeyId" --output text`;
 
             exec(getKeyIdCmd, (err: any, keyId: string, stderr: any) => {
               const safeKeyId = (keyId || '').trim();
@@ -545,11 +577,11 @@ export default defineConfig(({ mode }) => ({
               }
 
               // 2. Delete Alias
-              const deleteAliasCmd = `aws kms delete-alias --alias-name ${safeAlias} --profile ${safeProfile}`;
+              const deleteAliasCmd = `aws kms delete-alias --alias-name ${safeAlias} --profile ${profileArg}`;
 
               exec(deleteAliasCmd, (delErr: any) => {
                 // 3. Schedule Key Deletion (7 Days)
-                const scheduleDelCmd = `aws kms schedule-key-deletion --key-id ${safeKeyId} --pending-window-in-days 7 --profile ${safeProfile}`;
+                const scheduleDelCmd = `aws kms schedule-key-deletion --key-id ${safeKeyId} --pending-window-in-days 7 --profile ${profileArg}`;
 
                 exec(scheduleDelCmd, (schErr: any) => {
                   if (schErr) {
@@ -1549,11 +1581,15 @@ export default defineConfig(({ mode }) => ({
                 const runEnv = profileVal !== null ? { ...process.env, AWS_PROFILE: profileVal } : process.env;
                 exec(script, { timeout: 30000, maxBuffer: 1024 * 1024, env: runEnv }, (error: any, stdout: string, stderr: string) => {
                   const exitCode = error?.code ?? (error ? 1 : 0);
+                  let errOut = stderr || '';
+                  if (/ExpiredTokenException|security token.*expired/i.test(errOut)) {
+                    errOut = errOut.trim() + EXPIRED_TOKEN_FIX;
+                  }
                   res.setHeader('Content-Type', 'application/json');
                   res.end(JSON.stringify({
                     success: exitCode === 0,
                     stdout: stdout || '',
-                    stderr: stderr || '',
+                    stderr: errOut,
                     exitCode,
                   }));
                 });
@@ -1572,7 +1608,7 @@ export default defineConfig(({ mode }) => ({
             req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
             req.on('end', () => {
               try {
-                const { code, uri } = JSON.parse(body || '{}');
+                const { code, uri, region: regionOverride } = JSON.parse(body || '{}');
                 if (typeof code !== 'string' || !code.trim()) {
                   res.statusCode = 400;
                   res.setHeader('Content-Type', 'application/json');
@@ -1604,29 +1640,43 @@ export default defineConfig(({ mode }) => ({
                 const effectiveNodeUri = isLocalNoAuth && process.env.MONGODB_URI
                   ? process.env.MONGODB_URI
                   : nodeUri;
+                const awsRegion = (typeof regionOverride === 'string' && regionOverride.trim()) ? regionOverride.trim() : (process.env.AWS_REGION || process.env.AWS_KEY_REGION || '');
                 const env = {
                   ...process.env,
                   MONGODB_URI: effectiveNodeUri,
                   NODE_PATH: nodeModulesPath,
+                  ...(awsRegion ? { AWS_REGION: awsRegion } : {}),
                 };
                 execFile(process.execPath, [tmpFile], { timeout: 30000, maxBuffer: 1024 * 1024, env, cwd }, (error: any, stdout: string, stderr: string) => {
                   try { require('fs').unlinkSync(tmpFile); } catch { /* ignore */ }
                   const exitCode = error?.code ?? (error ? 1 : 0);
                   const out = (stdout || '').trim();
                   const err = (stderr || '').trim();
+                  const combined = [err, out].filter(Boolean).join('\n').trim();
+                  const isExpiredToken = /ExpiredTokenException|security token.*expired/i.test(combined);
+                  const isQueryTypeError = /MongoCryptCreateEncryptedCollectionError|queryType.*not a valid value|salary_.*queryType/i.test(combined);
                   // When failed, prefer stderr/stdout so the Console shows the real Node error (e.g. module not found, connection refused)
-                  let failedMessage = [err, out].filter(Boolean).join('\n').trim();
+                  let failedMessage = combined;
                   if (!failedMessage) {
                     failedMessage = error?.message || 'Command failed';
                     if (exitCode !== 0 && exitCode !== undefined) {
                       failedMessage += ` (exit code ${exitCode}). Check that MongoDB is running and the URI is set in Lab Setup.`;
                     }
                   }
+                  if (isExpiredToken) {
+                    failedMessage = failedMessage + EXPIRED_TOKEN_FIX;
+                  }
+                  if (isQueryTypeError) {
+                    failedMessage = failedMessage + QUERY_TYPE_ERROR_FIX;
+                  }
+                  let stderrOut = (stderr || '').trim();
+                  if (isExpiredToken) stderrOut = stderrOut + EXPIRED_TOKEN_FIX;
+                  if (isQueryTypeError) stderrOut = stderrOut + QUERY_TYPE_ERROR_FIX;
                   res.setHeader('Content-Type', 'application/json');
                   res.end(JSON.stringify({
                     success: exitCode === 0,
                     stdout: stdout || '',
-                    stderr: stderr || '',
+                    stderr: stderrOut,
                     exitCode,
                     error: exitCode !== 0,
                     message: exitCode === 0 ? (out || 'OK') : failedMessage,

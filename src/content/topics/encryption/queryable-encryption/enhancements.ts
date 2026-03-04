@@ -129,9 +129,9 @@ async function run() {
 run().catch(console.error);`,
         inlineHints: [
           { line: 31, blankText: '_______', hint: 'Field name for salary data', answer: 'salary' },
-          { line: 31, blankText: '________', hint: 'Query type for exact match on encrypted fields', answer: 'equality' },
+          { line: 31, blankText: '________', hint: "Query type: use exactly 'equality' or 'range', not the field name (e.g. not salary)", answer: 'equality' },
           { line: 32, blankText: '_____', hint: 'Field name for tax identifier', answer: 'taxId' },
-          { line: 32, blankText: '________', hint: 'Query type for exact match', answer: 'equality' },
+          { line: 32, blankText: '________', hint: "Query type: use 'equality' or 'range', not the field name", answer: 'equality' },
           { line: 43, blankText: '__________________________', hint: 'Method that creates DEKs and collection in one call', answer: 'createEncryptedCollection' },
           { line: 44, blankText: '_______________________', hint: 'Option key for encryptedFields', answer: 'createCollectionOptions' },
           { line: 51, blankText: '_______________', hint: 'Method to attach a keyAltName to a DEK', answer: 'addKeyAltName' },
@@ -153,6 +153,7 @@ run().catch(console.error);`,
     ],
     tips: [
       'createEncryptedCollection creates DEKs for fields without keyId, then creates the collection.',
+      "queries.queryType must be exactly 'equality' or 'range'—do not use the field name (e.g. salary) there.",
       'Adding keyAltNames after creation lets later steps look up DEKs by name (qe-salary-dek, qe-taxid-dek).',
       'Drop hr.employees first if it exists so the script can be re-run.'
     ]

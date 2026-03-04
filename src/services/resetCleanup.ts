@@ -87,15 +87,25 @@ async function cleanupKMS(alias: string, profile?: string): Promise<CleanupResul
 }
 
 /**
+ * Resolve MongoDB URI from localStorage using same per-user key as LabContext.
+ * Lab setup stores URI under lab_mongo_uri_${email}; fallback to lab_mongo_uri for legacy.
+ */
+function getStoredMongoUri(): string {
+  if (typeof localStorage === 'undefined') return '';
+  const email = localStorage.getItem('userEmail') || '';
+  const key = email.trim()
+    ? `lab_mongo_uri_${email.replace(/[^a-zA-Z0-9_.-]/g, '_')}`
+    : 'lab_mongo_uri';
+  return localStorage.getItem(key) || localStorage.getItem('lab_mongo_uri') || '';
+}
+
+/**
  * Run full cleanup: KMS (alias/key) and MongoDB (encryption, medical, hr).
- * Read lab_mongo_uri, lab_kms_alias, lab_aws_profile from localStorage (call before clearing storage).
+ * Read URI via getStoredMongoUri (per-user key), lab_kms_alias, lab_aws_profile from localStorage (call before clearing storage).
  */
 export async function runResetCleanup(): Promise<CleanupResult[]> {
   const results: CleanupResult[] = [];
-  const uri =
-    typeof localStorage !== 'undefined'
-      ? localStorage.getItem('lab_mongo_uri') || ''
-      : '';
+  const uri = getStoredMongoUri();
   const alias =
     typeof localStorage !== 'undefined'
       ? localStorage.getItem('lab_kms_alias') || ''

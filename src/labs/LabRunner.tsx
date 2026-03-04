@@ -7,8 +7,9 @@ import { useWorkshopSession } from '@/contexts/WorkshopSessionContext';
 import { useRole } from '@/contexts/RoleContext';
 import { buildStepEnhancementsAsync } from './stepEnhancementRegistry';
 import { labIntroComponents } from './labIntroComponents';
-import { getLabMongoUri } from '@/utils/workshopUtils';
+import { getLabMongoUri, getWorkshopSession } from '@/utils/workshopUtils';
 import { useWorkshopConfig } from '@/context/WorkshopConfigContext';
+import { useLab } from '@/context/LabContext';
 
 interface LabRunnerProps {
   labNumber: number;
@@ -102,6 +103,13 @@ export function LabRunner(props: LabRunnerProps) {
   const { currentMode, activeTemplate } = useWorkshopSession();
   const { isModerator } = useRole();
   const { runningInContainer } = useWorkshopConfig();
+  const { mongoUri } = useLab();
+  const session = getWorkshopSession();
+  const labMongoUri = mongoUri?.trim()
+    ? mongoUri
+    : session?.mongodbSource === 'local'
+      ? getLabMongoUri(runningInContainer)
+      : '';
   const [labDef, setLabDef] = useState<WorkshopLabDefinition | null>(null);
   const [enhancements, setEnhancements] = useState<Map<string, Partial<Step>>>(new Map());
   const [loading, setLoading] = useState(false);
@@ -247,7 +255,7 @@ export function LabRunner(props: LabRunnerProps) {
         isModerator={isModerator}
         defaultCompetitorId={defaultCompetitorId}
         competitorIds={competitorIds}
-        labMongoUri={getLabMongoUri(runningInContainer)}
+        labMongoUri={labMongoUri}
         onLabCompleted={props.onLabCompleted}
       />
     );
@@ -258,6 +266,6 @@ export function LabRunner(props: LabRunnerProps) {
     return <div>Error: Either provide labId or all required props</div>;
   }
 
-  return <LabViewWithTabs {...props as Required<LabRunnerProps>} labMongoUri={getLabMongoUri(runningInContainer)} />;
+  return <LabViewWithTabs {...props as Required<LabRunnerProps>} labMongoUri={labMongoUri} />;
 }
 

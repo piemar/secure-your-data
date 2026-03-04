@@ -3,7 +3,8 @@ import Editor from '@monaco-editor/react';
 import { Play, RotateCcw, Copy, Check, Terminal, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { getEditableLabOptions, defineLabDarkTheme, LAB_EDITOR_THEME } from '@/lib/monacoLabEditorOptions';
+import { getEditableLabOptions, defineLabDarkTheme, getLabEditorTheme } from '@/lib/monacoLabEditorOptions';
+import { useTheme } from 'next-themes';
 
 interface CodePlaygroundProps {
   initialCode: string;
@@ -26,6 +27,7 @@ export function CodePlayground({
   readOnly = false,
   height = '300px',
 }: CodePlaygroundProps) {
+  const { resolvedTheme } = useTheme();
   const [code, setCode] = useState(initialCode);
   const [output, setOutput] = useState<string>('');
   const [isRunning, setIsRunning] = useState(false);
@@ -147,7 +149,7 @@ export function CodePlayground({
           language={language}
           value={code}
           onChange={handleEditorChange}
-          theme={LAB_EDITOR_THEME}
+          theme={getLabEditorTheme(resolvedTheme)}
           beforeMount={defineLabDarkTheme}
           options={getEditableLabOptions({ readOnly, fontSize: 13 })}
         />

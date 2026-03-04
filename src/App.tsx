@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ThemeProvider } from "next-themes";
 import { WorkshopConfigProvider } from "./context/WorkshopConfigContext";
 import { LabProvider } from "./context/LabContext";
 import { RoleProvider } from "./contexts/RoleContext";
@@ -14,11 +15,12 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <WorkshopConfigProvider>
-      <RoleProvider>
-        <WorkshopSessionProvider>
-          <LabProvider>
-            <TooltipProvider>
+    <ThemeProvider attribute="class" defaultTheme="dark" storageKey="workshop-theme" enableSystem>
+      <WorkshopConfigProvider>
+        <RoleProvider>
+          <WorkshopSessionProvider>
+            <LabProvider>
+              <TooltipProvider>
               <Toaster />
               <Sonner />
               <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -29,11 +31,12 @@ const App = () => (
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </BrowserRouter>
-            </TooltipProvider>
-          </LabProvider>
-        </WorkshopSessionProvider>
-      </RoleProvider>
-    </WorkshopConfigProvider>
+              </TooltipProvider>
+            </LabProvider>
+          </WorkshopSessionProvider>
+        </RoleProvider>
+      </WorkshopConfigProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

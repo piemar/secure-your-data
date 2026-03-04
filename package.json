@@ -10,8 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "test:qe": "node scripts/test-queryable-encryption.cjs"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@aws-sdk/credential-providers": "^3.995.0",

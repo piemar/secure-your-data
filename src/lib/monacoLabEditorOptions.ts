@@ -1,12 +1,19 @@
 import type { editor } from 'monaco-editor';
 
-/** Background matching app theme (--background: 220 13% 5% → dark) */
-const LAB_EDITOR_BACKGROUND = '#0c0e12';
+/** Background matching app dark theme (--background: 220 13% 5%) */
+const LAB_EDITOR_BACKGROUND_DARK = '#0c0e12';
+/** Background matching app light theme (--background: 0 0% 98%) */
+const LAB_EDITOR_BACKGROUND_LIGHT = '#fafafa';
+
+/** Dark green for comments in light theme – readable on white (vs default light green) */
+const LAB_LIGHT_COMMENT = '#1e6b34';
+/** Dark orange-brown for strings in light theme – better contrast */
+const LAB_LIGHT_STRING = '#af4a0d';
 
 /**
- * Define a custom Monaco theme that matches the app's dark background.
- * Includes a rule so mongosh shell keywords (show, use, exit, help) are colored in cyan.
- * Call from Editor beforeMount so all lab editors use the same background.
+ * Define custom Monaco themes that match the app's dark and light backgrounds.
+ * Light theme overrides comment and string colors for clear contrast on white.
+ * Call from Editor beforeMount so all lab editors can use either theme.
  */
 export function defineLabDarkTheme(monaco: typeof import('monaco-editor')) {
   monaco.editor.defineTheme('lab-dark', {
@@ -16,7 +23,21 @@ export function defineLabDarkTheme(monaco: typeof import('monaco-editor')) {
       { token: 'keyword.control.mongosh', foreground: '4EC9B0', fontStyle: 'bold' },
     ],
     colors: {
-      'editor.background': LAB_EDITOR_BACKGROUND,
+      'editor.background': LAB_EDITOR_BACKGROUND_DARK,
+    },
+  });
+  monaco.editor.defineTheme('lab-light', {
+    base: 'vs',
+    inherit: true,
+    rules: [
+      { token: 'keyword.control.mongosh', foreground: '0d652d', fontStyle: 'bold' },
+      { token: 'comment', foreground: LAB_LIGHT_COMMENT },
+      { token: 'comment.line', foreground: LAB_LIGHT_COMMENT },
+      { token: 'comment.block', foreground: LAB_LIGHT_COMMENT },
+      { token: 'string', foreground: LAB_LIGHT_STRING },
+    ],
+    colors: {
+      'editor.background': LAB_EDITOR_BACKGROUND_LIGHT,
     },
   });
 }
@@ -67,10 +88,26 @@ export function registerMongoshLanguage(monaco: typeof import('monaco-editor')) 
 }
 
 /**
- * Theme name to use for lab editors (matches app background).
- * Use with <Editor theme={LAB_EDITOR_THEME} /> and defineLabDarkTheme(monaco) in beforeMount.
+ * Theme name for dark lab editors (matches app dark background).
+ * Use with <Editor theme={...} /> and defineLabDarkTheme(monaco) in beforeMount.
  */
-export const LAB_EDITOR_THEME = 'lab-dark';
+export const LAB_EDITOR_THEME_DARK = 'lab-dark';
+
+/**
+ * Theme name for light lab editors (matches app light background).
+ */
+export const LAB_EDITOR_THEME_LIGHT = 'lab-light';
+
+/**
+ * Resolve lab editor theme from next-themes resolved theme.
+ * Use: theme={getLabEditorTheme(resolvedTheme)} with resolvedTheme from useTheme().
+ */
+export function getLabEditorTheme(resolvedTheme: string | undefined): string {
+  return resolvedTheme === 'light' ? LAB_EDITOR_THEME_LIGHT : LAB_EDITOR_THEME_DARK;
+}
+
+/** @deprecated Use getLabEditorTheme(resolvedTheme) or LAB_EDITOR_THEME_DARK for dark-only. */
+export const LAB_EDITOR_THEME = LAB_EDITOR_THEME_DARK;
 
 /**
  * Shared Monaco Editor options for lab and playground editors.

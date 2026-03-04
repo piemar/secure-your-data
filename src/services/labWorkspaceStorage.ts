@@ -14,6 +14,10 @@ export interface LogEntryStored {
 export interface LabStepWorkspace {
   editors: Record<string, string>; // blockKey (e.g. "0-0", "1-0") -> code
   logEntriesByStep: Record<number, LogEntryStored[]>; // stepIndex -> log entries
+  /** Per-block revealed hint indices (blockKey -> number[]). Restored on next/previous/reload. */
+  revealedAnswersByBlock?: Record<string, number[]>;
+  /** Per-block revealed hint (conceptual) indices (blockKey -> number[]). Optional. */
+  revealedHintsByBlock?: Record<string, number[]>;
 }
 
 export interface LabWorkspaceState {
@@ -66,6 +70,8 @@ export function loadLabWorkspace(labNumber: number, userEmail?: string | null): 
   return {
     editors: lab.editors && typeof lab.editors === 'object' ? lab.editors : {},
     logEntriesByStep: lab.logEntriesByStep && typeof lab.logEntriesByStep === 'object' ? lab.logEntriesByStep : {},
+    revealedAnswersByBlock: lab.revealedAnswersByBlock && typeof lab.revealedAnswersByBlock === 'object' ? lab.revealedAnswersByBlock : {},
+    revealedHintsByBlock: lab.revealedHintsByBlock && typeof lab.revealedHintsByBlock === 'object' ? lab.revealedHintsByBlock : {},
   };
 }
 
@@ -81,10 +87,12 @@ export function saveLabWorkspace(
     const key = getStorageKey(userEmail);
     const state = loadWorkspaceState(userEmail);
     const labKey = String(labNumber);
-    const existing = state[labKey] || { editors: {}, logEntriesByStep: {} };
+    const existing = state[labKey] || { editors: {}, logEntriesByStep: {}, revealedAnswersByBlock: {}, revealedHintsByBlock: {} };
     state[labKey] = {
       editors: data.editors !== undefined ? data.editors : existing.editors,
       logEntriesByStep: data.logEntriesByStep !== undefined ? data.logEntriesByStep : existing.logEntriesByStep,
+      revealedAnswersByBlock: data.revealedAnswersByBlock !== undefined ? data.revealedAnswersByBlock : (existing.revealedAnswersByBlock || {}),
+      revealedHintsByBlock: data.revealedHintsByBlock !== undefined ? data.revealedHintsByBlock : (existing.revealedHintsByBlock || {}),
     };
     localStorage.setItem(key, JSON.stringify(state));
   } catch (e) {

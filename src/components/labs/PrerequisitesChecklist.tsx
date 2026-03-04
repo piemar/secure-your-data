@@ -17,9 +17,34 @@ interface Prerequisite {
 interface PrerequisitesChecklistProps {
   prerequisites: Prerequisite[];
   verifiedTools: Record<string, { verified: boolean; path: string; detectedLocation?: string }>;
+  /** Override inputs/sections to show directly under each prerequisite (key = prereq id, e.g. atlas, mongoCryptShared, mongosh, awsCli). */
+  overrideByPrereqId?: Record<string, React.ReactNode>;
 }
 
 const STORAGE_KEY = 'workshop_prereq_checklist';
+
+/** Full example SSO session (toggleable in AWS CLI setup instructions). */
+const AWS_SSO_FULL_EXAMPLE = `aws configure sso --profile lab-new
+SSO session name (Recommended): lab-new
+SSO start URL [None]: https://d-9067613a84.awsapps.com/start
+SSO region [None]: us-east-1
+SSO registration scopes [sso:account:access]: 
+Attempting to automatically open the SSO authorization page in your default browser.
+If the browser does not open or you wish to use a different device to authorize this request, open the following URL
+
+There are 2 AWS accounts available to you.
+> Solution Architects, aws-sa@mongodb.com 
+  Solutions Architects Collaboration, eugene.kang@mongodb.com
+
+Using the role name "Solution-Architects.User"
+CLI default client Region [None]: eu-west-2
+CLI default output format [None]: json
+
+To use this profile, specify the profile name using --profile, as shown:
+aws sso login --profile lab-new
+
+Run below to ensure it's up and running:
+aws s3 ls --profile lab-new`;
 
 // Extended prerequisites with setup instructions
 const EXTENDED_PREREQUISITES: Prerequisite[] = [
@@ -75,24 +100,27 @@ const EXTENDED_PREREQUISITES: Prerequisite[] = [
       'Linux: curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && unzip awscliv2.zip && sudo ./aws/install',
       '',
       '── Configure SSO ──',
-      '1. Run: aws configure sso',
-      '2. Enter your SSO start URL (e.g., https://your-org.awsapps.com/start)',
-      '3. Enter your SSO region (e.g., eu-central-1)',
+      '1. Run: aws configure sso (or aws configure sso --profile lab-new)',
+      '2. SSO start URL [None]: https://d-9067613a84.awsapps.com/start',
+      '3. SSO region [None]: us-east-1',
       '4. Select your AWS account and role when prompted',
-      '5. Choose a profile name (e.g., "workshop" or "default")',
+      '5. Choose a profile name (e.g. "workshop" or "default")',
       '',
-      '── Login to SSO ──',
-      'aws sso login --profile workshop',
-      '# Or if using default profile:',
+      '── To request a fresh set of credentials ──',
       'aws sso login',
+      '# Or with a named profile: aws sso login --profile workshop',
       '',
       '── Verify SSO Session ──',
       'aws sts get-caller-identity --profile workshop',
-      '# Should show your account ID and role'
+      '# Or: aws sts get-caller-identity  (if using default)',
+      '# Should show your account ID and role',
+      '',
+      '── Tip: Simplest setup ──',
+      'Use profile name "default", or clone your [profile ...] block to [profile default] in ~/.aws/config so you can leave the Lab Setup profile field empty.'
     ]
   },
-  { 
-    id: 'mongosh', 
+  {
+    id: 'mongosh',
     label: 'mongosh', 
     description: 'MongoDB Shell for database operations',
     required: true,
@@ -109,7 +137,7 @@ const EXTENDED_PREREQUISITES: Prerequisite[] = [
     label: 'mongo_crypt_shared', 
     description: 'Automatic Encryption Shared Library (crypt_shared). Required for automatic encryption in Lab 1 (CSFLE) and Lab 2 (QE).',
     required: true,
-    downloadUrl: 'https://www.mongodb.com/docs/manual/core/queryable-encryption/reference/shared-library/',
+    downloadUrl: 'https://www.mongodb.com/try/download/enterprise-advanced/releases',
     setupInstructions: [
       '1. Go to MongoDB Download Center',
       '2. Select "Crypt Shared Library" for your OS',
@@ -122,7 +150,8 @@ const EXTENDED_PREREQUISITES: Prerequisite[] = [
 
 export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
   prerequisites,
-  verifiedTools
+  verifiedTools,
+  overrideByPrereqId = {}
 }) => {
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
@@ -206,7 +235,14 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
               )}
             </div>
             <p className="text-xs text-muted-foreground">{prereq.description}</p>
-            
+
+            {/* Override input(s) for this prerequisite (e.g. MongoDB URI, path, AWS profile) */}
+            {overrideByPrereqId[prereq.id] && (
+              <div className="mt-2 pl-0">
+                {overrideByPrereqId[prereq.id]}
+              </div>
+            )}
+
             {/* Setup Instructions Collapsible */}
             {hasInstructions && (
               <Collapsible open={isExpanded} onOpenChange={() => toggleExpanded(prereq.id)}>
@@ -240,6 +276,21 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
                         </div>
                       ))}
                     </div>
+                    {prereq.id === 'awsCli' && (
+                      <Collapsible>
+                        <CollapsibleTrigger asChild>
+                          <button type="button" className="flex items-center gap-1 text-xs text-primary hover:underline mt-3 font-medium">
+                            <ChevronRight className="w-3 h-3" />
+                            View full example session
+                          </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <pre className="mt-2 p-3 text-[11px] font-mono bg-background rounded border border-border overflow-x-auto whitespace-pre-wrap">
+                            {AWS_SSO_FULL_EXAMPLE}
+                          </pre>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
                   </div>
                 </CollapsibleContent>
               </Collapsible>
