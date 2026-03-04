@@ -13,16 +13,15 @@ export interface CleanupResult {
 }
 
 /**
- * Call server to drop lab-created MongoDB databases: encryption, medical, hr.
+ * Call server to drop lab-created MongoDB databases (with optional suffix: encryption_${suffix}, etc.).
  */
-async function cleanupMongoDBCollections(uri: string): Promise<CleanupResult[]> {
+async function cleanupMongoDBCollectionsWithSuffix(uri: string, suffix?: string): Promise<CleanupResult[]> {
   const results: CleanupResult[] = [];
   if (!uri || !uri.trim()) {
     results.push({ item: 'MongoDB', status: 'skipped', message: 'No URI configured' });
     return results;
   }
   try {
-    const suffix = getLabUserSuffix();
     const res = await fetch('/api/cleanup-lab-collections', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -66,14 +65,16 @@ async function cleanupMongoDBCollections(uri: string): Promise<CleanupResult[]> 
 
 /**
  * Call existing /api/cleanup-resources to delete KMS alias and schedule key deletion.
+ * Region is required: KMS aliases are regional; without it the CLI uses default region and may not find the alias.
  */
-async function cleanupKMS(alias: string, profile?: string): Promise<CleanupResult> {
+async function cleanupKMS(alias: string, profile?: string, region?: string): Promise<CleanupResult> {
   if (!alias || !alias.trim()) {
     return { item: 'KMS', status: 'skipped', message: 'No alias configured' };
   }
   const safeAlias = alias.startsWith('alias/') ? alias : `alias/${alias.replace(/^alias\/?/, '')}`;
   try {
     const q = new URLSearchParams({ alias: safeAlias, profile: profile || '' });
+    if (region?.trim()) q.set('region', region.trim());
     const res = await fetch(`/api/cleanup-resources?${q.toString()}`);
     const data = await res.json().catch(() => ({}));
     const success = data.success === true;
@@ -121,6 +122,10 @@ export async function runResetCleanup(): Promise<CleanupResult[]> {
     typeof localStorage !== 'undefined'
       ? localStorage.getItem('lab_aws_profile') || ''
       : '';
+  const region =
+    typeof localStorage !== 'undefined'
+      ? localStorage.getItem('lab_aws_region') || ''
+      : '';
 
   // If no alias stored but we have suffix, use default lab alias name
   const aliasToUse =
@@ -132,12 +137,37 @@ export async function runResetCleanup(): Promise<CleanupResult[]> {
         })()
       : '');
 
-  // 1) KMS cleanup
-  const kmsResult = await cleanupKMS(aliasToUse, profile || undefined);
+  // 1) KMS cleanup (region is required – aliases are regional)
+  const kmsResult = await cleanupKMS(aliasToUse, profile || undefined, region || undefined);
   results.push(kmsResult);
 
   // 2) MongoDB cleanup (use env MONGODB_URI for local/docker when URI is localhost)
-  const mongoResults = await cleanupMongoDBCollections(uri);
+  const mongoResults = await cleanupMongoDBCollectionsWithSuffix(uri, getLabUserSuffix() || undefined);
+  results.push(...mongoResults);
+
+  return results;
+}
+
+/**
+ * Run the same cleanup as "Reset progress" for a given participant suffix.
+ * Uses standardized naming: KMS alias/mongodb-lab-key-${suffix}, DBs encryption_${suffix}, medical_${suffix}, hr_${suffix}.
+ * Call from moderator's browser with moderator's mongoUri and awsProfile (shared workshop cluster/account).
+ * Pass awsRegion if keys were created in a specific region (KMS is regional).
+ */
+export async function runCleanupForParticipant(
+  suffix: string,
+  mongoUri: string,
+  awsProfile?: string,
+  awsRegion?: string
+): Promise<CleanupResult[]> {
+  const results: CleanupResult[] = [];
+  const safeSuffix = (suffix || '').trim().replace(/\s+/g, '-').toLowerCase();
+  const alias = safeSuffix ? `alias/mongodb-lab-key-${safeSuffix}` : '';
+
+  const kmsResult = await cleanupKMS(alias, awsProfile || undefined, awsRegion || undefined);
+  results.push(kmsResult);
+
+  const mongoResults = await cleanupMongoDBCollectionsWithSuffix(mongoUri, safeSuffix || undefined);
   results.push(...mongoResults);
 
   return results;

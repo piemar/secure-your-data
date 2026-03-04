@@ -178,10 +178,18 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 try {
                     for (const labNum of [1, 2, 3]) {
                         const steps = entry.completedStepsByLab[labNum];
-                        if (Array.isArray(steps)) {
+                        if (Array.isArray(steps) && steps.length > 0) {
                             localStorage.setItem(`lab${labNum}-progress`, JSON.stringify(steps));
+                        } else {
+                            localStorage.removeItem(`lab${labNum}-progress`);
                         }
                     }
+                } catch {
+                    // ignore
+                }
+            } else {
+                try {
+                    [1, 2, 3].forEach((n) => localStorage.removeItem(`lab${n}-progress`));
                 } catch {
                     // ignore
                 }

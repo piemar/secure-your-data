@@ -28,34 +28,39 @@ This interactive web application provides a comprehensive, self-paced learning e
 
 ## Getting Started
 
-**Prerequisites:** MongoDB Atlas M10+ (or local MongoDB 8.0+), AWS account with KMS access, AWS SSO configured. For local run: Node.js 18+ and npm. For Docker: Docker Desktop.
+**Prerequisites:** MongoDB Atlas M10+ (or local MongoDB 8.0+), AWS account with KMS access, AWS SSO configured. For local run: Node.js 18+ and npm. For Docker: Docker Desktop. vite 7.x
 
-### 1. Run locally (recommended)
+### 1. Run with Docker (recommended)
+
+All tools (Node, mongosh, mongo_crypt_shared, AWS CLI) are included in the image. Supports **arm64** (Apple Silicon) and **amd64**.
 
 ```bash
-git clone <YOUR_GIT_URL>
+## Run the inital time, will build the image and start the container
+docker compose up app --build --force-recreate
+# To restart the container
+docker compose restart app
+```
+
+Open **http://localhost:8080** and complete Lab Setup. Run `aws sso login` on your host first if using AWS SSO.
+
+**Connect to the local MongoDB** (from a terminal on your host, while the stack is running):
+
+```bash
+mongosh "mongodb://root:example@127.0.0.1:27017"
+```
+
+Use this to inspect data, run ad-hoc queries, or verify lab databases (e.g. `encryption_<suffix>`, `medical_<suffix>`, `hr_<suffix>`). More Docker options (env vars, regions): [Appendix: Configuring the workshop (Docker)](#appendix-configuring-the-workshop-docker). To build the image only: `docker build -t mongodb-workshop .` then use `mongodb-workshop` in docker-compose.
+
+### 2. Run locally
+
+```bash
+git clone https://github.com/piemar/secure-your-data
 cd secure-your-data
 npm install
 npm run dev
 ```
 
 Open **http://localhost:8080**, complete **Lab Setup** (MongoDB URI, path to mongosh and mongo_crypt_shared if needed), then start the labs. Run `aws sso login` before lab scripts that use KMS.
-
-### 2. Run with Docker (experimental)
-
-All tools (Node, mongosh, mongo_crypt_shared, AWS CLI) are included in the image. Supports **arm64** (Apple Silicon) and **amd64**.
-
-```bash
-# Option A: use published image — set image in docker-compose.yml to pierrepetersson/mongodb-workshop-sandbox-final:latest, then:
-docker compose up app --force-recreate
-
-# Option B: build from source
-docker compose up app --build --force-recreate
-```
-
-Open **http://localhost:8080** and complete Lab Setup. Run `aws sso login` on your host first if using AWS SSO.
-
-More Docker options (env vars, regions): [Appendix: Configuring the workshop (Docker)](#appendix-configuring-the-workshop-docker). To build the image only: `docker build -t mongodb-workshop .` then use `mongodb-workshop` in docker-compose.
 
 ### Central deployment (multiple attendees)
 

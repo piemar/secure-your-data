@@ -275,6 +275,15 @@ async function clearAllLeaderboardEntries(): Promise<void> {
   await collection.deleteMany({});
 }
 
+/** Delete a single leaderboard entry by email (moderator only). Call after reset if desired. */
+async function deleteLeaderboardEntry(email: string): Promise<boolean> {
+  const client = await getLeaderboardMongoClient();
+  const db = client.db(LEADERBOARD_DB);
+  const collection = db.collection(LEADERBOARD_COLLECTION);
+  const result = await collection.deleteOne({ email });
+  return (result.deletedCount ?? 0) > 0;
+}
+
 async function addPointEntry(email: string, stepId: string, labNumber: number, points: number, assisted: boolean): Promise<void> {
   try {
     const client = await getLeaderboardMongoClient();
@@ -639,6 +648,8 @@ export default defineConfig(({ mode }) => ({
             const url = new URL(req.url, `http://${req.headers.host}`);
             const alias = url.searchParams.get('alias') || '';
             const profile = getEffectiveAwsProfile(url.searchParams.get('profile'));
+            const regionParam = (url.searchParams.get('region') || '').trim();
+            const regionArg = regionParam ? ` --region ${shellEscapeProfile(regionParam)}` : '';
             const safeAlias = alias.replace(/[^a-zA-Z0-9_\-\/]/g, '');
             const profileArg = shellEscapeProfile(profile);
 
@@ -647,8 +658,8 @@ export default defineConfig(({ mode }) => ({
               return;
             }
 
-            // 1. Resolve Alias to KeyID
-            const getKeyIdCmd = `aws kms list-aliases --profile ${profileArg} --query "Aliases[?AliasName=='${safeAlias}'].TargetKeyId" --output text`;
+            // 1. Resolve Alias to KeyID (KMS is regional – must use same region as where key was created)
+            const getKeyIdCmd = `aws kms list-aliases --profile ${profileArg}${regionArg} --query "Aliases[?AliasName=='${safeAlias}'].TargetKeyId" --output text`;
 
             exec(getKeyIdCmd, (err: any, keyId: string, stderr: any) => {
               const safeKeyId = (keyId || '').trim();
@@ -659,11 +670,11 @@ export default defineConfig(({ mode }) => ({
               }
 
               // 2. Delete Alias
-              const deleteAliasCmd = `aws kms delete-alias --alias-name ${safeAlias} --profile ${profileArg}`;
+              const deleteAliasCmd = `aws kms delete-alias --alias-name ${safeAlias} --profile ${profileArg}${regionArg}`;
 
               exec(deleteAliasCmd, (delErr: any) => {
                 // 3. Schedule Key Deletion (7 Days)
-                const scheduleDelCmd = `aws kms schedule-key-deletion --key-id ${safeKeyId} --pending-window-in-days 7 --profile ${profileArg}`;
+                const scheduleDelCmd = `aws kms schedule-key-deletion --key-id ${safeKeyId} --pending-window-in-days 7 --profile ${profileArg}${regionArg}`;
 
                 exec(scheduleDelCmd, (schErr: any) => {
                   if (schErr) {
@@ -732,6 +743,7 @@ export default defineConfig(({ mode }) => ({
           if (req.url && req.url.startsWith('/api/verify-keyvault-count')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
             const expectedCount = parseInt(url.searchParams.get('expectedCount') || '1', 10);
+            const keyVaultDb = (url.searchParams.get('keyVaultDb') || '').trim() || 'encryption';
 
             let uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
             if (!uri) {
@@ -741,7 +753,7 @@ export default defineConfig(({ mode }) => ({
             }
             const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
             const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : uri;
-            const dbName = 'encryption';
+            const dbName = keyVaultDb;
             const collName = '__keyVault';
 
             // Construct mongosh command to count documents
@@ -752,7 +764,7 @@ export default defineConfig(({ mode }) => ({
 
             const cmd = `mongosh "${effectiveUri.replace(/"/g, '\\"')}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
             const cmdForLog = `mongosh "${redactMongoUri(effectiveUri)}" --quiet --eval "<count ${dbName}.${collName}>"`;
-            logLabCommand('verify-keyvault-count', cmdForLog, { MONGODB_URI: redactMongoUri(effectiveUri) });
+            logLabCommand('verify-keyvault-count', cmdForLog, { keyVaultDb: dbName, MONGODB_URI: redactMongoUri(effectiveUri) });
 
             exec(cmd, (error: any, stdout: any, stderr: any) => {
               if (error) {
@@ -1313,12 +1325,12 @@ export default defineConfig(({ mode }) => ({
                 if (result.exists) {
                   res.end(JSON.stringify({
                     success: true,
-                    message: `Verified: DEK "${keyAltName}" exists in ${dbName}.${collName} (Provider: ${result.masterKey || 'N/A'})`
+                    message: `Step 5 verification: DEK "${keyAltName}" exists in ${dbName}.${collName} (Provider: ${result.masterKey || 'N/A'})`
                   }));
                 } else {
                   res.end(JSON.stringify({
                     success: false,
-                    message: `DEK with keyAltName "${keyAltName}" not found in ${dbName}.${collName}. Run the createKey.cjs script to create it.`
+                    message: `Step 5 verification: DEK "${keyAltName}" not found in ${dbName}.${collName}. Complete Step 4 (Generate Data Encryption Keys) by running createKey.cjs, then click Check again.`
                   }));
                 }
               } catch (e: any) {
@@ -1382,32 +1394,11 @@ export default defineConfig(({ mode }) => ({
 
           if (req.url && req.url.startsWith('/api/leaderboard')) {
             if (req.method === 'GET') {
-              // Get all leaderboard entries from MongoDB
+              // Get all leaderboard entries from MongoDB (single read, no per-user writes)
+              // Lab times are updated by heartbeat and start-lab/complete-lab; no need to recalc on every GET.
               (async () => {
                 try {
                   const entries = await getLeaderboard();
-                  // Update lab times for active users (add time since last active)
-                  const now = Date.now();
-                  for (const entry of entries) {
-                    const timeSinceLastActive = now - entry.lastActive;
-                    // Only update if user was active in last 5 minutes
-                    if (timeSinceLastActive < 5 * 60 * 1000) {
-                      // Update time for any active lab (not completed)
-                      Object.keys(entry.labTimes || {}).forEach(labNumStr => {
-                        const labNum = parseInt(labNumStr);
-                        if (!entry.completedLabs.includes(labNum)) {
-                          // This is the time elapsed since lab start
-                          // We keep it as elapsed time, not absolute timestamp
-                          const currentElapsed = entry.labTimes[labNum];
-                          // Add small increment for time since last refresh (max 1 min per refresh)
-                          entry.labTimes[labNum] = currentElapsed + Math.min(timeSinceLastActive, 60000);
-                        }
-                      });
-                      // Save updated times
-                      await updateLeaderboardEntry(entry.email, { labTimes: entry.labTimes });
-                    }
-                  }
-                  
                   res.setHeader('Content-Type', 'application/json');
                   res.end(JSON.stringify({ entries }));
                 } catch (error: any) {
@@ -1416,6 +1407,35 @@ export default defineConfig(({ mode }) => ({
                   res.end(JSON.stringify({ success: false, message: error?.message || 'Leaderboard unavailable' }));
                 }
               })();
+              return;
+            }
+
+            if (req.method === 'DELETE' && req.url?.includes('/entry')) {
+              let body = '';
+              req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+              req.on('end', async () => {
+                try {
+                  const data = JSON.parse(body || '{}');
+                  const email = data?.email;
+                  if (!email || typeof email !== 'string') {
+                    res.statusCode = 400;
+                    res.end(JSON.stringify({ success: false, message: 'email required' }));
+                    return;
+                  }
+                  await updateLeaderboardEntry(email, {
+                    score: 0,
+                    completedLabs: [],
+                    completedStepsByLab: {},
+                    labTimes: {}
+                  });
+                  const deleted = await deleteLeaderboardEntry(email);
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: true, deleted }));
+                } catch (e: any) {
+                  res.statusCode = 500;
+                  res.end(JSON.stringify({ success: false, message: e?.message || 'Delete failed' }));
+                }
+              });
               return;
             }
 

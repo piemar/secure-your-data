@@ -69,15 +69,20 @@ export class VerificationService {
         return validatorUtils.checkKeyPolicy(ctx.alias || "", ctx.profile, ctx.region);
 
       case "csfle.verifyKeyVaultCount":
-        return validatorUtils.checkKeyVaultCount(ctx.expectedCount ?? 1, ctx.mongoUri);
+        return validatorUtils.checkKeyVaultCount(ctx.expectedCount ?? 1, ctx.mongoUri, ctx.keyVaultDb);
 
       case "csfle.verifyDekCreated":
       case "csfle.verifyDataKey":
         return validatorUtils.checkDataKey(ctx.mongoUri || "", ctx.keyAltName || "", ctx.keyVaultDb);
 
       case "csfle.verifyEncryptionWorking":
-        // Currently verified by manually running the script; return a generic success
-        return { success: true, message: "CSFLE test script executed (manual verification)." };
+        // Verify at least one document in medical.patients (or medical_<suffix>) has ssn stored as Binary (CSFLE worked)
+        return validatorUtils.checkFieldEncrypted(
+          ctx.mongoUri || "",
+          ctx.medicalDb || "medical",
+          "patients",
+          "ssn"
+        );
 
       case "csfle.verifyComplete":
         return { success: true, message: "Lab steps completed. Manual review recommended for full validation." };

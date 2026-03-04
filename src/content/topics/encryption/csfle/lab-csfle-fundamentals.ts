@@ -147,16 +147,16 @@ export const lab1Definition: WorkshopLabDefinition = {
       sourceProof: 'Docs/Guides/Lab_1_CSFLE.md',
       sourceSection: 'Setup',
       hints: [
-        'The database name for encryption key vault is "encryption".',
+        'The key vault database is "encryption" or "encryption_<suffix>" (see Lab Setup for your suffix).',
         'Use db.collection("__keyVault").find({}) to list all DEK documents.',
-        'To verify your DEK: find a document where keyAltNames contains your key (e.g. user-<firstname>-<lastname>-ssn-key).'
+        'To verify your DEK: find a document where keyAltNames contains your key (e.g. user-<suffix>-ssn-key). The Check button verifies this for you.'
       ]
     },
     {
       id: 'lab-csfle-fundamentals-step-test-csfle',
       title: 'Test CSFLE: Insert & Query with Encryption',
       narrative: 'Create and run a Node.js test script that demonstrates the difference between encrypted and non-encrypted connections. This proves that CSFLE is working by showing ciphertext vs plaintext side-by-side.',
-      instructions: 'Create testCSFLE.cjs with a standard client and a CSFLE-enabled client.\nInsert documents with both; query to see Binary ciphertext vs decrypted plaintext.\nUse Run all or Run selection in the editor to run the test script.\nClick Check progress or Next to verify.',
+      instructions: 'Create testCSFLE.cjs with a standard client and a CSFLE-enabled client.\nInsert documents with both; query to see Binary ciphertext vs decrypted plaintext.\nUse Run all or Run selection in the editor to run the test script.\nClick Check progress or Next to verify (checks that ssn is stored as encrypted Binary in medical.patients).',
       estimatedTimeMinutes: 15,
       modes: ['demo', 'lab', 'challenge'],
       verificationId: 'csfle.verifyEncryptionWorking',
@@ -169,7 +169,8 @@ export const lab1Definition: WorkshopLabDefinition = {
         'The field in __keyVault that stores human-readable key names is "keyAltNames".',
         'Schema map keyword to specify field should be encrypted is "encrypt".',
         'Algorithm suffix for fields that need equality queries is "Deterministic".',
-        'MongoClient option that enables automatic encryption is "autoEncryption".'
+        'MongoClient option that enables automatic encryption is "autoEncryption".',
+        'Check verifies that at least one document in medical.patients has the ssn field stored as Binary (encrypted). Run testCSFLE.cjs to insert with CSFLE first.'
       ]
     },
     {

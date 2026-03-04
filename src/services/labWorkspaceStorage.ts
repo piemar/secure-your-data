@@ -9,6 +9,8 @@ const STORAGE_PREFIX = 'workshop_lab_workspace';
 export interface LogEntryStored {
   time: string; // ISO date string
   output: string;
+  /** When true/false, restores correct pass/fail badge when loading step; omit for legacy entries. */
+  success?: boolean;
 }
 
 export interface LabStepWorkspace {
@@ -103,20 +105,24 @@ export function saveLabWorkspace(
 /**
  * Convert in-memory log entries (Date) to stored format (ISO string).
  */
-export function logEntriesToStored(entries: Array<{ time: Date; output: string }>): LogEntryStored[] {
-  return entries.map(({ time, output }) => ({
+export function logEntriesToStored(entries: Array<{ time: Date; output: string; success?: boolean }>): LogEntryStored[] {
+  return entries.map(({ time, output, success }) => ({
     time: time instanceof Date ? time.toISOString() : String(time),
     output,
+    ...(success !== undefined && { success }),
   }));
 }
+
+export type LogEntryInMemory = { time: Date; output: string; success?: boolean };
 
 /**
  * Convert stored log entries back to in-memory format (Date).
  */
-export function storedToLogEntries(entries: LogEntryStored[]): Array<{ time: Date; output: string }> {
+export function storedToLogEntries(entries: LogEntryStored[]): LogEntryInMemory[] {
   if (!Array.isArray(entries)) return [];
-  return entries.map(({ time, output }) => ({
+  return entries.map(({ time, output, success }) => ({
     time: new Date(time),
     output: String(output),
+    ...(success !== undefined && { success }),
   }));
 }

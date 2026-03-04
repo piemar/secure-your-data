@@ -225,8 +225,9 @@ export const validatorUtils = {
     /**
      * Verifies the expected DEK count in the key vault.
      * Uses the real /api/verify-keyvault-count endpoint to check via mongosh.
+     * @param keyVaultDb Optional. Per-user key vault DB (e.g. encryption_test-user27). Omit for "encryption".
      */
-    checkKeyVaultCount: async (expectedCount: number = 1, uri?: string): Promise<ValidationResult> => {
+    checkKeyVaultCount: async (expectedCount: number = 1, uri?: string, keyVaultDb?: string): Promise<ValidationResult> => {
         // Get URI from parameter or try localStorage
         const mongoUri = uri || getStoredMongoUri();
         
@@ -235,7 +236,9 @@ export const validatorUtils = {
         }
 
         try {
-            const response = await fetch(`/api/verify-keyvault-count?uri=${encodeURIComponent(mongoUri)}&expectedCount=${expectedCount}`);
+            const params = new URLSearchParams({ uri: mongoUri, expectedCount: String(expectedCount) });
+            if (keyVaultDb?.trim()) params.set('keyVaultDb', keyVaultDb.trim());
+            const response = await fetch(`/api/verify-keyvault-count?${params.toString()}`);
             const data = await response.json();
             return { success: data.success, message: data.message };
         } catch (error) {

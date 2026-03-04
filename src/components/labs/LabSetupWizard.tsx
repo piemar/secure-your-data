@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLab } from '@/context/LabContext';
+import { useWorkshopConfig } from '@/context/WorkshopConfigContext';
 import { useWorkshopSession } from '@/contexts/WorkshopSessionContext';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { getWorkshopSession, updateWorkshopSession } from '@/utils/workshopUtils';
@@ -55,9 +56,11 @@ export const LabSetupWizard: React.FC = () => {
     } = useLab();
     const { activeTemplate, setCurrentLabId } = useWorkshopSession();
     const { setSection } = useNavigation();
+    const { runningInContainer } = useWorkshopConfig();
 
+    const defaultMongoUri = runningInContainer ? 'mongodb://mongo:27017' : 'mongodb://127.0.0.1:27017';
     const [phase, setPhase] = useState<SetupPhase>(mongoUri ? 'ready' : 'onboarding');
-    const [localUri, setLocalUri] = useState(mongoUri || 'mongodb://mongo:27017');
+    const [localUri, setLocalUri] = useState(mongoUri || defaultMongoUri);
     const [uriFromWorkshop, setUriFromWorkshop] = useState(false);
     const [isCheckingPrereqs, setIsCheckingPrereqs] = useState(false);
     const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
@@ -101,14 +104,17 @@ export const LabSetupWizard: React.FC = () => {
         if (mongoUri) setLocalUri(mongoUri);
     }, [mongoUri]);
 
-    // For local Docker workshops only: default URI when session is local (no per-user credentials)
+    // When Docker: default URI to mongo:27017. When local dev with local session: default to 127.0.0.1:27017.
     useEffect(() => {
         const session = getWorkshopSession();
-        if (session?.mongodbSource === 'local' && !mongoUri) {
-            setLocalUri('mongodb://mongo:27017');
+        if (mongoUri) return;
+        const useDockerUri = runningInContainer || session?.mongodbSource === 'local';
+        if (useDockerUri) {
+            const uri = runningInContainer ? 'mongodb://mongo:27017' : 'mongodb://127.0.0.1:27017';
+            setLocalUri(uri);
             setUriFromWorkshop(true);
         }
-    }, [mongoUri]);
+    }, [mongoUri, runningInContainer]);
 
     // Auto-detect AWS profile and region when field is empty (so "default" is filled without running full Check Prerequisites)
     useEffect(() => {
@@ -172,11 +178,11 @@ export const LabSetupWizard: React.FC = () => {
 
     const checkAllPrerequisites = async () => {
         if (!localUri?.trim()) {
-            toast.error('Enter MongoDB URI first (in the MongoDB Atlas Cluster section above).');
+            toast.error('Enter MongoDB URI first (in the MongoDB connection section above).');
             return;
         }
         setIsCheckingPrereqs(true);
-        const results: Record<string, { verified: boolean; message: string; path?: string }> = {};
+        const results: Record<string, { verified: boolean; message: string; path?: string; detectedLocation?: string }> = {};
 
         for (const prereq of PREREQUISITES) {
             try {
@@ -186,6 +192,7 @@ export const LabSetupWizard: React.FC = () => {
                     const result = await validatorUtils.checkMongoCryptShared(storedPath || undefined);
                     if (result.success && result.path) {
                         if (!storedPath) localStorage.setItem('crypt_shared_lib_path', result.path);
+                        setCryptSharedManualPath(result.path);
                         results[prereq.id] = {
                             verified: true,
                             message: result.message || 'File found',
@@ -261,6 +268,11 @@ export const LabSetupWizard: React.FC = () => {
             localStorage.setItem('workshop_mongosh_path', mongoshPath);
             setMongoshPathInput(mongoshPath);
         }
+        // Sync detected mongo_crypt_shared path into the input field (like mongosh / AWS)
+        const cryptSharedPath = results['mongoCryptShared']?.path || verifiedTools['mongoCryptShared']?.path;
+        if (cryptSharedPath) {
+            setCryptSharedManualPath(cryptSharedPath);
+        }
 
         const requiredPassed = PREREQUISITES.filter(p => p.required).every(p => results[p.id]?.verified);
         if (requiredPassed) {
@@ -332,7 +344,7 @@ export const LabSetupWizard: React.FC = () => {
         <div className="space-y-2">
           <Input
             id="uri"
-            placeholder="mongodb://mongo:27017 (local Docker) or mongodb+srv://user:pass@cluster.mongodb.net/ (Atlas)"
+            placeholder={getWorkshopSession()?.mongodbSource === 'local' ? 'mongodb://mongo:27017' : 'mongodb+srv://user:pass@cluster.mongodb.net/'}
             value={localUri}
             onChange={(e) => { setLocalUri(e.target.value); setUriFromWorkshop(false); }}
             onBlur={() => { const v = localUri.trim(); if (v) setMongoUri(v); }}
@@ -345,7 +357,7 @@ export const LabSetupWizard: React.FC = () => {
                 <span>Pre-configured from workshop session ({getWorkshopSession()?.mongodbSource === 'local' ? 'Local Docker' : 'Atlas'})</span>
               </div>
               {getWorkshopSession()?.mongodbSource === 'local' && (
-                <span className="text-muted-foreground text-[11px]">In Docker, lab Run uses the server URI. Use <code className="bg-muted px-0.5 rounded">process.env.MONGODB_URI</code> in scripts.</span>
+                <span className="text-muted-foreground text-[11px]">Lab Run uses this URI. In scripts use <code className="bg-muted px-0.5 rounded">process.env.MONGODB_URI</code>. From your host: <code className="bg-muted px-0.5 rounded">mongosh &quot;mongodb://root:example@localhost:27017/?replicaSet=rs0&quot;</code></span>
               )}
             </div>
           )}
@@ -358,10 +370,11 @@ export const LabSetupWizard: React.FC = () => {
           <Collapsible>
             <CollapsibleTrigger className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
               <HelpCircle className="w-3 h-3" />
-              Need help getting a connection string?
+              {getWorkshopSession()?.mongodbSource === 'local' ? 'Using Atlas instead?' : 'Need help getting a connection string?'}
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="mt-2 p-3 rounded-lg bg-muted/50 border border-border text-xs space-y-2">
+                <p className="text-muted-foreground">Use an Atlas M10+ cluster for encryption support. Paste your connection string above.</p>
                 <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
                   <li>Go to <a href="https://cloud.mongodb.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">MongoDB Atlas</a></li>
                   <li>Click <strong>Connect</strong> on your cluster</li>
@@ -469,7 +482,7 @@ export const LabSetupWizard: React.FC = () => {
           </div>
         </div>
       ),
-    }), [localUri, uriFromWorkshop, hasAtlasConnection, cryptSharedManualPath, isVerifyingCryptPath, mongoshPathInput, awsProfileInput, awsRegionInput, awsProfilesList, awsProfilesLoading, awsTestLoading, verifiedTools, prereqResults]);
+    }), [localUri, uriFromWorkshop, hasAtlasConnection, cryptSharedManualPath, isVerifyingCryptPath, mongoshPathInput, awsProfileInput, awsRegionInput, awsProfilesList, awsProfilesLoading, awsTestLoading, verifiedTools, prereqResults, getWorkshopSession()?.mongodbSource]);
 
     if (phase === 'ready') {
         return (
@@ -531,7 +544,7 @@ export const LabSetupWizard: React.FC = () => {
                     </div>
                     <div>
                         <CardTitle className="text-2xl font-bold">Lab Environment Setup</CardTitle>
-                        <CardDescription>Verify your tools and connect to MongoDB Atlas</CardDescription>
+                        <CardDescription>Verify your tools and connect to MongoDB (Atlas or Local Docker)</CardDescription>
                     </div>
                 </div>
             </CardHeader>
@@ -556,6 +569,7 @@ export const LabSetupWizard: React.FC = () => {
                     prerequisites={PREREQUISITES}
                     verifiedTools={verifiedTools}
                     overrideByPrereqId={overrideByPrereqId}
+                    mongodbSource={getWorkshopSession()?.mongodbSource}
                 />
 
                 {/* Single "Show details" (merged into What You'll Need): installation instructions when prerequisites are missing */}
@@ -661,7 +675,7 @@ export const LabSetupWizard: React.FC = () => {
                             disabled={isCheckingPrereqs || !localUri?.trim()}
                             size="sm"
                             className="gap-2"
-                            title={!localUri?.trim() ? 'Enter MongoDB URI above first (in the MongoDB Atlas Cluster section)' : undefined}
+                            title={!localUri?.trim() ? 'Enter MongoDB URI above first (in the MongoDB connection section)' : undefined}
                         >
                             {isCheckingPrereqs ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -717,7 +731,7 @@ export const LabSetupWizard: React.FC = () => {
                     ) : !allVerified ? (
                         <>Missing prerequisites (or continue anyway)</>
                     ) : !localUri ? (
-                        <>Enter Atlas connection string</>
+                        <>Enter MongoDB connection string</>
                     ) : (
                         <>Activate Lab Environment</>
                     )}

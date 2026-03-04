@@ -145,3 +145,20 @@ export async function postResetLeaderboardAll(): Promise<void> {
     throw new Error(data.message || `Reset leaderboard failed: ${res.status}`);
   }
 }
+
+/**
+ * Delete a participant from the leaderboard (moderator only).
+ * Performs the same server-side reset as "Reset progress" (score 0, clear labs, steps, times)
+ * then removes the user's entry from the leaderboard.
+ */
+export async function postDeleteLeaderboardEntry(email: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/entry`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || `Delete participant failed: ${res.status}`);
+  }
+}

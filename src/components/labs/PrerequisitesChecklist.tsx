@@ -19,9 +19,22 @@ interface PrerequisitesChecklistProps {
   verifiedTools: Record<string, { verified: boolean; path: string; detectedLocation?: string }>;
   /** Override inputs/sections to show directly under each prerequisite (key = prereq id, e.g. atlas, mongoCryptShared, mongosh, awsCli). */
   overrideByPrereqId?: Record<string, React.ReactNode>;
+  /** When 'local', atlas prerequisite shows "MongoDB (Local Docker)" and Docker-focused copy. When 'atlas', shows Atlas M10+ copy. */
+  mongodbSource?: 'local' | 'atlas';
 }
 
 const STORAGE_KEY = 'workshop_prereq_checklist';
+
+/** Shown when mongodbSource is 'local': how to use MongoDB in the Docker stack. */
+const LOCAL_MONGO_SETUP_INSTRUCTIONS = [
+  'MongoDB runs in the workshop Docker stack (replica set for encryption support).',
+  'The app connects automatically using the URI above (e.g. mongodb://mongo:27017).',
+  '── From your host (e.g. to inspect data) ──',
+  'mongosh "mongodb://root:example@localhost:27017/?replicaSet=rs0"',
+  '# Or without auth if you disabled it: mongosh "mongodb://localhost:27017/?replicaSet=rs0"',
+  '── From lab Run / scripts inside the app ──',
+  'Use process.env.MONGODB_URI (already set in the container).'
+];
 
 /** Full example SSO session (toggleable in AWS CLI setup instructions). */
 const AWS_SSO_FULL_EXAMPLE = `aws configure sso --profile lab-new
@@ -155,7 +168,8 @@ const EXTENDED_PREREQUISITES: Prerequisite[] = [
 export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
   prerequisites,
   verifiedTools,
-  overrideByPrereqId = {}
+  overrideByPrereqId = {},
+  mongodbSource
 }) => {
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
@@ -192,7 +206,15 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
     const isVerified = verifiedTools[prereq.id]?.verified;
     const isChecked = checkedItems[prereq.id] || isVerified;
     const isExpanded = expandedItems[prereq.id];
-    const hasInstructions = prereq.setupInstructions && prereq.setupInstructions.length > 0;
+    const isAtlasLocal = prereq.id === 'atlas' && mongodbSource === 'local';
+    const displayLabel = isAtlasLocal ? 'MongoDB for labs (Local Docker)' : prereq.label;
+    const displayDescription = isAtlasLocal
+      ? 'MongoDB running in the workshop Docker stack. The app connects automatically. Use the URI below; from your host you can connect with mongosh (see setup instructions).'
+      : prereq.description;
+    const setupInstructions = prereq.id === 'atlas' && mongodbSource === 'local'
+      ? LOCAL_MONGO_SETUP_INSTRUCTIONS
+      : prereq.setupInstructions;
+    const hasInstructions = setupInstructions && setupInstructions.length > 0;
     
     return (
       <div key={prereq.id} className="py-2">
@@ -212,7 +234,7 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
                   isChecked && "text-green-600 line-through opacity-70"
                 )}
               >
-                {prereq.label}
+                {displayLabel}
               </label>
               {isVerified && (
                 <>
@@ -226,7 +248,7 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
                   )}
                 </>
               )}
-              {prereq.downloadUrl && (
+              {prereq.downloadUrl && !isAtlasLocal && (
                 <a
                   href={prereq.downloadUrl}
                   target="_blank"
@@ -238,7 +260,7 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
                 </a>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">{prereq.description}</p>
+            <p className="text-xs text-muted-foreground">{displayDescription}</p>
 
             {/* Override input(s) for this prerequisite (e.g. MongoDB URI, path, AWS profile) */}
             {overrideByPrereqId[prereq.id] && (
@@ -259,7 +281,7 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
                 <CollapsibleContent>
                   <div className="mt-2 p-3 bg-muted/50 rounded-lg border border-border/50">
                     <div className="space-y-1">
-                        {prereq.setupInstructions!.map((instruction, idx) => (
+                        {setupInstructions!.map((instruction, idx) => (
                         <div key={idx} className={cn(
                           "text-xs font-mono",
                           instruction.startsWith('──') 

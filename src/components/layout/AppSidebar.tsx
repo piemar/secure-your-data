@@ -137,8 +137,7 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
       localStorage.removeItem('lab3-progress');
       localStorage.removeItem('completedLabs');
       localStorage.removeItem('labStartTimes');
-      // Keep MongoDB URI so user does not have to re-enter connection string after reset
-      localStorage.removeItem('lab_aws_profile');
+      // Keep MongoDB URI and AWS profile so user does not have to re-enter after reset
       localStorage.removeItem('lab_kms_alias');
       window.location.reload();
     })();

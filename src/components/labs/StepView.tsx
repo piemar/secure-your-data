@@ -1046,12 +1046,17 @@ export function StepView({
   useEffect(() => {
     const w = loadLabWorkspace(labNumber, userEmail);
     const entries = w.logEntriesByStep[currentStepIndex] || [];
-    setLogEntries(storedToLogEntries(entries));
-    const last = entries[entries.length - 1];
+    const entriesWithDates = storedToLogEntries(entries);
+    setLogEntries(entriesWithDates);
+    const last = entriesWithDates[entriesWithDates.length - 1];
     if (last && last.output) {
       setLastOutput(last.output);
-      setOutputSummary(last.output.trim().split('\n')[0].slice(0, 80) || 'Step output');
-      setOutputSuccess(true); // success not stored per entry; neutral when switching
+      const lines = last.output.trim().split(/\r?\n/).filter(Boolean);
+      const firstLine = lines[0]?.slice(0, 80) || '';
+      // If first line is [lab] context (Key vault / KMS alias), use the result line for summary so badge shows pass/fail message not context
+      const summaryLine = lines.length > 1 && /^\[lab\]\s+(Key vault|KMS alias):/.test(firstLine) ? lines[1]?.slice(0, 120) || firstLine : firstLine;
+      setOutputSummary(summaryLine || 'Step output');
+      setOutputSuccess(last.success !== undefined ? last.success : !/\b(not found|failed|Error:)\b/i.test(last.output));
     } else {
       setLastOutput('');
       setOutputSummary('');
@@ -1289,11 +1294,13 @@ export function StepView({
         const result = await verificationService.verify(currentStep.verificationId as VerificationId, ctx);
         success = result.success;
         summary = result.message;
-        const contextLine = [
-          keyVaultDb ? `Key vault: ${keyVaultDb}` : null,
-          awsProfile ? `AWS profile: ${awsProfile}` : null,
-          awsRegion ? `region: ${awsRegion}` : null,
-        ].filter(Boolean).join(' | ');
+        // Context line should reflect what this step validates: CMK/alias for KMS steps, key vault for key-vault steps
+        const vid = currentStep.verificationId || '';
+        const isKmsOnlyStep = vid === 'csfle.verifyCmkExists' || vid === 'csfle.verifyKeyPolicy';
+        const contextParts = isKmsOnlyStep
+          ? [ctx.alias ? `KMS alias: ${ctx.alias}` : null, awsProfile ? `AWS profile: ${awsProfile}` : null, awsRegion ? `region: ${awsRegion}` : null]
+          : [keyVaultDb ? `Key vault: ${keyVaultDb}` : null, awsProfile ? `AWS profile: ${awsProfile}` : null, awsRegion ? `region: ${awsRegion}` : null];
+        const contextLine = contextParts.filter(Boolean).join(' | ');
         output = contextLine ? `[lab] ${contextLine}\n${result.message}` : result.message;
       } else {
         success = true;
@@ -1317,7 +1324,7 @@ export function StepView({
     // Persist validation result to this step's console log so it's kept when advancing and when returning to this step
     const w = loadLabWorkspace(labNumber, userEmail);
     const existing = w.logEntriesByStep[currentStepIndex] || [];
-    const newStored = logEntriesToStored([{ time: now, output }]);
+    const newStored = logEntriesToStored([{ time: now, output, success }]);
     saveLabWorkspace(labNumber, { logEntriesByStep: { ...w.logEntriesByStep, [currentStepIndex]: [...existing, ...newStored] } }, userEmail);
     setIsRunning(false);
     return success;
