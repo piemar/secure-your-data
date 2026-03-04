@@ -30,8 +30,9 @@ export async function syncLeaderboardFromApi(): Promise<void> {
         // Ignore quota or disabled localStorage
       }
     }
-  } catch {
-    // API unavailable; keep using existing localStorage
+  } catch (e) {
+    // Rethrow so Leaderboard can show "Leaderboard unavailable" when MongoDB is not configured
+    throw e;
   }
 }
 

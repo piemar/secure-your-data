@@ -171,7 +171,11 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
   useEffect(() => {
     const updateStatus = async () => {
       const { syncLeaderboardFromApi, getSortedLeaderboard } = await import('@/utils/leaderboardUtils');
-      await syncLeaderboardFromApi();
+      try {
+        await syncLeaderboardFromApi();
+      } catch {
+        // Leaderboard API unavailable; use cached data
+      }
       const leaderboard = getSortedLeaderboard();
       setTotalParticipants(leaderboard.length);
       const rank = leaderboard.findIndex(e => e.email === userEmail) + 1;

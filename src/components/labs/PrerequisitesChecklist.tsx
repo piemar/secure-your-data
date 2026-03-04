@@ -137,13 +137,17 @@ const EXTENDED_PREREQUISITES: Prerequisite[] = [
     label: 'mongo_crypt_shared', 
     description: 'Automatic Encryption Shared Library (crypt_shared). Required for automatic encryption in Lab 1 (CSFLE) and Lab 2 (QE).',
     required: true,
-    downloadUrl: 'https://www.mongodb.com/try/download/enterprise-advanced/releases',
+    downloadUrl: 'https://www.mongodb.com/try/download/enterprise',
     setupInstructions: [
-      '1. Go to MongoDB Download Center',
-      '2. Select "Crypt Shared Library" for your OS',
+      '1. Go to MongoDB Enterprise Server Download',
+      '2. Choose your platform and select the crypt_shared package (see images below)',
+      '── macOS ──',
+      'Version: 8.2.5 (current) or 7.0.x • Platform: macOS ARM 64 or macOS x64 • Package: crypt_shared',
+      '── Windows ──',
+      'Version: 8.2.5 (current) or 7.0.x • Platform: Windows x64 • Package: crypt_shared',
       '3. Download and extract the archive',
-      '4. Note the path to mongo_crypt_v1.so (or .dylib on macOS)',
-      '5. Set in your scripts: cryptSharedLibPath: "/path/to/mongo_crypt_v1.so"'
+      '4. Note the path to mongo_crypt_v1.dylib (macOS) or mongo_crypt_v1.dll (Windows)',
+      '5. Set in Lab Setup above or in scripts: cryptSharedLibPath: "/path/to/mongo_crypt_v1.dylib"'
     ]
   }
 ];
@@ -276,6 +280,26 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
                         </div>
                       ))}
                     </div>
+                    {prereq.id === 'mongoCryptShared' && (
+                      <div className="mt-4 space-y-4">
+                        <p className="text-xs font-medium text-foreground">What to select on the download page:</p>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold text-foreground">macOS</p>
+                            <p className="text-xs text-muted-foreground">Version: 8.2.5 (current) or 7.0.x • Platform: macOS ARM 64 or macOS x64 • Package: <strong>crypt_shared</strong></p>
+                            <img src="/images/mongcrypt_shared_mac.png" alt="MongoDB Enterprise download page with macOS ARM 64 and crypt_shared selected" className="rounded border border-border w-full max-w-md" />
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold text-foreground">Windows</p>
+                            <p className="text-xs text-muted-foreground">Version: 8.2.5 (current) or 7.0.x • Platform: Windows x64 • Package: <strong>crypt_shared</strong></p>
+                            <img src="/images/mongocrypt_shared_windows.png" alt="MongoDB Enterprise download page with Windows x64 and crypt_shared selected" className="rounded border border-border w-full max-w-md" />
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          <a href={prereq.downloadUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Open MongoDB Enterprise Server Download</a>
+                        </p>
+                      </div>
+                    )}
                     {prereq.id === 'awsCli' && (
                       <Collapsible>
                         <CollapsibleTrigger asChild>

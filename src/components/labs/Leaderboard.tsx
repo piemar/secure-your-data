@@ -8,14 +8,25 @@ export function Leaderboard() {
   const { userEmail } = useLab();
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const updateLeaderboard = async () => {
-      const { syncLeaderboardFromApi, getSortedLeaderboard } = await import('@/utils/leaderboardUtils');
-      await syncLeaderboardFromApi();
-      const entries = getSortedLeaderboard();
-      setLeaderboard(entries);
-      setLoading(false);
+      setLoading(true);
+      setError(null);
+      try {
+        const { syncLeaderboardFromApi, getSortedLeaderboard } = await import('@/utils/leaderboardUtils');
+        await syncLeaderboardFromApi();
+        const entries = getSortedLeaderboard();
+        setLeaderboard(entries);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Leaderboard unavailable';
+        setError(message);
+        const { getSortedLeaderboard } = await import('@/utils/leaderboardUtils');
+        setLeaderboard(getSortedLeaderboard());
+      } finally {
+        setLoading(false);
+      }
     };
 
     updateLeaderboard();
@@ -76,6 +87,14 @@ export function Leaderboard() {
           </div>
           <p className="text-muted-foreground">See how you rank against other participants</p>
         </div>
+
+        {error && (
+          <div className="mb-6 p-4 rounded-lg border border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400">
+            <p className="font-medium">Leaderboard unavailable</p>
+            <p className="text-sm mt-1">{error}</p>
+            <p className="text-xs mt-2 text-muted-foreground">Set LEADERBOARD_MONGODB_URI on the server or use a local MongoDB. Showing cached data if any.</p>
+          </div>
+        )}
 
         {userEmail && userRank > 0 && (
           <Card className="mb-6 border-primary/20 bg-primary/5">

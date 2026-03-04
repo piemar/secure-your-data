@@ -38,7 +38,7 @@ const PREREQUISITES: Prerequisite[] = [
     { id: 'mongosh', label: 'mongosh', description: 'MongoDB Shell for database operations', installCommand: 'brew install mongodb-community-shell', downloadUrl: 'https://www.mongodb.com/try/download/shell', required: true },
     { id: 'node', label: 'Node.js v18+', description: 'JavaScript runtime', installCommand: 'brew install node', downloadUrl: 'https://nodejs.org/', required: true },
     { id: 'npm', label: 'npm', description: 'Package manager (comes with Node.js)', installCommand: 'Included with Node.js', required: true },
-    { id: 'mongoCryptShared', label: 'mongo_crypt_shared', description: 'Required for automatic encryption (Lab 1 CSFLE and Lab 2 QE). Not needed for explicit-only (e.g. Lab 3 migration).', installCommand: 'Download from MongoDB', downloadUrl: 'https://www.mongodb.com/try/download/enterprise-advanced/releases', required: true },
+    { id: 'mongoCryptShared', label: 'mongo_crypt_shared', description: 'Required for automatic encryption (Lab 1 CSFLE and Lab 2 QE). Not needed for explicit-only (e.g. Lab 3 migration).', installCommand: 'Download from MongoDB', downloadUrl: 'https://www.mongodb.com/try/download/enterprise', required: true },
 ];
 
 export const LabSetupWizard: React.FC = () => {

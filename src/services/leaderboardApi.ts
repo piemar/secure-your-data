@@ -10,14 +10,13 @@ import type { LeaderboardEntry } from '@/utils/leaderboardUtils';
 const API_BASE = '/api/leaderboard';
 
 export async function fetchLeaderboardFromApi(): Promise<LeaderboardEntry[]> {
-  try {
-    const res = await fetch(API_BASE);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.entries ?? [];
-  } catch {
-    return [];
+  const res = await fetch(API_BASE);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = data?.message || 'Leaderboard unavailable';
+    throw new Error(msg);
   }
+  return data.entries ?? [];
 }
 
 export async function postStartLab(email: string, labNumber: number): Promise<void> {

@@ -31,6 +31,29 @@ function shellEscapeProfile(profile: string): string {
   return "'" + String(profile).replace(/'/g, "'\\''") + "'";
 }
 
+/** Redact MongoDB URI for safe logging (password and query params). */
+function redactMongoUri(uri: string): string {
+  if (!uri || typeof uri !== 'string') return '<none>';
+  try {
+    return uri.replace(/^(mongodb(\+srv)?:\/\/)([^@]+)(@.*)$/, (_, scheme, _srv, creds, rest) =>
+      scheme + (creds.includes(':') ? '***:***' : '***') + rest
+    );
+  } catch {
+    return '<redacted>';
+  }
+}
+
+/** Log executed command and env to the terminal so users can see what ran. */
+function logLabCommand(tag: string, command: string, envSummary?: Record<string, string>): void {
+  console.log(`[lab] ${tag} Command: ${command}`);
+  if (envSummary && Object.keys(envSummary).length > 0) {
+    const envStr = Object.entries(envSummary)
+      .map(([k, v]) => `${k}=${v}`)
+      .join(' ');
+    console.log(`[lab] ${tag} Env: ${envStr}`);
+  }
+}
+
 const KMS_PROFILE_NOT_FOUND_FIX =
   " How to fix: (1) Use the default profile—leave AWS profile empty in Lab Setup or clone your SSO profile as [profile default] in ~/.aws/config. (2) If using a named profile, ensure the name in Lab Setup exactly matches ~/.aws/config (including dots). (3) Run aws sso login and try again.";
 
@@ -193,6 +216,9 @@ let leaderboardMongoClient: MongoClient | null = null;
 async function getLeaderboardMongoClient(): Promise<MongoClient> {
   if (!leaderboardMongoClient) {
     const uri = getLeaderboardMongoUri();
+    if (!uri || uri.length < 10) {
+      throw new Error('Leaderboard database not configured. Set LEADERBOARD_MONGODB_URI on the server or configure the shared leaderboard URI.');
+    }
     leaderboardMongoClient = new MongoClient(uri);
     await leaderboardMongoClient.connect();
   }
@@ -200,16 +226,11 @@ async function getLeaderboardMongoClient(): Promise<MongoClient> {
 }
 
 async function getLeaderboard(): Promise<LeaderboardEntry[]> {
-  try {
-    const client = await getLeaderboardMongoClient();
-    const db = client.db(LEADERBOARD_DB);
-    const collection = db.collection<LeaderboardEntry>(LEADERBOARD_COLLECTION);
-    const entries = await collection.find({}).toArray();
-    return entries;
-  } catch (error) {
-    console.error('Error fetching leaderboard:', error);
-    return [];
-  }
+  const client = await getLeaderboardMongoClient();
+  const db = client.db(LEADERBOARD_DB);
+  const collection = db.collection<LeaderboardEntry>(LEADERBOARD_COLLECTION);
+  const entries = await collection.find({}).toArray();
+  return entries;
 }
 
 async function updateLeaderboardEntry(email: string, updates: Partial<LeaderboardEntry>): Promise<LeaderboardEntry> {
@@ -282,21 +303,17 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
-  optimizeDeps: {
-    // Exclude the problematic polyfill package from pre-bundling
-    exclude: ['@esbuild-plugins/node-globals-polyfill'],
-  },
   plugins: [
     react(),
     mode === "development" && componentTagger(),
-    // Polyfills for Node.js modules required by html2pptx
-    // Using minimal config to avoid Vite 7 compatibility issues
+    // Polyfills for Node.js modules required by html2pptxgenjs and MongoDB driver (browser)
     nodePolyfills({
       globals: {
         Buffer: true,
         global: true,
         process: true,
       },
+      protocolImports: true,
     }),
     {
       name: 'tooling-proxy',
@@ -520,12 +537,17 @@ export default defineConfig(({ mode }) => ({
             `;
 
             const cmd = `mongosh "${effectiveUri.replace(/"/g, '\\"')}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
+            const cmdForLog = `mongosh "${redactMongoUri(effectiveUri)}" --quiet --eval "<script checking keyVault index>"`;
+            logLabCommand('verify-index', cmdForLog, { keyVaultNamespace: keyVaultNs, MONGODB_URI: redactMongoUri(effectiveUri) });
 
             exec(cmd, (error: any, stdout: any, stderr: any) => {
               if (error) {
-                // Check for common connection errors
+                const stderrStr = (stderr || '').trim();
+                const errMsg = (error?.message || '').trim();
+                const detail = [stderrStr, errMsg].filter(Boolean).join('\n');
+                const message = `Connection Failed: Ensure IP is Whitelisted.\n\nCommand executed:\n${cmdForLog}\n\n${detail ? `Output:\n${detail}` : ''}`;
                 res.statusCode = 500;
-                res.end(JSON.stringify({ success: false, message: `Connection Failed: Ensure IP is Whitelisted.` }));
+                res.end(JSON.stringify({ success: false, message }));
                 return;
               }
 
@@ -554,6 +576,7 @@ export default defineConfig(({ mode }) => ({
 
             // 1. Resolve Alias to KeyID
             const getKeyIdCmd = `aws kms list-aliases --profile ${profileArg}${regionArg} --query "Aliases[?AliasName=='${safeAlias}'].TargetKeyId" --output text`;
+            logLabCommand('verify-policy', getKeyIdCmd, { profile, ...(regionParam ? { region: regionParam } : {}) });
 
             exec(getKeyIdCmd, (err: any, keyId: string, stderr: any) => {
               if (err || !keyId.trim()) {
@@ -728,13 +751,16 @@ export default defineConfig(({ mode }) => ({
             `;
 
             const cmd = `mongosh "${effectiveUri.replace(/"/g, '\\"')}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
+            const cmdForLog = `mongosh "${redactMongoUri(effectiveUri)}" --quiet --eval "<count ${dbName}.${collName}>"`;
+            logLabCommand('verify-keyvault-count', cmdForLog, { MONGODB_URI: redactMongoUri(effectiveUri) });
 
             exec(cmd, (error: any, stdout: any, stderr: any) => {
               if (error) {
+                const detail = [stderr, error?.message].filter(Boolean).join('\n');
                 res.statusCode = 500;
                 res.end(JSON.stringify({
                   success: false,
-                  message: `Connection Failed: ${stderr || error.message}. Ensure IP is whitelisted.`
+                  message: `Connection Failed: Ensure IP is whitelisted.\n\nCommand executed:\n${cmdForLog}\n\n${detail ? `Output:\n${detail}` : ''}`
                 }));
                 return;
               }
@@ -1385,13 +1411,14 @@ export default defineConfig(({ mode }) => ({
                   res.setHeader('Content-Type', 'application/json');
                   res.end(JSON.stringify({ entries }));
                 } catch (error: any) {
+                  console.error('[leaderboard] Error fetching leaderboard:', error?.message || error);
                   res.statusCode = 500;
-                  res.end(JSON.stringify({ success: false, message: error.message }));
+                  res.end(JSON.stringify({ success: false, message: error?.message || 'Leaderboard unavailable' }));
                 }
               })();
               return;
             }
-            
+
             if (req.method === 'POST') {
               let body = '';
               req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
@@ -1653,15 +1680,16 @@ export default defineConfig(({ mode }) => ({
                   AWS_PROFILE: profileVal,
                   ...(regionVal ? { AWS_REGION: regionVal, AWS_DEFAULT_REGION: regionVal } : {}),
                 };
+                const bashEnvSummary: Record<string, string> = { AWS_PROFILE: profileVal || 'default' };
+                if (regionVal) bashEnvSummary.AWS_REGION = regionVal;
+                logLabCommand('run-bash', script, bashEnvSummary);
+                const envLine = `[lab] Commands:\n${script}\n[lab] Env: AWS_PROFILE=${profileVal || 'default'}${regionVal ? ` AWS_REGION=${regionVal}` : ''}\n`;
                 exec(script, { timeout: 30000, maxBuffer: 1024 * 1024, env: runEnv }, (error: any, stdout: string, stderr: string) => {
                   const exitCode = error?.code ?? (error ? 1 : 0);
                   let errOut = stderr || '';
                   if (/ExpiredTokenException|security token.*expired/i.test(errOut)) {
                     errOut = errOut.trim() + EXPIRED_TOKEN_FIX;
                   }
-                  const envLine = (runEnv.AWS_PROFILE || runEnv.AWS_REGION)
-                    ? `[lab] Using AWS profile: ${runEnv.AWS_PROFILE || 'default'}${runEnv.AWS_REGION ? `, region: ${runEnv.AWS_REGION}` : ''}\n`
-                    : '';
                   const stdoutOut = envLine + (stdout || '');
                   res.setHeader('Content-Type', 'application/json');
                   res.end(JSON.stringify({
@@ -1727,15 +1755,21 @@ export default defineConfig(({ mode }) => ({
                   AWS_PROFILE: awsProfile,
                   ...(awsRegion ? { AWS_REGION: awsRegion } : {}),
                 };
+                const nodeCmd = `${process.execPath} ${tmpFile}`;
+                const envSummary: Record<string, string> = {
+                  MONGODB_URI: redactMongoUri(effectiveNodeUri),
+                  AWS_PROFILE: awsProfile || 'default',
+                  cwd,
+                };
+                if (awsRegion) envSummary.AWS_REGION = awsRegion;
+                logLabCommand('run-node', nodeCmd, envSummary);
+                const envLine = `[lab] Command: ${nodeCmd}\n[lab] Env: MONGODB_URI=${redactMongoUri(effectiveNodeUri)} AWS_PROFILE=${awsProfile || 'default'}${awsRegion ? ` AWS_REGION=${awsRegion}` : ''} cwd=${cwd}\n`;
                 execFile(process.execPath, [tmpFile], { timeout: 30000, maxBuffer: 1024 * 1024, env, cwd }, (error: any, stdout: string, stderr: string) => {
                   try { require('fs').unlinkSync(tmpFile); } catch { /* ignore */ }
                   const exitCode = error?.code ?? (error ? 1 : 0);
-                  const envLine = (awsProfile || awsRegion)
-                    ? `[lab] Using AWS profile: ${awsProfile || 'default'}${awsRegion ? `, region: ${awsRegion}` : ''}\n`
-                    : '';
                   const out = (stdout || '').trim();
                   const err = (stderr || '').trim();
-                  const outWithEnv = envLine ? envLine + (stdout || '') : (stdout || '');
+                  const outWithEnv = envLine + (stdout || '');
                   const combined = [err, out].filter(Boolean).join('\n').trim();
                   const isExpiredToken = /ExpiredTokenException|security token.*expired/i.test(combined);
                   const isSSOSessionInvalid = /CredentialsProviderError|SSO session token.*not found|SSO session.*invalid|was not found or is invalid/i.test(combined);
@@ -1808,16 +1842,18 @@ export default defineConfig(({ mode }) => ({
                 const isLocalOrDockerHost = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
                 const effectiveUri = (isLocalOrDockerHost && process.env.MONGODB_URI) ? process.env.MONGODB_URI : uri;
 
+                let mongoshLogPrefix = '';
                 const sendResult = (stdout: string, stderr: string, exitCode: number, err?: any) => {
                   const out = [stdout || '', stderr || ''].filter(Boolean).join('\n').trim() || (err?.message || '');
+                  const outWithLog = mongoshLogPrefix ? mongoshLogPrefix + '\n' + out : out;
                   res.setHeader('Content-Type', 'application/json');
                   res.end(JSON.stringify({
                     success: exitCode === 0,
-                    stdout: out,
+                    stdout: outWithLog,
                     stderr: '',
                     exitCode,
                     error: exitCode !== 0,
-                    message: err?.message || (exitCode !== 0 ? out : ''),
+                    message: err?.message || (exitCode !== 0 ? outWithLog : ''),
                   }));
                 };
 
@@ -1826,6 +1862,9 @@ export default defineConfig(({ mode }) => ({
                 // Use execFile whenever we have an absolute path (avoids node-pty posix_spawnp issues when running without Docker). Otherwise use PTY.
                 const hasAbsoluteMongoshPath = /^(\/|[A-Za-z]:[\\/])/.test(mongoshPathToUse);
                 if (nodePty && !hasAbsoluteMongoshPath) {
+                  const ptyCmd = `${mongoshPathToUse} ${redactMongoUri(effectiveUri)}`;
+                  mongoshLogPrefix = `[lab] Command: ${ptyCmd}\n[lab] Env: PATH=<with mongosh paths> (inline script)`;
+                  logLabCommand('run-mongosh', ptyCmd, { MONGODB_URI: redactMongoUri(effectiveUri) });
                   try {
                     const RUN_TIMEOUT_MS = 15000;
                     const PROMPT_WAIT_MS = 2500;
@@ -1917,6 +1956,9 @@ export default defineConfig(({ mode }) => ({
                   res.end(JSON.stringify({ success: false, stdout: '', stderr: writeErr?.message || 'Failed to write script', message: writeErr?.message }));
                   return;
                 }
+                const mongoshCmd = `${mongoshPathToUse} ${redactMongoUri(effectiveUri)} --file ${tempPath}`;
+                mongoshLogPrefix = `[lab] Command: ${mongoshCmd}\n[lab] Env: PATH=<with mongosh paths>`;
+                logLabCommand('run-mongosh', mongoshCmd, { MONGODB_URI: redactMongoUri(effectiveUri) });
                 const envWithPath = { ...process.env, PATH: (process.env.PATH || "") + MONGOSH_PATH_SUFFIX };
                 execFile(mongoshPathToUse, [effectiveUri, '--file', tempPath], { timeout: 15000, maxBuffer: 512 * 1024, env: envWithPath }, (error: any, stdout: string, stderr: string) => {
                   try { unlinkSync(tempPath); } catch (_) { /* ignore */ }
@@ -2005,6 +2047,7 @@ export default defineConfig(({ mode }) => ({
                   }));
                 }
               } else if (stats.isFile()) {
+                // Validate the path from the request (input field): basename must be a crypt shared library
                 const filename = path.basename(filePath);
                 const isCryptShared = filename === 'mongo_crypt_v1.dylib' || filename === 'mongo_crypt_v1.so' || filename.endsWith('.dylib') || filename.endsWith('.so');
                 if (isCryptShared || fileType !== 'mongoCryptShared') {
