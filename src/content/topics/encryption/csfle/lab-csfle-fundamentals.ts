@@ -10,9 +10,8 @@ import { WorkshopLabDefinition, WorkshopLabStep } from '@/types';
  * For now, we keep verification functions and complex code blocks
  * in the component, but the structure and metadata live here.
  * 
- * Source PoV Proof Exercise: Docs/pov-proof-exercises/proofs/46/README.md (CSFLE section)
  * This lab covers Client-Side Field Level Encryption fundamentals with AWS KMS.
- * Note: This lab uses AWS KMS (production approach) vs the proof exercise's local key (development approach).
+ * See Docs/Guides/Lab_1_CSFLE.md for additional reference.
  */
 export const lab1Definition: WorkshopLabDefinition = {
   id: 'lab-csfle-fundamentals',
@@ -27,7 +26,6 @@ export const lab1Definition: WorkshopLabDefinition = {
     'AWS IAM User with KMS Management Permissions',
     'Working Terminal with AWS CLI access'
   ],
-  labFolderPath: 'Docs/pov-proof-exercises/proofs/46',
   keyConcepts: [
     { term: 'Client-Side Field Level Encryption (CSFLE)', explanation: 'Encrypts sensitive fields in the application before data reaches MongoDB.' },
     { term: 'Envelope Encryption', explanation: 'CMK wraps DEKs; DEKs encrypt data. CMK never leaves KMS.' },
@@ -43,7 +41,7 @@ export const lab1Definition: WorkshopLabDefinition = {
 
       hints: [
         'Review the step instructions and narrative above for what to do.',
-        'Check the lab folder path or source proof document for detailed guidance.',
+        'Check the step instructions and Help for detailed guidance.',
         'Use "Check my progress" or verification when available to confirm completion.',
       ],      sizeHint: 'created by driver',
     },
@@ -55,8 +53,6 @@ export const lab1Definition: WorkshopLabDefinition = {
       sizeHint: 'sample PII documents',
     },
   ],
-  // Source PoV proof exercise
-  // See Docs/pov-proof-exercises/proofs/46/README.md, CSFLE section (Setup Steps 1-6, Execution)
   steps: [
     {
       id: 'lab-csfle-fundamentals-step-create-cmk',
@@ -69,7 +65,7 @@ export const lab1Definition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'csfle.create-cmk',
       preview: { type: 'encryption-demo', config: { variant: 'default' } },
-      sourceProof: 'proofs/46/README.md',
+      sourceProof: 'Docs/Guides/Lab_1_CSFLE.md',
       sourceSection: 'Setup',
       hints: [
         'The AWS KMS command to create a new key is "create-key" (no space).',
@@ -88,7 +84,7 @@ export const lab1Definition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'csfle.apply-key-policy',
       preview: { type: 'encryption-demo', config: { variant: 'default' } },
-      sourceProof: 'proofs/46/README.md',
+      sourceProof: 'Docs/Guides/Lab_1_CSFLE.md',
       sourceSection: 'Setup',
       hints: [
         'The command to get details about an existing key is "describe-key".',
@@ -108,7 +104,7 @@ export const lab1Definition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'csfle.init-keyvault',
       preview: { type: 'encryption-demo', config: { variant: 'default' } },
-      sourceProof: 'proofs/46/README.md',
+      sourceProof: 'Docs/Guides/Lab_1_CSFLE.md',
       sourceSection: 'Setup',
       hints: [
         'The database name for encryption operations is "encryption".',
@@ -128,7 +124,7 @@ export const lab1Definition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'csfle.create-deks',
       preview: { type: 'encryption-demo', config: { variant: 'csfle-toggle', fields: ['ssn'] } },
-      sourceProof: 'proofs/46/README.md',
+      sourceProof: 'Docs/Guides/Lab_1_CSFLE.md',
       sourceSection: 'Setup',
       hints: [
         'Import "ClientEncryption" from the mongodb package.',
@@ -148,7 +144,7 @@ export const lab1Definition: WorkshopLabDefinition = {
       points: 5,
       enhancementId: 'csfle.verify-dek',
       preview: { type: 'encryption-demo', config: { variant: 'default' } },
-      sourceProof: 'proofs/46/README.md',
+      sourceProof: 'Docs/Guides/Lab_1_CSFLE.md',
       sourceSection: 'Setup',
       hints: [
         'The database name for encryption key vault is "encryption".',
@@ -167,7 +163,7 @@ export const lab1Definition: WorkshopLabDefinition = {
       points: 20,
       enhancementId: 'csfle.test-csfle',
       preview: { type: 'encryption-demo', config: { variant: 'csfle-toggle', fields: ['ssn'] } },
-      sourceProof: 'proofs/46/README.md',
+      sourceProof: 'Docs/Guides/Lab_1_CSFLE.md',
       sourceSection: 'Execution',
       hints: [
         'The field in __keyVault that stores human-readable key names is "keyAltNames".',
@@ -187,7 +183,7 @@ export const lab1Definition: WorkshopLabDefinition = {
       points: 10,
       enhancementId: 'csfle.complete-application',
       preview: { type: 'encryption-demo', config: { variant: 'csfle-toggle', fields: ['ssn'] } },
-      sourceProof: 'proofs/46/README.md',
+      sourceProof: 'Docs/Guides/Lab_1_CSFLE.md',
       sourceSection: 'Execution',
       hints: [
         'Look up the DEK by keyAltName from the key vault before building the schemaMap.',

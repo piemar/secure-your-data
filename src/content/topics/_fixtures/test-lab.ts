@@ -15,9 +15,8 @@ export const labtestlab: WorkshopLabDefinition = {
   prerequisites: [], // e.g., ['lab-csfle-fundamentals']
   povCapabilities: ['ENCRYPT-FIELDS'], // PoV capabilities covered by this lab
   modes: ['demo', 'lab', 'challenge'],
-  // Source PoV proof exercise
-  // See Docs/pov-proof-exercises/proofs/46/README.md
-  // sourceProof: 'proofs/46/README.md',
+  // Optional: sourceProof for step-level reference
+  // sourceProof: 'Docs/Guides/Lab_1_CSFLE.md',
   steps: [
     {
       id: 'step-1-introduction',

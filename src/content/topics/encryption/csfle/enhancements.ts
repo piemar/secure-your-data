@@ -5,14 +5,14 @@ import type { EnhancementMetadataRegistry } from '@/labs/enhancements/schema';
  *
  * This file is the content-driven source for lab-csfle-fundamentals when rendered via LabRunner
  * (see Docs/LAB_IMPLEMENTATION_PATHS.md). Placeholders substituted at load time: ALIAS_NAME,
- * YOUR_SUFFIX, AWS_REGION, CRYPT_SHARED_LIB_PATH. Source: Docs/pov-proof-exercises/proofs/46 (CSFLE).
+ * YOUR_SUFFIX, AWS_REGION, CRYPT_SHARED_LIB_PATH. See Docs/Guides/Lab_1_CSFLE.md for reference.
  */
 
 export const enhancements: EnhancementMetadataRegistry = {
   'csfle.create-cmk': {
     id: 'csfle.create-cmk',
     povCapability: 'ENCRYPT-FIELDS',
-    sourceProof: 'proofs/46/README.md',
+    sourceProof: 'Docs/Guides/Lab_1_CSFLE.md',
     sourceSection: 'Setup',
     codeBlocks: [
       {
@@ -142,7 +142,7 @@ echo "Alias Created: ALIAS_NAME"`,
   'csfle.apply-key-policy': {
     id: 'csfle.apply-key-policy',
     povCapability: 'ENCRYPT-FIELDS',
-    sourceProof: 'proofs/46/README.md',
+    sourceProof: 'Docs/Guides/Lab_1_CSFLE.md',
     sourceSection: 'Setup',
     codeBlocks: [
       {
@@ -263,7 +263,7 @@ aws kms ______________ --key-id $KMS_KEY_ID --policy-name default --policy file:
   'csfle.init-keyvault': {
     id: 'csfle.init-keyvault',
     povCapability: 'ENCRYPT-FIELDS',
-    sourceProof: 'proofs/46/README.md',
+    sourceProof: 'Docs/Guides/Lab_1_CSFLE.md',
     sourceSection: 'Setup',
     codeBlocks: [
       {
@@ -371,7 +371,7 @@ print("Key Vault index created.");`,
   'csfle.create-deks': {
     id: 'csfle.create-deks',
     povCapability: 'ENCRYPT-FIELDS',
-    sourceProof: 'proofs/46/README.md',
+    sourceProof: 'Docs/Guides/Lab_1_CSFLE.md',
     sourceSection: 'Setup',
     codeBlocks: [
       {
@@ -497,7 +497,7 @@ run().catch(console.dir);`,
   'csfle.verify-dek': {
     id: 'csfle.verify-dek',
     povCapability: 'ENCRYPT-FIELDS',
-    sourceProof: 'proofs/46/README.md',
+    sourceProof: 'Docs/Guides/Lab_1_CSFLE.md',
     sourceSection: 'Setup',
     codeBlocks: [
       {
@@ -553,7 +553,7 @@ run().catch(console.dir);`,
   'csfle.test-csfle': {
     id: 'csfle.test-csfle',
     povCapability: 'ENCRYPT-FIELDS',
-    sourceProof: 'proofs/46/README.md',
+    sourceProof: 'Docs/Guides/Lab_1_CSFLE.md',
     sourceSection: 'Execution',
     codeBlocks: [
       {
@@ -746,7 +746,7 @@ run().catch(console.error);`,
   'csfle.complete-application': {
     id: 'csfle.complete-application',
     povCapability: 'ENCRYPT-FIELDS',
-    sourceProof: 'proofs/46/README.md',
+    sourceProof: 'Docs/Guides/Lab_1_CSFLE.md',
     sourceSection: 'Execution',
     codeBlocks: [
       {

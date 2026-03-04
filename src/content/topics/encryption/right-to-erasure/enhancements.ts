@@ -6,7 +6,7 @@ import type { EnhancementMetadataRegistry } from '@/labs/enhancements/schema';
  * Lab 3 is content-driven: rendered via LabRunner; step content (codeBlocks, skeleton,
  * inlineHints) comes from this file. See Docs/LAB_IMPLEMENTATION_PATHS.md.
  *
- * Source PoV Proof Exercise: Docs/pov-proof-exercises/proofs/46/README.md (CSFLE - advanced patterns)
+ * See Docs/Guides/Lab_3_GDPR.md for reference.
  *
  * Replace placeholders with values from the Setup Wizard:
  * - YOUR_MONGO_URI: Connection string from Lab Setup
@@ -19,7 +19,7 @@ export const enhancements: EnhancementMetadataRegistry = {
   'right-to-erasure.explicit-encryption': {
     id: 'right-to-erasure.explicit-encryption',
     povCapability: 'ENCRYPT-FIELDS',
-    sourceProof: 'proofs/46/README.md',
+    sourceProof: 'Docs/Guides/Lab_3_GDPR.md',
     sourceSection: 'CSFLE - Migration',
     codeBlocks: [
       {
@@ -223,7 +223,7 @@ run().catch(console.error);`,
   'right-to-erasure.multi-tenant-keys': {
     id: 'right-to-erasure.multi-tenant-keys',
     povCapability: 'ENCRYPT-FIELDS',
-    sourceProof: 'proofs/46/README.md',
+    sourceProof: 'Docs/Guides/Lab_3_GDPR.md',
     sourceSection: 'CSFLE - Multi-Tenant',
     codeBlocks: [
       {
@@ -362,7 +362,7 @@ CREATE POLICY tenant_isolation ON patients
   'right-to-erasure.key-rotation': {
     id: 'right-to-erasure.key-rotation',
     povCapability: 'ENCRYPT-FIELDS',
-    sourceProof: 'proofs/46/README.md',
+    sourceProof: 'Docs/Guides/Lab_3_GDPR.md',
     sourceSection: 'CSFLE - Key Rotation',
     codeBlocks: [
       {
@@ -500,7 +500,7 @@ run().catch(console.error);`,
   'right-to-erasure.rotation-readiness': {
     id: 'right-to-erasure.rotation-readiness',
     povCapability: 'ENCRYPT-FIELDS',
-    sourceProof: 'proofs/46/README.md',
+    sourceProof: 'Docs/Guides/Lab_3_GDPR.md',
     sourceSection: 'CSFLE - Infrastructure',
     codeBlocks: [
       {

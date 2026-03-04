@@ -7,8 +7,8 @@ import { WorkshopLabDefinition, WorkshopLabStep } from '@/types';
  * and equality queries on taxId. It demonstrates the differences between
  * CSFLE and QE, particularly the requirement for separate DEKs per field.
  * 
- * Source PoV Proof Exercise: Docs/pov-proof-exercises/proofs/46/README.md (Queryable Encryption section)
  * This lab covers Queryable Encryption with encryptedFields configuration.
+ * See Docs/Guides/Lab_2_QE.md for additional reference.
  */
 export const lab2Definition: WorkshopLabDefinition = {
   id: 'lab-queryable-encryption',
@@ -18,7 +18,6 @@ export const lab2Definition: WorkshopLabDefinition = {
   difficulty: 'intermediate',
   estimatedTotalTimeMinutes: 45,
   tags: ['queryable-encryption', 'qe', 'range-queries', 'security', 'hands-on'],
-  labFolderPath: 'Docs/pov-proof-exercises/proofs/46',
   keyConcepts: [
     { term: 'Queryable Encryption (QE)', explanation: 'Encrypt fields while supporting equality and range queries on ciphertext.' },
     { term: 'DEK per Field', explanation: 'QE requires a separate DEK for each encrypted field (unlike CSFLE).' },
@@ -34,7 +33,7 @@ export const lab2Definition: WorkshopLabDefinition = {
 
       hints: [
         'Review the step instructions and narrative above for what to do.',
-        'Check the lab folder path or source proof document for detailed guidance.',
+        'Check the step instructions and Help for detailed guidance.',
         'Use "Check my progress" or verification when available to confirm completion.',
       ],      sizeHint: 'QE metadata',
     },
@@ -52,8 +51,6 @@ export const lab2Definition: WorkshopLabDefinition = {
     'AWS KMS CMK created (from Lab 1)',
     'Node.js and npm installed'
   ],
-  // Source PoV proof exercise
-  // See Docs/pov-proof-exercises/proofs/46/README.md, Queryable Encryption section (Setup Step 6, Execution)
   steps: [
     {
       id: 'lab-queryable-encryption-step-create-deks',
@@ -66,7 +63,7 @@ export const lab2Definition: WorkshopLabDefinition = {
       points: 15,
       enhancementId: 'queryable-encryption.create-deks',
       preview: { type: 'encryption-demo', config: { variant: 'csfle-toggle', fields: ['salary', 'taxId'] } },
-      sourceProof: 'proofs/54/README.md',
+      sourceProof: 'Docs/Guides/Lab_2_QE.md',
       sourceSection: 'Setup',
       hints: [
         'QE requires a separate DEK for each encrypted field (unlike CSFLE which can reuse DEKs).',
@@ -85,7 +82,7 @@ export const lab2Definition: WorkshopLabDefinition = {
       points: 20,
       enhancementId: 'queryable-encryption.create-collection',
       preview: { type: 'encryption-demo', config: { variant: 'csfle-toggle', fields: ['salary', 'taxId'] } },
-      sourceProof: 'proofs/54/README.md',
+      sourceProof: 'Docs/Guides/Lab_2_QE.md',
       sourceSection: 'Setup',
       hints: [
         'Use encryptedFields instead of schemaMap for QE.',
@@ -105,7 +102,7 @@ export const lab2Definition: WorkshopLabDefinition = {
       points: 20,
       enhancementId: 'queryable-encryption.test-queries',
       preview: { type: 'encryption-demo', config: { variant: 'csfle-toggle', fields: ['salary', 'taxId'] } },
-      sourceProof: 'proofs/54/README.md',
+      sourceProof: 'Docs/Guides/Lab_2_QE.md',
       sourceSection: 'Execution',
       hints: [
         'Use the same keyAltNames and DEKs that you created in Step 1.',
@@ -124,7 +121,7 @@ export const lab2Definition: WorkshopLabDefinition = {
       points: 20,
       enhancementId: 'queryable-encryption.metadata',
       preview: { type: 'encryption-demo', config: { variant: 'csfle-toggle', fields: ['salary', 'taxId'] } },
-      sourceProof: 'proofs/54/README.md',
+      sourceProof: 'Docs/Guides/Lab_2_QE.md',
       sourceSection: 'Execution',
       hints: [
         'Use a plain MongoClient first to show that encrypted fields appear as Binary and equality queries on taxId fail.',

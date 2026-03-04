@@ -5,14 +5,14 @@ import type { EnhancementMetadataRegistry } from '@/labs/enhancements/schema';
  *
  * This file is the content-driven source for lab-queryable-encryption when rendered via LabRunner
  * (see Docs/LAB_IMPLEMENTATION_PATHS.md). Placeholders: ALIAS_NAME, YOUR_SUFFIX, AWS_REGION.
- * Source: Docs/pov-proof-exercises/proofs/54 (FLE-QUERYABLE-KMIP).
+ * See Docs/Guides/Lab_2_QE.md for reference.
  */
 
 export const enhancements: EnhancementMetadataRegistry = {
   'queryable-encryption.create-deks': {
     id: 'queryable-encryption.create-deks',
     povCapability: 'FLE-QUERYABLE-KMIP',
-    sourceProof: 'proofs/54/README.md',
+    sourceProof: 'Docs/Guides/Lab_2_QE.md',
     sourceSection: 'Setup',
     codeBlocks: [
       {
@@ -174,7 +174,7 @@ run().catch(console.error);`,
   'queryable-encryption.create-collection': {
     id: 'queryable-encryption.create-collection',
     povCapability: 'FLE-QUERYABLE-KMIP',
-    sourceProof: 'proofs/54/README.md',
+    sourceProof: 'Docs/Guides/Lab_2_QE.md',
     sourceSection: 'Setup',
     codeBlocks: [
       {
@@ -297,7 +297,7 @@ run().catch(console.error);`,
   'queryable-encryption.test-queries': {
     id: 'queryable-encryption.test-queries',
     povCapability: 'FLE-QUERYABLE-KMIP',
-    sourceProof: 'proofs/54/README.md',
+    sourceProof: 'Docs/Guides/Lab_2_QE.md',
     sourceSection: 'Execution',
     codeBlocks: [
       {
@@ -451,7 +451,7 @@ run().catch(console.error);`,
   'queryable-encryption.metadata': {
     id: 'queryable-encryption.metadata',
     povCapability: 'FLE-QUERYABLE-KMIP',
-    sourceProof: 'proofs/54/README.md',
+    sourceProof: 'Docs/Guides/Lab_2_QE.md',
     sourceSection: 'Execution',
     codeBlocks: [
       {

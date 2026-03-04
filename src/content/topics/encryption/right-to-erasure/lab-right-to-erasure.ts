@@ -6,9 +6,8 @@ import { WorkshopLabDefinition, WorkshopLabStep } from '@/types';
  * This lab teaches data migration from plaintext to encrypted state,
  * per-tenant key isolation, and GDPR right-to-erasure / crypto-shredding patterns.
  * 
- * Source PoV Proof Exercise: Docs/pov-proof-exercises/proofs/46/README.md (CSFLE section - advanced patterns)
- * This lab extends the proof exercise with production-ready patterns including migration,
- * multi-tenant key isolation, and key rotation.
+ * This lab covers migration, multi-tenant key isolation, and GDPR right-to-erasure / crypto-shredding.
+ * See Docs/Guides/Lab_3_GDPR.md for additional reference.
  */
 export const lab3Definition: WorkshopLabDefinition = {
   id: 'lab-right-to-erasure',
@@ -18,7 +17,6 @@ export const lab3Definition: WorkshopLabDefinition = {
   difficulty: 'advanced',
   estimatedTotalTimeMinutes: 45,
   tags: ['csfle', 'migration', 'gdpr', 'crypto-shredding', 'multi-tenant', 'compliance'],
-  labFolderPath: 'Docs/pov-proof-exercises/proofs/46',
   keyConcepts: [
     { term: 'Right to Erasure', explanation: 'GDPR requirement to delete personal data; crypto-shredding destroys DEK to make ciphertext unrecoverable.' },
     { term: 'Crypto-Shredding', explanation: 'Delete the DEK used to encrypt data; ciphertext becomes permanently unreadable.' },
@@ -34,7 +32,7 @@ export const lab3Definition: WorkshopLabDefinition = {
 
       hints: [
         'Review the step instructions and narrative above for what to do.',
-        'Check the lab folder path or source proof document for detailed guidance.',
+        'Check the step instructions and Help for detailed guidance.',
         'Use "Check my progress" or verification when available to confirm completion.',
       ],      sizeHint: 'pre-migration data',
     },
@@ -55,8 +53,6 @@ export const lab3Definition: WorkshopLabDefinition = {
   ],
   defaultCompetitorId: 'postgresql',
   competitorIds: ['postgresql', 'cosmosdb-vcore'],
-  // Source PoV proof exercise
-  // See Docs/pov-proof-exercises/proofs/46/README.md, CSFLE section (advanced patterns: migration, multi-tenant, key rotation)
   steps: [
     {
       id: 'lab-right-to-erasure-step-explicit-encryption',

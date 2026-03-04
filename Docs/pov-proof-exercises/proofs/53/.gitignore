@@ -1,4 +1,0 @@
-.ENV
-__pychache__
-config.py
-data_sources/Binance_BTCUSDT_minute.csv
