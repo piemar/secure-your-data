@@ -1095,7 +1095,7 @@ export function StepView({
     });
   }, [currentStep.codeBlocks, currentStepIndex, revealedAnswers, showSolution, alwaysShowSolutions]);
 
-  const runAllDisabled = isRunning || !currentStep.codeBlocks?.length || hasUnresolvedHints;
+  const runAllDisabled = false;
   const runAllTooltip = hasUnresolvedHints
     ? 'Fill in or reveal all blanks in the code before running.'
     : 'Run all';
