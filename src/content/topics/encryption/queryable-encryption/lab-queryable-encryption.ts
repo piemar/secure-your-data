@@ -53,48 +53,28 @@ export const lab2Definition: WorkshopLabDefinition = {
   ],
   steps: [
     {
-      id: 'lab-queryable-encryption-step-create-deks',
-      title: 'Step 1: Create Data Encryption Keys (DEKs) for QE',
-      narrative: 'Before defining encrypted fields, you need to create Data Encryption Keys (DEKs) for each field you want to encrypt. Unlike CSFLE, QE requires a separate DEK for each encrypted field. Create DEKs for both salary (range queries) and taxId (equality queries). We will use keyAltNames to reference them, making the code more maintainable.',
-      instructions: 'Create a Node.js script (createQEDeks.cjs) that creates two DEKs: one for salary, one for taxId, with keyAltNames "qe-salary-dek" and "qe-taxid-dek".\nUse Run all or Run selection in the editor to run the script.\nClick Check progress or Next to verify.',
-      estimatedTimeMinutes: 10,
-      modes: ['lab', 'challenge'],
-      verificationId: 'qe.verifyQEDEKs',
-      points: 15,
-      enhancementId: 'queryable-encryption.create-deks',
-      preview: { type: 'encryption-demo', config: { variant: 'csfle-toggle', fields: ['salary', 'taxId'] } },
-      sourceProof: 'Docs/Guides/Lab_2_QE.md',
-      sourceSection: 'Setup',
-      hints: [
-        'QE requires a separate DEK for each encrypted field (unlike CSFLE which can reuse DEKs).',
-        'Use keyAltNames to make your code more maintainable than hardcoding UUIDs.',
-        'The ClientEncryption.createDataKey() method is the same as CSFLE, but you need one per field.'
-      ]
-    },
-    {
-      id: 'lab-queryable-encryption-step-create-collection',
-      title: 'Step 2: Create QE Collection with Encrypted Fields',
-      narrative: 'Create the collection with the encryptedFields configuration. This single step defines which fields to encrypt AND creates the collection. MongoDB will automatically create the system catalog (.esc) and context cache (.ecoc) collections. We use keyAltNames to look up the DEKs, making the code cleaner and more maintainable.',
-      instructions: 'Create the collection with encryptedFields configuration (salary and taxId with their query types).\nUse Run all or Run selection in the editor to run the script.\nClick Check progress or Next to verify.',
+      id: 'lab-queryable-encryption-step-create-encrypted-collection',
+      title: 'Step 1: Create QE collection with automatic DEK creation',
+      narrative: 'The driver provides createEncryptedCollection(), which creates DEKs for each encrypted field that does not have a keyId and then creates the collection in one call. You do not need to call createDataKey per field manually. Define encryptedFields for salary (range) and taxId (equality) without keyId; the helper generates the keys and creates hr.employees.',
+      instructions: 'Write a script that uses ClientEncryption.createEncryptedCollection() with an encryptedFields definition (salary and taxId, with range and equality query types). Drop hr.employees first if it exists. Run the script and add keyAltNames (qe-salary-dek, qe-taxid-dek) so later steps can look up DEKs by name.\nUse Run all or Run selection in the editor to run the script.\nClick Check progress or Next to verify.',
       estimatedTimeMinutes: 15,
       modes: ['lab', 'challenge'],
       verificationId: 'qe.verifyQECollection',
-      points: 20,
-      enhancementId: 'queryable-encryption.create-collection',
+      points: 25,
+      enhancementId: 'queryable-encryption.create-encrypted-collection',
       preview: { type: 'encryption-demo', config: { variant: 'csfle-toggle', fields: ['salary', 'taxId'] } },
       sourceProof: 'Docs/Guides/Lab_2_QE.md',
       sourceSection: 'Setup',
       hints: [
-        'Use encryptedFields instead of schemaMap for QE.',
-        'MongoDB automatically creates metadata collections (.esc, .ecoc).',
-        'Reference DEKs using keyAltNames, not UUIDs.',
-        'You can only create a collection with encryptedFields ONCE - drop it first if it exists.'
+        'Use createEncryptedCollection(db, "employees", { createCollectionOptions: { encryptedFields }, provider: "aws", masterKey: { key, region } }).',
+        'Define encryptedFields.fields without keyId so the driver creates DEKs automatically.',
+        'Drop the collection first if it already exists so the script can be re-run.'
       ]
     },
     {
       id: 'lab-queryable-encryption-step-test-queries',
-      title: 'Step 3: Insert Test Data with Encrypted Fields',
-      narrative: 'Before you can test queries, you need to insert documents with encrypted fields. Use a QE-enabled client connection to insert data so that fields defined in encryptedFields are automatically encrypted.',
+      title: 'Step 2: Insert Test Data with Encrypted Fields',
+      narrative: 'Before you can test queries, you need to insert documents with encrypted fields. Use a QE-enabled client connection to insert data so that fields defined in encryptedFields are automatically encrypted. The DEKs created in Step 1 (with keyAltNames qe-salary-dek and qe-taxid-dek) are used by the client.',
       instructions: 'Create a QE-enabled client with autoEncryption and encryptedFieldsMap.\nInsert at least 3–5 test documents into hr.employees with different salary and taxId values.\nUse Run all or Run selection in the editor to run the insert script.\nClick Check progress or Next to verify.',
       estimatedTimeMinutes: 12,
       modes: ['demo', 'lab', 'challenge'],
@@ -105,14 +85,14 @@ export const lab2Definition: WorkshopLabDefinition = {
       sourceProof: 'Docs/Guides/Lab_2_QE.md',
       sourceSection: 'Execution',
       hints: [
-        'Use the same keyAltNames and DEKs that you created in Step 1.',
+        'Use the keyAltNames (qe-salary-dek, qe-taxid-dek) from the collection created in Step 1.',
         'Configure encryptedFieldsMap on the client so that salary and taxId are encrypted automatically.',
-        'Insert multiple documents so you can later demonstrate equality and (future) range queries.'
+        'Insert multiple documents so you can later demonstrate equality and range queries.'
       ]
     },
     {
       id: 'lab-queryable-encryption-step-metadata',
-      title: 'Step 4: Query Encrypted Data - QE vs Non-QE Client Comparison',
+      title: 'Step 3: Query Encrypted Data - QE vs Non-QE Client Comparison',
       narrative: 'Demonstrate the power of Queryable Encryption by comparing queries with a QE-enabled client versus a standard client. The standard client only sees Binary ciphertext, while the QE client transparently decrypts and allows equality queries on encrypted fields.',
       instructions: 'Write a script that queries hr.employees with a standard MongoClient (Binary ciphertext, failed equality), then with a QE-enabled client (successful equality on salary and taxId).\nUse Run all or Run selection in the editor to run the script.\nClick Check progress or Next to verify.',
       estimatedTimeMinutes: 15,
