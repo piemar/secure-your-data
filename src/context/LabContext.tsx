@@ -198,7 +198,7 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, [mongoUri, runningInContainer]);
 
     const resetProgress = () => {
-        setMongoUri('');
+        // Keep MongoDB URI so user does not have to re-enter connection string after reset
         setAwsCreds({ awsAccessKeyId: '', awsSecretAccessKey: '', awsKeyArn: '', awsRegion: 'eu-central-1' });
         setCurrentScore(0);
         setCompletedSteps([]);

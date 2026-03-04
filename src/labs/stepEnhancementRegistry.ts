@@ -98,6 +98,8 @@ function substitutePlaceholders(text: string | undefined): string | undefined {
   const awsRegion = getLabAwsRegion();
   const cryptPath = getCryptSharedLibPath();
   const prefix = getLabCollectionPrefix();
+  const medicalDb = 'medical_' + suffix;
+  const hrDb = 'hr_' + suffix;
   return text
     .replace(/\bYOUR_SUFFIX\b/g, suffix)
     .replace(/\bALIAS_NAME\b/g, aliasName)
@@ -106,7 +108,26 @@ function substitutePlaceholders(text: string | undefined): string | undefined {
     .replace(/encryption\.__keyVault/g, prefix + '.__keyVault')
     .replace(/\.db\("encryption"\)/g, '.db("' + prefix + '")')
     .replace(/getSiblingDB\("encryption"\)/g, 'getSiblingDB("' + prefix + '")')
-    .replace(/getSiblingDB\('encryption'\)/g, "getSiblingDB('" + prefix + "')");
+    .replace(/getSiblingDB\('encryption'\)/g, "getSiblingDB('" + prefix + "')")
+    .replace(/\.db\("medical"\)/g, '.db("' + medicalDb + '")')
+    .replace(/\.db\('medical'\)/g, ".db('" + medicalDb + "')")
+    .replace(/"medical\./g, '"' + medicalDb + '.')
+    .replace(/'medical\./g, "'" + medicalDb + '.')
+    .replace(/\.db\("hr"\)/g, '.db("' + hrDb + '")')
+    .replace(/\.db\('hr'\)/g, ".db('" + hrDb + "')")
+    .replace(/"hr\./g, '"' + hrDb + '.')
+    .replace(/'hr\./g, "'" + hrDb + '.');
+}
+
+/** Map hint answers that are lab DB names to per-user substituted values (so skeleton + solution show correct namespace). */
+function substituteHintAnswer(answer: string | undefined): string | undefined {
+  if (answer == null) return answer;
+  const suffix = getLabUserSuffix();
+  const prefix = getLabCollectionPrefix();
+  if (answer === 'encryption') return prefix;
+  if (answer === 'medical') return 'medical_' + suffix;
+  if (answer === 'hr') return 'hr_' + suffix;
+  return answer;
 }
 
 /**
@@ -121,7 +142,10 @@ function buildEnhancementFromMetadata(metadata: any): Partial<Step> {
       skeleton: substitutePlaceholders(block.skeleton),
       challengeSkeleton: substitutePlaceholders(block.challengeSkeleton),
       expertSkeleton: substitutePlaceholders(block.expertSkeleton),
-      inlineHints: block.inlineHints,
+      inlineHints: block.inlineHints?.map((h: { line?: number; blankText?: string; hint?: string; answer?: string }) => ({
+        ...h,
+        answer: substituteHintAnswer(h.answer) ?? h.answer,
+      })),
       competitorEquivalents: block.competitorEquivalents,
     })),
     tips: metadata.tips,

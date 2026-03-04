@@ -22,10 +22,11 @@ async function cleanupMongoDBCollections(uri: string): Promise<CleanupResult[]> 
     return results;
   }
   try {
+    const suffix = getLabUserSuffix();
     const res = await fetch('/api/cleanup-lab-collections', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uri: uri.trim() }),
+      body: JSON.stringify({ uri: uri.trim(), ...(suffix ? { suffix } : {}) }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -97,6 +98,12 @@ function getStoredMongoUri(): string {
     ? `lab_mongo_uri_${email.replace(/[^a-zA-Z0-9_.-]/g, '_')}`
     : 'lab_mongo_uri';
   return localStorage.getItem(key) || localStorage.getItem('lab_mongo_uri') || '';
+}
+
+/** Per-user suffix for lab DB names (same as stepEnhancementRegistry). Used so reset deletes this user's encryption_*, medical_*, hr_*. */
+function getLabUserSuffix(): string {
+  if (typeof window === 'undefined' || !window.localStorage) return '';
+  return window.localStorage.getItem('lab_user_suffix') || window.localStorage.getItem('userEmail')?.split('@')[0] || '';
 }
 
 /**

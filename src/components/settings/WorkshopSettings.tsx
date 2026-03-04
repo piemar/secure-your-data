@@ -253,6 +253,22 @@ export const WorkshopSettings: React.FC = () => {
               onCheckedChange={handleToggleLabs}
             />
           </div>
+          <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border mt-3">
+            <div>
+              <p className="font-medium">Show competitor comparisons</p>
+              <p className="text-sm text-muted-foreground">
+                Show the right-hand panel in lab steps: Compete (e.g. PostgreSQL comparison) and Preview. When off, only the editor and console are shown. Off by default.
+              </p>
+            </div>
+            <Switch
+              checked={session?.showCompetitorComparisons === true}
+              onCheckedChange={async (checked) => {
+                await updateWorkshopSession({ showCompetitorComparisons: checked });
+                setSession(getWorkshopSession());
+                toast.success(checked ? 'Competitor comparisons visible in labs' : 'Competitor comparisons hidden');
+              }}
+            />
+          </div>
           <p className="text-xs text-muted-foreground mt-2">
             Moderators always have access to labs regardless of this setting.
           </p>

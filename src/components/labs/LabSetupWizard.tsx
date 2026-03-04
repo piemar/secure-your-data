@@ -12,6 +12,8 @@ import { validatorUtils } from '@/utils/validatorUtils';
 import { getKeyVaultNamespace } from '@/labs/stepEnhancementRegistry';
 import { toast } from 'sonner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
 import { ArchitectureDiagram } from '@/components/workshop/ArchitectureDiagram';
 import { LabEnvironmentDiagram } from './LabEnvironmentDiagram';
@@ -72,6 +74,9 @@ export const LabSetupWizard: React.FC = () => {
     const [mongoshPathInput, setMongoshPathInput] = useState(() => localStorage.getItem('workshop_mongosh_path') || '');
     const [awsProfileInput, setAwsProfileInput] = useState(() => localStorage.getItem('lab_aws_profile') || '');
     const [awsRegionInput, setAwsRegionInput] = useState(() => localStorage.getItem('lab_aws_region') || '');
+    const [awsProfilesList, setAwsProfilesList] = useState<string[]>([]);
+    const [awsProfilesLoading, setAwsProfilesLoading] = useState(false);
+    const [awsTestLoading, setAwsTestLoading] = useState(false);
 
     // Get attendee name from localStorage (set during registration)
     const attendeeName = localStorage.getItem('workshop_attendee_name') || '';
@@ -420,11 +425,37 @@ export const LabSetupWizard: React.FC = () => {
         <div className="space-y-3 mt-1">
           <div>
             <p className="text-xs text-muted-foreground mb-1">
-              For the simplest experience, create or clone your SSO profile as <strong>default</strong> in <code className="bg-muted px-1 rounded">~/.aws/config</code> and leave this field empty. If override doesn&apos;t work: clone your SSO profile as <strong>default</strong> in <code className="bg-muted px-1 rounded">~/.aws/config</code>, then leave the profile override empty.
+              For the simplest experience, create or clone your SSO profile as <strong>default</strong> in <code className="bg-muted px-1 rounded">~/.aws/config</code> and leave this field empty. Or choose a profile from your config, or type any profile name.
             </p>
-            <div className="flex gap-2">
-              <Input placeholder="Leave empty for default, or enter profile name" value={awsProfileInput} onChange={(e) => setAwsProfileInput(e.target.value)} onBlur={() => { const v = awsProfileInput.trim(); v ? localStorage.setItem('lab_aws_profile', v) : localStorage.removeItem('lab_aws_profile'); }} className="font-mono text-xs" />
+            <div className="flex flex-wrap items-center gap-2">
+              <Input placeholder="Leave empty for default, or enter profile name" value={awsProfileInput} onChange={(e) => setAwsProfileInput(e.target.value)} onBlur={() => { const v = awsProfileInput.trim(); v ? localStorage.setItem('lab_aws_profile', v) : localStorage.removeItem('lab_aws_profile'); }} className="font-mono text-xs w-[200px] min-w-0" />
+              <Popover onOpenChange={(open) => { if (open && awsProfilesList.length === 0) { setAwsProfilesLoading(true); validatorUtils.listAwsProfiles().then((r) => { setAwsProfilesList(r.profiles || []); setAwsProfilesLoading(false); if (!r.success && r.message) toast.error(r.message); }); } }}>
+                <PopoverTrigger asChild>
+                  <Button size="sm" variant="outline" disabled={awsProfilesLoading} className="gap-1">
+                    {awsProfilesLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <ChevronDown className="w-3 h-3" />}
+                    Choose from config
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[240px] p-0" align="start">
+                  <Command>
+                    <CommandList>
+                      <CommandEmpty>No profiles found. Run aws configure list-profiles locally to verify.</CommandEmpty>
+                      <CommandGroup>
+                        {awsProfilesList.map((p) => (
+                          <CommandItem key={p} value={p} onSelect={() => { setAwsProfileInput(p); localStorage.setItem('lab_aws_profile', p); toast.success(`Using profile: ${p}`); }}>
+                            {p}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
               <Button size="sm" variant="secondary" onClick={() => { const v = awsProfileInput.trim(); if (v) { localStorage.setItem('lab_aws_profile', v); toast.success(`Using AWS profile: ${v}`); } else { localStorage.removeItem('lab_aws_profile'); toast.success('Cleared.'); } }}>Save</Button>
+              <Button size="sm" variant="secondary" disabled={awsTestLoading} onClick={async () => { setAwsTestLoading(true); const profile = awsProfileInput.trim() || undefined; const result = await validatorUtils.testAwsAuth(profile); setAwsTestLoading(false); if (result.success) toast.success(result.message); else toast.error(result.message); }} className="gap-1">
+                {awsTestLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                Test AWS
+              </Button>
             </div>
           </div>
           <div>
@@ -438,7 +469,7 @@ export const LabSetupWizard: React.FC = () => {
           </div>
         </div>
       ),
-    }), [localUri, uriFromWorkshop, hasAtlasConnection, cryptSharedManualPath, isVerifyingCryptPath, mongoshPathInput, awsProfileInput, awsRegionInput, verifiedTools, prereqResults]);
+    }), [localUri, uriFromWorkshop, hasAtlasConnection, cryptSharedManualPath, isVerifyingCryptPath, mongoshPathInput, awsProfileInput, awsRegionInput, awsProfilesList, awsProfilesLoading, awsTestLoading, verifiedTools, prereqResults]);
 
     if (phase === 'ready') {
         return (

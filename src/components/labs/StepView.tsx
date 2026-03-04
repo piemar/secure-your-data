@@ -35,6 +35,7 @@ import {
   storedToLogEntries,
 } from '@/services/labWorkspaceStorage';
 import { getVerificationService, type VerificationId } from '@/services/verificationService';
+import { getWorkshopSession } from '@/utils/workshopUtils';
 
 interface CodeBlock {
   filename: string;
@@ -629,7 +630,10 @@ export function StepView({
   const { userEmail, userSuffix, subtractPoints } = useLab();
   const { resolvedTheme } = useTheme();
   const [helpOpen, setHelpOpen] = useState(false);
-  const [previewPanelTab, setPreviewPanelTab] = useState<'preview' | 'compete'>('compete');
+  const showCompetitorComparisons = getWorkshopSession()?.showCompetitorComparisons === true;
+  const [previewPanelTab, setPreviewPanelTab] = useState<'preview' | 'compete'>(() =>
+    getWorkshopSession()?.showCompetitorComparisons ? 'compete' : 'preview'
+  );
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState<string>('code');
   const [editorPanelCollapsed, setEditorPanelCollapsed] = useState(false);
@@ -1105,6 +1109,7 @@ export function StepView({
     return Array.from(ids);
   }, [currentStep.codeBlocks]);
   const showCompetitorPanel =
+    showCompetitorComparisons &&
     currentMode === 'demo' &&
     !!isModerator &&
     stepCompetitorIds.length > 0;
@@ -1216,14 +1221,20 @@ export function StepView({
   }, [subtractPoints, revealedAnswers]);
 
 
-  // Helper to reveal full solution
-  const revealSolution = useCallback((blockKey: string, tier: SkeletonTier) => {
-    setShowSolution(prev => ({ ...prev, [blockKey]: true }));
+  // Helper to reveal full solution (single block or all blocks in a node-mongosh slot so Run enables and no hint markers)
+  const revealSolution = useCallback((blockKeyOrKeys: string | string[], tier: SkeletonTier) => {
+    const keys = Array.isArray(blockKeyOrKeys) ? blockKeyOrKeys : [blockKeyOrKeys];
+    setShowSolution(prev => {
+      const next = { ...prev };
+      keys.forEach(k => { next[k] = true; });
+      return next;
+    });
     const penalty = getSolutionPenalty(tier);
-    setPointsDeducted(prev => ({
-      ...prev,
-      [blockKey]: (prev[blockKey] || 0) + penalty
-    }));
+    setPointsDeducted(prev => {
+      const next = { ...prev };
+      keys.forEach(k => { next[k] = (next[k] || 0) + penalty; });
+      return next;
+    });
     subtractPoints(penalty);
   }, [subtractPoints]);
 
@@ -1260,17 +1271,30 @@ export function StepView({
         const verificationService = getVerificationService();
         const suffix = userSuffix || (typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_user_suffix') || '') : '') || 'default';
         const storedAlias = typeof localStorage !== 'undefined' ? localStorage.getItem('lab_kms_alias') || undefined : undefined;
+        const awsProfile = typeof localStorage !== 'undefined' ? localStorage.getItem('lab_aws_profile') || undefined : undefined;
+        const awsRegion = typeof localStorage !== 'undefined' ? localStorage.getItem('lab_aws_region') || undefined : undefined;
+        const keyVaultDb = suffix ? `encryption_${suffix}` : undefined;
         const ctx = {
           mongoUri: labMongoUri || (typeof localStorage !== 'undefined' ? localStorage.getItem('lab_mongo_uri') || undefined : undefined),
           alias: storedAlias || (suffix ? `alias/mongodb-lab-key-${suffix}` : undefined),
-          profile: typeof localStorage !== 'undefined' ? localStorage.getItem('lab_aws_profile') || undefined : undefined,
+          profile: awsProfile,
+          region: awsRegion,
           keyAltName: `user-${suffix}-ssn-key`,
+          keyVaultDb,
+          db: suffix ? `hr_${suffix}` : undefined,
+          coll: 'employees',
+          medicalDb: suffix ? `medical_${suffix}` : undefined,
           expectedCount: 1,
         };
         const result = await verificationService.verify(currentStep.verificationId as VerificationId, ctx);
         success = result.success;
         summary = result.message;
-        output = result.message;
+        const contextLine = [
+          keyVaultDb ? `Key vault: ${keyVaultDb}` : null,
+          awsProfile ? `AWS profile: ${awsProfile}` : null,
+          awsRegion ? `region: ${awsRegion}` : null,
+        ].filter(Boolean).join(' | ');
+        output = contextLine ? `[lab] ${contextLine}\n${result.message}` : result.message;
       } else {
         success = true;
         summary = 'No verification configured for this step.';
@@ -1364,15 +1388,16 @@ export function StepView({
               const res = await fetch('/api/run-bash', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ commands: beforeNode, ...(awsProfile && { profile: awsProfile }) }),
+                body: JSON.stringify({ commands: beforeNode, profile: awsProfile || 'default', ...(labAwsRegion && { region: labAwsRegion }) }),
               });
               const data = await res.json();
               outputs.push(formatBashRunOutput(data));
             }
+            const labAwsProfile = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
             const res = await fetch('/api/run-node', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ code: editorCode, uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }) }),
+              body: JSON.stringify({ code: editorCode, uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }), profile: labAwsProfile || 'default' }),
             });
             const data = await res.json();
             const stderr = (data.stderr || '').trim();
@@ -1393,7 +1418,7 @@ export function StepView({
             const res = await fetch('/api/run-bash', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ commands, ...(awsProfile && { profile: awsProfile }) }),
+              body: JSON.stringify({ commands, profile: awsProfile || 'default', ...(labAwsRegion && { region: labAwsRegion }) }),
             });
             const data = await res.json();
             const out = formatBashRunOutput(data);
@@ -1429,10 +1454,11 @@ export function StepView({
       }
       // 4) Node-like JavaScript → run-node (optional URI for MONGODB_URI env)
       else if ((language === 'javascript' || language === 'typescript') && code.trim().length > 0) {
+        const labAwsProfile = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
         const res = await fetch('/api/run-node', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code, uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }) }),
+          body: JSON.stringify({ code, uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }), profile: labAwsProfile || 'default' }),
         });
         const data = await res.json();
         const stderr = (data.stderr || '').trim();
@@ -1539,11 +1565,12 @@ export function StepView({
               const beforeNode = commands.slice(0, nodeCmdIndex);
               if (beforeNode.length > 0) {
                 const awsProfile = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
-                const res = await fetch('/api/run-bash', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ commands: beforeNode, ...(awsProfile && { profile: awsProfile }) }) });
+                const res = await fetch('/api/run-bash', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ commands: beforeNode, profile: awsProfile || 'default', ...(labAwsRegion && { region: labAwsRegion }) }) });
                 const data = await res.json();
                 outputs.push(formatBashRunOutput(data));
               }
-              const res = await fetch('/api/run-node', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: editorCode, uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }) }) });
+              const labAwsProfileRun = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
+              const res = await fetch('/api/run-node', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: editorCode, uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }), profile: labAwsProfileRun || 'default' }) });
               const data = await res.json();
               const out = [(data.stderr || '').trim(), (data.stdout || '').trim()].filter(Boolean).join('\n') || data.message || '(no output)';
               outputs.push(out);
@@ -1551,13 +1578,14 @@ export function StepView({
               lastSummary = data.success ? 'Node completed' : (data.message?.split('\n')[0] || 'Node failed');
             } else {
               const awsProfile = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
-              const res = await fetch('/api/run-bash', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ commands, ...(awsProfile && { profile: awsProfile }) }) });
+              const res = await fetch('/api/run-bash', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ commands, profile: awsProfile || 'default', ...(labAwsRegion && { region: labAwsRegion }) }) });
               const data = await res.json();
               outputs.push(formatBashRunOutput(data));
             }
           }
         } else if ((language === 'javascript' || language === 'typescript') && code.trim().length > 0) {
-          const res = await fetch('/api/run-node', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }) }) });
+          const labAwsProfileRun = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
+          const res = await fetch('/api/run-node', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }), profile: labAwsProfileRun || 'default' }) });
           const data = await res.json();
           const out = [(data.stderr || '').trim(), (data.stdout || '').trim()].filter(Boolean).join('\n') || data.message || '(no output)';
           outputs.push(out);
@@ -1786,7 +1814,7 @@ export function StepView({
                                 </Button>
                               </TooltipTrigger><TooltipContent side="bottom">Reset step</TooltipContent></Tooltip></TooltipProvider>
                               {firstHasSkeleton && !firstSolutionRevealed && (
-                                <Button variant="ghost" size="sm" onClick={() => revealSolution(firstKey, firstTier)} className="gap-0.5 h-3.5 text-[8px] px-1 text-destructive hover:text-destructive hover:bg-destructive/10">
+                                <Button variant="ghost" size="sm" onClick={() => revealSolution(firstIsNodeMongosh ? [`${currentStepIndex}-${firstSlot.nodeIndex}`, `${currentStepIndex}-${firstSlot.mongoshIndex}`] : firstKey, firstTier)} className="gap-0.5 h-3.5 text-[8px] px-1 text-destructive hover:text-destructive hover:bg-destructive/10">
                                   <Eye className="w-2 h-2" /><span className="hidden sm:inline">Solution</span><span>(-{firstPenalty})</span>
                                 </Button>
                               )}
@@ -1866,7 +1894,7 @@ export function StepView({
                                 <Button variant="ghost" size="sm" onClick={() => stepToolbarRef?.current?.reset()} className="h-3.5 gap-0.5 px-1 text-[8px]" title="Reset step"><RotateCcw className="w-2 h-2" /><span className="hidden sm:inline">Reset</span></Button>
                               </TooltipTrigger><TooltipContent side="bottom">Reset step</TooltipContent></Tooltip></TooltipProvider>
                               {hasSkeleton && !isSolutionRevealed && (
-                                <Button variant="ghost" size="sm" onClick={() => revealSolution(activeKey, tier)} className="gap-0.5 h-3.5 text-[8px] px-1 text-destructive hover:text-destructive hover:bg-destructive/10">
+                                <Button variant="ghost" size="sm" onClick={() => revealSolution([nodeKey, mongoshKey], tier)} className="gap-0.5 h-3.5 text-[8px] px-1 text-destructive hover:text-destructive hover:bg-destructive/10">
                                   <Eye className="w-2 h-2" /><span className="hidden sm:inline">Solution</span><span>(-{solutionPenalty})</span>
                                 </Button>
                               )}
@@ -2238,118 +2266,121 @@ export function StepView({
                 </ResizablePanelGroup>
               </ResizablePanel>
 
-              <ResizableHandle withHandle className="bg-border hover:bg-primary/50 transition-colors" />
-
-              {/* Preview panel: right column — starts narrow so editor/console get most space */}
-              <ResizablePanel defaultSize={20} minSize={15}>
-                <div className="h-full flex flex-col bg-background/95 border-l border-border">
-                  <div className="flex-shrink-0 flex items-center gap-1.5 px-1.5 py-0.5 border border-border border-b bg-muted/40">
-                    <Tabs value={previewPanelTab} onValueChange={(v) => setPreviewPanelTab(v as 'preview' | 'compete')} className="flex-shrink-0">
-                      <TabsList className="bg-transparent h-5 p-0 gap-0">
-                        <TabsTrigger value="compete" className="text-[9px] h-4 px-1.5 data-[state=active]:bg-muted">Compete</TabsTrigger>
-                        <TabsTrigger value="preview" className="text-[9px] h-4 px-1.5 data-[state=active]:bg-muted">Preview</TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                    {atlasCapability && (
-                      <div className="flex-1 flex justify-center min-w-0">
-                        <span className="text-[9px] font-medium text-primary truncate" title={atlasCapability}>{atlasCapability}</span>
-                      </div>
-                    )}
-                    {previewPanelTab === 'preview' && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={() => setPreviewRefreshKey((k) => k + 1)} className="h-4 w-4">
-                              <RefreshCw className="w-2.5 h-2.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">Refresh preview</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                  </div>
-                  <div className="flex-1 overflow-auto min-h-0 px-2 py-2">
-                    {previewPanelTab === 'compete' ? (
-                      stepCompetitorIds.length > 0 ? (
-                        <div className="flex flex-col h-full min-h-0 gap-2 overflow-auto">
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-[10px] text-muted-foreground">Competitor:</span>
-                            <Select value={effectiveCompetitorId ?? ''} onValueChange={(v) => setSelectedCompetitorId(v)}>
-                              <SelectTrigger className="h-6 text-[10px] w-[140px]">
-                                <SelectValue placeholder="Select…" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {stepCompetitorIds.map((id) => (
-                                  <SelectItem key={id} value={id}>
-                                    {getCompetitorProductLabel(id)}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+              {showCompetitorComparisons && (
+                <>
+                  <ResizableHandle withHandle className="bg-border hover:bg-primary/50 transition-colors" />
+                  {/* Preview panel: right column — only when moderator enables competitor comparisons */}
+                  <ResizablePanel defaultSize={20} minSize={15}>
+                    <div className="h-full flex flex-col bg-background/95 border-l border-border">
+                      <div className="flex-shrink-0 flex items-center gap-1.5 px-1.5 py-0.5 border border-border border-b bg-muted/40">
+                        <Tabs value={previewPanelTab} onValueChange={(v) => setPreviewPanelTab(v as 'preview' | 'compete')} className="flex-shrink-0">
+                          <TabsList className="bg-transparent h-5 p-0 gap-0">
+                            <TabsTrigger value="compete" className="text-[9px] h-4 px-1.5 data-[state=active]:bg-muted">Compete</TabsTrigger>
+                            <TabsTrigger value="preview" className="text-[9px] h-4 px-1.5 data-[state=active]:bg-muted">Preview</TabsTrigger>
+                          </TabsList>
+                        </Tabs>
+                        {atlasCapability && (
+                          <div className="flex-1 flex justify-center min-w-0">
+                            <span className="text-[9px] font-medium text-primary truncate" title={atlasCapability}>{atlasCapability}</span>
                           </div>
-                          {competitorBlockForSelected && (
-                            <>
-                              <div className="flex-shrink-0">
-                                <p className="text-[10px] font-medium text-muted-foreground mb-1">How {getCompetitorProductLabel(effectiveCompetitorId ?? '')} does it (prefer code)</p>
-                                <div className="rounded border border-border overflow-hidden min-h-[120px] flex-1">
-                                  <Editor
-                                    height="180"
-                                    theme={getLabEditorTheme(resolvedTheme)}
-                                    beforeMount={defineLabDarkTheme}
-                                    language={competitorBlockForSelected.equiv.language}
-                                    value={competitorBlockForSelected.equiv.code}
-                                    options={getReadOnlyLabOptions()}
-                                  />
-                                </div>
-                              </div>
-                              <div className="flex-shrink-0 rounded border border-amber-500/20 bg-amber-500/5 p-2 space-y-2">
-                                <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">Challenges vs MongoDB</p>
-                                {competitorBlockForSelected.equiv.workaroundNote && (
-                                  <p className="text-[10px] text-muted-foreground leading-snug">{competitorBlockForSelected.equiv.workaroundNote}</p>
-                                )}
-                                {competitorBlockForSelected.equiv.challenges && competitorBlockForSelected.equiv.challenges.length > 0 && (
-                                  <ul className="list-disc list-inside text-[10px] text-muted-foreground space-y-0.5">
-                                    {competitorBlockForSelected.equiv.challenges.map((c, i) => (
-                                      <li key={i}>{c}</li>
+                        )}
+                        {previewPanelTab === 'preview' && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={() => setPreviewRefreshKey((k) => k + 1)} className="h-4 w-4">
+                                  <RefreshCw className="w-2.5 h-2.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">Refresh preview</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
+                      <div className="flex-1 overflow-auto min-h-0 px-2 py-2">
+                        {previewPanelTab === 'compete' ? (
+                          stepCompetitorIds.length > 0 ? (
+                            <div className="flex flex-col h-full min-h-0 gap-2 overflow-auto">
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className="text-[10px] text-muted-foreground">Competitor:</span>
+                                <Select value={effectiveCompetitorId ?? ''} onValueChange={(v) => setSelectedCompetitorId(v)}>
+                                  <SelectTrigger className="h-6 text-[10px] w-[140px]">
+                                    <SelectValue placeholder="Select…" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {stepCompetitorIds.map((id) => (
+                                      <SelectItem key={id} value={id}>
+                                        {getCompetitorProductLabel(id)}
+                                      </SelectItem>
                                     ))}
-                                  </ul>
-                                )}
-                                {competitorBlockForSelected.equiv.comparisonSummary && (
-                                  <div className="text-[10px] text-muted-foreground leading-snug whitespace-pre-wrap border-t border-amber-500/20 pt-1.5 mt-1.5">
-                                    {competitorBlockForSelected.equiv.comparisonSummary}
-                                  </div>
-                                )}
-                                {!competitorBlockForSelected.equiv.workaroundNote &&
-                                  (!competitorBlockForSelected.equiv.challenges || competitorBlockForSelected.equiv.challenges.length === 0) &&
-                                  !competitorBlockForSelected.equiv.comparisonSummary && (
-                                    <p className="text-[10px] text-muted-foreground italic">Compare with the MongoDB approach in the editor — native driver support, no workarounds.</p>
-                                  )}
+                                  </SelectContent>
+                                </Select>
                               </div>
-                            </>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="h-full min-h-[80px] flex items-center justify-center text-center text-muted-foreground text-[10px]">No competitor comparison for this step.</div>
-                      )
-                    ) : previewPanelTab === 'preview' && currentStep.preview ? (
-                      <div key={previewRefreshKey} className="h-full min-h-0">
-                        <GenericLabPreview
-                          preview={currentStep.preview}
-                          data={{ rawOutput: lastOutput } as LabPreviewData}
-                          isRunning={isRunning}
-                          hasRun={!!lastOutput}
-                        />
+                              {competitorBlockForSelected && (
+                                <>
+                                  <div className="flex-shrink-0">
+                                    <p className="text-[10px] font-medium text-muted-foreground mb-1">How {getCompetitorProductLabel(effectiveCompetitorId ?? '')} does it (prefer code)</p>
+                                    <div className="rounded border border-border overflow-hidden min-h-[120px] flex-1">
+                                      <Editor
+                                        height="180"
+                                        theme={getLabEditorTheme(resolvedTheme)}
+                                        beforeMount={defineLabDarkTheme}
+                                        language={competitorBlockForSelected.equiv.language}
+                                        value={competitorBlockForSelected.equiv.code}
+                                        options={getReadOnlyLabOptions()}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="flex-shrink-0 rounded border border-amber-500/20 bg-amber-500/5 p-2 space-y-2">
+                                    <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">Challenges vs MongoDB</p>
+                                    {competitorBlockForSelected.equiv.workaroundNote && (
+                                      <p className="text-[10px] text-muted-foreground leading-snug">{competitorBlockForSelected.equiv.workaroundNote}</p>
+                                    )}
+                                    {competitorBlockForSelected.equiv.challenges && competitorBlockForSelected.equiv.challenges.length > 0 && (
+                                      <ul className="list-disc list-inside text-[10px] text-muted-foreground space-y-0.5">
+                                        {competitorBlockForSelected.equiv.challenges.map((c, i) => (
+                                          <li key={i}>{c}</li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                    {competitorBlockForSelected.equiv.comparisonSummary && (
+                                      <div className="text-[10px] text-muted-foreground leading-snug whitespace-pre-wrap border-t border-amber-500/20 pt-1.5 mt-1.5">
+                                        {competitorBlockForSelected.equiv.comparisonSummary}
+                                      </div>
+                                    )}
+                                    {!competitorBlockForSelected.equiv.workaroundNote &&
+                                      (!competitorBlockForSelected.equiv.challenges || competitorBlockForSelected.equiv.challenges.length === 0) &&
+                                      !competitorBlockForSelected.equiv.comparisonSummary && (
+                                        <p className="text-[10px] text-muted-foreground italic">Compare with the MongoDB approach in the editor — native driver support, no workarounds.</p>
+                                      )}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="h-full min-h-[80px] flex items-center justify-center text-center text-muted-foreground text-[10px]">No competitor comparison for this step.</div>
+                          )
+                        ) : currentStep.preview ? (
+                          <div key={previewRefreshKey} className="h-full min-h-0">
+                            <GenericLabPreview
+                              preview={currentStep.preview}
+                              data={{ rawOutput: lastOutput } as LabPreviewData}
+                              isRunning={isRunning}
+                              hasRun={!!lastOutput}
+                            />
+                          </div>
+                        ) : (
+                          <div className="h-full min-h-[120px] flex flex-col items-center justify-center text-center rounded border border-dashed border-border p-4 text-muted-foreground">
+                            <Layout className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                            <p className="text-xs font-medium mb-0.5">Preview: frontend demo</p>
+                            <p className="text-[10px]">When configured, this tab shows a visual frontend that demonstrates how this capability can be used (e.g. search, table, chart, encryption demo). Run the step code to see results here.</p>
+                          </div>
+                        )}
                       </div>
-                    ) : previewPanelTab === 'preview' ? (
-                      <div className="h-full min-h-[120px] flex flex-col items-center justify-center text-center rounded border border-dashed border-border p-4 text-muted-foreground">
-                        <Layout className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                        <p className="text-xs font-medium mb-0.5">Preview: frontend demo</p>
-                        <p className="text-[10px]">When configured, this tab shows a visual frontend that demonstrates how this capability can be used (e.g. search, table, chart, encryption demo). Run the step code to see results here.</p>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              </ResizablePanel>
+                    </div>
+                  </ResizablePanel>
+                </>
+              )}
             </ResizablePanelGroup>
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground">
@@ -2433,6 +2464,23 @@ export function StepView({
             <ChevronLeft className="w-4 h-4" />
             Previous
           </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRunAll}
+                  disabled={runAllDisabled}
+                  className="gap-1"
+                >
+                  {isRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                  Run
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">{runAllTooltip}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Button
             size="sm"
             onClick={handleNextStep}

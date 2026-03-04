@@ -29,6 +29,8 @@ export interface WorkshopSession {
   programmingLanguage?: ProgrammingLanguage;
   templateId?: string;
   labIds?: string[];
+  /** When true, show Compete tab and competitor comparison in labs (moderator-controlled; default false) */
+  showCompetitorComparisons?: boolean;
 }
 
 const WORKSHOP_SESSION_KEY = 'workshop_session';
@@ -306,7 +308,7 @@ export function getParticipantCount(): number {
  * If no session exists (e.g. user went straight to Lab Setup), creates a minimal session so lab Run gets the URI.
  */
 export async function updateWorkshopSession(
-  updates: Partial<Pick<WorkshopSession, 'customerName' | 'workshopDate' | 'mongodbSource' | 'atlasConnectionString' | 'salesforceWorkloadName' | 'technicalChampionName' | 'technicalChampionEmail' | 'currentDatabase' | 'mode' | 'programmingLanguage' | 'templateId' | 'labIds'>>
+  updates: Partial<Pick<WorkshopSession, 'customerName' | 'workshopDate' | 'mongodbSource' | 'atlasConnectionString' | 'salesforceWorkloadName' | 'technicalChampionName' | 'technicalChampionEmail' | 'currentDatabase' | 'mode' | 'programmingLanguage' | 'templateId' | 'labIds' | 'showCompetitorComparisons'>>
 ): Promise<void> {
   let session = getWorkshopSession();
   if (!session) {

@@ -40,6 +40,9 @@ const EXPIRED_TOKEN_FIX =
 const QUERY_TYPE_ERROR_FIX =
   "\n\nHow to fix: queries.queryType must be exactly 'equality' or 'range', not the field name (e.g. not salary). In encryptedFields.fields set queries: { queryType: \"equality\" } or queryType: \"range\" for each field.";
 
+const KMS_ALIAS_NOT_FOUND_FIX =
+  "\n\nKMS alias not found. Complete Step 1 (Create Customer Master Key) to create the key and alias in AWS. The alias must be alias/mongodb-lab-key-<suffix> where <suffix> matches your Lab Setup (e.g. from your email or lab_user_suffix). If you already created a key with a different alias, set your suffix in Lab Setup to match it, or create a new key in Step 1 with the expected alias.";
+
 /** Resolve mongosh executable path. Dev server often has limited PATH (e.g. when started from IDE) and may not see /opt/homebrew/bin. */
 function getMongoshPath(): string {
   const envWithPath = { ...process.env, PATH: (process.env.PATH || "") + MONGOSH_PATH_SUFFIX };
@@ -417,14 +420,68 @@ export default defineConfig(({ mode }) => ({
             return;
           }
 
+          if (req.url && req.url.startsWith('/api/aws-list-profiles')) {
+            exec('aws configure list-profiles', (error: any, stdout: any, stderr: any) => {
+              res.setHeader('Content-Type', 'application/json');
+              if (error) {
+                const errMsg = (stderr || error.message || '').trim();
+                res.statusCode = 500;
+                res.end(JSON.stringify({ success: false, message: errMsg || 'Failed to list profiles', profiles: [] }));
+                return;
+              }
+              const lines = (stdout || '').trim().split(/\r?\n/).map((s: string) => s.trim()).filter(Boolean);
+              res.end(JSON.stringify({ success: true, profiles: lines }));
+            });
+            return;
+          }
+
+          if (req.url && req.url.startsWith('/api/aws-test-auth')) {
+            const url = new URL(req.url, `http://${req.headers.host}`);
+            const profile = getEffectiveAwsProfile(url.searchParams.get('profile'));
+            const profileArg = shellEscapeProfile(profile);
+            const cmd = `aws sts get-caller-identity --profile ${profileArg} --output json`;
+            exec(cmd, (error: any, stdout: any, stderr: any) => {
+              res.setHeader('Content-Type', 'application/json');
+              if (error) {
+                const errMsg = (stderr || error.message || '').trim();
+                const isProfileNotFound = /config profile.*could not be found/i.test(errMsg);
+                const isExpired = /token.*expired|sso.*login/i.test(errMsg);
+                const message = isProfileNotFound
+                  ? `Profile not found.${KMS_PROFILE_NOT_FOUND_FIX}`
+                  : isExpired
+                    ? 'SSO session expired. Run: aws sso login --profile ' + profile
+                    : (errMsg || 'Authentication failed.');
+                res.statusCode = 500;
+                res.end(JSON.stringify({ success: false, message }));
+                return;
+              }
+              try {
+                const data = JSON.parse(stdout || '{}');
+                const account = data.Account || '';
+                const arn = data.Arn || '';
+                res.end(JSON.stringify({
+                  success: true,
+                  message: `Authenticated as ${arn || account || 'AWS identity'}`,
+                  account,
+                  arn,
+                }));
+              } catch {
+                res.end(JSON.stringify({ success: true, message: 'Authentication succeeded.' }));
+              }
+            });
+            return;
+          }
+
           if (req.url && req.url.startsWith('/api/verify-kms')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
             const alias = url.searchParams.get('alias') || '';
             const profile = getEffectiveAwsProfile(url.searchParams.get('profile'));
+            const regionParam = (url.searchParams.get('region') || '').trim();
+            const regionArg = regionParam ? ` --region ${shellEscapeProfile(regionParam)}` : '';
             const safeAlias = alias.replace(/[^a-zA-Z0-9_\-\/]/g, '');
             const profileArg = shellEscapeProfile(profile);
 
-            const cmd = `aws kms list-aliases --profile ${profileArg} --query "Aliases[?AliasName=='${safeAlias}'].AliasName" --output text`;
+            const cmd = `aws kms list-aliases --profile ${profileArg}${regionArg} --query "Aliases[?AliasName=='${safeAlias}'].AliasName" --output text`;
 
             exec(cmd, (error: any, stdout: any, stderr: any) => {
               if (error) {
@@ -490,11 +547,13 @@ export default defineConfig(({ mode }) => ({
             const url = new URL(req.url, `http://${req.headers.host}`);
             const alias = url.searchParams.get('alias') || '';
             const profile = getEffectiveAwsProfile(url.searchParams.get('profile'));
+            const regionParam = (url.searchParams.get('region') || '').trim();
+            const regionArg = regionParam ? ` --region ${shellEscapeProfile(regionParam)}` : '';
             const safeAlias = alias.replace(/[^a-zA-Z0-9_\-\/]/g, '');
             const profileArg = shellEscapeProfile(profile);
 
             // 1. Resolve Alias to KeyID
-            const getKeyIdCmd = `aws kms list-aliases --profile ${profileArg} --query "Aliases[?AliasName=='${safeAlias}'].TargetKeyId" --output text`;
+            const getKeyIdCmd = `aws kms list-aliases --profile ${profileArg}${regionArg} --query "Aliases[?AliasName=='${safeAlias}'].TargetKeyId" --output text`;
 
             exec(getKeyIdCmd, (err: any, keyId: string, stderr: any) => {
               if (err || !keyId.trim()) {
@@ -512,7 +571,7 @@ export default defineConfig(({ mode }) => ({
                 }
                 const callerArnTrimmed = callerArn.trim();
                 // 3. Get Policy
-                const getPolicyCmd = `aws kms get-key-policy --key-id ${safeKeyId} --policy-name default --profile ${profileArg} --output json`;
+                const getPolicyCmd = `aws kms get-key-policy --key-id ${safeKeyId} --policy-name default --profile ${profileArg}${regionArg} --output json`;
                 exec(getPolicyCmd, (pErr: any, policyOutput: string, pStderr: any) => {
                   if (pErr) {
                     res.end(JSON.stringify({ success: false, message: `Failed to read policy. Do you have 'kms:GetKeyPolicy'?` }));
@@ -605,7 +664,7 @@ export default defineConfig(({ mode }) => ({
                 res.end(JSON.stringify({ success, results, message }));
               };
               try {
-                const { uri } = JSON.parse(body || '{}');
+                const { uri, suffix } = JSON.parse(body || '{}');
                 const rawUri = typeof uri === 'string' ? uri.trim() : '';
                 if (!rawUri) {
                   results.push({ db: 'all', status: 'skipped', message: 'No URI provided' });
@@ -614,7 +673,10 @@ export default defineConfig(({ mode }) => ({
                 }
                 const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(rawUri);
                 const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : rawUri;
-                const dbsToDrop = ['encryption', 'medical', 'hr'];
+                const userSuffix = typeof suffix === 'string' ? suffix.trim() : '';
+                const dbsToDrop = userSuffix
+                  ? [`encryption_${userSuffix}`, `medical_${userSuffix}`, `hr_${userSuffix}`]
+                  : ['encryption', 'medical', 'hr'];
                 MongoClient.connect(effectiveUri).then((client) => {
                   Promise.all(
                     dbsToDrop.map((dbName) =>
@@ -836,8 +898,10 @@ export default defineConfig(({ mode }) => ({
 
           if (req.url && req.url.startsWith('/api/verify-qe-collection')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
-            const dbName = url.searchParams.get('db') || 'hr';
-            const collName = url.searchParams.get('coll') || 'employees';
+            const dbParam = (url.searchParams.get('db') || 'hr').trim();
+            const collParam = (url.searchParams.get('coll') || 'employees').trim();
+            const dbName = /^[a-zA-Z0-9_-]+$/.test(dbParam) ? dbParam : 'hr';
+            const collName = /^[a-zA-Z0-9_-]+$/.test(collParam) ? collParam : 'employees';
             let uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
             if (!uri) {
               res.statusCode = 400;
@@ -981,7 +1045,8 @@ export default defineConfig(({ mode }) => ({
             }
             const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
             const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : uri;
-            const dbName = 'medical';
+            const dbParam = (url.searchParams.get('db') || 'medical').trim();
+            const dbName = /^[a-zA-Z0-9_-]+$/.test(dbParam) ? dbParam : 'medical';
             const collName = 'patients_secure';
 
             // Check if secure collection exists and has encrypted documents
@@ -1056,11 +1121,13 @@ export default defineConfig(({ mode }) => ({
             }
             const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
             const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : uri;
+            const keyVaultDbParam = (url.searchParams.get('keyVaultDb') || '').trim();
+            const keyVaultDb = /^[a-zA-Z0-9_-]+$/.test(keyVaultDbParam) ? keyVaultDbParam : 'encryption';
             const expectedTenants = ['acme', 'contoso', 'fabrikam'];
 
-            // Check if tenant DEKs exist
+            // Check if tenant DEKs exist (per-user key vault when keyVaultDb provided)
             const script = `
-              var db = db.getSiblingDB('encryption');
+              var db = db.getSiblingDB('${keyVaultDb}');
               var tenants = ${JSON.stringify(expectedTenants)};
               var found = [];
               tenants.forEach(function(tenant) {
@@ -1116,10 +1183,12 @@ export default defineConfig(({ mode }) => ({
             const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
             const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : uri;
             const keyAltName = url.searchParams.get('keyAltName') || 'user-pierre-petersson-ssn-key';
+            const keyVaultDbParam = (url.searchParams.get('keyVaultDb') || '').trim();
+            const keyVaultDb = /^[a-zA-Z0-9_-]+$/.test(keyVaultDbParam) ? keyVaultDbParam : 'encryption';
 
             // Check if DEK exists and get its master key info
             const script = `
-              var db = db.getSiblingDB('encryption');
+              var db = db.getSiblingDB('${keyVaultDb}');
               var key = db.getCollection('__keyVault').findOne({ keyAltNames: '${keyAltName}' });
               if (key) {
                 var result = {
@@ -1155,7 +1224,7 @@ export default defineConfig(({ mode }) => ({
                 } else {
                   res.end(JSON.stringify({
                     success: false,
-                    message: `DEK with keyAltName "${keyAltName}" not found. Create it first.`
+                    message: `DEK with keyAltName "${keyAltName}" not found in ${keyVaultDb}.__keyVault. Create it first.`
                   }));
                 }
               } catch (e: any) {
@@ -1172,6 +1241,9 @@ export default defineConfig(({ mode }) => ({
             const url = new URL(req.url, `http://${req.headers.host}`);
             let uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
             const keyAltName = url.searchParams.get('keyAltName') || '';
+            const keyVaultDbParam = (url.searchParams.get('keyVaultDb') || '').trim();
+            const dbName = /^[a-zA-Z0-9_-]+$/.test(keyVaultDbParam) ? keyVaultDbParam : 'encryption';
+            const collName = '__keyVault';
             
             if (!uri) {
               res.statusCode = 400;
@@ -1187,10 +1259,7 @@ export default defineConfig(({ mode }) => ({
               return;
             }
 
-            const dbName = 'encryption';
-            const collName = '__keyVault';
-
-            // Check if DEK exists by keyAltName
+            // Check if DEK exists by keyAltName (per-user key vault when keyVaultDb provided)
             const script = `
               var key = db.getSiblingDB('${dbName}').getCollection('${collName}').findOne({ keyAltNames: '${keyAltName}' });
               var result = { exists: !!key };
@@ -1223,7 +1292,7 @@ export default defineConfig(({ mode }) => ({
                 } else {
                   res.end(JSON.stringify({
                     success: false,
-                    message: `DEK with keyAltName "${keyAltName}" not found. Run the createKey.cjs script to create it.`
+                    message: `DEK with keyAltName "${keyAltName}" not found in ${dbName}.${collName}. Run the createKey.cjs script to create it.`
                   }));
                 }
               } catch (e: any) {
@@ -1547,7 +1616,7 @@ export default defineConfig(({ mode }) => ({
             req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
             req.on('end', () => {
               try {
-                const { command, commands: rawCommands, profile: profileOverride } = JSON.parse(body || '{}');
+                const { command, commands: rawCommands, profile: profileOverride, region: regionOverride } = JSON.parse(body || '{}');
                 const commands = Array.isArray(rawCommands)
                   ? rawCommands
                   : typeof command === 'string'
@@ -1577,18 +1646,27 @@ export default defineConfig(({ mode }) => ({
                   return;
                 }
                 const script = toRun.join('\n');
-                const profileVal = (profileOverride != null && String(profileOverride).trim() !== '') ? String(profileOverride).trim() : null;
-                const runEnv = profileVal !== null ? { ...process.env, AWS_PROFILE: profileVal } : process.env;
+                const profileVal = (profileOverride != null && String(profileOverride).trim() !== '') ? String(profileOverride).trim() : (process.env.AWS_PROFILE || 'default');
+                const regionVal = (regionOverride != null && String(regionOverride).trim() !== '') ? String(regionOverride).trim() : (process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || '');
+                const runEnv: Record<string, string> = {
+                  ...process.env,
+                  AWS_PROFILE: profileVal,
+                  ...(regionVal ? { AWS_REGION: regionVal, AWS_DEFAULT_REGION: regionVal } : {}),
+                };
                 exec(script, { timeout: 30000, maxBuffer: 1024 * 1024, env: runEnv }, (error: any, stdout: string, stderr: string) => {
                   const exitCode = error?.code ?? (error ? 1 : 0);
                   let errOut = stderr || '';
                   if (/ExpiredTokenException|security token.*expired/i.test(errOut)) {
                     errOut = errOut.trim() + EXPIRED_TOKEN_FIX;
                   }
+                  const envLine = (runEnv.AWS_PROFILE || runEnv.AWS_REGION)
+                    ? `[lab] Using AWS profile: ${runEnv.AWS_PROFILE || 'default'}${runEnv.AWS_REGION ? `, region: ${runEnv.AWS_REGION}` : ''}\n`
+                    : '';
+                  const stdoutOut = envLine + (stdout || '');
                   res.setHeader('Content-Type', 'application/json');
                   res.end(JSON.stringify({
                     success: exitCode === 0,
-                    stdout: stdout || '',
+                    stdout: stdoutOut,
                     stderr: errOut,
                     exitCode,
                   }));
@@ -1608,7 +1686,7 @@ export default defineConfig(({ mode }) => ({
             req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
             req.on('end', () => {
               try {
-                const { code, uri, region: regionOverride } = JSON.parse(body || '{}');
+                const { code, uri, region: regionOverride, profile: profileOverride } = JSON.parse(body || '{}');
                 if (typeof code !== 'string' || !code.trim()) {
                   res.statusCode = 400;
                   res.setHeader('Content-Type', 'application/json');
@@ -1641,20 +1719,28 @@ export default defineConfig(({ mode }) => ({
                   ? process.env.MONGODB_URI
                   : nodeUri;
                 const awsRegion = (typeof regionOverride === 'string' && regionOverride.trim()) ? regionOverride.trim() : (process.env.AWS_REGION || process.env.AWS_KEY_REGION || '');
+                const awsProfile = (typeof profileOverride === 'string' && profileOverride.trim()) ? profileOverride.trim() : (process.env.AWS_PROFILE || 'default');
                 const env = {
                   ...process.env,
                   MONGODB_URI: effectiveNodeUri,
                   NODE_PATH: nodeModulesPath,
+                  AWS_PROFILE: awsProfile,
                   ...(awsRegion ? { AWS_REGION: awsRegion } : {}),
                 };
                 execFile(process.execPath, [tmpFile], { timeout: 30000, maxBuffer: 1024 * 1024, env, cwd }, (error: any, stdout: string, stderr: string) => {
                   try { require('fs').unlinkSync(tmpFile); } catch { /* ignore */ }
                   const exitCode = error?.code ?? (error ? 1 : 0);
+                  const envLine = (awsProfile || awsRegion)
+                    ? `[lab] Using AWS profile: ${awsProfile || 'default'}${awsRegion ? `, region: ${awsRegion}` : ''}\n`
+                    : '';
                   const out = (stdout || '').trim();
                   const err = (stderr || '').trim();
+                  const outWithEnv = envLine ? envLine + (stdout || '') : (stdout || '');
                   const combined = [err, out].filter(Boolean).join('\n').trim();
                   const isExpiredToken = /ExpiredTokenException|security token.*expired/i.test(combined);
+                  const isSSOSessionInvalid = /CredentialsProviderError|SSO session token.*not found|SSO session.*invalid|was not found or is invalid/i.test(combined);
                   const isQueryTypeError = /MongoCryptCreateEncryptedCollectionError|queryType.*not a valid value|salary_.*queryType/i.test(combined);
+                  const isKmsAliasNotFound = /NotFoundException|alias.*is not found|Alias.*not found/i.test(combined) && /alias|kms/i.test(combined);
                   // When failed, prefer stderr/stdout so the Console shows the real Node error (e.g. module not found, connection refused)
                   let failedMessage = combined;
                   if (!failedMessage) {
@@ -1663,19 +1749,23 @@ export default defineConfig(({ mode }) => ({
                       failedMessage += ` (exit code ${exitCode}). Check that MongoDB is running and the URI is set in Lab Setup.`;
                     }
                   }
-                  if (isExpiredToken) {
+                  if (isExpiredToken || isSSOSessionInvalid) {
                     failedMessage = failedMessage + EXPIRED_TOKEN_FIX;
+                  }
+                  if (isKmsAliasNotFound) {
+                    failedMessage = failedMessage + KMS_ALIAS_NOT_FOUND_FIX;
                   }
                   if (isQueryTypeError) {
                     failedMessage = failedMessage + QUERY_TYPE_ERROR_FIX;
                   }
                   let stderrOut = (stderr || '').trim();
-                  if (isExpiredToken) stderrOut = stderrOut + EXPIRED_TOKEN_FIX;
+                  if (isExpiredToken || isSSOSessionInvalid) stderrOut = stderrOut + EXPIRED_TOKEN_FIX;
+                  if (isKmsAliasNotFound) stderrOut = stderrOut + KMS_ALIAS_NOT_FOUND_FIX;
                   if (isQueryTypeError) stderrOut = stderrOut + QUERY_TYPE_ERROR_FIX;
                   res.setHeader('Content-Type', 'application/json');
                   res.end(JSON.stringify({
                     success: exitCode === 0,
-                    stdout: stdout || '',
+                    stdout: outWithEnv || stdout || '',
                     stderr: stderrOut,
                     exitCode,
                     error: exitCode !== 0,

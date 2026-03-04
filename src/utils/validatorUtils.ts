@@ -64,8 +64,9 @@ export const validatorUtils = {
      * Verifies a KMS Alias exists in the user's AWS account.
      * Uses the real /api/verify-kms endpoint to check via AWS CLI.
      * @param profile Optional. If omitted or empty, server uses AWS_PROFILE env or "default".
+     * @param region Optional. If provided, server uses this region for the AWS CLI call (must match where the key was created).
      */
-    checkKmsAlias: async (alias: string, profile?: string): Promise<ValidationResult> => {
+    checkKmsAlias: async (alias: string, profile?: string, region?: string): Promise<ValidationResult> => {
         if (!alias || alias.trim() === '') {
             return { success: false, message: 'KMS alias is required.' };
         }
@@ -75,7 +76,9 @@ export const validatorUtils = {
         }
 
         try {
-            const response = await fetch(`/api/verify-kms?alias=${encodeURIComponent(alias)}&profile=${encodeURIComponent(profile ?? '')}`);
+            const params = new URLSearchParams({ alias, profile: profile ?? '' });
+            if (region?.trim()) params.set('region', region.trim());
+            const response = await fetch(`/api/verify-kms?${params.toString()}`);
             const data = await response.json();
             return { success: data.success, message: data.message };
         } catch (error) {
@@ -87,14 +90,17 @@ export const validatorUtils = {
      * Verifies that the KMS Key Policy allows the current user.
      * Uses the real /api/verify-policy endpoint to check via AWS CLI.
      * @param profile Optional. If omitted or empty, server uses AWS_PROFILE env or "default".
+     * @param region Optional. If provided, server uses this region for the AWS CLI call.
      */
-    checkKeyPolicy: async (alias: string, profile?: string): Promise<ValidationResult> => {
+    checkKeyPolicy: async (alias: string, profile?: string, region?: string): Promise<ValidationResult> => {
         if (!alias || alias.trim() === '') {
             return { success: false, message: 'KMS alias is required.' };
         }
 
         try {
-            const response = await fetch(`/api/verify-policy?alias=${encodeURIComponent(alias)}&profile=${encodeURIComponent(profile ?? '')}`);
+            const params = new URLSearchParams({ alias, profile: profile ?? '' });
+            if (region?.trim()) params.set('region', region.trim());
+            const response = await fetch(`/api/verify-policy?${params.toString()}`);
             const data = await response.json();
             return { success: data.success, message: data.message };
         } catch (error) {
@@ -118,16 +124,51 @@ export const validatorUtils = {
     },
 
     /**
+     * Lists AWS CLI profile names from ~/.aws/config (runs aws configure list-profiles on server).
+     */
+    listAwsProfiles: async (): Promise<{ success: boolean; profiles: string[]; message?: string }> => {
+        try {
+            const response = await fetch('/api/aws-list-profiles');
+            const data = await response.json();
+            return {
+                success: data.success === true,
+                profiles: Array.isArray(data.profiles) ? data.profiles : [],
+                message: data.message,
+            };
+        } catch (error) {
+            return { success: false, profiles: [], message: 'Connection to server failed. Ensure npm run dev is active.' };
+        }
+    },
+
+    /**
+     * Tests AWS authentication for the given profile (runs aws sts get-caller-identity on server).
+     * @param profile Optional. If omitted or empty, server uses AWS_PROFILE env or "default".
+     */
+    testAwsAuth: async (profile?: string): Promise<ValidationResult> => {
+        try {
+            const q = profile != null && profile.trim() !== '' ? `?profile=${encodeURIComponent(profile.trim())}` : '';
+            const response = await fetch(`/api/aws-test-auth${q}`);
+            const data = await response.json();
+            return { success: data.success === true, message: data.message || (data.success ? 'OK' : 'Failed') };
+        } catch (error) {
+            return { success: false, message: 'Connection to server failed. Ensure npm run dev is active.' };
+        }
+    },
+
+    /**
      * Verifies that migration was successful - checks for encrypted data in secure collection.
      * Uses the real /api/verify-migration endpoint to check via mongosh.
+     * @param medicalDb Optional. Per-user DB (e.g. medical_user-test10). Omit for "medical".
      */
-    checkMigration: async (uri: string): Promise<ValidationResult> => {
+    checkMigration: async (uri: string, medicalDb?: string): Promise<ValidationResult> => {
         if (!uri || uri.trim() === '') {
             return { success: false, message: 'MongoDB URI is required.' };
         }
 
         try {
-            const response = await fetch(`/api/verify-migration?uri=${encodeURIComponent(uri)}`);
+            const params = new URLSearchParams({ uri });
+            if (medicalDb?.trim()) params.set('db', medicalDb.trim());
+            const response = await fetch(`/api/verify-migration?${params.toString()}`);
             const data = await response.json();
             return { success: data.success, message: data.message };
         } catch (error) {
@@ -138,14 +179,17 @@ export const validatorUtils = {
     /**
      * Verifies that tenant DEKs exist for multi-tenant isolation.
      * Uses the real /api/verify-tenant-deks endpoint to check via mongosh.
+     * @param keyVaultDb Optional. Per-user key vault DB (e.g. encryption_user-test10). Omit for "encryption".
      */
-    checkTenantDEKs: async (uri: string): Promise<ValidationResult> => {
+    checkTenantDEKs: async (uri: string, keyVaultDb?: string): Promise<ValidationResult> => {
         if (!uri || uri.trim() === '') {
             return { success: false, message: 'MongoDB URI is required.' };
         }
 
         try {
-            const response = await fetch(`/api/verify-tenant-deks?uri=${encodeURIComponent(uri)}`);
+            const params = new URLSearchParams({ uri });
+            if (keyVaultDb?.trim()) params.set('keyVaultDb', keyVaultDb.trim());
+            const response = await fetch(`/api/verify-tenant-deks?${params.toString()}`);
             const data = await response.json();
             return { success: data.success, message: data.message };
         } catch (error) {
@@ -156,8 +200,9 @@ export const validatorUtils = {
     /**
      * Verifies that a DEK exists and can be rotated (checks master key configuration).
      * Uses the real /api/verify-key-rotation endpoint to check via mongosh.
+     * @param keyVaultDb Optional. Key vault DB (e.g. encryption_user-test10). Omit for "encryption".
      */
-    checkKeyRotation: async (uri: string, keyAltName: string): Promise<ValidationResult> => {
+    checkKeyRotation: async (uri: string, keyAltName: string, keyVaultDb?: string): Promise<ValidationResult> => {
         if (!uri || uri.trim() === '') {
             return { success: false, message: 'MongoDB URI is required.' };
         }
@@ -167,7 +212,9 @@ export const validatorUtils = {
         }
 
         try {
-            const response = await fetch(`/api/verify-key-rotation?uri=${encodeURIComponent(uri)}&keyAltName=${encodeURIComponent(keyAltName)}`);
+            const params = new URLSearchParams({ uri, keyAltName });
+            if (keyVaultDb?.trim()) params.set('keyVaultDb', keyVaultDb.trim());
+            const response = await fetch(`/api/verify-key-rotation?${params.toString()}`);
             const data = await response.json();
             return { success: data.success, message: data.message };
         } catch (error) {
@@ -295,8 +342,9 @@ export const validatorUtils = {
     /**
      * Verifies that a specific DEK exists in the key vault by keyAltName.
      * Uses the real /api/verify-datakey endpoint to check via mongosh.
+     * @param keyVaultDb Optional. Key vault DB (e.g. encryption_user-test10). Omit for "encryption".
      */
-    checkDataKey: async (uri: string, keyAltName: string): Promise<ValidationResult> => {
+    checkDataKey: async (uri: string, keyAltName: string, keyVaultDb?: string): Promise<ValidationResult> => {
         if (!uri || uri.trim() === '') {
             return { 
                 success: false, 
@@ -319,7 +367,9 @@ export const validatorUtils = {
         }
 
         try {
-            const response = await fetch(`/api/verify-datakey?uri=${encodeURIComponent(uri)}&keyAltName=${encodeURIComponent(keyAltName)}`);
+            const params = new URLSearchParams({ uri, keyAltName });
+            if (keyVaultDb?.trim()) params.set('keyVaultDb', keyVaultDb.trim());
+            const response = await fetch(`/api/verify-datakey?${params.toString()}`);
             const data = await response.json();
             return { success: data.success, message: data.message };
         } catch (error) {

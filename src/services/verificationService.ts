@@ -38,7 +38,12 @@ export interface VerificationContext {
   coll?: string;
   alias?: string;
   profile?: string;
+  region?: string;
   keyAltName?: string;
+  /** Key vault database name (e.g. encryption_user-test10 for per-user labs). Omit to use "encryption". */
+  keyVaultDb?: string;
+  /** Per-user medical DB for Lab 3 migration (e.g. medical_user-test10). Omit for "medical". */
+  medicalDb?: string;
   expectedCount?: number;
 }
 
@@ -58,17 +63,17 @@ export class VerificationService {
         return validatorUtils.checkKeyVault(ctx.mongoUri || "", getKeyVaultNamespace());
 
       case "csfle.verifyCmkExists":
-        return validatorUtils.checkKmsAlias(ctx.alias || "", ctx.profile);
+        return validatorUtils.checkKmsAlias(ctx.alias || "", ctx.profile, ctx.region);
 
       case "csfle.verifyKeyPolicy":
-        return validatorUtils.checkKeyPolicy(ctx.alias || "", ctx.profile);
+        return validatorUtils.checkKeyPolicy(ctx.alias || "", ctx.profile, ctx.region);
 
       case "csfle.verifyKeyVaultCount":
         return validatorUtils.checkKeyVaultCount(ctx.expectedCount ?? 1, ctx.mongoUri);
 
       case "csfle.verifyDekCreated":
       case "csfle.verifyDataKey":
-        return validatorUtils.checkDataKey(ctx.mongoUri || "", ctx.keyAltName || "");
+        return validatorUtils.checkDataKey(ctx.mongoUri || "", ctx.keyAltName || "", ctx.keyVaultDb);
 
       case "csfle.verifyEncryptionWorking":
         // Currently verified by manually running the script; return a generic success
@@ -78,14 +83,14 @@ export class VerificationService {
         return { success: true, message: "Lab steps completed. Manual review recommended for full validation." };
 
       case "csfle.verifyMigration":
-        return validatorUtils.checkMigration(ctx.mongoUri || "");
+        return validatorUtils.checkMigration(ctx.mongoUri || "", ctx.medicalDb);
 
       case "csfle.verifyTenantDEKs":
       case "csfle.verifyMultiTenantKeys":
-        return validatorUtils.checkTenantDEKs(ctx.mongoUri || "");
+        return validatorUtils.checkTenantDEKs(ctx.mongoUri || "", ctx.keyVaultDb);
 
       case "csfle.verifyKeyRotation":
-        return validatorUtils.checkKeyRotation(ctx.mongoUri || "", ctx.keyAltName || "");
+        return validatorUtils.checkKeyRotation(ctx.mongoUri || "", ctx.keyAltName || "", ctx.keyVaultDb);
 
       case "qe.verifyDEKs":
       case "qe.verifyQEDEKs":
@@ -110,7 +115,7 @@ export class VerificationService {
         if (!keyVaultCheck.success) {
           return { success: false, message: "Key vault not properly configured" };
         }
-        const dekCheck = await validatorUtils.checkDataKey(ctx.mongoUri || "", ctx.keyAltName || "");
+        const dekCheck = await validatorUtils.checkDataKey(ctx.mongoUri || "", ctx.keyAltName || "", ctx.keyVaultDb);
         return dekCheck.success 
           ? { success: true, message: "PII collections are encrypted" }
           : { success: false, message: "No encryption keys found for PII collections" };

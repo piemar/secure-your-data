@@ -137,10 +137,7 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
       localStorage.removeItem('lab3-progress');
       localStorage.removeItem('completedLabs');
       localStorage.removeItem('labStartTimes');
-      const email = localStorage.getItem('userEmail') || '';
-      const uriKey = email.trim() ? `lab_mongo_uri_${email.replace(/[^a-zA-Z0-9_.-]/g, '_')}` : 'lab_mongo_uri';
-      localStorage.removeItem(uriKey);
-      localStorage.removeItem('lab_mongo_uri');
+      // Keep MongoDB URI so user does not have to re-enter connection string after reset
       localStorage.removeItem('lab_aws_profile');
       localStorage.removeItem('lab_kms_alias');
       window.location.reload();
