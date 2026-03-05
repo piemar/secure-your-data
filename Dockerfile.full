@@ -52,8 +52,13 @@ RUN curl -sL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearm
     && (apt-get update && apt-get install -y --no-install-recommends google-cloud-cli || true) \
     && rm -rf /var/lib/apt/lists/*
 
-# Install build deps for mongodb-client-encryption native addon (for local dev when node_modules is mounted)
-RUN apt-get update -y && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
+# Install build deps for mongodb-client-encryption native addon (for local dev when node_modules is mounted).
+# If apt-get update fails with "invalid signature", refresh keyring then update normally.
+RUN apt-get update -o Acquire::AllowInsecureRepositories=true || true \
+    && apt-get install -y --no-install-recommends debian-archive-keyring gnupg ca-certificates \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 # Workshop config: target cloud (aws | azure | gcp) and container mode
 ENV WORKSHOP_CLOUD=aws

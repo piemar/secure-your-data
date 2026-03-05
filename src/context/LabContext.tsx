@@ -7,6 +7,7 @@ import { getWorkshopSession } from '@/utils/workshopUtils';
 import { getMetricsService } from '@/services/metricsService';
 import { clearLabWorkspace } from '@/services/labWorkspaceStorage';
 import { trackSolutionReveal } from '@/utils/leaderboardUtils';
+import { sanitizeLabSuffix } from '@/labs/stepEnhancementRegistry';
 
 interface LabState {
     mongoUri: string;
@@ -209,6 +210,20 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
     }, [mongoUri, runningInContainer]);
 
+    // When running in Docker, tools (Node, npm, mongosh, mongo_crypt_shared, MongoDB) are provided by the image — show as installed/tested by default.
+    useEffect(() => {
+        if (!runningInContainer) return;
+        setVerifiedTools(prev => {
+            const next = { ...prev };
+            if (!prev.node?.verified) next.node = { verified: true, path: 'Docker image', detectedLocation: 'Docker image' };
+            if (!prev.npm?.verified) next.npm = { verified: true, path: 'Docker image', detectedLocation: 'Docker image' };
+            if (!prev.mongosh?.verified) next.mongosh = { verified: true, path: 'Docker image', detectedLocation: 'Docker image' };
+            if (!prev.mongoCryptShared?.verified) next.mongoCryptShared = { verified: true, path: 'Docker image', detectedLocation: 'Docker image' };
+            if (!prev.atlas?.verified) next.atlas = { verified: true, path: 'Local Docker (mongo service)', detectedLocation: 'Docker stack' };
+            return next;
+        });
+    }, [runningInContainer]);
+
     const resetProgress = () => {
         // Keep MongoDB URI so user does not have to re-enter connection string after reset
         setAwsCreds({ awsAccessKeyId: '', awsSecretAccessKey: '', awsKeyArn: '', awsRegion: 'eu-central-1' });
@@ -318,8 +333,9 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const setVerifiedTool = useCallback((tool: string, verified: boolean, path: string, detectedLocation?: string) => {
         if (tool === 'suffix' && path) {
-            localStorage.setItem('lab_user_suffix', path);
-            setUserSuffixState(path);
+            const safe = sanitizeLabSuffix(path);
+            localStorage.setItem('lab_user_suffix', safe);
+            setUserSuffixState(safe);
         }
         setVerifiedTools(prev => ({
             ...prev,

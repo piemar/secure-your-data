@@ -36,6 +36,7 @@ import {
 } from '@/services/labWorkspaceStorage';
 import { getVerificationService, type VerificationId } from '@/services/verificationService';
 import { getWorkshopSession } from '@/utils/workshopUtils';
+import { getLabUserSuffix } from '@/labs/stepEnhancementRegistry';
 
 interface CodeBlock {
   filename: string;
@@ -639,6 +640,7 @@ export function StepView({
   const [editorPanelCollapsed, setEditorPanelCollapsed] = useState(false);
   const [consolePanelCollapsed, setConsolePanelCollapsed] = useState(true); // default collapsed, aligned to bottom
   const editorConsoleGroupRef = useRef<ImperativePanelGroupHandle | null>(null);
+  const consoleOutputScrollRef = useRef<HTMLDivElement>(null);
   const [competitorPanelCollapsed, setCompetitorPanelCollapsed] = useState(false);
   const [selectedCompetitorId, setSelectedCompetitorId] = useState<string | null>(null);
   const [lastOutput, setLastOutput] = useState<string>('');
@@ -1179,6 +1181,13 @@ export function StepView({
     prevLogCountRef.current = logEntries.length;
   }, [logEntries.length]);
 
+  // Scroll console to latest output when new output is shown
+  useEffect(() => {
+    const el = consoleOutputScrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [logEntries, lastOutput]);
+
   // Helper to reveal an inline hint (conceptual)
   const revealInlineHint = useCallback((blockKey: string, hintIdx: number, tier: SkeletonTier) => {
     const alreadyRevealed = (revealedHints[blockKey] || []).includes(hintIdx);
@@ -1274,7 +1283,7 @@ export function StepView({
         output = result.message;
       } else if (currentStep.verificationId) {
         const verificationService = getVerificationService();
-        const suffix = userSuffix || (typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_user_suffix') || '') : '') || 'default';
+        const suffix = getLabUserSuffix();
         const storedAlias = typeof localStorage !== 'undefined' ? localStorage.getItem('lab_kms_alias') || undefined : undefined;
         const awsProfile = typeof localStorage !== 'undefined' ? localStorage.getItem('lab_aws_profile') || undefined : undefined;
         const awsRegion = typeof localStorage !== 'undefined' ? localStorage.getItem('lab_aws_region') || undefined : undefined;
@@ -2213,7 +2222,7 @@ export function StepView({
                       </span>
                     )}
                   </button>
-                  <div className="flex-1 min-h-0 overflow-auto px-2 py-1.5 bg-[hsl(220,20%,6%)] font-mono text-xs text-white">
+                  <div ref={consoleOutputScrollRef} className="flex-1 min-h-0 overflow-auto px-2 py-1.5 bg-[hsl(220,20%,6%)] font-mono text-xs text-white">
                     {logEntries.length > 0 ? (
                       <div className="space-y-0.5">
                         {logEntries.flatMap((entry, entryIndex) => {

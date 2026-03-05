@@ -167,13 +167,13 @@ function EnvelopeEncryptionDiagram({ highlightStep = 0 }: { highlightStep?: 0 | 
       <div className={cn('mb-2', focused(step) ? 'text-primary' : 'text-foreground')}>{icon}</div>
       <div className={cn('font-bold text-sm', focused(step) ? 'text-primary' : 'text-foreground')}>{title}</div>
       <div className="text-xs text-muted-foreground mt-0.5">{subtitle}</div>
-    </div>
+        </div>
   );
   const arrow = (label: string, opacity?: number) => (
     <div className="flex flex-col items-center justify-center px-2 shrink-0" style={opacity !== undefined ? { opacity } : undefined}>
       <ArrowRight className="w-8 h-8 text-green-500 shrink-0" />
       <span className="text-xs font-semibold text-green-600 dark:text-green-400 mt-0.5">{label}</span>
-    </div>
+      </div>
   );
   return (
     <div className="flex flex-wrap items-center justify-center gap-1 my-6 px-2">
@@ -184,7 +184,7 @@ function EnvelopeEncryptionDiagram({ highlightStep = 0 }: { highlightStep?: 0 | 
       {node(3, <FileText className="w-10 h-10 text-green-600 dark:text-green-400" />, 'Plain text', 'Your sensitive data')}
       {arrow('Creates', dim(3))}
       {node(3, <FileLock className="w-10 h-10 text-primary" />, 'Cipher text', 'Encrypted · stored in MongoDB')}
-    </div>
+      </div>
   );
 }
 
@@ -204,7 +204,7 @@ function EnvelopeSlideWithSteps() {
           <p className="text-sm text-muted-foreground">{tooltips[stepIndex]}</p>
         </div>
       )}
-    </div>
+      </div>
   );
 }
 
@@ -298,7 +298,7 @@ function QEPlaintextVsCiphertextStrip() {
         <div className="font-semibold text-amber-600 dark:text-amber-400 mb-2">Server view (ciphertext)</div>
         <pre className="font-mono text-[10px] text-muted-foreground overflow-x-auto whitespace-pre-wrap">{'{ "payer": "Acme", "ssn": "r6EaUcgZ...", "email": "iu233oh..." }'}</pre>
       </div>
-    </div>
+      </div>
   );
 }
 
@@ -1059,9 +1059,9 @@ Explicit Encryption:
             <div className="flex flex-wrap gap-1">
               {['String', 'Int32/64', 'Date', 'ObjectId', 'UUID', 'BinData', 'Bool'].map((t, i) => (
                 <span key={i} className="px-2 py-0.5 rounded bg-primary/10 text-primary text-xs font-mono">{t}</span>
-              ))}
-            </div>
+            ))}
           </div>
+        </div>
           <div>
             <h3 className="font-semibold mb-2 text-sm">Range index</h3>
             <p className="text-xs text-muted-foreground mb-2">Supports: int32, int64, double, decimal128, date. Supports both range operators ($lt, $lte, $gt, $gte) and equality ($eq, $ne).</p>

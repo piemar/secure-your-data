@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 import { ArchitectureDiagram } from '@/components/workshop/ArchitectureDiagram';
 import { LabEnvironmentDiagram } from './LabEnvironmentDiagram';
 import { PrerequisitesChecklist } from './PrerequisitesChecklist';
-import { runResetCleanup } from '@/services/resetCleanup';
+import { runResetCleanup, finishResetProgress } from '@/services/resetCleanup';
 import type { CleanupResult } from '@/services/resetCleanup';
 import { ResetCleanupStatusDialog, type ResetCleanupDialogPhase } from './ResetCleanupStatusDialog';
 
@@ -307,9 +307,7 @@ export const LabSetupWizard: React.FC = () => {
 
     const handleCleanupDialogClose = () => {
         setCleanupDialogOpen(false);
-        resetProgress();
-        setPhase('onboarding');
-        toast.info('Progress reset.');
+        void finishResetProgress(userEmail ?? undefined, resetProgress);
     };
 
     const handleFinalize = async () => {
@@ -337,7 +335,6 @@ export const LabSetupWizard: React.FC = () => {
     const requiredVerified = verifiedTools.awsCli.verified && verifiedTools.mongosh.verified && verifiedTools.node.verified && verifiedTools.npm.verified;
     const allVerified = requiredVerified || bypassPrereqs;
     const hasAtlasConnection = verifiedTools.atlas.verified || prereqResults['atlas']?.verified;
-    const hasCheckedPrereqs = Object.keys(prereqResults).length > 0;
 
     const overrideByPrereqId = useMemo(() => ({
       atlas: (
@@ -436,6 +433,12 @@ export const LabSetupWizard: React.FC = () => {
       ),
       awsCli: (
         <div className="space-y-3 mt-1">
+          <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-xs font-medium text-foreground">
+              Required: set your profile and region below, then <strong>Test AWS</strong> or run <strong>Check Prerequisites</strong> above to validate. Labs will fail without a working AWS connection.
+            </p>
+          </div>
           <div>
             <p className="text-xs text-muted-foreground mb-2">
               Choose a profile from your config, or type any profile name.
@@ -455,12 +458,14 @@ export const LabSetupWizard: React.FC = () => {
                   <p className="text-xs font-medium text-foreground">PowerShell:</p>
                   <pre className="text-xs font-mono bg-muted p-2 rounded border overflow-x-auto whitespace-pre-wrap">
 {`$env:AWS_CONFIG_PATH = "$env:USERPROFILE\\.aws"
-docker compose up app --build --force-recreate`}
+docker compose build --no-cache app
+docker compose up app --force-recreate`}
                   </pre>
                   <p className="text-xs font-medium text-foreground">Command Prompt (CMD):</p>
                   <pre className="text-xs font-mono bg-muted p-2 rounded border overflow-x-auto whitespace-pre-wrap">
 {`set AWS_CONFIG_PATH=%USERPROFILE%\\.aws
-docker compose up app --build --force-recreate`}
+docker compose build --no-cache app
+docker compose up app --force-recreate`}
                   </pre>
                   <p className="text-xs text-muted-foreground pt-1 border-t border-border">
                     If setting <code className="bg-muted px-0.5 rounded">AWS_CONFIG_PATH</code> in the environment does not work, you can set the path directly in <code className="bg-muted px-0.5 rounded">docker-compose.yml</code> at the volume line (around line 27), e.g. <code className="bg-muted px-0.5 rounded">C:\\Users\\YourName\\.aws:/root/.aws</code>, as a workaround.
@@ -514,6 +519,7 @@ docker compose up app --build --force-recreate`}
 
     if (phase === 'ready') {
         return (
+            <>
             <Card className="max-w-2xl mx-auto mt-10 border-primary/20 bg-primary/5 shadow-lg">
                 <CardHeader>
                     <div className="flex items-center gap-3">
@@ -542,7 +548,7 @@ docker compose up app --build --force-recreate`}
                         <p className="font-semibold flex items-center gap-1 mb-1"><HelpCircle className="w-3 h-3" /> Get Started:</p>
                         <p>Open <strong>Lab 1: CSFLE Fundamentals</strong> from the sidebar to create your first Customer Master Key (CMK).</p>
                         <Button
-                            className="gap-2"
+                            className="w-full gap-2"
                             onClick={() => {
                                 const firstLabId = activeTemplate?.labIds?.[0] ?? 'lab-csfle-fundamentals';
                                 setCurrentLabId(firstLabId);
@@ -554,10 +560,32 @@ docker compose up app --build --force-recreate`}
                         </Button>
                     </div>
 
-                    {/* Architecture Diagram */}
-                    <ArchitectureDiagram variant="overview" />
+                    {/* MongoDB Encryption Architecture – optional, default collapsed */}
+                    <Collapsible defaultOpen={false}>
+                        <CollapsibleTrigger asChild>
+                            <button type="button" className="group flex items-center gap-2 text-sm text-primary hover:text-primary/90 transition-colors">
+                                <ChevronRight className="w-4 h-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
+                                MongoDB Encryption Architecture
+                            </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                            <div className="pt-3">
+                                <ArchitectureDiagram variant="overview" />
+                            </div>
+                        </CollapsibleContent>
+                    </Collapsible>
                 </CardContent>
             </Card>
+            <ResetCleanupStatusDialog
+                open={cleanupDialogOpen}
+                onOpenChange={setCleanupDialogOpen}
+                phase={cleanupPhase}
+                results={cleanupResults}
+                loading={cleanupLoading}
+                onConfirm={handleConfirmReset}
+                onClose={handleCleanupDialogClose}
+            />
+            </>
         );
     }
 
@@ -588,180 +616,73 @@ docker compose up app --build --force-recreate`}
                         </div>
                         <div className="text-xs text-muted-foreground">
                             AWS suffix: <span className="font-mono text-primary">{verifiedTools['suffix']?.path || '...'}</span>
+                            <span className="block mt-0.5 text-[11px] opacity-90">Dots and special characters are replaced with a dash for AWS KMS compatibility.</span>
                         </div>
                     </div>
                 )}
 
-                {/* What You'll Need: checklist with overrides + single "Show details" for installation instructions */}
-                <PrerequisitesChecklist 
+                {/* Single action: Check Prerequisites until ready, then Activate Lab Environment – same width as What You'll Need below */}
+                <Button
+                    size="default"
+                    variant="default"
+                    className="w-full gap-2 font-semibold rounded-lg min-w-0"
+                    disabled={!localUri?.trim() || isCheckingPrereqs}
+                    onClick={allVerified && localUri ? handleFinalize : checkAllPrerequisites}
+                    title={!localUri?.trim() ? 'Enter MongoDB URI in What You\'ll Need first (MongoDB connection)' : undefined}
+                >
+                    {isCheckingPrereqs ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" />Checking...</>
+                    ) : allVerified && localUri ? (
+                        <><PlayCircle className="w-4 h-4" />Activate Lab Environment</>
+                    ) : !localUri?.trim() ? (
+                        <><ShieldCheck className="w-4 h-4" />Enter MongoDB connection string</>
+                    ) : (
+                        <><ShieldCheck className="w-4 h-4" />Check Prerequisites</>
+                    )}
+                </Button>
+
+                {/* What You'll Need: checklist with overrides + single "Show details" for installation instructions (same width as button above) */}
+                <PrerequisitesChecklist
                     prerequisites={PREREQUISITES}
                     verifiedTools={verifiedTools}
                     overrideByPrereqId={overrideByPrereqId}
                     mongodbSource={getWorkshopSession()?.mongodbSource}
+                    runningInContainer={runningInContainer}
                 />
 
-                {/* Single "Show details" (merged into What You'll Need): installation instructions when prerequisites are missing */}
-                {hasCheckedPrereqs && (
-                    <Collapsible open={!requiredVerified}>
-                        <CollapsibleTrigger asChild>
-                            <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                                {requiredVerified ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                                {requiredVerified ? 'Show details' : 'Installation instructions'}
-                            </button>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                                <div className="mt-3 space-y-2">
-                                    {PREREQUISITES.filter(p => !prereqResults[p.id]?.verified).map((prereq) => (
-                                        <div key={prereq.id} className={cn(
-                                            "p-3 rounded-lg border",
-                                            prereq.required 
-                                                ? "bg-red-500/5 border-red-500/20" 
-                                                : "bg-amber-500/5 border-amber-500/20"
-                                        )}>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <div className="flex items-center gap-2">
-                                                    <span className={cn(
-                                                        "text-sm font-medium",
-                                                        prereq.required ? "text-red-600" : "text-amber-600"
-                                                    )}>
-                                                        {prereq.label}
-                                                    </span>
-                                                    {!prereq.required && (
-                                                        <span className="text-xs px-1.5 py-0.5 bg-amber-500/10 text-amber-600 rounded">Optional</span>
-                                                    )}
-                                                </div>
-                                                {prereq.downloadUrl && (
-                                                    <a
-                                                        href={prereq.downloadUrl}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-xs text-primary hover:underline flex items-center gap-1"
-                                                    >
-                                                        Download <ExternalLink className="w-3 h-3" />
-                                                    </a>
-                                                )}
-                                            </div>
-                                            <p className="text-xs text-muted-foreground mb-2">{prereq.description}</p>
-                                            {prereq.installCommand && prereq.installCommand !== 'Included with Node.js' && prereq.installCommand !== 'Download from MongoDB' && (
-                                                <div className="flex items-center gap-2">
-                                                    <code className="flex-1 text-xs p-2 bg-background rounded border border-border font-mono">
-                                                        {prereq.installCommand}
-                                                    </code>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="h-8 px-2"
-                                                        onClick={() => copyToClipboard(prereq.installCommand!, prereq.id)}
-                                                    >
-                                                        {copiedCommand === prereq.id ? (
-                                                            <Check className="w-3 h-3 text-green-500" />
-                                                        ) : (
-                                                            <Copy className="w-3 h-3" />
-                                                        )}
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                    
-                                    {/* Continue anyway option */}
-                                    {!requiredVerified && (
-                                        <div className="mt-4 p-3 rounded-lg bg-muted/50 border border-dashed border-border">
-                                            <div className="flex items-start gap-3">
-                                                <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
-                                                <div className="flex-1">
-                                                    <p className="text-sm font-medium">Continue without all prerequisites?</p>
-                                                    <p className="text-xs text-muted-foreground mt-1">
-                                                        Some labs may not work correctly. You can always return here to check prerequisites later.
-                                                    </p>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="mt-2"
-                                                        onClick={() => setBypassPrereqs(true)}
-                                                    >
-                                                        Continue Anyway
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </CollapsibleContent>
-                        </Collapsible>
-                    )}
-
-                {/* Verify Installation */}
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-semibold flex items-center gap-2">
-                            <Terminal className="w-4 h-4 text-primary" />
-                            Verify Installation
-                        </h3>
-                        <Button
-                            onClick={checkAllPrerequisites}
-                            disabled={isCheckingPrereqs || !localUri?.trim()}
-                            size="sm"
-                            className="gap-2"
-                            title={!localUri?.trim() ? 'Enter MongoDB URI above first (in the MongoDB connection section)' : undefined}
-                        >
-                            {isCheckingPrereqs ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                                <ShieldCheck className="w-4 h-4" />
-                            )}
-                            {isCheckingPrereqs ? 'Checking...' : 'Check Prerequisites'}
-                        </Button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        {PREREQUISITES.map((prereq) => {
-                            const result = prereqResults[prereq.id] || verifiedTools[prereq.id];
-                            const isVerified = result?.verified;
-                            return (
-                                <div
-                                    key={prereq.id}
-                                    className={cn(
-                                        "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border transition-colors",
-                                        isVerified
-                                            ? "bg-green-500/10 text-green-600 border-green-500/30"
-                                            : prereqResults[prereq.id]
-                                            ? "bg-red-500/10 text-red-600 border-red-500/30"
-                                            : "bg-muted text-muted-foreground border-border"
-                                    )}
-                                >
-                                    {isVerified ? (
-                                        <CheckCircle2 className="w-3 h-3" />
-                                    ) : prereqResults[prereq.id] ? (
-                                        <AlertTriangle className="w-3 h-3" />
-                                    ) : (
-                                        <div className="w-3 h-3 rounded-full border border-current" />
-                                    )}
-                                    {prereq.label}
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* Architecture Overview */}
-                <LabEnvironmentDiagram />
+                {/* Architecture Overview – default collapsed, light green toggle like other links */}
+                <Collapsible defaultOpen={false}>
+                    <CollapsibleTrigger asChild>
+                        <button type="button" className="group flex items-center gap-2 text-sm text-primary hover:text-primary/90 transition-colors">
+                            <ChevronRight className="w-4 h-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
+                            How it works (architecture diagram)
+                        </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                        <div className="pt-3">
+                            <LabEnvironmentDiagram />
+                        </div>
+                    </CollapsibleContent>
+                </Collapsible>
 
             </CardContent>
 
-            <CardFooter className="bg-primary/5 p-6 border-t">
+            <CardFooter className="px-6 pt-4 pb-6 border-0 bg-transparent">
                 <Button
-                    className="w-full h-12 text-base font-semibold rounded-lg"
-                    disabled={!allVerified || !localUri}
-                    onClick={handleFinalize}
+                    variant="default"
+                    className="w-full h-12 text-base font-semibold rounded-lg gap-2"
+                    disabled={!localUri?.trim() || isCheckingPrereqs}
+                    onClick={allVerified && localUri ? handleFinalize : checkAllPrerequisites}
+                    title={!localUri?.trim() ? 'Enter MongoDB URI in What You\'ll Need first (MongoDB connection)' : undefined}
                 >
-                    {!hasCheckedPrereqs ? (
-                        <>Check prerequisites first</>
-                    ) : !allVerified ? (
-                        <>Missing prerequisites (or continue anyway)</>
-                    ) : !localUri ? (
-                        <>Enter MongoDB connection string</>
+                    {isCheckingPrereqs ? (
+                        <><Loader2 className="w-5 h-5 animate-spin" />Checking...</>
+                    ) : allVerified && localUri ? (
+                        <><PlayCircle className="w-5 h-5" />Activate Lab Environment</>
+                    ) : !localUri?.trim() ? (
+                        <><ShieldCheck className="w-5 h-5" />Enter MongoDB connection string</>
                     ) : (
-                        <>Activate Lab Environment</>
+                        <><ShieldCheck className="w-5 h-5" />Check Prerequisites</>
                     )}
                 </Button>
             </CardFooter>

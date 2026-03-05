@@ -21,7 +21,7 @@ Phases 0–17 are done (including AUTO-HA). See `Docs/COMPREHENSIVE_POV_LAB_IMPL
 
 ## Next Steps (pick one or more)
 
-1. **15 POVs quality review** – Run `Docs/VALIDATE_LABS_MASTER_PROMPT.md` (full audit or validate by topic/lab). Fix gaps from `Docs/YYYY-MM-DD_FIX_PLAN.md` so all 15 POVs are high quality and engaging in Demo, Lab, and Challenge modes.
+1. **15 POVs quality review** – Run `Docs/VALIDATE_LABS_MASTER_PROMPT.md` (full audit or validate by topic/lab). Fix gaps from `Docs/YYYY-MM-DD_FIX_PLAN.md` (new runs) or see `Docs/archive/` for past fix plans.
 2. **Data storage** – Implement central template store (MongoDB Atlas, obfuscated URI) for predefined templates; keep session data on provided URI (default local). See `Docs/WORKSHOP_SESSION_AND_QUALITY_PRINCIPLES.md` §4.
 3. **Key concepts side-by-side** – Ensure intro/key-concepts view shows MongoDB vs competitor side-by-side when content supports it (already in StepView for demo; extend to intro if needed).
 4. **Optional: specific labs in wizard** – In wizard step 3, allow “Select specific labs” (e.g. LabPoolBrowser) in addition to predefined templates, and support combining topics (Encryption + Analytics) with full lab steps.
@@ -49,8 +49,9 @@ Phases 0–17 are done (including AUTO-HA). See `Docs/COMPREHENSIVE_POV_LAB_IMPL
 
 ## Quick Start Tomorrow
 
+See **README.md** → [Getting Started](README.md#getting-started) for dev server, Docker, and AWS setup.
+
 ```bash
-cd /Users/pierre.petersson/csfle-new/secure-your-data
 npm run dev
 ```
 

@@ -57,10 +57,24 @@ export function getStepEnhancementSync(enhancementId?: string): Partial<Step> | 
   return factory ? factory() : undefined;
 }
 
-/** Get lab user suffix for placeholder substitution (YOUR_SUFFIX → same key as Lab 1). */
+/**
+ * Sanitize suffix for AWS KMS alias and DB names: only [a-zA-Z0-9_-] allowed.
+ * Replaces dots and other invalid chars with '-', collapses repeated dashes, trims.
+ */
+export function sanitizeLabSuffix(s: string): string {
+  if (s == null || typeof s !== 'string') return 'default';
+  const trimmed = s.trim();
+  if (!trimmed) return 'default';
+  const replaced = trimmed.replace(/[^a-zA-Z0-9_-]/g, '-');
+  const collapsed = replaced.replace(/-+/g, '-').replace(/^-|-$/g, '');
+  return collapsed || 'default';
+}
+
+/** Get lab user suffix for placeholder substitution (YOUR_SUFFIX → same key as Lab 1). Sanitized for KMS/alias compatibility. */
 export function getLabUserSuffix(): string {
   if (typeof window === 'undefined' || !window.localStorage) return 'default';
-  return window.localStorage.getItem('lab_user_suffix') || localStorage.getItem('userEmail')?.split('@')[0] || 'default';
+  const raw = window.localStorage.getItem('lab_user_suffix') || localStorage.getItem('userEmail')?.split('@')[0] || 'default';
+  return sanitizeLabSuffix(raw);
 }
 
 /** Get collection/database prefix for multi-user same cluster (e.g. encryption_<suffix>). */

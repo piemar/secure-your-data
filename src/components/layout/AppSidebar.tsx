@@ -29,7 +29,7 @@ import type { Section } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useState, useEffect } from 'react';
-import { runResetCleanup } from '@/services/resetCleanup';
+import { runResetCleanup, finishResetProgress } from '@/services/resetCleanup';
 import type { CleanupResult } from '@/services/resetCleanup';
 import { ResetCleanupStatusDialog, type ResetCleanupDialogPhase } from '@/components/labs/ResetCleanupStatusDialog';
 
@@ -121,26 +121,7 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
   };
 
   const finishResetAfterCleanup = () => {
-    (async () => {
-      try {
-        if (userEmail) {
-          const { postResetProgress } = await import('@/services/leaderboardApi');
-          await postResetProgress(userEmail);
-        }
-      } catch {
-        // Proceed with local reset even if API fails
-      }
-      localStorage.removeItem('workshop_leaderboard');
-      resetProgress();
-      localStorage.removeItem('lab1-progress');
-      localStorage.removeItem('lab2-progress');
-      localStorage.removeItem('lab3-progress');
-      localStorage.removeItem('completedLabs');
-      localStorage.removeItem('labStartTimes');
-      // Keep MongoDB URI and AWS profile so user does not have to re-enter after reset
-      localStorage.removeItem('lab_kms_alias');
-      window.location.reload();
-    })();
+    void finishResetProgress(userEmail, resetProgress);
   };
 
   const handleResetProgress = () => {

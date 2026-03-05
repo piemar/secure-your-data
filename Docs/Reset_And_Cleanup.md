@@ -54,3 +54,9 @@ The **Reset cleanup status** dialog lists each step (KMS, MongoDB per database o
 | Cleanup orchestration | [src/services/resetCleanup.ts](src/services/resetCleanup.ts) |
 | KMS + MongoDB API (dev server) | [vite.config.ts](vite.config.ts) (search for `cleanup-resources`, `cleanup-lab-collections`) |
 | Reset trigger + dialog | [AppSidebar.tsx](src/components/layout/AppSidebar.tsx), [ResetCleanupStatusDialog.tsx](src/components/labs/ResetCleanupStatusDialog.tsx) |
+
+---
+
+## Troubleshooting
+
+If you see **"Alias not found"** even after creating the key in Step 1, or have **Docker build** issues, see [Docker_Troubleshooting.md](Docker_Troubleshooting.md).

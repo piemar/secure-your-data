@@ -100,8 +100,8 @@ async function run() {
 
   const encryptedFields = {
     fields: [
-      { path: "_______", bsonType: "int", queries: { queryType: "________" } },
-      { path: "_____", bsonType: "string", queries: { queryType: "________" } }
+      { path: "___", bsonType: "int", queries: { queryType: "equality" } },
+      { path: "taxId", bsonType: "string", queries: { queryType: "___" } }
     ]
   };
 
@@ -128,10 +128,8 @@ async function run() {
 }
 run().catch(console.error);`,
         inlineHints: [
-          { line: 31, blankText: '_______', hint: 'Field name for salary data', answer: 'salary' },
-          { line: 31, blankText: '________', hint: "Query type: use exactly 'equality' or 'range', not the field name (e.g. not salary)", answer: 'equality' },
-          { line: 32, blankText: '_____', hint: 'Field name for tax identifier', answer: 'taxId' },
-          { line: 32, blankText: '________', hint: "Query type: use 'equality' or 'range', not the field name", answer: 'equality' },
+          { line: 31, blankText: '___', hint: 'Field name for salary data', answer: 'salary' },
+          { line: 32, blankText: '___', hint: "Query type: use exactly 'equality' or 'range', not the field name", answer: 'equality' },
           { line: 43, blankText: '__________________________', hint: 'Method that creates DEKs and collection in one call', answer: 'createEncryptedCollection' },
           { line: 44, blankText: '_______________________', hint: 'Option key for encryptedFields', answer: 'createCollectionOptions' },
           { line: 51, blankText: '_______________', hint: 'Method to attach a keyAltName to a DEK', answer: 'addKeyAltName' },

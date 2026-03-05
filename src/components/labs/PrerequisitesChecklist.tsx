@@ -21,6 +21,8 @@ interface PrerequisitesChecklistProps {
   overrideByPrereqId?: Record<string, React.ReactNode>;
   /** When 'local', atlas prerequisite shows "MongoDB (Local Docker)" and Docker-focused copy. When 'atlas', shows Atlas M10+ copy. */
   mongodbSource?: 'local' | 'atlas';
+  /** When true, app is running in Docker; setup instructions are for local installs only. */
+  runningInContainer?: boolean;
 }
 
 const STORAGE_KEY = 'workshop_prereq_checklist';
@@ -59,8 +61,40 @@ aws sso login --profile lab-new
 Run below to ensure it's up and running:
 aws s3 ls --profile lab-new`;
 
-// Extended prerequisites with setup instructions
+// Extended prerequisites with setup instructions (AWS CLI first per Lab Setup UX)
 const EXTENDED_PREREQUISITES: Prerequisite[] = [
+  { 
+    id: 'awsCli', 
+    label: 'AWS CLI v2 + SSO', 
+    description: 'AWS Command Line Interface with SSO configured for KMS operations',
+    required: true,
+    downloadUrl: 'https://aws.amazon.com/cli/',
+    setupInstructions: [
+      '── Install AWS CLI ──',
+      'macOS: brew install awscli',
+      'Windows: Download MSI from aws.amazon.com/cli',
+      'Linux: curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && unzip awscliv2.zip && sudo ./aws/install',
+      '',
+      '── Configure SSO ──',
+      '1. Run: aws configure sso (or aws configure sso --profile lab-new)',
+      '2. SSO start URL [None]: https://d-9067613a84.awsapps.com/start',
+      '3. SSO region [None]: us-east-1',
+      '4. Select your AWS account and role when prompted',
+      '5. Choose a profile name (e.g. "workshop" or "default")',
+      '',
+      '── To request a fresh set of credentials ──',
+      'aws sso login',
+      '# Or with a named profile: aws sso login --profile workshop',
+      '',
+      '── Verify SSO Session ──',
+      'aws sts get-caller-identity --profile workshop',
+      '# Or: aws sts get-caller-identity  (if using default)',
+      '# Should show your account ID and role',
+      '',
+      '── Tip: Simplest setup ──',
+      'Use profile name "default", or clone your [profile ...] block to [profile default] in ~/.aws/config so you can leave the Lab Setup profile field empty.'
+    ]
+  },
   { 
     id: 'atlas', 
     label: 'MongoDB Atlas Cluster (M10+)', 
@@ -100,38 +134,6 @@ const EXTENDED_PREREQUISITES: Prerequisite[] = [
       'Verify: npm --version'
     ]
   },
-  { 
-    id: 'awsCli', 
-    label: 'AWS CLI v2 + SSO', 
-    description: 'AWS Command Line Interface with SSO configured for KMS operations',
-    required: true,
-    downloadUrl: 'https://aws.amazon.com/cli/',
-    setupInstructions: [
-      '── Install AWS CLI ──',
-      'macOS: brew install awscli',
-      'Windows: Download MSI from aws.amazon.com/cli',
-      'Linux: curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && unzip awscliv2.zip && sudo ./aws/install',
-      '',
-      '── Configure SSO ──',
-      '1. Run: aws configure sso (or aws configure sso --profile lab-new)',
-      '2. SSO start URL [None]: https://d-9067613a84.awsapps.com/start',
-      '3. SSO region [None]: us-east-1',
-      '4. Select your AWS account and role when prompted',
-      '5. Choose a profile name (e.g. "workshop" or "default")',
-      '',
-      '── To request a fresh set of credentials ──',
-      'aws sso login',
-      '# Or with a named profile: aws sso login --profile workshop',
-      '',
-      '── Verify SSO Session ──',
-      'aws sts get-caller-identity --profile workshop',
-      '# Or: aws sts get-caller-identity  (if using default)',
-      '# Should show your account ID and role',
-      '',
-      '── Tip: Simplest setup ──',
-      'Use profile name "default", or clone your [profile ...] block to [profile default] in ~/.aws/config so you can leave the Lab Setup profile field empty.'
-    ]
-  },
   {
     id: 'mongosh',
     label: 'mongosh', 
@@ -169,10 +171,12 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
   prerequisites,
   verifiedTools,
   overrideByPrereqId = {},
-  mongodbSource
+  mongodbSource,
+  runningInContainer = false
 }) => {
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+  const [expandedOverrides, setExpandedOverrides] = useState<Record<string, boolean>>({ awsCli: true });
 
   // Load checked state from localStorage
   useEffect(() => {
@@ -195,6 +199,10 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
 
   const toggleExpanded = (id: string) => {
     setExpandedItems(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const toggleOverride = (id: string) => {
+    setExpandedOverrides(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   // Use extended prerequisites instead of passed ones
@@ -262,11 +270,21 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
             </div>
             <p className="text-xs text-muted-foreground">{displayDescription}</p>
 
-            {/* Override input(s) for this prerequisite (e.g. MongoDB URI, path, AWS profile) */}
+            {/* Override input(s) for this prerequisite (e.g. MongoDB URI, path, AWS profile) – default collapsed */}
             {overrideByPrereqId[prereq.id] && (
-              <div className="mt-2 pl-0">
-                {overrideByPrereqId[prereq.id]}
-              </div>
+              <Collapsible open={!!expandedOverrides[prereq.id]} onOpenChange={() => toggleOverride(prereq.id)}>
+                <CollapsibleTrigger asChild>
+                  <button type="button" className="flex items-center gap-1 text-xs text-primary hover:underline mt-1">
+                    {expandedOverrides[prereq.id] ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                    {expandedOverrides[prereq.id] ? 'Hide' : 'Show'} connection / path / options
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="mt-2 pl-0">
+                    {overrideByPrereqId[prereq.id]}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             )}
 
             {/* Setup Instructions Collapsible */}
@@ -370,7 +388,9 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
       </CardHeader>
       <CardContent className="pt-0">
         <p className="text-sm text-muted-foreground mb-4">
-          Check off each item as you complete the setup. Click "Show setup instructions" for detailed guidance.
+          {runningInContainer
+            ? "When using Docker, tools are provided by the image. The \"Show setup instructions\" below are for local installs only (when not using the container)."
+            : "Check off each item as you complete the setup. Click \"Show setup instructions\" for detailed guidance."}
         </p>
         
         {/* Required */}
@@ -396,7 +416,8 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
         )}
 
         <p className="text-xs text-muted-foreground mt-4 p-2 bg-muted/30 rounded border border-border/50">
-          💡 Use the checkboxes to track your progress. Click "Check Prerequisites" below to auto-verify installed tools.
+          💡 Use the checkboxes to track your progress. Click "Check Prerequisites" above to auto-verify installed tools.
+          {runningInContainer && " Setup instructions in each item apply only when running locally (not in Docker)."}
         </p>
       </CardContent>
     </Card>

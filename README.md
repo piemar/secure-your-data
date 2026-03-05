@@ -89,11 +89,14 @@ All tools (Node, mongosh, mongo_crypt_shared, AWS CLI) are included in the image
 **On Linux/Mac:** Run the commands below. Your `~/.aws` folder is used by default; no extra setup.
 
 ```bash
-## Run the inital time, will build the image and start the container
-docker compose up app --build --force-recreate
-# To restart the container
+# First time or when you want a clean rebuild (recommended): build without cache, then start
+docker compose build --no-cache app
+docker compose up app --force-recreate
+# To restart the container (no rebuild)
 docker compose restart app
 ```
+
+For faster rebuilds using cache (e.g. after small changes), you can use: `docker compose up app --build --force-recreate`.
 
 **On Windows:** The app must mount your `.aws` folder so lab scripts can use your AWS credentials. Set `AWS_CONFIG_PATH` before starting the stack—choose one of the following.
 
@@ -101,19 +104,21 @@ docker compose restart app
 
 ```bash
 $env:AWS_CONFIG_PATH = "$env:USERPROFILE\.aws"
-docker compose up app --build --force-recreate
+docker compose build --no-cache app
+docker compose up app --force-recreate
 ```
 
 **Command Prompt (CMD):**
 
 ```bash
 set AWS_CONFIG_PATH=%USERPROFILE%\.aws
-docker compose up app --build --force-recreate
+docker compose build --no-cache app
+docker compose up app --force-recreate
 ```
 
-**Alternative:** Create a file named `.env` in the same folder as `docker-compose.yml` with one line: `AWS_CONFIG_PATH=C:\Users\YourName\.aws` (replace `YourName` with your Windows username). Then run `docker compose up app --build --force-recreate` as usual; the variable is read from `.env` automatically.
+**Alternative:** Create a file named `.env` in the same folder as `docker-compose.yml` with one line: `AWS_CONFIG_PATH=C:\Users\YourName\.aws` (replace `YourName` with your Windows username). Then run the same two-step: `docker compose build --no-cache app` and `docker compose up app --force-recreate`; the variable is read from `.env` automatically.
 
-**Workaround if env doesn't work:** If setting `AWS_CONFIG_PATH` in the environment or in `.env` does not work, edit `docker-compose.yml` at the volume line that mounts `.aws` (around line 27) and replace the expression with your Windows path, e.g. `C:\Users\YourName\.aws:/root/.aws`.
+**Workaround if env doesn't work:** If setting `AWS_CONFIG_PATH` in the environment or in `.env` does not work, edit `docker-compose.yml` at the volume line that mounts `.aws` (around line 27) and replace the expression with your Windows path, e.g. `C:\Users\YourName\.aws:/root/.aws`. Then run `docker compose build --no-cache app` and `docker compose up app --force-recreate` as above.
 
 ---
 
@@ -152,19 +157,21 @@ Use this **only when you host one instance for many attendees who do not run the
 
 **Configuration:**
 
-| Env var | Purpose |
-|---------|---------|
+
+| Env var                       | Purpose                                                                                                                                                                             |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `WORKSHOP_DEPLOYMENT=central` | Use when one instance serves many browser-only attendees. Lab Setup then instructs them to run scripts on their own machine instead of assuming the server’s environment is theirs. |
-| `LEADERBOARD_MONGODB_URI` | Connection string for the shared leaderboard. Set on the central server so all attendees see the same leaderboard. |
+| `LEADERBOARD_MONGODB_URI`     | Connection string for the shared leaderboard. Set on the central server so all attendees see the same leaderboard.                                                                  |
+
 
 **Server requirements:**
 
-- The server that serves the app and `/api/*` must have **mongosh** (and Node.js if any verify step uses it) installed so that URI-based verification (e.g. key vault index, encryption checks) can run. Attendees pass their MongoDB URI with each request; the server uses it only to run verification and does not store it.
+- The server that serves the app and `/api/`* must have **mongosh** (and Node.js if any verify step uses it) installed so that URI-based verification (e.g. key vault index, encryption checks) can run. Attendees pass their MongoDB URI with each request; the server uses it only to run verification and does not store it.
 - **KMS verification** (`/api/verify-kms` and similar) runs AWS/Azure/GCP CLI on the server. The server typically does not have each attendee's cloud credentials (e.g. `aws sso login`). So in central deployment, KMS verification may be **local-only** unless you add a different auth path (e.g. client-side verification); document this for attendees.
 
-**CORS:** If the frontend is served from a different origin than the API (e.g. static hosting on a CDN, API on another host), configure CORS on the central server so the browser can call `/api/*`.
+**CORS:** If the frontend is served from a different origin than the API (e.g. static hosting on a CDN, API on another host), configure CORS on the central server so the browser can call `/api/`*.
 
-**Optional:** Add rate limiting on `/api/verify-*` and `/api/check-tool` to avoid abuse.
+**Optional:** Add rate limiting on `/api/verify-`* and `/api/check-tool` to avoid abuse.
 
 ### Application Structure
 
@@ -203,9 +210,10 @@ secure-your-data/
 
 The complete workshop content is available in markdown format:
 
-👉 **[See `Docs/README_WORKSHOP.md`](./Docs/README_WORKSHOP.md)**
+👉 **[See `Docs/README_WORKSHOP.md](./Docs/README_WORKSHOP.md)`**
 
 This comprehensive guide includes:
+
 - Full presentation content
 - All lab instructions
 - Code examples
@@ -264,7 +272,7 @@ node rotateCMK.cjs
 
 ### Common Issues
 
-1. **"Bridge connection failed" / "Connection to validation bridge failed"**: Verification and in-browser run use the dev server. Run `npm run dev` so that `/api/verify-*`, `/api/run-node`, and `/api/run-mongosh` are available. The Vite dev server acts as the backend for these requests.
+1. **"Bridge connection failed" / "Connection to validation bridge failed"**: Verification and in-browser run use the dev server. Run `npm run dev` so that `/api/verify-`*, `/api/run-node`, and `/api/run-mongosh` are available. The Vite dev server acts as the backend for these requests.
 2. **AWS SSO Credentials**: Ensure you've run `aws sso login` before running scripts
 3. **KMS Permissions**: Verify your KMS key policy allows `kms:Decrypt` and `kms:GenerateDataKey`
 4. **MongoDB Connection**: Check your Atlas connection string and network access
@@ -277,12 +285,13 @@ For detailed troubleshooting, see [Docs/README_WORKSHOP.md](./Docs/README_WORKSH
 
 Environment variables (set when running the container) let you choose cloud and region. Image used below: `pierrepetersson/mongodb-workshop-sandbox:latest` (use `mongodb-workshop` if you built locally).
 
-| Env var | Purpose | Example |
-|---------|---------|--------|
-| `AWS_CONFIG_PATH` | Host path to `.aws` (for KMS/SSO in container). Set on **Windows** so the app can mount your credentials; Linux/Mac default is `$HOME/.aws`. | Windows: `C:\Users\You\.aws` or `%USERPROFILE%\.aws` in `.env` |
-| `WORKSHOP_CLOUD` | Target cloud | `aws` (default), `azure`, `gcp` |
-| `WORKSHOP_AWS_DEFAULT_REGION` | AWS region in UI | `eu-central-1` |
-| `WORKSHOP_GCP_DEFAULT_LOCATION` | GCP KMS location | `global`, `europe-west1` |
+
+| Env var                         | Purpose                                                                                                                                      | Example                                                        |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `AWS_CONFIG_PATH`               | Host path to `.aws` (for KMS/SSO in container). Set on **Windows** so the app can mount your credentials; Linux/Mac default is `$HOME/.aws`. | Windows: `C:\Users\You\.aws` or `%USERPROFILE%\.aws` in `.env` |
+| `WORKSHOP_CLOUD`                | Target cloud                                                                                                                                 | `aws` (default), `azure`, `gcp`                                |
+| `WORKSHOP_AWS_DEFAULT_REGION`   | AWS region in UI                                                                                                                             | `eu-central-1`                                                 |
+| `WORKSHOP_GCP_DEFAULT_LOCATION` | GCP KMS location                                                                                                                             | `global`, `europe-west1`                                       |
 
 
 When using Docker, `WORKSHOP_DEPLOYMENT` has no effect (ignore it). For central deployment (one URL, many attendees) and other options, see [Central deployment](#central-deployment-multiple-attendees).

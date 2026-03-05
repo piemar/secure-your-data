@@ -153,8 +153,8 @@ KMS_KEY_ID=$(aws kms describe-key --key-id ALIAS_NAME --query 'KeyMetadata.KeyId
 IAM_ARN=$(aws sts get-caller-identity --query 'Arn' --output text)
 ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text)
 
-# Create a policy allowing YOU full access
-cat <<EOF > policy.json
+# Create a policy allowing YOU full access (use /tmp so it works in Docker/read-only CWD)
+cat <<EOF > /tmp/policy.json
 {
     "Version": "2012-10-17",
     "Statement": [{
@@ -173,7 +173,7 @@ cat <<EOF > policy.json
 }
 EOF
 
-aws kms put-key-policy --key-id $KMS_KEY_ID --policy-name default --policy file://policy.json`,
+aws kms put-key-policy --key-id $KMS_KEY_ID --policy-name default --policy file:///tmp/policy.json`,
         skeleton: `# ══════════════════════════════════════════════════════════════
 # Apply a Key Policy to Allow Your IAM User
 # ══════════════════════════════════════════════════════════════
@@ -188,8 +188,8 @@ KMS_KEY_ID=$(aws kms ____________ --key-id ALIAS_NAME --query 'KeyMetadata.KeyId
 IAM_ARN=$(aws sts ___________________ --query 'Arn' --output text)
 ACCOUNT_ID=$(aws sts get-caller-identity --query '________' --output text)
 
-# Create a policy allowing YOU full access
-cat <<EOF > policy.json
+# Create a policy allowing YOU full access (use /tmp so it works in Docker/read-only CWD)
+cat <<EOF > /tmp/policy.json
 {
     "Version": "2012-10-17",
     "Statement": [{
@@ -209,7 +209,7 @@ cat <<EOF > policy.json
 EOF
 
 # Apply the policy to your CMK
-aws kms ______________ --key-id $KMS_KEY_ID --policy-name default --policy file://policy.json`,
+aws kms ______________ --key-id $KMS_KEY_ID --policy-name default --policy file:///tmp/policy.json`,
         challengeSkeleton: `# ══════════════════════════════════════════════════════════════
 # CHALLENGE MODE - Apply KMS Key Policy
 # ══════════════════════════════════════════════════════════════
@@ -257,6 +257,7 @@ aws kms ______________ --key-id $KMS_KEY_ID --policy-name default --policy file:
     tips: [
       'KMS keys use resource-based policies (like S3). The key must explicitly trust your IAM principal.',
       'In production, separate "Key Admin" vs "Key User" permissions. For this lab, you are both.',
+      'We use /tmp/policy.json so the command works in Docker and read-only directories. On native Windows you can use %TEMP%\\policy.json if needed.',
     ],
   },
 

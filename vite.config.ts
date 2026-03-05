@@ -1677,7 +1677,7 @@ export default defineConfig(({ mode }) => ({
                   if (/^[A-Za-z_][A-Za-z0-9_]*=\$\(aws\s/.test(t) || /^[A-Za-z_][A-Za-z0-9_]*=.*\$\(aws\s/.test(t)) return true;
                   if (/^--[A-Za-z0-9-]+/.test(t)) return true;
                   if (/^\)\s*;?\s*$/.test(t)) return true;
-                  if (/^cat\s+<<\w+(\s+>|\s*>>)\s*policy\.json\s*$/.test(t)) return true;
+                  if (/^cat\s+<<\w+(\s+>|\s*>>)\s*(\/tmp\/)?policy\.json\s*$/.test(t)) return true;
                   if (t === 'EOF') return true;
                   if (t.length <= 500 && /^\s*[\s"{}\[\]:,*A-Za-z0-9._$-]+$/.test(t)) return true;
                   return false;

@@ -4,6 +4,8 @@
  * Returns a list of results for the status dialog.
  */
 
+import { sanitizeLabSuffix } from '@/labs/stepEnhancementRegistry';
+
 export type CleanupStatus = 'success' | 'skipped' | 'error';
 
 export interface CleanupResult {
@@ -101,10 +103,11 @@ function getStoredMongoUri(): string {
   return localStorage.getItem(key) || localStorage.getItem('lab_mongo_uri') || '';
 }
 
-/** Per-user suffix for lab DB names (same as stepEnhancementRegistry). Used so reset deletes this user's encryption_*, medical_*, hr_*. */
+/** Per-user suffix for lab DB names (same as stepEnhancementRegistry). Sanitized for KMS/alias compatibility. */
 function getLabUserSuffix(): string {
   if (typeof window === 'undefined' || !window.localStorage) return '';
-  return window.localStorage.getItem('lab_user_suffix') || window.localStorage.getItem('userEmail')?.split('@')[0] || '';
+  const raw = window.localStorage.getItem('lab_user_suffix') || window.localStorage.getItem('userEmail')?.split('@')[0] || '';
+  return sanitizeLabSuffix(raw);
 }
 
 /**
@@ -127,12 +130,13 @@ export async function runResetCleanup(): Promise<CleanupResult[]> {
       ? localStorage.getItem('lab_aws_region') || ''
       : '';
 
-  // If no alias stored but we have suffix, use default lab alias name
+  // If no alias stored but we have suffix, use default lab alias name (sanitized for KMS)
   const aliasToUse =
     alias.trim() ||
     (typeof localStorage !== 'undefined'
       ? (() => {
-          const suffix = localStorage.getItem('lab_user_suffix') || '';
+          const rawSuffix = localStorage.getItem('lab_user_suffix') || '';
+          const suffix = rawSuffix ? sanitizeLabSuffix(rawSuffix) : '';
           return suffix ? `alias/mongodb-lab-key-${suffix}` : '';
         })()
       : '');
@@ -161,7 +165,8 @@ export async function runCleanupForParticipant(
   awsRegion?: string
 ): Promise<CleanupResult[]> {
   const results: CleanupResult[] = [];
-  const safeSuffix = (suffix || '').trim().replace(/\s+/g, '-').toLowerCase();
+  const trimmed = (suffix || '').trim();
+  const safeSuffix = trimmed ? sanitizeLabSuffix(trimmed) : '';
   const alias = safeSuffix ? `alias/mongodb-lab-key-${safeSuffix}` : '';
 
   const kmsResult = await cleanupKMS(alias, awsProfile || undefined, awsRegion || undefined);
@@ -171,4 +176,31 @@ export async function runCleanupForParticipant(
   results.push(...mongoResults);
 
   return results;
+}
+
+/**
+ * Same steps as dashboard "Reset progress" after cleanup dialog: notify leaderboard API,
+ * clear local progress, then reload. Call this from the reset dialog's onClose when phase is 'done'.
+ */
+export async function finishResetProgress(
+  userEmail: string | undefined,
+  resetProgress: () => void
+): Promise<void> {
+  try {
+    if (userEmail) {
+      const { postResetProgress } = await import('@/services/leaderboardApi');
+      await postResetProgress(userEmail);
+    }
+  } catch {
+    // Proceed with local reset even if API fails
+  }
+  localStorage.removeItem('workshop_leaderboard');
+  resetProgress();
+  localStorage.removeItem('lab1-progress');
+  localStorage.removeItem('lab2-progress');
+  localStorage.removeItem('lab3-progress');
+  localStorage.removeItem('completedLabs');
+  localStorage.removeItem('labStartTimes');
+  localStorage.removeItem('lab_kms_alias');
+  window.location.reload();
 }

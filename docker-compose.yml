@@ -1,7 +1,7 @@
 # Run MongoDB only (for local dev): docker compose up mongo -d
 # Run full stack: docker compose up
 # If localhost:8080 is not reachable, check app logs: docker compose logs -f app
-# To reset app (e.g. after dependency changes): docker compose up app --build --force-recreate
+# To reset app: docker compose build --no-cache app && docker compose up app --force-recreate (or faster: docker compose up app --build --force-recreate)
 #
 # Lab "Run" needs MongoDB on localhost:27017 when using "Local" in workshop; mongo service exposes 27017.
 # Queryable Encryption and encrypted collections require a replica set (standalone not supported).
