@@ -23,7 +23,8 @@ services:
       # Replica set required for QE/CSFLE encrypted collections. mongo-init inits rs0.
       - MONGODB_URI=mongodb://root:example@mongo:27017/?replicaSet=rs0
     volumes:
-      - ~/.aws:/root/.aws
+      # Host AWS config: set AWS_CONFIG_PATH on Windows (e.g. %USERPROFILE%\.aws); Linux/Mac use $HOME/.aws by default
+      - ${AWS_CONFIG_PATH:-$HOME/.aws}:/root/.aws
       - .:/usr/src/app
       - /usr/src/app/node_modules
     depends_on:

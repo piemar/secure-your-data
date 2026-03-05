@@ -28,11 +28,65 @@ This interactive web application provides a comprehensive, self-paced learning e
 
 ## Getting Started
 
-**Prerequisites:** MongoDB Atlas M10+ (or local MongoDB 8.0+), AWS account with KMS access, AWS SSO configured. For local run: Node.js 18+ and npm. For Docker: Docker Desktop. vite 7.x
+**Prerequisites**
+
+- **MongoDB:** Atlas M10+ or local MongoDB 8.0+
+- **AWS:** Account with KMS access (see [AWS CLI and SSO setup](#aws-cli-and-sso-setup) below)
+- **If running locally:** Node.js 18+, npm, vite 7.x
+- **If using Docker:** Docker Desktop
+
+### AWS CLI and SSO setup
+
+Do this **before** starting the stack (Docker or local) so your `.aws` folder has valid credentials when the container mounts it or when lab scripts run.
+
+**── Configure SSO (one-time) ──**
+
+1. Run: `aws configure sso` (or `aws configure sso --profile lab-new`)
+2. SSO start URL [None]: `https://d-9067613a84.awsapps.com/start`
+3. SSO region [None]: `us-east-1`
+4. Select your AWS account and role when prompted
+5. Choose a profile name (e.g. "workshop" or "default")
+
+**── Full example session ──**
+
+```bash
+aws configure sso --profile lab-new
+# SSO session name (Recommended): lab-new
+# SSO start URL [None]: https://d-9067613a84.awsapps.com/start
+# SSO region [None]: us-east-1
+# SSO registration scopes [sso:account:access]: (press Enter)
+# → Browser opens for auth; select your AWS account and role (e.g. Solution-Architects.User)
+# CLI default client Region [None]: eu-west-2
+# CLI default output format [None]: json
+
+# To use this profile:
+aws sso login --profile lab-new
+
+# Verify it's working:
+aws s3 ls --profile lab-new
+```
+
+**── To request a fresh set of credentials ──**
+
+Run in PowerShell, CMD, or a shell (before each workshop session or when the session has expired):
+
+```bash
+aws sso login
+# Or with a named profile:
+aws sso login --profile lab-new
+```
+
+**── Tip: Simplest setup ──**
+
+Use profile name "default", or clone your `[profile ...]` block to `[profile default]` in `~/.aws/config` (Windows: `%USERPROFILE%\.aws\config`) so you can leave the Lab Setup profile field empty in the app.
+
+---
 
 ### 1. Run with Docker (recommended)
 
 All tools (Node, mongosh, mongo_crypt_shared, AWS CLI) are included in the image. Supports **arm64** (Apple Silicon) and **amd64**.
+
+**On Linux/Mac:** Run the commands below. Your `~/.aws` folder is used by default; no extra setup.
 
 ```bash
 ## Run the inital time, will build the image and start the container
@@ -41,7 +95,35 @@ docker compose up app --build --force-recreate
 docker compose restart app
 ```
 
-Open **http://localhost:8080** and complete Lab Setup. Run `aws sso login` on your host first if using AWS SSO.
+**On Windows:** The app must mount your `.aws` folder so lab scripts can use your AWS credentials. Set `AWS_CONFIG_PATH` before starting the stack—choose one of the following.
+
+**PowerShell** (run these two lines, then start the app):
+
+```bash
+$env:AWS_CONFIG_PATH = "$env:USERPROFILE\.aws"
+docker compose up app --build --force-recreate
+```
+
+**Command Prompt (CMD):**
+
+```bash
+set AWS_CONFIG_PATH=%USERPROFILE%\.aws
+docker compose up app --build --force-recreate
+```
+
+**Alternative:** Create a file named `.env` in the same folder as `docker-compose.yml` with one line: `AWS_CONFIG_PATH=C:\Users\YourName\.aws` (replace `YourName` with your Windows username). Then run `docker compose up app --build --force-recreate` as usual; the variable is read from `.env` automatically.
+
+**Workaround if env doesn't work:** If setting `AWS_CONFIG_PATH` in the environment or in `.env` does not work, edit `docker-compose.yml` at the volume line that mounts `.aws` (around line 27) and replace the expression with your Windows path, e.g. `C:\Users\YourName\.aws:/root/.aws`.
+
+---
+
+**After the stack is running**
+
+1. **Open the app:** [http://localhost:8080](http://localhost:8080)
+2. **Complete Lab Setup** in the app: enter your MongoDB URI (or use the default when using Docker), choose your AWS profile, and set the AWS region. The in-app Lab Setup screen walks you through this and can run a "Check Prerequisites" to verify tools.
+3. **If your AWS SSO session expired:** Run `aws sso login` (or `aws sso login --profile <name>`) again on your host; the container uses your mounted `.aws` folder. See [AWS CLI and SSO setup](#aws-cli-and-sso-setup) above.
+
+---
 
 **Connect to the local MongoDB** (from a terminal on your host, while the stack is running):
 
@@ -60,7 +142,7 @@ npm install
 npm run dev
 ```
 
-Open **http://localhost:8080**, complete **Lab Setup** (MongoDB URI, path to mongosh and mongo_crypt_shared if needed), then start the labs. Run `aws sso login` before lab scripts that use KMS.
+Open [http://localhost:8080](http://localhost:8080), complete **Lab Setup** in the app (MongoDB URI, paths to mongosh and mongo_crypt_shared, AWS profile and region), then start the labs. If you use AWS SSO, run `aws sso login` (or `aws sso login --profile <name>`) on your machine before running lab steps that use KMS.
 
 ### Central deployment (multiple attendees)
 
@@ -197,6 +279,7 @@ Environment variables (set when running the container) let you choose cloud and 
 
 | Env var | Purpose | Example |
 |---------|---------|--------|
+| `AWS_CONFIG_PATH` | Host path to `.aws` (for KMS/SSO in container). Set on **Windows** so the app can mount your credentials; Linux/Mac default is `$HOME/.aws`. | Windows: `C:\Users\You\.aws` or `%USERPROFILE%\.aws` in `.env` |
 | `WORKSHOP_CLOUD` | Target cloud | `aws` (default), `azure`, `gcp` |
 | `WORKSHOP_AWS_DEFAULT_REGION` | AWS region in UI | `eu-central-1` |
 | `WORKSHOP_GCP_DEFAULT_LOCATION` | GCP KMS location | `global`, `europe-west1` |

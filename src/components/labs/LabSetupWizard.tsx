@@ -437,9 +437,37 @@ export const LabSetupWizard: React.FC = () => {
       awsCli: (
         <div className="space-y-3 mt-1">
           <div>
-            <p className="text-xs text-muted-foreground mb-1">
-              For the simplest experience, create or clone your SSO profile as <strong>default</strong> in <code className="bg-muted px-1 rounded">~/.aws/config</code> and leave this field empty. Or choose a profile from your config, or type any profile name.
+            <p className="text-xs text-muted-foreground mb-2">
+              Choose a profile from your config, or type any profile name.
             </p>
+            {runningInContainer && (
+              <Collapsible className="group mb-2">
+                <CollapsibleTrigger asChild>
+                  <button type="button" className="flex items-center gap-1 text-xs text-primary hover:underline">
+                    <ChevronRight className="w-3 h-3 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
+                    Windows: set path for Docker
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-2 pl-4 border-l-2 border-muted space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    On Windows, you must set <code className="bg-muted px-0.5 rounded">AWS_CONFIG_PATH</code> before starting <code className="bg-muted px-0.5 rounded">docker compose</code> so the container can mount your .aws folder. Use one of the options below.
+                  </p>
+                  <p className="text-xs font-medium text-foreground">PowerShell:</p>
+                  <pre className="text-xs font-mono bg-muted p-2 rounded border overflow-x-auto whitespace-pre-wrap">
+{`$env:AWS_CONFIG_PATH = "$env:USERPROFILE\\.aws"
+docker compose up app --build --force-recreate`}
+                  </pre>
+                  <p className="text-xs font-medium text-foreground">Command Prompt (CMD):</p>
+                  <pre className="text-xs font-mono bg-muted p-2 rounded border overflow-x-auto whitespace-pre-wrap">
+{`set AWS_CONFIG_PATH=%USERPROFILE%\\.aws
+docker compose up app --build --force-recreate`}
+                  </pre>
+                  <p className="text-xs text-muted-foreground pt-1 border-t border-border">
+                    If setting <code className="bg-muted px-0.5 rounded">AWS_CONFIG_PATH</code> in the environment does not work, you can set the path directly in <code className="bg-muted px-0.5 rounded">docker-compose.yml</code> at the volume line (around line 27), e.g. <code className="bg-muted px-0.5 rounded">C:\\Users\\YourName\\.aws:/root/.aws</code>, as a workaround.
+                  </p>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
             <div className="flex flex-wrap items-center gap-2">
               <Input placeholder="Leave empty for default, or enter profile name" value={awsProfileInput} onChange={(e) => setAwsProfileInput(e.target.value)} onBlur={() => { const v = awsProfileInput.trim(); v ? localStorage.setItem('lab_aws_profile', v) : localStorage.removeItem('lab_aws_profile'); }} className="font-mono text-xs w-[200px] min-w-0" />
               <Popover onOpenChange={(open) => { if (open && awsProfilesList.length === 0) { setAwsProfilesLoading(true); validatorUtils.listAwsProfiles().then((r) => { setAwsProfilesList(r.profiles || []); setAwsProfilesLoading(false); if (!r.success && r.message) toast.error(r.message); }); } }}>
@@ -482,7 +510,7 @@ export const LabSetupWizard: React.FC = () => {
           </div>
         </div>
       ),
-    }), [localUri, uriFromWorkshop, hasAtlasConnection, cryptSharedManualPath, isVerifyingCryptPath, mongoshPathInput, awsProfileInput, awsRegionInput, awsProfilesList, awsProfilesLoading, awsTestLoading, verifiedTools, prereqResults, getWorkshopSession()?.mongodbSource]);
+    }), [localUri, uriFromWorkshop, hasAtlasConnection, cryptSharedManualPath, isVerifyingCryptPath, mongoshPathInput, awsProfileInput, awsRegionInput, awsProfilesList, awsProfilesLoading, awsTestLoading, verifiedTools, prereqResults, getWorkshopSession()?.mongodbSource, runningInContainer]);
 
     if (phase === 'ready') {
         return (
