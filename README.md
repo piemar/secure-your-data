@@ -304,24 +304,36 @@ When using Docker, `WORKSHOP_DEPLOYMENT` has no effect (ignore it). For central 
 
 To publish one image tag that works on both **arm64** (Apple Silicon) and **amd64** (Intel/AMD), build and push with buildx (e.g. to GitHub Container Registry or Docker Hub).
 
-**One-time setup:** The default Docker builder does not support multi-platform builds. Create and use a builder that does (run once per machine):
+**One-time setup:** The default Docker builder does not support multi-platform builds. You need a builder that uses the `docker-container` driver.
+
+If you already have a builder named `multiarch`, switch to it and bootstrap:
 
 ```bash
-docker buildx create --name multiarch --use
+docker buildx use multiarch
 docker buildx inspect --bootstrap
 ```
 
-If `multiarch` already exists, run `docker buildx use multiarch` instead of the first line.
+If you don't have one, or you still see *"Multi-platform build is not supported"*, create it (this removes an existing `multiarch` builder if present):
 
-Then build and push (example for Docker Hub user `pierrepetersson`). **You must be logged in** to Docker Hub as the user that owns the repository, and the repository must exist (create it at [hub.docker.com](https://hub.docker.com) if needed). To ensure the image includes the latest code, add `--no-cache` or `--build-arg CACHEBUST=$(date +%s)`:
+```bash
+docker buildx rm multiarch 2>/dev/null || true
+docker buildx create --name multiarch --driver docker-container --use
+docker buildx inspect --bootstrap
+```
+
+Then build and push. **You must be logged in** to Docker Hub (`docker login`) and the repository must exist (create it at [hub.docker.com](https://hub.docker.com) if needed).
+
+The default **Dockerfile** is a thin image that uses `FROM youruser/mongodb-workshop-sandbox:latest`. That base image must already exist on Docker Hub. If it doesn't (e.g. first publish or a variant repo like `...-sandbox-apac`), use **Dockerfile.full** so the image is built from scratch with no pre-published base:
 
 ```bash
 docker login
-docker buildx build --platform linux/amd64,linux/arm64 --build-arg CACHEBUST=$(date +%s) -t pierrepetersson/mongodb-workshop-sandbox-final:latest --push .
-# If you need the image to reflect latest code: add --no-cache or --build-arg CACHEBUST=$(date +%s)
+# Full image (use this if the base image doesn't exist yet, or for a separate tag like -apac):
+docker buildx build -f Dockerfile.full --platform linux/amd64,linux/arm64 --build-arg CACHEBUST=$(date +%s) -t pierrepetersson/mongodb-workshop-sandbox:latest --push .
+# Thin image (only after you have published the base as pierrepetersson/mongodb-workshop-sandbox:latest):
+# docker buildx build --platform linux/amd64,linux/arm64 --build-arg CACHEBUST=$(date +%s) -t pierrepetersson/mongodb-workshop-sandbox-final:latest --push .
 ```
 
-Use your own Docker Hub username instead of `pierrepetersson` if you're publishing under a different account (e.g. `youruser/mongodb-workshop:latest`). If you see *"push access denied"* or *"authorization failed"*, run `docker login` and ensure you're pushing to a repository you own.
+Use your own Docker Hub username instead of `pierrepetersson` if you're publishing under a different account. If you see *"push access denied"* or *"authorization failed"*, run `docker login` and ensure you're pushing to a repository you own. If you see *"not found"* when loading metadata for the base image, build with `-f Dockerfile.full`.
 
 ### When to set `WORKSHOP_DEPLOYMENT=central`
 
