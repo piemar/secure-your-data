@@ -14,7 +14,7 @@ import { WorkshopLabDefinition } from '@/types';
 /**
  * Lab {N}: {Title}
  * 
- * Source PoV Proof Exercise: Docs/pov-proof-exercises/proofs/{N}/README.md
+ * Source: Docs/pov-proof-exercises/proofs/{N}/README.md OR Docs/Guides/MyLab.md (guide-based labs)
  * {Brief description of what this lab covers}
  */
 export const {labId}Definition: WorkshopLabDefinition = {
@@ -53,7 +53,7 @@ export const {labId}Definition: WorkshopLabDefinition = {
 
 ### Complete Example
 
-See: `src/content/labs/lab-csfle-fundamentals.ts`
+See: `src/content/topics/encryption/csfle/lab-csfle-fundamentals.ts`
 
 ## Quest Template
 
@@ -202,18 +202,7 @@ node scripts/lint-content.js
 
 ## Registration
 
-Register new content:
-
-```bash
-# Auto-register (dry run first)
-node scripts/register-content.js --dry-run=true
-
-# Register specific file
-node scripts/register-content.js --file=src/content/labs/lab-new.ts --type=lab
-
-# Auto-discover and register all new content
-node scripts/register-content.js
-```
+**Labs:** Register new labs by (1) adding the import and lab export to the `allLabs` array in `src/content/topics/index.ts`, and (2) if the POV prefix is new, adding it to the `moduleMap` in `src/labs/enhancements/loader.ts`. See `Docs/ARCHITECTURE_AND_ADDING_LABS.md` and `Docs/ADD_LAB_MASTER_PROMPT.md`. The script `register-content.js` may support other content types; for labs, manual registration in `index.ts` and the loader is the current approach.
 
 ## Next Steps
 

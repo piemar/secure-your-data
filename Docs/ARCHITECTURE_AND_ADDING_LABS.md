@@ -112,5 +112,8 @@ flowchart TB
 ## Related docs
 
 - **Adding a lab with one prompt:** [ADD_LAB_MASTER_PROMPT.md](./ADD_LAB_MASTER_PROMPT.md)
+- **Validating labs (quality audit):** [VALIDATE_LABS_MASTER_PROMPT.md](./VALIDATE_LABS_MASTER_PROMPT.md)
+- **Content-driven vs legacy paths:** [LAB_IMPLEMENTATION_PATHS.md](./LAB_IMPLEMENTATION_PATHS.md)
 - **Content creator workflow:** [CONTENT_CREATOR_QUICK_START.md](./CONTENT_CREATOR_QUICK_START.md)
 - **Folder structure:** [LAB_FOLDER_STRUCTURE_GUIDELINE.md](./LAB_FOLDER_STRUCTURE_GUIDELINE.md)
+- **Historical lab-to-content mapping:** [archive/WORKSHOP_LAB_MAPPING_HISTORICAL.md](./archive/WORKSHOP_LAB_MAPPING_HISTORICAL.md)

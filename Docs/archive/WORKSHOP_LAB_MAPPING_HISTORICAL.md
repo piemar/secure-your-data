@@ -1,3 +1,9 @@
+# Historical: Mapping Labs to Content Model (Pre–topic-centric)
+
+**Note:** This document is archived. Migration is complete. Current lab IDs and paths: Lab 1 `lab-csfle-fundamentals`, Lab 2 `lab-queryable-encryption`, Lab 3 `lab-right-to-erasure`; all labs live under `src/content/topics/<topic>/<pov>/`. See `Docs/LAB_IMPLEMENTATION_PATHS.md` and `Docs/ARCHITECTURE_AND_ADDING_LABS.md`.
+
+---
+
 ## Mapping Current Labs to the New Content Model
 
 This document sketches how the existing labs in `src/components/labs/` map to the new `WorkshopLabDefinition` and `WorkshopLabStep` model defined in `src/types/index.ts`.
@@ -82,7 +88,7 @@ These IDs will be used:
 
 ## 4. Example Lab-to-Content Mapping (Lab 1)
 
-The example in `content/README.md` (`lab-csfle-fundamentals.yaml`) is a concrete sketch of how Lab 1’s steps can be represented as `WorkshopLabDefinition` / `WorkshopLabStep` instances.
+The example in `content/README.md` (`lab-csfle-fundamentals.yaml`) is a concrete sketch of how Lab 1's steps can be represented as `WorkshopLabDefinition` / `WorkshopLabStep` instances.
 
 At a high level:
 
@@ -111,4 +117,3 @@ When we are ready to migrate the labs (later in Phase 2):
    - Any verification or hint behavior is preserved.
 
 This mapping document is intentionally descriptive and preparatory; it does not change runtime behavior on its own.
-

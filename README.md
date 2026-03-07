@@ -175,14 +175,18 @@ Use this **only when you host one instance for many attendees who do not run the
 
 ### Application Structure
 
+Labs are **content-driven**: definitions and step content live under `src/content/topics/` and are rendered by `LabRunner` (no per-lab TSX components for step content). The golden template labs are Lab 1 (CSFLE), Lab 2 (Queryable Encryption), and Lab 3 (Right to Erasure); their definitions and enhancements are the reference for adding new labs.
+
 ```
 secure-your-data/
 ├── src/
 │   ├── components/
-│   │   ├── labs/              # Lab components (Lab1CSFLE, Lab2QueryableEncryption, Lab3RightToErasure)
+│   │   ├── labs/              # LabRunner, StepView, layout (content-driven; no Lab1/Lab2/Lab3 TSX for content)
 │   │   ├── presentation/      # Presentation slides and viewer
 │   │   ├── layout/            # Sidebar, main layout
 │   │   └── settings/          # Workshop settings (moderator: labs, leaderboard reset)
+│   ├── content/
+│   │   └── topics/            # Lab definitions and enhancements (golden: encryption/csfle, queryable-encryption, right-to-erasure)
 │   ├── context/               # React context (LabContext, WorkshopConfigContext, etc.)
 │   └── utils/                 # Validators, leaderboard, workshop storage, etc.
 ├── Docs/
@@ -194,6 +198,16 @@ secure-your-data/
                                # createQEDeks.cjs, createQECollection.cjs, insertQEData.cjs, queryQERange.cjs (Lab 2)
                                # migrateToCSFLE.cjs, multiTenantIsolation.cjs, rotateCMK.cjs (Lab 3)
 ```
+
+**Golden template labs (reference for new labs):** Lab 1 — `src/content/topics/encryption/csfle/lab-csfle-fundamentals.ts` + `enhancements.ts`; Lab 2 — `encryption/queryable-encryption/lab-queryable-encryption.ts` + enhancements; Lab 3 — `encryption/right-to-erasure/lab-right-to-erasure.ts` + enhancements. Principles: minimum 3 steps per lab (5–7 for hands-on), execution via **Run all** / **Run selection** in the editor (no Terminal block that runs `node file.cjs`), Node + Mongosh only when the same action can run in mongosh, skeleton + inlineHints for fill-in-the-blank, 4+ key concepts, and `dataRequirements` for labs that need pre-loaded data.
+
+### Adding a new lab
+
+1. Open [Docs/ADD_LAB_MASTER_PROMPT.md](./Docs/ADD_LAB_MASTER_PROMPT.md) and run the master prompt in Cursor (or your LLM) with a short description and either a proof number or a source doc path (e.g. `Docs/Guides/MyLab.md`).
+2. Apply the generated file edits (lab file, enhancements, index registration, loader if new POV, tests).
+3. Validate: run `node scripts/validate-content.js`, run the hint-rendering test (`npm test -- --run src/test/labs/validate-hint-rendering.test.ts`), and open the app to confirm the new lab and steps load.
+
+Related docs: [Docs/VALIDATE_LABS_MASTER_PROMPT.md](./Docs/VALIDATE_LABS_MASTER_PROMPT.md) (audit existing labs), [Docs/LAB_SAMPLE_DATA_PLAN.md](./Docs/LAB_SAMPLE_DATA_PLAN.md) (pre-loaded data), [Docs/ARCHITECTURE_AND_ADDING_LABS.md](./Docs/ARCHITECTURE_AND_ADDING_LABS.md) (checklist), [Docs/COMPREHENSIVE_POV_LAB_IMPLEMENTATION_PLAN.md](./Docs/COMPREHENSIVE_POV_LAB_IMPLEMENTATION_PLAN.md) (principles).
 
 ### Available Scripts
 

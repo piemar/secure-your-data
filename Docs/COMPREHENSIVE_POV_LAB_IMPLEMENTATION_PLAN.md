@@ -9,7 +9,7 @@ This document is the single source of truth for the 57 Proof of Value (PoV) capa
 ## 1. Overview
 
 - **Source of PoV list:** `Docs/POV.txt` and `Docs/pov-proof-exercises/`
-- **Content model:** Labs are `WorkshopLabDefinition` in `src/content/labs/`; steps use `enhancementId` to load code/skeletons/hints from `src/labs/enhancements/metadata/`.
+- **Content model:** Labs are `WorkshopLabDefinition` in `src/content/topics/<topic>/<pov>/lab-*.ts`; steps use `enhancementId` to load code/skeletons/hints from the same POV folder’s `enhancements.ts` via `src/labs/enhancements/loader.ts` (moduleMap).
 - **Rule:** Each PoV phase has a minimum of 3 labs; each lab has a minimum of 3 steps. Each phase includes documentation, dependent docs, test cases, and cleanup.
 - **Principles:** See `Docs/WORKSHOP_FRAMEWORK_PLAN.md` – content-first, UX parity, modes/roles first-class, story & game as design elements.
 
@@ -34,7 +34,7 @@ This document is the single source of truth for the 57 Proof of Value (PoV) capa
 | **GRAPH (PoV #26)** | Not listed | 3 labs: lab-graph-traversal, lab-graph-recommendations, lab-graph-fraud-detection |
 | **CHANGE-CAPTURE (PoV #33)** | Not listed | 1 lab: lab-data-change-streams |
 | **MONITORING (PoV #28, #29, #25)** | Not listed | 1 lab: lab-operations-monitoring |
-| **Lab folder structure** | Flat or optional data folders | All labs in flat `src/content/labs/` – no POV grouping |
+| **Lab folder structure** | Topic-centric with POV subfolders | All labs in `src/content/topics/<topic>/<pov>/` (e.g. encryption/csfle, query/rich-query). See `Docs/LAB_FOLDER_STRUCTURE_GUIDELINE.md`. |
 | **ContentService registration** | N/A | Manual imports per lab – not scalable |
 | **test-lab.ts** | N/A | Exists but not registered in ContentService |
 
@@ -185,8 +185,8 @@ Run `npm test -- --run` before marking each phase complete.
 
 For each new PoV phase:
 
-1. **Content:** Add lab definitions under `src/content/labs/<pov-slug>/` with `enhancementId` on every step that should show code. If the lab needs data, add `dataRequirements` and optionally `labFolderPath`; use the POV folder's `data/` and `scripts/` subfolders (see §9).
-2. **Metadata:** Add or extend enhancement metadata in `src/labs/enhancements/metadata/<prefix>.ts` (codeBlocks with `code`, `skeleton`, `inlineHints`; ensure each `blankText` matches skeleton). Add `dataRequirements` to enhancements when steps need data.
+1. **Content:** Add lab definitions under `src/content/topics/<topic>/<pov>/lab-<slug>.ts` with `enhancementId` on every step that should show code. If the lab needs data, add `dataRequirements` and optionally `labFolderPath`; use the POV folder's `data/` and `scripts/` subfolders when present (see `Docs/LAB_FOLDER_STRUCTURE_GUIDELINE.md`).
+2. **Metadata:** Add or extend enhancement metadata in `src/content/topics/<topic>/<pov>/enhancements.ts` (codeBlocks with `code`, `skeleton`, `inlineHints`; ensure each `blankText` matches skeleton). Add `dataRequirements` to lab definition when steps need data.
 3. **Loader:** Ensure `src/labs/enhancements/loader.ts` has the correct prefix in `moduleMap` if using a new prefix.
 4. **Tests:** Add or extend tests under `src/test/labs/` for the new enhancements.
 5. **Full test suite:** Run `npm test -- --run` before marking the phase complete. Fix any regressions introduced by the phase. Document known pre-existing failures separately.
@@ -222,102 +222,29 @@ Grouping labs by **POV (Proof of Value)** instead of a flat structure provides:
 
 - **Maintainability:** All labs for a capability live together with their metadata, data, and scripts.
 - **Scalability:** New labs are added to the correct POV folder; no manual ContentService imports.
-- **Discoverability:** Lab loader can scan `src/content/labs/<pov>/` to auto-register labs.
+- **Discoverability:** Labs are registered in `src/content/topics/index.ts` (import + allLabs array); enhancement loader maps prefix to `src/content/topics/<topic>/<pov>/enhancements.ts`.
 - **Dependencies:** Each POV folder can declare its own `data/`, `scripts/`, and enhancement metadata.
 - **Consistency:** Aligns with POV.txt and phase tracking.
 
-### 9.2 Proposed Structure
+### 9.2 Current structure (topic-centric)
 
-```
-src/content/labs/
-├── rich-query/
-│   ├── lab-rich-query-basics.ts
-│   ├── lab-rich-query-aggregations.ts
-│   ├── lab-rich-query-encrypted-vs-plain.ts
-│   ├── data/                    # optional: shared sample data
-│   └── README.md                # optional: POV-specific setup notes
-├── flexible/
-│   ├── lab-flexible-basic-evolution.ts
-│   ├── lab-flexible-nested-documents.ts
-│   ├── lab-flexible-microservice-compat.ts
-│   └── data/
-├── ingest-rate/
-│   ├── lab-ingest-rate-basics.ts
-│   ├── lab-ingest-rate-bulk-operations.ts
-│   ├── lab-ingest-rate-replication-verify.ts
-│   └── scripts/
-├── in-place-analytics/
-│   ├── lab-analytics-overview.ts
-│   ├── lab-in-place-analytics-basics.ts
-│   ├── lab-in-place-analytics-advanced.ts
-│   └── data/
-├── workload-isolation/
-│   ├── lab-workload-isolation-overview.ts
-│   ├── lab-workload-isolation-replica-tags.ts
-│   └── lab-workload-isolation-read-preference.ts
-├── consistency/
-│   ├── lab-consistency-overview.ts
-│   ├── lab-consistency-sharded-setup.ts
-│   └── lab-consistency-verify.ts
-├── scale-out/
-│   ├── lab-scale-out-overview.ts
-│   ├── lab-scale-out-setup.ts
-│   ├── lab-scale-out-execute.ts
-│   └── data/
-├── scale-up/
-│   ├── lab-scale-up-overview.ts
-│   ├── lab-scale-up-setup.ts
-│   ├── lab-scale-up-execute.ts
-│   ├── data/
-│   └── scripts/
-├── encryption/                   # PoV #46, #54, #21
-│   ├── lab-csfle-fundamentals.ts
-│   ├── lab-queryable-encryption.ts
-│   ├── lab-right-to-erasure.ts
-│   └── data/
-├── text-search/                  # PoV #36, #37
-│   ├── lab-text-search-basics.ts
-│   ├── lab-text-search-with-autocomplete.ts
-│   └── lab-text-search-experience.ts
-├── geospatial/                   # PoV #30
-│   ├── lab-geospatial-near.ts
-│   ├── lab-geospatial-polygons.ts
-│   └── lab-geospatial-performance.ts
-├── graph/                        # PoV #26
-│   ├── lab-graph-traversal.ts
-│   ├── lab-graph-recommendations.ts
-│   └── lab-graph-fraud-detection.ts
-├── change-capture/               # PoV #33, #56
-│   └── lab-data-change-streams.ts
-├── monitoring/                   # PoV #28, #29, #25
-│   └── lab-operations-monitoring.ts
-└── index.ts                     # barrel export or lab discovery
-```
+Labs live under `src/content/topics/<topic>/<pov>/` (e.g. `query/rich-query/`, `encryption/csfle/`, `data-management/flexible/`, `scalability/ingest-rate/`). Each topic has a `topic.ts`; each POV subfolder contains `lab-*.ts` and `enhancements.ts`. Registration is in `src/content/topics/index.ts` (allLabs array). See **`Docs/LAB_FOLDER_STRUCTURE_GUIDELINE.md`** for the full tree.
 
 ### 9.3 Primary POV Rule
 
-Labs that cover multiple POVs (e.g. lab-rich-query-encrypted-vs-plain: RICH-QUERY + ENCRYPT-FIELDS) are placed in the folder of their **primary** POV—the main capability the lab teaches. For lab-rich-query-encrypted-vs-plain, primary is RICH-QUERY → `rich-query/`.
+Labs that cover multiple POVs (e.g. lab-rich-query-encrypted-vs-plain: RICH-QUERY + ENCRYPT-FIELDS) are placed in the **topic + POV folder** of their **primary** capability. For lab-rich-query-encrypted-vs-plain, primary is RICH-QUERY → `query/rich-query/`.
 
 ### 9.4 Enhancement Metadata
 
-Enhancement metadata stays in `src/labs/enhancements/metadata/<prefix>.ts` (unchanged). The prefix (e.g. `rich-query`, `flexible`) matches the POV slug. No change to the loader.
+Enhancement metadata lives in the same POV folder as the lab: `src/content/topics/<topic>/<pov>/enhancements.ts`. The loader’s `moduleMap` maps enhancementId **prefix** (e.g. `rich-query`, `csfle`) to that module. See `Docs/LAB_IMPLEMENTATION_PATHS.md` and `Docs/METADATA_DRIVEN_ENHANCEMENT_SYSTEM_COMPLETE.md`.
 
-### 9.5 ContentService Migration
+### 9.5 ContentService and registration
 
-1. **Option A – Barrel exports:** Each POV folder exports its labs; `src/content/labs/index.ts` re-exports all. ContentService imports from the barrel.
-2. **Option B – Dynamic discovery:** ContentService (or a LabRegistry) scans `src/content/labs/**/*.ts` and dynamically imports lab definitions. Requires build-time or runtime glob.
+ContentService imports `allLabs` and `allTopics` from `src/content/topics/index.ts`. Each new lab is added by (1) creating the lab file and enhancements in the topic/POV folder, (2) adding the import and the lab export to the `allLabs` array in `index.ts`, and (3) if the POV prefix is new, adding it to the loader’s `moduleMap` in `src/labs/enhancements/loader.ts`. See `Docs/ARCHITECTURE_AND_ADDING_LABS.md` and `Docs/ADD_LAB_MASTER_PROMPT.md`.
 
-Recommendation: Start with **Option A** (barrel exports) for simplicity; migrate to Option B when the lab count grows significantly.
+### 9.6 Phase 0.5 (Done)
 
-### 9.6 Migration Steps (Phase 0.5)
-
-1. Create POV folders under `src/content/labs/`.
-2. Move each lab file into its POV folder.
-3. Update `labFolderPath` in lab definitions to point to the new path (e.g. `content/labs/rich-query`).
-4. Create `src/content/labs/index.ts` that exports all labs from POV folders.
-5. Update ContentService to import from the barrel instead of individual files.
-6. Update `Docs/LAB_FOLDER_STRUCTURE_GUIDELINE.md` to reflect POV-based structure.
-7. Run tests and verify all labs load correctly.
+Topic-centric structure is in place. Labs are in `src/content/topics/<topic>/<pov>/`; `index.ts` registers all labs; enhancement loader uses moduleMap. For adding a new lab, follow `Docs/ADD_LAB_MASTER_PROMPT.md`.
 
 ---
 

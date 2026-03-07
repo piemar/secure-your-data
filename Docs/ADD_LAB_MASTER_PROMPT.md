@@ -1,6 +1,6 @@
 # Master Template Prompt: Add a New Lab
 
-Use this prompt to generate a complete new lab (lab file, enhancements, and registration) for the workshop framework. You can use it in **two ways**: give a short **description** of what the lab should cover (and proof number), and the AI will infer structure and content from the proof README; or provide **full structured inputs** and the AI will format them into the correct files.
+Use this prompt to generate a complete new lab (lab file, enhancements, and registration) for the workshop framework. You can use it in **two ways**: give a short **description** of what the lab should cover and either a **proof number** (for PoV proof exercises) or a **source doc path** (e.g. `Docs/Guides/Lab_1_CSFLE.md`), and the AI will infer structure and content from that source; or provide **full structured inputs** and the AI will format them into the correct files.
 
 This prompt follows the rules and principles in **`Docs/COMPREHENSIVE_POV_LAB_IMPLEMENTATION_PLAN.md`** (minimum 3 steps per lab, enhancementId-based steps, enhancement metadata, tests, and—when completing a full phase—phase docs and full test suite). It also aligns with **`Docs/WORKSHOP_SESSION_AND_QUALITY_PRINCIPLES.md`** (workshop session wizard, modes Demo/Lab/Challenge, templates in Atlas, session data in provided URI, clone session to change mode, key concepts side-by-side MongoDB vs competitor, combining topics with full lab steps, programming language and DB-per-lab).
 
@@ -47,13 +47,13 @@ Use **Lab 1: CSFLE Fundamentals** and **Lab 2: Queryable Encryption** as the pri
 
 **Avoid:** One-sentence narratives, steps without hints where guidance is needed, missing keyConcepts or prerequisites, **Terminal blocks that only run node**, or labs that feel sparse compared to the encryption labs.
 
-### Use MongoDB official documentation and other sources
+### Use MongoDB official documentation and external research
 
-When inferring or elaborating lab content (what to implement, key concepts, correct terminology, code patterns), use **MongoDB official documentation** as the primary source. Use other sources when needed (e.g. driver docs, Atlas docs, cloud provider docs for KMS).
+**Before generating the lab, perform external research where needed.** Use **MongoDB official documentation** as the primary source; use driver docs, Atlas docs, and cloud provider docs (e.g. KMS) when needed. This ensures correct APIs, terminology, key concepts, and up-to-date code patterns.
 
 - **MongoDB Manual:** https://www.mongodb.com/docs/ (and subpaths such as /manual/, /atlas/, /drivers/).
 - Use the docs to: identify correct APIs and options, define key concepts with accurate explanations, ensure code examples follow current best practices, and align step narratives with official terminology.
-- When the proof README or user description is insufficient, consult the manual (or linked docs) to fill in implementation details, key concepts (4+), and prerequisites.
+- When the source doc (proof README or guide) or user description is insufficient, **consult the manual and other sources** to fill in implementation details, key concepts (4+), and prerequisites. Do not guess; look up when unsure.
 
 ---
 
@@ -76,13 +76,15 @@ In every case: no Terminal block for running node; Node + Mongosh steps use two 
 
 | Mode | You provide | AI does |
 |------|-------------|--------|
-| **Minimal (default)** | A short description of what the lab is about, the proof number, and (optionally) topic, POV folder, lab name. | Reads the proof README (`Docs/pov-proof-exercises/proofs/<n>/README.md`), infers steps (min 3), narratives, instructions, enhancementIds, and code block content from Description/Setup/Execution/Measurement. Generates lab file, enhancements, registration, and tests. |
+| **Minimal (default)** | A short description and **either** a proof number (for `Docs/pov-proof-exercises/proofs/<n>/README.md`) **or** a source doc path (e.g. `Docs/Guides/Lab_1_CSFLE.md`). Optionally: topic, POV folder, lab name. | Reads the given source (proof README or guide). Infers steps (min 3; prefer 5–7 for hands-on), narratives, instructions, enhancementIds, and code block content. Performs external research (MongoDB docs, etc.) when the source is insufficient. Generates lab file, enhancements, registration, and tests. |
 | **Full structured** | All inputs in the User inputs table (lab name, topic, POV folder, every step with title, narrative, instructions, enhancementId, etc.). | Uses your inputs directly and generates the same outputs (no inference from proof). |
 
 **When the AI will ask you for input:**
 
-- **Minimal mode:** If topic or POV folder cannot be inferred from the proof or your description, the AI will ask you to specify them. If the proof README is not available to the AI (e.g. not in context), the AI will ask you to paste the relevant sections (Description, Setup, Execution) or the path so it can work from that.
+- **Minimal mode:** Prefer inferring topic, POV folder, steps, and metadata from the description and source doc; **ask the user only when inference is impossible**. If you have a **source doc path** (e.g. `Docs/Guides/MyLab.md`), read that file instead of a proof README. If the source is not available in context, ask the user to paste the relevant sections or confirm the path.
 - **Full mode:** Only if a required field is missing (e.g. no steps, or enhancementId missing for a step) will the AI ask you to supply it.
+
+**Self-contained labs:** Labs are self-contained with multiple steps the user must complete. The **number of steps** is determined by the LLM from the source doc and topic (minimum 3; prefer 5–7 for hands-on). Do not ask the user how many steps; infer and document the choice.
 
 **Quick start (minimal):** Copy the **Master prompt** and one of the **Examples** below. Replace the example’s description and proof number with yours, paste into Cursor (or your LLM), then apply the generated file edits.
 
@@ -100,11 +102,11 @@ Use this table for **full structured** mode. For **minimal** mode, only the star
 | **Topic** | [USER_INPUT: topicId, must exist, e.g. operations] | Optional; ask if not inferrable from proof/POV |
 | **POV folder** | [USER_INPUT: kebab-case subfolder under topic, e.g. partial-recovery-rpo] | Optional; ask if not inferrable (often kebab-case of POV label) |
 | **POV capability ID(s)** | [USER_INPUT: e.g. ['PARTIAL-RECOVERY-RPO']] | Optional; inferred from proof/POV.txt |
-| **Proof number** | [USER_INPUT: Proof exercise number, e.g. 14] | **Required** (so AI can read proof README) |
+| **Proof number or Source doc path** | [USER_INPUT: Proof number, e.g. 14, OR path e.g. Docs/Guides/Lab_1_CSFLE.md] | **Required** (one of the two: so AI can read proof README or the guide) |
 | **Description** | [USER_INPUT: One sentence, 20–200 chars] | **Required** (what the lab is about) |
-| **Difficulty** | [USER_INPUT: beginner \| intermediate \| advanced] | Optional; default intermediate |
+| **Difficulty** | [USER_INPUT: beginner \| intermediate \| advanced] | Optional; default **intermediate** |
 | **Estimated total time (minutes)** | [USER_INPUT: Number, e.g. 25] | Optional; inferred from steps |
-| **Modes** | [USER_INPUT: e.g. ['lab','demo','challenge']] | Optional; default lab, demo, challenge |
+| **Modes** | [USER_INPUT: e.g. ['lab','demo','challenge']] | Optional; default **['lab','demo','challenge']** |
 | **Steps** | [USER_INPUT: For each step: title, narrative, instructions, enhancementId, estimatedTimeMinutes, points. Min 3.] | Inferred from proof sections (Description, Setup, Execution) |
 | **Key concepts (optional)** | [USER_INPUT: term + explanation pairs, or "none"] | Optional; can infer from proof |
 | **Tags (optional)** | [USER_INPUT: e.g. ['operations','backup','rpo'] or "none"] | Optional |
@@ -211,11 +213,12 @@ The AI will use these values as-is and generate the lab file, enhancements (with
 ```
 You are adding a new lab to the workshop framework. You must support two ways the user can provide input:
 
-**Mode A – Minimal input:** The user gives a short description of what the lab is about and the proof number (and optionally topic, POV folder, lab name). In that case:
-1. Read the proof README from Docs/pov-proof-exercises/proofs/<proof-number>/README.md. If you cannot access that file, ask the user to paste the relevant sections (Description, Setup, Execution, Measurement).
-2. Use the **principal quality template** (CSFLE and Queryable Encryption labs) for elaboration: rich step narratives (2–4 sentences), detailed instructions, 3–5 hints per step where applicable, keyConcepts (4+), prerequisites, dataRequirements when needed, verificationId and sourceSection on every step. Prefer 5–7 steps for hands-on labs when the proof supports it. Use **MongoDB official documentation** (e.g. https://www.mongodb.com/docs/) to determine what to implement, how to phrase key concepts, and correct APIs/terminology; use other sources (driver docs, Atlas docs, cloud provider docs) when needed.
-3. From the proof content and the user's description (and the docs when helpful), infer: lab name (if not given), topic and POV folder (if not given—ask the user if you cannot infer from POV.txt or proof), POV capability ID(s), steps with titles/narratives/instructions mapped to Description/Setup/Execution, enhancementIds (prefix = POV folder), key concepts, and code block content for each enhancement.
-4. Then generate the same outputs as below (lab file, enhancements file, index registration, loader registration if new prefix, tests). If any required value cannot be inferred (e.g. topic or POV folder), ask the user before generating.
+**Mode A – Minimal input:** The user gives a short description and **either** a proof number **or** a source doc path (e.g. Docs/Guides/Lab_1_CSFLE.md), and optionally topic, POV folder, lab name. In that case:
+1. **Read the source:** If the user provided a **source doc path** (e.g. Docs/Guides/MyLab.md), read that file. Otherwise read the proof README from Docs/pov-proof-exercises/proofs/<proof-number>/README.md. If you cannot access the file, ask the user to paste the relevant sections (Description, Setup, Execution, Measurement) or confirm the path.
+2. **External research:** Use **MongoDB official documentation** (https://www.mongodb.com/docs/) and other sources (driver docs, Atlas docs, cloud provider docs for KMS) to determine what to implement, correct APIs/terminology, and key concepts. If the source doc does not specify step count or granularity, decide a sensible number of steps (min 3, prefer 5–7 for hands-on) based on the topic and documentation.
+3. Use the **principal quality template** (CSFLE and Queryable Encryption labs) for elaboration: rich step narratives (2–4 sentences), detailed instructions, 3–5 hints per step where applicable, keyConcepts (4+), prerequisites, dataRequirements when needed, verificationId and sourceSection on every step. Prefer 5–7 steps for hands-on labs when the source supports it.
+4. From the source content and the user's description (and the docs when helpful), infer: lab name (if not given), topic and POV folder (if not given—ask the user if you cannot infer), POV capability ID(s), steps with titles/narratives/instructions mapped to Description/Setup/Execution, enhancementIds (prefix = POV folder), key concepts, and code block content for each enhancement.
+5. Then generate the same outputs as below (lab file, enhancements file, index registration, loader registration if new prefix, tests). If any required value cannot be inferred (e.g. topic or POV folder), ask the user before generating. **Defaults when not specified:** difficulty = intermediate, modes = ['lab','demo','challenge'], verification = none unless step clearly needs it, data requirements = infer from lab description, competitor products = none.
 
 **Mode B – Full structured input:** The user provides all of the following explicitly. Use their values directly; do not infer from the proof. Then generate the outputs below.
 

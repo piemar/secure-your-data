@@ -201,6 +201,6 @@ Before submitting content, ensure:
 ## Examples
 
 See existing content for reference:
-- **Lab Example**: `src/content/labs/lab-csfle-fundamentals.ts`
+- **Lab Example**: `src/content/topics/encryption/csfle/lab-csfle-fundamentals.ts`
 - **Quest Example**: `src/content/quests/stop-the-leak.ts`
 - **Demo Script Example**: `src/content/demo-scripts/test-demo.json`

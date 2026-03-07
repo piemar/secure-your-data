@@ -77,7 +77,7 @@ src/content/topics/
 └── index.ts                  # Barrel: allTopics, allLabs
 ```
 
-**Rule:** Labs are grouped by their **topic** (via `topicId`). Topics with multiple POVs use subfolders (e.g. `query/rich-query/`). Topics with a single focus (e.g. encryption) keep labs flat in the topic folder.
+**Rule:** Labs are grouped by their **topic** (via `topicId`). Topics with multiple POVs or multiple labs use subfolders (e.g. `query/rich-query/`, `encryption/csfle/`, `encryption/queryable-encryption/`, `encryption/right-to-erasure/`). Each POV subfolder contains that capability’s lab(s) and `enhancements.ts`.
 
 ---
 
