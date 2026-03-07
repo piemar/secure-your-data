@@ -62,8 +62,8 @@ export function mapLabDefinitionToIntroContent(
   labDef: WorkshopLabDefinition
 ): Partial<LabIntroContent> {
   return {
-    whatYouWillBuild: labDef.steps.map(s => s.title),
+    whatYouWillBuild: labDef.whatYouWillBuild ?? labDef.steps.map(s => s.title),
     keyConcepts: labDef.keyConcepts ?? [],
-    keyInsight: labDef.description
+    keyInsight: labDef.keyInsight ?? labDef.description
   };
 }

@@ -298,6 +298,10 @@ export interface WorkshopLabDefinition {
   labFolderPath?: string;
   /** Optional: key concepts for the lab overview/intro tab */
   keyConcepts?: Array<{ term: string; explanation: string }>;
+  /** Optional: bullets for "What you will build" on the lab overview (intro) tab. When present, used instead of step titles. */
+  whatYouWillBuild?: string[];
+  /** Optional: main takeaway or "why this matters" for the lab overview (intro) tab. When present, used instead of description. */
+  keyInsight?: string;
 
   /** Default competitor product id to show in demo side-by-side (e.g. postgresql) */
   defaultCompetitorId?: string;
