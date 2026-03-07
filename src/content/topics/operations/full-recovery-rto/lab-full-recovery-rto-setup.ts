@@ -16,7 +16,7 @@ export const labFullRecoveryRtoSetupDefinition: WorkshopLabDefinition = {
   estimatedTotalTimeMinutes: 90,
   tags: ['operations', 'backup', 'rto', 'mgeneratejs', 'setup'],
   prerequisites: [
-    'MongoDB Atlas account with SA credits',
+    'MongoDB Atlas account with credits',
   ],
   povCapabilities: ['FULL-RECOVERY-RTO'],
   labFolderPath: 'Docs/pov-proof-exercises/proofs/14',

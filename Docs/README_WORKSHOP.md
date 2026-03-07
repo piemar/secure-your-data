@@ -20,7 +20,7 @@
 10. [Lab 1: CSFLE Fundamentals with AWS KMS](#10-lab-1-csfle-fundamentals-with-aws-kms)
 11. [Lab 2: Queryable Encryption & Range Queries](#11-lab-2-queryable-encryption--range-queries)
 12. [Lab 3: Migration & Multi-Tenant Patterns](#12-lab-3-migration--multi-tenant-patterns)
-13. [SA Quick Reference Cheat Sheet](#13-sa-quick-reference-cheat-sheet)
+13. [Quick Reference Cheat Sheet](#13-quick-reference-cheat-sheet)
 14. [Troubleshooting FAQ](#14-troubleshooting-faq)
 15. [Additional Resources](#15-additional-resources)
 
@@ -1473,7 +1473,7 @@ rotateCMK("tenant-acme-corp-dek", "arn:aws:kms:us-east-1:123456789012:key/NEW-KE
 
 ---
 
-## 14. SA Quick Reference Cheat Sheet
+## 14. Quick Reference Cheat Sheet
 
 ### Decision Tree: CSFLE vs. QE
 
@@ -1611,4 +1611,4 @@ Outcome:  Data becomes cryptographically indecipherable garbage
 
 ---
 
-*This workshop was created for MongoDB Solutions Architects. For feedback or corrections, contact the SA Enablement team.*
+*This workshop was created for MongoDB technical enablement. For feedback or corrections, contact the Enablement team.*

@@ -123,7 +123,7 @@ export function StepContextDrawer({
             <section>
               <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
                 <Sparkles className="w-4 h-4 text-purple-500" />
-                Pro Tips for SAs
+                Pro Tips
               </h3>
               <div className="space-y-2">
                 {tips.map((tip, idx) => (

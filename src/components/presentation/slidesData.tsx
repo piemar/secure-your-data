@@ -137,7 +137,7 @@ export const slides: SlideData[] = [
             Client-Side Field-Level Encryption
           </h1>
           <h2 className="text-3xl font-semibold mb-2">& Queryable Encryption</h2>
-          <p className="text-xl text-muted-foreground">SA Technical Enablement Deep-Dive</p>
+          <p className="text-xl text-muted-foreground">Technical Enablement Deep-Dive</p>
         </div>
         <div className="flex gap-6 mt-8">
           <StatCard value="45 min" label="Presentation" icon={Database} />
@@ -148,7 +148,7 @@ export const slides: SlideData[] = [
     ),
     speakerNotes: `Welcome to the CSFLE & Queryable Encryption deep-dive session.
 
-This is designed for senior SAs who need to handle complex "Day 2" architectural discussions with customers.
+This is designed for technical roles who need to handle complex "Day 2" architectural discussions with customers.
 
 By the end of this session, you'll be able to:
 - Explain HOW QE works under the hood (not just what it does)

@@ -1,6 +1,6 @@
 # Master Template Prompt: Add a New Lab
 
-Use this prompt to generate a complete new lab (lab file, enhancements, and registration) for the workshop framework. You can use it in **two ways**: give a short **description** of what the lab should cover and either a **proof number** (for PoV proof exercises) or a **source doc path** (e.g. `Docs/Guides/Lab_1_CSFLE.md`), and the AI will infer structure and content from that source; or provide **full structured inputs** and the AI will format them into the correct files.
+Use this prompt to generate a complete new lab (lab file, enhancements, and registration) for the workshop framework. You can use it in **two ways**: give a **description** of what the lab should cover (required) and optionally a **proof number** or **source doc path** so the AI can read that file and infer steps and content; or provide **full structured inputs** and the AI will format them into the correct files.
 
 This prompt follows the rules and principles in **`Docs/COMPREHENSIVE_POV_LAB_IMPLEMENTATION_PLAN.md`** (minimum 3 steps per lab, enhancementId-based steps, enhancement metadata, tests, and—when completing a full phase—phase docs and full test suite). It also aligns with **`Docs/WORKSHOP_SESSION_AND_QUALITY_PRINCIPLES.md`** (workshop session wizard, modes Demo/Lab/Challenge, templates in Atlas, session data in provided URI, clone session to change mode, key concepts side-by-side MongoDB vs competitor, combining topics with full lab steps, programming language and DB-per-lab).
 
@@ -32,7 +32,7 @@ Use **Lab 1: CSFLE Fundamentals** and **Lab 2: Queryable Encryption** as the pri
 
 | Aspect | Minimum / style |
 |--------|------------------|
-| **Steps per lab** | Minimum 3; for hands-on labs prefer **5–7 steps** (CSFLE has 7, QE has 4+). Overview-only labs may have 3. |
+| **Steps per lab** | Minimum 3; for hands-on labs prefer **5–7 steps** (CSFLE has 7, QE has 4+). Overview-only labs may have 3. **Every step must be actual code**—no step that only lists resources, links, or “next steps”; put those in keyInsight, keyConcepts, or the lab description. |
 | **Step narrative** | **2–4 sentences** explaining the *why* and *what* (not one line). Example: "The CMK is the root of trust in Envelope Encryption. It never leaves the KMS Hardware Security Module (HSM). This key will \"wrap\" (encrypt) the Data Encryption Keys (DEKs) that MongoDB stores." |
 | **Step instructions** | **Concrete, actionable** (bullet or numbered). Tell the user exactly what to run, create, or do—e.g. "Run the AWS CLI command to create a new symmetric key, create an alias for easier reference, and save the Key ID for the next step." |
 | **Hints per step** | **3–5 hints** where the step has code or verification (CSFLE steps have 3–4 hints each). Hints should guide without giving the answer away (e.g. "The AWS KMS command to create a new key is \"create-key\" (no space)."). |
@@ -41,12 +41,27 @@ Use **Lab 1: CSFLE Fundamentals** and **Lab 2: Queryable Encryption** as the pri
 | **Prerequisites** | List concrete prerequisites (Atlas M10+, AWS IAM, Node.js, etc.). |
 | **dataRequirements** | Include when the lab uses collections, scripts, or files (keyVault, encrypted collection, etc.). **For labs that require pre-loaded data** (e.g. Rich Query Basics, in-place analytics, workload isolation)—so that steps can run queries/aggregations and get sensible results—include a `dataRequirements` array with at least one entry of `type: 'collection'` (with `namespace`, e.g. `RICH-QUERY.customers`) or `type: 'script'` (with `path` to a seed script). When implemented, the UI will show "Load Sample Data" before Start; reset will restore the original dataset. See **`Docs/LAB_SAMPLE_DATA_PLAN.md`**. |
 | **Per-step metadata** | Each step: `estimatedTimeMinutes`, `points`, `sourceProof`, `sourceSection`, `verificationId` (when verification exists), `modes` (e.g. `['lab','demo','challenge']`). |
-| **Enhancement code blocks** | Full working code (or clear text/shell); optional `skeleton` with `inlineHints` for fill-in-the-blank; `tips` array (2–4 tips per enhancement). |
+| **Enhancement code blocks** | Full working code (or clear text/shell); **for every Node or Mongosh code block always include `skeleton` and `inlineHints`**. `tips` array (2–4 tips per enhancement). See **Placeholders** below. |
 | **No Terminal block** | **Do not** add a Terminal (bash) block that only runs `node file.cjs` or `node file.js`. Execution is via **Run all** and **Run selection** in the editor; the app runs the current tab’s content. Steps that only have a Node script have one block; steps with Node + Mongosh have two blocks (no Terminal). |
 | **Node + Mongosh composite** | When a step offers both a Node (`.cjs`/`.js`) script and a Mongosh alternative, define **exactly two blocks**: (1) Node block (e.g. `keyvault-setup.cjs`), (2) `filename: 'Mongosh'`, `language: 'mongosh'`. **No Terminal block.** UI shows one slot **"mongosh ! node"**; mongosh first and default; Run all / Run selection run the active tab (node → run-node, mongosh → run-mongosh). **Only add a Mongosh block when the same functionality can be executed in mongosh** (e.g. key vault index); do not add Mongosh for driver-only actions (create DEK, auto-encrypt, rewrap, etc.)—those steps have one block and no mongosh tab. |
 | **Mongosh blocks** | Same rigour as Node blocks: `skeleton` with placeholders and `inlineHints` (`line`, `blankText`, `hint`, `answer`). Run hint rendering validation and visual check so "?" aligns with each placeholder. Use `$exists` (not `exists`) in MongoDB operators where required (e.g. partialFilterExpression). |
 
-**Avoid:** One-sentence narratives, steps without hints where guidance is needed, missing keyConcepts or prerequisites, **Terminal blocks that only run node**, **missing or thin lab overview (intro tab)**—the overview must be created with research and include whatYouWillBuild, keyInsight, and keyConcepts—or labs that feel sparse compared to the encryption labs.
+**Avoid:** One-sentence narratives, steps without hints where guidance is needed, missing keyConcepts or prerequisites, **Terminal blocks that only run node**, **a step that only compiles resources/links** (every step must be runnable code), **missing or thin lab overview (intro tab)**—the overview must be created with research and include whatYouWillBuild, keyInsight, and keyConcepts—or labs that feel sparse compared to the encryption labs.
+
+### Placeholders (skeleton + inlineHints)
+
+For every enhancement that has a Node or Mongosh code block, always include a **skeleton** and **inlineHints**.
+
+- **Balanced number:** **2–4 blanks per code block** (or 3–5 per step if multiple blocks). Avoid 0 blanks and avoid more than ~5 per block so the step stays focused.
+- **Places that make sense:** Put blanks where the learner should reason or look up: **API/method names** (e.g. `insertOne`, `find`, `$set`), **key string literals** (collection name, filter values), **important arguments** (e.g. filter keys, projection fields). Do not put blanks on boilerplate (requires, `async function run`, `client.close()`).
+- **Format:** Skeleton uses a single placeholder per blank (e.g. `_________` or `_______`); each `inlineHint` has `line` (1-based index into the skeleton string split by newlines), `blankText` (exact string in skeleton), `hint`, `answer`. Reference: `csfle.init-keyvault` and `csfle.create-cmk` in `src/content/topics/encryption/csfle/enhancements.ts`; see **`Docs/HINT_AND_SKELETON_REFACTOR_PLAN.md`** for authoring rules.
+
+### TASK comments in code
+
+In each code block (and its skeleton), add a short **step header** and a **TASK** line so learners see what to do at a glance. Use the same block in both `code` and `skeleton` (and adjust `inlineHints` line numbers if the header adds lines).
+
+- **Format:** Start the file with: step title line (e.g. `// STEP 1: Connect and Insert (insertOne & insertMany)` or `# STEP 1: Create a Customer Master Key (CMK)` for shell), a separator line (e.g. `// ═══════════════════════════════════════`), a 1–2 line explanation, then `// TASK: …` (or `# TASK: …`) describing what to complete (e.g. “Complete the connect call and the insert methods (fill the blanks).”). Use `//` for JavaScript/Node, `#` for shell.
+- **Example:** See `src/content/topics/query/crud/enhancements.ts` (e.g. `crud.connect-insert`) and CSFLE key-vault/CMK steps in `src/content/topics/encryption/csfle/enhancements.ts`.
 
 ### Use MongoDB official documentation and external research
 
@@ -78,12 +93,12 @@ In every case: no Terminal block for running node; Node + Mongosh steps use two 
 
 | Mode | You provide | AI does |
 |------|-------------|--------|
-| **Minimal (default)** | A short description and **either** a proof number (for `Docs/pov-proof-exercises/proofs/<n>/README.md`) **or** a source doc path (e.g. `Docs/Guides/Lab_1_CSFLE.md`). Optionally: topic, POV folder, lab name. | Reads the given source (proof README or guide). Infers steps (min 3; prefer 5–7 for hands-on), narratives, instructions, enhancementIds, and code block content. Performs external research (MongoDB docs, etc.) when the source is insufficient. Generates lab file, enhancements, registration, and tests. |
+| **Minimal (default)** | A **description** (required) and optionally a proof number or source doc path. If you provide a source, the AI reads it to infer steps and content; otherwise it infers from your description and may ask for topic/POV. Optionally: topic, POV folder, lab name. | Reads the source if provided; otherwise uses description + external research. Infers steps (min 3; prefer 5–7 for hands-on), narratives, instructions, enhancementIds, and code block content. Generates lab file, enhancements, registration, and tests. Runs validation after generating. |
 | **Full structured** | All inputs in the User inputs table (lab name, topic, POV folder, every step with title, narrative, instructions, enhancementId, etc.). | Uses your inputs directly and generates the same outputs (no inference from proof). |
 
 **When the AI will ask you for input:**
 
-- **Minimal mode:** Prefer inferring topic, POV folder, steps, and metadata from the description and source doc; **ask the user only when inference is impossible**. If you have a **source doc path** (e.g. `Docs/Guides/MyLab.md`), read that file instead of a proof README. If the source is not available in context, ask the user to paste the relevant sections or confirm the path.
+- **Minimal mode:** Only **Description** is required. **Source** (proof number or path to a guide) is optional: if you provide it, the AI reads that file to infer steps and content; if you omit it, the AI infers from your description and may ask for topic or POV folder. The AI prefers inferring topic, POV folder, and steps from description and (when given) source; it asks only when inference is impossible. If a source path was given but the file is not available, the AI will ask you to paste the relevant sections or confirm the path.
 - **Full mode:** Only if a required field is missing (e.g. no steps, or enhancementId missing for a step) will the AI ask you to supply it.
 
 **Self-contained labs:** Labs are self-contained with multiple steps the user must complete. The **number of steps** is determined by the LLM from the source doc and topic (minimum 3; prefer 5–7 for hands-on). Do not ask the user how many steps; infer and document the choice.
@@ -91,6 +106,57 @@ In every case: no Terminal block for running node; Node + Mongosh steps use two 
 **Quick start (minimal):** Copy the **Master prompt** and one of the **Examples** below. Replace the example’s description and proof number with yours, paste into Cursor (or your LLM), then apply the generated file edits.
 
 **Quick start (full):** Copy the **Master prompt**, fill every **[USER_INPUT: ...]** in the User inputs section with your values, paste into Cursor (or your LLM), then apply the generated file edits.
+
+**In Cursor:** You can either paste the **User input block** with values filled in, or ask to "run the ADD_LAB prompt". When you run the prompt **without** a full User input block, the AI will **show a structured checklist** in the chat (required + optional items) so you know exactly what to provide; you **reply in the same chat** with your answers. The AI then uses those inputs to generate the lab and runs validation afterward. See **Interactive flow in Cursor** below.
+
+---
+
+## Interactive flow in Cursor (ask first, then generate)
+
+**When the user says "run the ADD_LAB prompt" or "run @Docs/ADD_LAB_MASTER_PROMPT.md" (or similar) and has NOT already provided a full User input block with all key values, you MUST NOT start generating the lab.**
+
+Instead, **present the required inputs as a structured checklist** so the user knows exactly what to provide. Use the format below every time you ask for input (do not substitute a single paragraph or one question at a time). The user will **reply in the same chat** with their answers for each item or paste the User input block with values filled in. Only after the user has provided at least the **required** inputs should you proceed to read the source, do research, and generate.
+
+**Checklist format to use in chat:**
+
+- **Header:** One short line of context, e.g. *"Adding a new lab — please provide these inputs (reply in chat or paste the User input block)."*
+- **Required:** A clear list of items the user must fill in, each on its own line with a checkbox-style bullet so the user can provide input for each.
+- **Optional:** A separate list of items the user may skip (you will infer or use defaults).
+
+**Template to paste (the AI must output something like this):**
+
+```
+Adding a new lab — please provide these inputs.
+
+Reply with your answers below (or paste the User input block from the doc with values filled in). I need at least Description before generating.
+
+Required:
+• Description — What is the lab about? (One short sentence.)
+
+Optional — you can skip; I'll infer or use defaults:
+• Source — Proof number (e.g. 17) or path to a guide (e.g. Docs/Guides/Lab_1_CSFLE.md). If provided, we use it to infer steps and content; otherwise we infer from your description and may ask for topic/POV.
+• Topic (e.g. query, encryption, operations)
+• POV folder (e.g. auto-ha, crud-operations)
+• Lab name
+```
+
+**Fixed behavior (do not ask):** Placeholders (skeleton + inlineHints) are always generated. Validation runs after generating (default). Validation-only and revert-after-completion are not offered in the checklist.
+
+**If the user has already pasted a full User input block** (with Description and optionally Source, Topic, POV folder, etc.), you may use those values and only ask for any missing required fields using the same checklist format. Do not ask for optional fields that are already present or that have sensible defaults.
+
+---
+
+## User input block (alternative: paste pre-filled)
+
+Copy this block into your message when using **minimal** mode **and** you want to provide all values at once (instead of answering in the chat). Replace each `[USER_INPUT: ...]` with your value. If the user pastes this block with values filled in, the AI uses it and only asks for missing required fields. **If the user did NOT paste this block**, the AI must ask for the inputs **in the chat**, and the user **types their answers in the chat**; see **Interactive flow in Cursor** above.
+
+```
+- Description: [USER_INPUT: One sentence, what the lab is about]
+- Source (optional): [USER_INPUT: Proof number e.g. 17 OR path e.g. Docs/Guides/Lab_1_CSFLE.md — we use it to infer steps; omit to infer from description]
+- Topic: [USER_INPUT: e.g. operations — optional]
+- POV folder: [USER_INPUT: e.g. auto-ha — optional]
+- Lab name: [USER_INPUT: optional]
+```
 
 ---
 
@@ -104,12 +170,12 @@ Use this table for **full structured** mode. For **minimal** mode, only the star
 | **Topic** | [USER_INPUT: topicId, must exist, e.g. operations] | Optional; ask if not inferrable from proof/POV |
 | **POV folder** | [USER_INPUT: kebab-case subfolder under topic, e.g. partial-recovery-rpo] | Optional; ask if not inferrable (often kebab-case of POV label) |
 | **POV capability ID(s)** | [USER_INPUT: e.g. ['PARTIAL-RECOVERY-RPO']] | Optional; inferred from proof/POV.txt |
-| **Proof number or Source doc path** | [USER_INPUT: Proof number, e.g. 14, OR path e.g. Docs/Guides/Lab_1_CSFLE.md] | **Required** (one of the two: so AI can read proof README or the guide) |
 | **Description** | [USER_INPUT: One sentence, 20–200 chars] | **Required** (what the lab is about) |
+| **Proof number or Source doc path** | [USER_INPUT: Proof number, e.g. 14, OR path e.g. Docs/Guides/Lab_1_CSFLE.md] | Optional; if provided, AI reads it to infer steps and content; otherwise infers from description. |
 | **Difficulty** | [USER_INPUT: beginner \| intermediate \| advanced] | Optional; default **intermediate** |
 | **Estimated total time (minutes)** | [USER_INPUT: Number, e.g. 25] | Optional; inferred from steps |
 | **Modes** | [USER_INPUT: e.g. ['lab','demo','challenge']] | Optional; default **['lab','demo','challenge']** |
-| **Steps** | [USER_INPUT: For each step: title, narrative, instructions, enhancementId, estimatedTimeMinutes, points. Min 3.] | Inferred from proof sections (Description, Setup, Execution) |
+| **Steps** | [USER_INPUT: For each step: title, narrative, instructions, enhancementId, estimatedTimeMinutes, points. Min 3.] | Inferred from proof/source or description |
 | **Key concepts (optional)** | [USER_INPUT: term + explanation pairs, or "none"] | Optional; can infer from proof |
 | **Tags (optional)** | [USER_INPUT: e.g. ['operations','backup','rpo'] or "none"] | Optional |
 | **Verification (optional)** | [USER_INPUT: verificationId per step or "none"] | Optional |
@@ -213,10 +279,19 @@ The AI will use these values as-is and generate the lab file, enhancements (with
 ## Master prompt (copy from here)
 
 ```
-You are adding a new lab to the workshop framework. You must support two ways the user can provide input:
+You are adding a new lab to the workshop framework.
 
-**Mode A – Minimal input:** The user gives a short description and **either** a proof number **or** a source doc path (e.g. Docs/Guides/Lab_1_CSFLE.md), and optionally topic, POV folder, lab name. In that case:
-1. **Read the source:** If the user provided a **source doc path** (e.g. Docs/Guides/MyLab.md), read that file. Otherwise read the proof README from Docs/pov-proof-exercises/proofs/<proof-number>/README.md. If you cannot access the file, ask the user to paste the relevant sections (Description, Setup, Execution, Measurement) or confirm the path.
+**CRITICAL – Interactive flow:** When the user asks you to "run the ADD_LAB prompt" or run this prompt (e.g. "run @Docs/ADD_LAB_MASTER_PROMPT.md") and has **not** already provided a full User input block with at least Description, you MUST **present a structured checklist** in the chat (see "Interactive flow in Cursor" in this doc). Do NOT use a single run-on sentence or one question at a time. Output:
+1. A short header line (e.g. "Adding a new lab — please provide these inputs.")
+2. A **Required** section with one item: Description.
+3. An **Optional** section: Source (with short explanation: if provided we use it to infer steps; otherwise we infer from description), Topic, POV folder, Lab name.
+
+Do not ask about placeholders (always yes), validation-after (always yes), validation-only, or revert. The user will **reply in the chat** with their answers (or paste the User input block). Do NOT start reading the source or generating until you have at least Description. Only after the user has **replied** should you proceed. For minimal mode, if Topic or POV folder cannot be inferred and are missing, ask. After generating, always run validation.
+
+You must support three modes:
+
+**Mode A – Minimal input:** The user gives a **description** (required) and optionally a proof number or source doc path, topic, POV folder, lab name. In that case:
+1. **Read the source if provided:** If the user gave a source doc path (e.g. Docs/Guides/MyLab.md), read that file. If they gave a proof number, read Docs/pov-proof-exercises/proofs/<proof-number>/README.md. If no source was provided, infer from the description and use external research (MongoDB docs, etc.). If a source was given but you cannot access it, ask the user to paste the relevant sections or confirm the path.
 2. **External research:** Use **MongoDB official documentation** (https://www.mongodb.com/docs/) and other sources (driver docs, Atlas docs, cloud provider docs for KMS) to determine what to implement, correct APIs/terminology, and key concepts. If the source doc does not specify step count or granularity, decide a sensible number of steps (min 3, prefer 5–7 for hands-on) based on the topic and documentation.
 3. Use the **principal quality template** (CSFLE and Queryable Encryption labs) for elaboration: rich step narratives (2–4 sentences), detailed instructions, 3–5 hints per step where applicable, keyConcepts (4+), prerequisites, dataRequirements when needed, verificationId and sourceSection on every step. Prefer 5–7 steps for hands-on labs when the source supports it. **Create the lab overview (intro page):** whatYouWillBuild (3–6 bullets), keyInsight (1–2 sentences), and keyConcepts (4+), using external research and the source so the overview is accurate and engaging.
 4. From the source content and the user's description (and the docs when helpful), infer: lab name (if not given), topic and POV folder (if not given—ask the user if you cannot infer), POV capability ID(s), **overview content (whatYouWillBuild, keyInsight, keyConcepts)**, steps with titles/narratives/instructions mapped to Description/Setup/Execution, enhancementIds (prefix = POV folder), and code block content for each enhancement.
@@ -224,23 +299,25 @@ You are adding a new lab to the workshop framework. You must support two ways th
 
 **Mode B – Full structured input:** The user provides all of the following explicitly. Use their values directly; do not infer from the proof. Then generate the outputs below.
 
-**Quality bar:** Match the elaboration of the encryption labs (CSFLE and Queryable Encryption). **Standardized approach (Lab 1 Step 3):** No Terminal block that only runs node; execution via Run all / Run selection. Node + Mongosh steps: two blocks only (Node, then Mongosh) **when the same can run in mongosh**—otherwise one block, no mongosh tab; no Terminal; composite header "mongosh ! node" when both present, mongosh first and default. Skeleton + inlineHints for both Node and Mongosh blocks when present; hint placement verification for all. Each step: narrative 2–4 sentences, concrete instructions, 3–5 hints where applicable, estimatedTimeMinutes, points, sourceProof, sourceSection, verificationId when applicable. Lab: keyConcepts (4+), prerequisites, dataRequirements when needed. Prefer 5–7 steps for hands-on labs. Reference: Lab 1 Step 3 enhancement `csfle.init-keyvault` in src/content/topics/encryption/csfle/enhancements.ts; lab definitions in lab-csfle-fundamentals.ts and lab-queryable-encryption.ts.
+**Mode C – Validation only:** If the user sets **Run validation stand-alone only?** to yes, do **not** generate lab, enhancements, registration, or tests. Instead: (1) Run `node scripts/validate-content.js` and report output. (2) If the user specified a topic or lab id, run validation for that scope (see Docs/VALIDATE_LABS_MASTER_PROMPT). (3) Run `npm test -- --run src/test/labs/validate-hint-rendering.test.ts` and report pass/fail. Then stop.
+
+**Quality bar:** Match the elaboration of the encryption labs (CSFLE and Queryable Encryption). **Every step must be actual code**—no step that only lists resources or links; put those in overview/keyInsight. **TASK comments:** In each code block (and skeleton), add a step header (e.g. `// STEP N: Title` or `# STEP N: Title`), a separator line, a 1–2 line explanation, and `// TASK: …` (or `# TASK: …`) stating what to complete; use `//` for JS/Node, `#` for shell. **Standardized approach (Lab 1 Step 3):** No Terminal block that only runs node; execution via Run all / Run selection. Node + Mongosh steps: two blocks only (Node, then Mongosh) **when the same can run in mongosh**—otherwise one block, no mongosh tab; no Terminal; composite header "mongosh ! node" when both present, mongosh first and default. **Always include skeleton and inlineHints** for every Node or Mongosh code block (do not output full code only). Placeholders: 2–4 blanks per code block in sensible places (API names, key literals, filter/update keys); see Placeholders subsection. Hint placement verification for all. Each step: narrative 2–4 sentences, concrete instructions, 3–5 hints where applicable, estimatedTimeMinutes, points, sourceProof, sourceSection, verificationId when applicable. Lab: keyConcepts (4+), prerequisites, dataRequirements when needed. Prefer 5–7 steps for hands-on labs. Reference: Lab 1 Step 3 enhancement `csfle.init-keyvault` in src/content/topics/encryption/csfle/enhancements.ts; lab definitions in lab-csfle-fundamentals.ts and lab-queryable-encryption.ts; CRUD lab for TASK headers in src/content/topics/query/crud/enhancements.ts.
 
 Reference shapes and types:
 - Lab definition shape: WorkshopLabDefinition from @/types. Use lab-csfle-fundamentals.ts and lab-queryable-encryption.ts as style reference. **Lab overview (intro tab):** Include whatYouWillBuild (string[], 3–6 items), keyInsight (string, 1–2 sentences), and keyConcepts (4+). Create these using external research and the source doc. Steps use enhancementId only (no inline codeBlocks). Minimum 3 steps; prefer 5–7 for hands-on labs. Every step: id, title, narrative (2–4 sentences), instructions (concrete), estimatedTimeMinutes, points, modes, enhancementId, sourceProof, sourceSection, hints (3–5 where applicable), verificationId when verification exists. Lab-level: keyConcepts (4+), whatYouWillBuild, keyInsight, prerequisites, dataRequirements when needed (when the lab requires pre-loaded data use type 'collection' with namespace or type 'script' with path; see Docs/LAB_SAMPLE_DATA_PLAN.md), labFolderPath when proof folder is used.
-- Enhancements shape: EnhancementMetadataRegistry from @/labs/enhancements/schema. Each entry: id, povCapability, sourceProof, sourceSection, codeBlocks (at least one block: filename, language, code; optional skeleton, inlineHints), tips (2–4). When using skeleton + inlineHints: each inlineHint must have `line` (1-based index into the skeleton string split by newlines) and `blankText` such that the skeleton line at that index contains that exact blank string; otherwise hint markers ("?") will not align. Run `npm test -- --run src/test/labs/validate-hint-rendering.test.ts` to verify, and do a visual check in the browser. (In demo mode the UI shows full solution with no hint markers.)
+- Enhancements shape: EnhancementMetadataRegistry from @/labs/enhancements/schema. Each entry: id, povCapability, sourceProof, sourceSection, codeBlocks (at least one block: filename, language, code; always include skeleton and inlineHints for Node/Mongosh), tips (2–4). For each code block, include skeleton and inlineHints with 2–4 blanks in sensible places (key API names, important literals, filter/update keys). blankText must match the skeleton placeholder exactly. Each inlineHint: `line` (1-based), `blankText`, `hint`, `answer`. Run `npm test -- --run src/test/labs/validate-hint-rendering.test.ts` to verify, and do a visual check in the browser. (In demo mode the UI shows full solution with no hint markers.)
 - **Node + Mongosh composite:** When a step has both a Node (`.cjs`/`.js`) block and a Mongosh block (filename `Mongosh`, language `mongosh`), the UI shows one slot with header **"mongosh ! node"** (no filename shown). The **mongosh** tab is first and is the default view. Run all / Run selection execute the current tab's content (node → run-node, mongosh → run-mongosh; server uses temp files when needed). Both blocks can have skeleton + inlineHints.
 - **Mongosh blocks:** Use the same skeleton + inlineHints pattern as Node/JS blocks: skeleton with placeholders, inlineHints with line, blankText, hint, answer. Hint placement verification applies to mongosh blocks too.
 - Registration: labs are registered in src/content/topics/index.ts (import + add to allLabs array). If the POV prefix is new, add an entry to the moduleMap in src/labs/enhancements/loader.ts (and to preloadAllEnhancements array if present).
 - Enhancement tests: existing tests live in src/test/labs/ and use getStepEnhancement from @/labs/stepEnhancementRegistry. Example: src/test/labs/FullRecoveryRpoEnhancements.test.ts (describe per POV, one it() per enhancementId asserting enh is defined and codeBlocks contain expected content).
 
-User inputs (for Mode B, replace placeholders; for Mode A, user gives description + proof number and optionally topic, POV folder, lab name):
+User inputs (for Mode B, replace placeholders; for Mode A, user gives description and optionally source, topic, POV folder, lab name):
 
 - Lab name: [USER_INPUT: ...]
 - Topic: [USER_INPUT: ...]
 - POV folder: [USER_INPUT: ...]
 - POV capability ID(s): [USER_INPUT: ...]
-- Proof number: [USER_INPUT: ...]
+- Proof number or Source path: [USER_INPUT: optional]
 - Description: [USER_INPUT: ...]
 - Difficulty: [USER_INPUT: ...]
 - Estimated total time (minutes): [USER_INPUT: ...]
@@ -257,7 +334,7 @@ Generate the following:
 
 1. **Lab file** – Full content for src/content/topics/<topic>/<pov-folder>/lab-<slug>.ts. Use a valid export name (e.g. labPartialRecoveryRpoOverviewDefinition for "Partial Recovery RPO Overview"). **Include the lab overview (intro page) content:** whatYouWillBuild (array of 3–6 short strings: what the attendee will build/learn), keyInsight (1–2 sentences: main takeaway), and keyConcepts (4+ terms with explanations). Create these using external research and the source doc so the overview tab is accurate and engaging. Steps must reference enhancementId only (no inline codeBlocks). Minimum 3 steps. Step ids: lab-<slug>-step-1, lab-<slug>-step-2, etc. sourceProof: 'proofs/<proof-number>/README.md' or the source doc path, sourceSection per step where relevant. If the lab needs data/scripts/files, include dataRequirements array (id, type: 'file'|'collection'|'script', path, description, optional sizeHint; for type 'collection' include namespace). **When steps require pre-loaded data** (e.g. query/aggregation labs), include at least one requirement of type 'collection' (with namespace) or type 'script' (path to seed script) so the app can support "Load Sample Data" and reset = original dataset (see Docs/LAB_SAMPLE_DATA_PLAN.md). Optionally set labFolderPath to the proof folder (e.g. 'Docs/pov-proof-exercises/proofs/<proof-number>'). When competitor products were specified: add defaultCompetitorId (e.g. 'postgresql') and competitorIds (e.g. ['postgresql','cosmosdb-vcore','dynamodb']) to the lab definition.
 
-2. **Enhancements file** – Full content for src/content/topics/<topic>/<pov-folder>/enhancements.ts. One entry per enhancementId used in the lab. Each entry: id, povCapability (from POV capability IDs), sourceProof: 'proofs/<proof-number>/README.md', sourceSection (e.g. 'Description', 'Execution', 'Setup'), codeBlocks (at least one block with filename, language, code; add skeleton/tips as appropriate), tips (string array). **Standardized approach (Lab 1 Step 3):** Do not add any Terminal (bash) block that only runs `node file.cjs`. Execution is via Run all / Run selection in the editor. When a step has both Node and Mongosh: list exactly two blocks—Node block first, then Mongosh block (filename 'Mongosh', language 'mongosh'); no Terminal block. UI shows one composite slot "mongosh ! node"; mongosh first and default; Run all / Run selection run the active tab. Both Node and Mongosh blocks must have skeleton + inlineHints (line, blankText, hint, answer) where the step uses fill-in-the-blank; blankText must match the skeleton placeholder exactly. Run hint placement verification for all blocks. When competitor products were specified: for each code block add competitorEquivalents (Record<productId, { language, code, workaroundNote? }>) for each product.
+2. **Enhancements file** – Full content for src/content/topics/<topic>/<pov-folder>/enhancements.ts. One entry per enhancementId used in the lab. Each entry: id, povCapability (from POV capability IDs), sourceProof: 'proofs/<proof-number>/README.md', sourceSection (e.g. 'Description', 'Execution', 'Setup'), codeBlocks (at least one block with filename, language, code; always add skeleton and inlineHints), tips (string array). **In each code and skeleton, add a TASK header** at the top: step title (e.g. `// STEP N: Title`), separator line, short explanation, then `// TASK: …` (or `# TASK: …` for shell). **For each code block, include skeleton and inlineHints with 2–4 blanks in sensible places** (key API names, important literals, filter/update keys). blankText must match the skeleton placeholder exactly; if the TASK header adds lines, increase all inlineHints line numbers accordingly. **Standardized approach (Lab 1 Step 3):** Do not add any Terminal (bash) block that only runs `node file.cjs`. Execution is via Run all / Run selection in the editor. When a step has both Node and Mongosh: list exactly two blocks—Node block first, then Mongosh block (filename 'Mongosh', language 'mongosh'); no Terminal block. The UI shows one composite slot "mongosh ! node"; mongosh first and default; Run all / Run selection run the active tab. Both Node and Mongosh blocks must have skeleton + inlineHints (line, blankText, hint, answer); blankText must match the skeleton placeholder exactly. Run hint placement verification for all blocks. When competitor products were specified: for each code block add competitorEquivalents (Record<productId, { language, code, workaroundNote? }>) for each product.
 
 3. **Index registration** – Exact import statement to add to src/content/topics/index.ts and the exact line to add to the allLabs array (the export name from step 1).
 
@@ -290,6 +367,8 @@ Generate the following:
    - Fix any failures by correcting `line` and/or `blankText` in the enhancement’s `inlineHints` so each blank exists on the given skeleton line (see `Docs/HINT_AND_SKELETON_REFACTOR_PLAN.md` Section 7).
    - **Visual check:** Open each step that has a skeleton and inline hints in the browser and confirm the "?" hint marker appears **exactly where** the placeholder (e.g. `_____________`) is rendered in the editor. If it is misaligned, adjust the enhancement’s `inlineHints` (line numbers and `blankText` length) until the marker aligns.
 9. Open the app and confirm the new lab appears and steps load enhancement content correctly.
+
+10. **Run validation after generating (default):** Run `node scripts/validate-content.js`; run `npx vitest run src/test/labs/<PovPascal>Enhancements.test.ts`; if the lab has skeleton + inlineHints, run `npm test -- --run src/test/labs/validate-hint-rendering.test.ts`. Report any failures and fix or list recommended fixes.
 
 **When completing a full PoV phase (all 3 labs for a new POV):**
 

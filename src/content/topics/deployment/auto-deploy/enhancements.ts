@@ -84,7 +84,7 @@ Benefits:
         filename: 'Cluster Payload',
         language: 'json',
         code: `{
-  "name": "SA-PoV",
+  "name": "Demo-PoV",
   "clusterType": "REPLICASET",
   "mongoDBMajorVersion": "5.0",
   "numShards": 1,
@@ -110,7 +110,7 @@ Benefits:
   "providerBackupEnabled": _________
 }`,
         inlineHints: [
-          { line: 2, blankText: '_________', hint: 'Cluster name (e.g. SA-PoV)', answer: 'SA-PoV' },
+          { line: 2, blankText: '_________', hint: 'Cluster name (e.g. Demo-PoV)', answer: 'Demo-PoV' },
           { line: 6, blankText: '_________', hint: 'Cloud provider: AWS, AZURE, or GCP', answer: 'AWS' },
           { line: 7, blankText: '_________', hint: 'Region (e.g. US_WEST_2, US_EAST_1)', answer: 'US_WEST_2' },
           { line: 8, blankText: '_________', hint: 'Instance size (e.g. M10, M30)', answer: 'M30' },
@@ -238,7 +238,7 @@ Security: Never commit keys to git. Use env vars.`,
 apiPublicKey  = "ATLAS-API-PUBLIC-KEY"
 apiPrivateKey = "ATLAS-API-PRIVATE-KEY"
 projectId     = "ATLAS-PROJECTID"
-clusterName   = "SA-PoV"  # optional`,
+clusterName   = "Demo-PoV"  # optional`,
         skeleton: `apiPublicKey  = "_________"
 apiPrivateKey = "_________"
 projectId     = "_________"`,
@@ -272,7 +272,7 @@ chmod +x auto_deploy_atlas.py
 ./auto_deploy_atlas.py
 
 # Output:
-# Creating cluster: SA-PoV
+# Creating cluster: Demo-PoV
 # Cluster status: CREATING
 # ...
 # Cluster status: IDLE

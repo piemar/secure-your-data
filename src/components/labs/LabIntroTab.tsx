@@ -89,7 +89,7 @@ export function LabIntroTab({
         <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 flex items-start gap-3">
           <Lightbulb className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
           <div className="text-sm">
-            <span className="font-medium text-primary">SA Insight: </span>
+            <span className="font-medium text-primary">Insight: </span>
             <span className="text-muted-foreground italic">"{keyInsight}"</span>
           </div>
         </div>

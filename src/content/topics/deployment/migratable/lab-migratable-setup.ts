@@ -16,7 +16,7 @@ export const labMigratableSetupDefinition: WorkshopLabDefinition = {
   estimatedTotalTimeMinutes: 45,
   tags: ['migration', 'atlas', 'ec2', 'live-migration', 'setup'],
   prerequisites: [
-    'MongoDB Atlas account with SA credits',
+    'MongoDB Atlas account with credits',
     'AWS account access',
     'SSH key for EC2',
   ],

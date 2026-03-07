@@ -282,7 +282,7 @@ export function WorkshopSessionWizard({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="demo">Demo (SA-led presentation)</SelectItem>
+                  <SelectItem value="demo">Demo (instructor-led presentation)</SelectItem>
                   <SelectItem value="lab">Labs (hands-on)</SelectItem>
                   <SelectItem value="challenge">Challenge (timed, scored)</SelectItem>
                 </SelectContent>

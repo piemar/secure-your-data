@@ -65,7 +65,7 @@ export const labRichQueryEncryptedVsPlainDefinition: WorkshopLabDefinition = {
       narrative:
         'Design a query pattern that keeps PII encrypted while still supporting the business queries your customer needs.',
       instructions:
-        '- Propose which fields stay encrypted and which remain plain.\n- Show at least one query that works end-to-end without exposing PII.\n- Document trade-offs for the SA playbook.',
+        '- Propose which fields stay encrypted and which remain plain.\n- Show at least one query that works end-to-end without exposing PII.\n- Document trade-offs for the playbook.',
       estimatedTimeMinutes: 10,
       modes: ['lab', 'demo', 'challenge'],
       enhancementId: 'rich-query.encrypted-vs-plain-design',

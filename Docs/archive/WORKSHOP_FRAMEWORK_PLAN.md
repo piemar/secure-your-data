@@ -10,7 +10,7 @@ Instead of a flat list of labs, you see:
   - Modeling data and security in MongoDB.
   - Comparing this to how it would look on an RDBMS or DocumentDB competitor.
 - **Flags** and **achievements** that make the experience feel like a capture‑the‑flag game: discover a misconfigured index, enforce encryption end-to-end, or fix a slow query.
-- A **moderator dashboard** for the SA: they can flip between demo mode (telling the story) and hands‑on mode (letting attendees solve it), see team progress in real time, and adapt on the fly.
+- A **moderator dashboard** for the facilitator: they can flip between demo mode (telling the story) and hands‑on mode (letting attendees solve it), see team progress in real time, and adapt on the fly.
 - Everything **configurable via content** (YAML/JSON/Markdown) so new topics, industries, and challenges can be added without touching core code.
 
 This plan describes how to get from the current single‑topic CSFLE/QE app to that framework, **without breaking today’s UX** and always working on a **separate branch**.
@@ -82,11 +82,11 @@ These will be defined as TypeScript types and JSON Schemas, but here is the conc
 ### Roles & Modes
 
 - **Role**:
-  - `moderator` (SA or facilitator).
+  - `moderator` (instructor or facilitator).
   - `attendee` (hands-on participant).
   - `observer` (for example a stakeholder watching).
 - **Mode**:
-  - `demo`: SA talks through the material; slides and live demo.
+  - `demo`: Instructor talks through the material; slides and live demo.
   - `lab`: hands-on guided steps.
   - `challenge`: story and game mode (quest-driven, flags, customer challenge).
 
@@ -135,7 +135,7 @@ These will be defined as TypeScript types and JSON Schemas, but here is the conc
 
 - Stack: **React + Vite + shadcn** (same as today).
 - Key frontend modules:
-  - **`LabRunner`**: generic component that renders any lab described in content (steps, hints, flags, verifications).
+  - `**LabRunner`**: generic component that renders any lab described in content (steps, hints, flags, verifications).
   - **Topic & Lab Catalog**: browse and select topics, labs, and templates.
   - **Modes UI**:
     - **Demo mode**: presenter view, speaker notes, controlled pacing.
@@ -267,7 +267,7 @@ No code or content changes happen in this phase.
 ### Goals
 
 - Replace hard-coded lab definitions with **content files**, without changing how the labs appear or behave to users.
-- Introduce a reusable **`LabRunner`** that can render any lab described in content.
+- Introduce a reusable `**LabRunner`** that can render any lab described in content.
 
 ### Activities
 
@@ -279,7 +279,7 @@ No code or content changes happen in this phase.
 - Implement **ContentService**:
   - Loads and validates content at backend startup.
   - Exposes read APIs: `GET /api/topics`, `GET /api/labs/:id`, and similar.
-- Implement **`LabRunner`**:
+- Implement `**LabRunner`**:
   - A React component that:
     - Receives a lab definition (from content).
     - Renders steps, descriptions, code blocks, and “Verify” actions.

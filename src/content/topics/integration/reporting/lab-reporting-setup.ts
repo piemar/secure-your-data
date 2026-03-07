@@ -15,7 +15,7 @@ export const labReportingSetupDefinition: WorkshopLabDefinition = {
   difficulty: 'intermediate',
   estimatedTotalTimeMinutes: 75,
   tags: ['integration', 'reporting', 'bi-connector', 'mongoimport', 'odbc', 'mysql-workbench'],
-  prerequisites: ['MongoDB Atlas account with SA credits', 'MongoDB tools 3.6+'],
+  prerequisites: ['MongoDB Atlas account with credits', 'MongoDB tools 3.6+'],
   povCapabilities: ['REPORTING'],
   labFolderPath: 'Docs/pov-proof-exercises/proofs/16',
   modes: ['lab', 'demo'],

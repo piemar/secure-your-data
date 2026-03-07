@@ -16,7 +16,7 @@ export const labRollingUpdatesSetupDefinition: WorkshopLabDefinition = {
   estimatedTotalTimeMinutes: 25,
   tags: ['operations', 'rolling-updates', 'python', 'atlas', 'setup'],
   prerequisites: [
-    'MongoDB Atlas account with SA credits',
+    'MongoDB Atlas account with credits',
   ],
   povCapabilities: ['ROLLING-UPDATES'],
   labFolderPath: 'Docs/pov-proof-exercises/proofs/12',

@@ -228,7 +228,7 @@ export async function generateBrandedTemplate(filename: string = 'MongoDB-Brande
       // Session title
       {
         text: {
-          text: 'SA Enablement: CSFLE & Queryable Encryption',
+          text: 'Enablement: CSFLE & Queryable Encryption',
           options: {
             x: 2,
             y: LAYOUT.footerY + 0.03,
@@ -665,7 +665,7 @@ export async function generateBrandedTemplate(filename: string = 'MongoDB-Brande
     fontFace: 'Arial',
     align: 'center',
   });
-  titleSlide.addText('SA Enablement Session', {
+  titleSlide.addText('Enablement Session', {
     x: 0.5,
     y: 4.1,
     w: 9,

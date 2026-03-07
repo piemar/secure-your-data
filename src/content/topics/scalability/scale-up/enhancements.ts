@@ -172,7 +172,7 @@ pip3 install pymongo asyncio dnspython
     ],
     tips: [
       'M20 is the minimum tier for this proof (M10 has limited features).',
-      'Use SA preallocated Atlas credits for the cluster.',
+      'Use preallocated Atlas credits for the cluster.',
       'Connection string format: mongodb+srv://main_user:<PASSWORD>@cluster.mongodb.net/test',
     ],
   },

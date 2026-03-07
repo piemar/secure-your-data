@@ -1,4 +1,4 @@
-# SA Must-Know Concepts (CSFLE, QE, Right to Erasure)
+# Must-Know Concepts (CSFLE, QE, Right to Erasure)
 
 Summary of key concepts Solutions Architects should know for each lab, aligned with the presentation and lab overviews.
 

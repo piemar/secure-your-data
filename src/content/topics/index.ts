@@ -37,6 +37,7 @@ import { lab3Definition } from './encryption/right-to-erasure/lab-right-to-erasu
 import { labRichQueryBasicsDefinition } from './query/rich-query/lab-rich-query-basics';
 import { labRichQueryAggregationsDefinition } from './query/rich-query/lab-rich-query-aggregations';
 import { labRichQueryEncryptedVsPlainDefinition } from './query/rich-query/lab-rich-query-encrypted-vs-plain';
+import { labMongodbCrudDefinition } from './query/crud/lab-mongodb-crud';
 import { labFlexibleBasicEvolutionDefinition } from './data-management/flexible/lab-flexible-basic-evolution';
 import { labFlexibleNestedDocumentsDefinition } from './data-management/flexible/lab-flexible-nested-documents';
 import { labFlexibleMicroserviceCompatDefinition } from './data-management/flexible/lab-flexible-microservice-compat';
@@ -119,6 +120,7 @@ export const allLabs: WorkshopLabDefinition[] = [
   labRichQueryBasicsDefinition,
   labRichQueryAggregationsDefinition,
   labRichQueryEncryptedVsPlainDefinition,
+  labMongodbCrudDefinition,
   labFlexibleBasicEvolutionDefinition,
   labFlexibleNestedDocumentsDefinition,
   labFlexibleMicroserviceCompatDefinition,

@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   CryptoShreddingDiagram,
+  CRUDOperationsDiagram,
   CSFLEArchitectureDiagram,
   PITRFlowDiagram,
   LiveMigrationFlowDiagram,
@@ -40,6 +41,9 @@ export const labIntroComponents: Record<
   }),
   'lab-workload-isolation-overview': () => ({
     architectureDiagram: <WorkloadIsolationDiagram />,
+  }),
+  'lab-mongodb-crud': () => ({
+    architectureDiagram: <CRUDOperationsDiagram />,
   }),
   'lab-csfle-fundamentals': () => ({
     architectureDiagram: <CSFLEArchitectureDiagram />,

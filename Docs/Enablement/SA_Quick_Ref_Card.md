@@ -1,4 +1,4 @@
-# SA Quick Reference: MongoDB CSFLE & Queryable Encryption
+# Quick Reference: MongoDB CSFLE & Queryable Encryption
 
 ## 1. Decision Matrix: Which one to use?
 | Requirement | Recommend | Why? |

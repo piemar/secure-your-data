@@ -36,6 +36,7 @@ Quick pointers to the docs you need.
 - **[LAB_MIGRATION_GUIDE.md](./LAB_MIGRATION_GUIDE.md)** – Migrating from TSX to content-driven lab definitions.
 - **[LAB_SAMPLE_DATA_PLAN.md](./LAB_SAMPLE_DATA_PLAN.md)** – Pre-loaded data, Load Sample Data UX, reset behaviour.
 - **[LAB_UI_LAYOUT_TARGET.md](./LAB_UI_LAYOUT_TARGET.md)** – Target layout: Sidebar | Database Navigator | Editor | Preview.
+- **[LAB_PREREQUISITES_IMPLEMENTATION_PLAN.md](./LAB_PREREQUISITES_IMPLEMENTATION_PLAN.md)** – Lab dependencies (prerequisiteLabIds), auto-include and sort in workshop builder.
 - **[SA_MUST_KNOW_CONCEPTS.md](./SA_MUST_KNOW_CONCEPTS.md)** – CSFLE, QE, Right to Erasure concepts for SAs.
 - **Guides/** – Lab guides (e.g. Lab_1_CSFLE.md, Lab_2_QE.md, Lab_3_GDPR.md), security, migration.
-- **Enablement/** – SA quick reference, patterns.
+- **Enablement/** – Quick reference, patterns.

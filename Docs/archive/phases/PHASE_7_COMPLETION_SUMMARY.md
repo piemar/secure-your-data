@@ -88,7 +88,7 @@ const stepEnhancements = createStepEnhancements(lab1Steps);
 **What's in stepEnhancements** (Map<string, Partial<Step>>):
 - Code blocks (full code, skeletons, challenge/expert skeletons)
 - Inline hints (line-by-line guidance for skeletons)
-- Tips (SA tips, best practices)
+- Tips (Pro tips, best practices)
 - Exercises (quizzes, fill-in-the-blank, challenges)
 - Verification functions (`onVerify` callbacks)
 - Troubleshooting guides

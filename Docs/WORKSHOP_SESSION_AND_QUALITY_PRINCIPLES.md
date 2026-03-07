@@ -41,7 +41,7 @@ Additional implemented labs (Query & Search, Encryption, etc.): TEXT-SEARCH, AUT
 
 | Mode | Purpose | Key behavior |
 |------|--------|----------------|
-| **Demo** | SA-led presentation; minimal typing by attendees | Intro and key concepts with **MongoDB vs competitor side-by-side**; steps can be shown with full solution; competitor panel 50/50 when applicable. |
+| **Demo** | Instructor-led presentation; minimal typing by attendees | Intro and key concepts with **MongoDB vs competitor side-by-side**; steps can be shown with full solution; competitor panel 50/50 when applicable. |
 | **Labs** | Hands-on; attendees run code and complete steps | Full narratives, instructions, code blocks (skeleton + hints), verification; DB per lab (default local MongoDB Community). |
 | **Challenge** | Timed, scored, gamified | Same lab content with challenge skeletons; leaderboard, flags, quests; session stores all stats and metrics. |
 
@@ -84,7 +84,7 @@ Additional implemented labs (Query & Search, Encryption, etc.): TEXT-SEARCH, AUT
 
 ## 6. Dynamic Presentation and Key Concepts
 
-- A workshop typically starts with an **intro** where the SA explains **key concepts** for the selected topic/labs.
+- A workshop typically starts with an **intro** where the presenter explains **key concepts** for the selected topic/labs.
 - **Key concepts** must be shown **side-by-side: how MongoDB does it vs how the competitor does it**, so attendees see the difference immediately.
 - The content (intro, key concepts, steps) must **adapt to the selected template and labs** (dynamic, not one-size-fits-all).
 

@@ -39,7 +39,7 @@ export async function exportToPPTX(slides: SlideData[], filename: string = 'Mong
   // Set presentation properties
   pptx.author = 'MongoDB Solutions Architecture';
   pptx.title = 'Client-Side Field Level Encryption & Queryable Encryption';
-  pptx.subject = 'SA Enablement Session';
+  pptx.subject = 'Enablement Session';
   pptx.company = 'MongoDB';
   pptx.layout = 'LAYOUT_16x9';
 
@@ -87,7 +87,7 @@ export async function exportToPPTX(slides: SlideData[], filename: string = 'Mong
       // Session title in footer
       {
         text: {
-          text: 'SA Enablement: CSFLE & Queryable Encryption',
+          text: 'Enablement: CSFLE & Queryable Encryption',
           options: {
             x: 2,
             y: 5.38,

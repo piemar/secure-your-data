@@ -16,7 +16,7 @@ export const labScaleOutSetupDefinition: WorkshopLabDefinition = {
   estimatedTotalTimeMinutes: 45,
   tags: ['scale-out', 'atlas', 'aws', 'api', 'setup'],
   prerequisites: [
-    'MongoDB Atlas account with SA credits',
+    'MongoDB Atlas account with credits',
     'AWS account access',
     'Python 3',
   ],

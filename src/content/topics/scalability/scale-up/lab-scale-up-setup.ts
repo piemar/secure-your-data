@@ -16,7 +16,7 @@ export const labScaleUpSetupDefinition: WorkshopLabDefinition = {
   estimatedTotalTimeMinutes: 20,
   tags: ['scale-up', 'atlas', 'setup', 'monitoring'],
   prerequisites: [
-    'MongoDB Atlas account with SA credits',
+    'MongoDB Atlas account with credits',
     'Python 3',
   ],
   povCapabilities: ['SCALE-UP'],
@@ -84,7 +84,7 @@ export const labScaleUpSetupDefinition: WorkshopLabDefinition = {
       narrative:
         'Create an M20 3-node replica set in Atlas, add main_user with Atlas admin role, and whitelist your laptop IP. Obtain the Application Short SRV connection string for the proof scripts.',
       instructions:
-        '- Log into Atlas (cloud.mongodb.com), navigate to your SA project\n- Security → Database Access: add main_user, Built-in Role: Atlas admin (note password)\n- Create M20 3-node replica set in a single region (default settings)\n- Security → Network Access: add IP Access List entry for your laptop IP\n- Connect → Connect Your Application → Python → copy Connection String Only',
+        '- Log into Atlas (cloud.mongodb.com), navigate to your Atlas project\n- Security → Database Access: add main_user, Built-in Role: Atlas admin (note password)\n- Create M20 3-node replica set in a single region (default settings)\n- Security → Network Access: add IP Access List entry for your laptop IP\n- Connect → Connect Your Application → Python → copy Connection String Only',
       estimatedTimeMinutes: 10,
       modes: ['lab', 'demo', 'challenge'],
       points: 10,

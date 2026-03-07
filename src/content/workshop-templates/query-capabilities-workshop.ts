@@ -12,6 +12,7 @@ export const queryCapabilitiesWorkshopTemplate: WorkshopTemplate = {
     'Hands-on workshop showcasing MongoDB rich queries, text search, geospatial queries, and graph-style traversals.',
   topicIds: ['query'],
   labIds: [
+    'lab-mongodb-crud',
     'lab-rich-query-basics',
     'lab-rich-query-aggregations',
     'lab-rich-query-encrypted-vs-plain',

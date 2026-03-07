@@ -15,7 +15,7 @@ export const labPartialRecoverySetupDefinition: WorkshopLabDefinition = {
   difficulty: 'intermediate',
   estimatedTotalTimeMinutes: 35,
   tags: ['operations', 'backup', 'partial-recovery', 'setup', 'mgeneratejs', 'atlas'],
-  prerequisites: ['MongoDB Atlas account with SA credits'],
+  prerequisites: ['MongoDB Atlas account with credits'],
   povCapabilities: ['PARTIAL-RECOVERY'],
   labFolderPath: 'Docs/pov-proof-exercises/proofs/15',
   modes: ['lab', 'demo'],

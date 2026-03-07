@@ -26,7 +26,7 @@ export const labAutoHaSetupDefinition: WorkshopLabDefinition = {
       narrative:
         'In your Atlas project, create an M10-based 3-node replica set in a single region. Add a database user (e.g. main_user) with read and write to any database, and note the password.',
       instructions:
-        '- Log in to cloud.mongodb.com and open your SA project\n- Create cluster: M10, 3 nodes, single region (default settings)\n- Security → Add Database User: main_user, Read and write to any database; save password',
+        '- Log in to cloud.mongodb.com and open your Atlas project\n- Create cluster: M10, 3 nodes, single region (default settings)\n- Security → Add Database User: main_user, Read and write to any database; save password',
       estimatedTimeMinutes: 6,
       modes: ['lab', 'demo', 'challenge'],
       points: 10,

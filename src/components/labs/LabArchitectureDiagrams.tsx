@@ -804,3 +804,50 @@ export function WorkloadIsolationDiagram({ className }: DiagramProps) {
     </div>
   );
 }
+
+/** MongoDB CRUD: high-level flow — Application → Driver → Database */
+export function CRUDOperationsDiagram({ className }: DiagramProps) {
+  return (
+    <div className={cn('w-full py-4', className)}>
+      <h3 className="text-lg font-semibold mb-4 text-center">How CRUD flows</h3>
+      <svg viewBox="0 0 560 160" className="w-full h-auto max-w-2xl mx-auto">
+        {/* Your Application — conceptual, not a method list */}
+        <rect x="16" y="24" width="148" height="112" rx="8" fill="hsl(220, 13%, 14%)" stroke="hsl(145, 100%, 42%)" strokeWidth="2" />
+        <text x="90" y="48" textAnchor="middle" fill="hsl(145, 100%, 46%)" fontSize="11" fontWeight="600">Your Application</text>
+        <text x="90" y="72" textAnchor="middle" fill="hsl(215, 15%, 65%)" fontSize="10">Create</text>
+        <text x="90" y="88" textAnchor="middle" fill="hsl(215, 15%, 65%)" fontSize="10">Read</text>
+        <text x="90" y="104" textAnchor="middle" fill="hsl(215, 15%, 65%)" fontSize="10">Update</text>
+        <text x="90" y="120" textAnchor="middle" fill="hsl(215, 15%, 65%)" fontSize="10">Delete</text>
+        <text x="90" y="128" textAnchor="middle" fill="hsl(215, 15%, 50%)" fontSize="8">(single &amp; batch)</text>
+
+        {/* Arrow */}
+        <path d="M 164 80 L 208 80" stroke="hsl(215, 15%, 50%)" strokeWidth="2" markerEnd="url(#crud-arrow)" />
+
+        {/* Driver — same filter syntax, atomicity */}
+        <rect x="216" y="24" width="128" height="112" rx="8" fill="hsl(220, 13%, 14%)" stroke="hsl(280, 70%, 58%)" strokeWidth="2" strokeDasharray="5 4" />
+        <text x="280" y="48" textAnchor="middle" fill="hsl(280, 70%, 62%)" fontSize="11" fontWeight="600">MongoDB Driver</text>
+        <text x="280" y="72" textAnchor="middle" fill="hsl(215, 15%, 65%)" fontSize="9">One filter syntax</text>
+        <text x="280" y="88" textAnchor="middle" fill="hsl(215, 15%, 65%)" fontSize="9">for find, update, delete</text>
+        <text x="280" y="108" textAnchor="middle" fill="hsl(145, 100%, 46%)" fontSize="9">Document-level</text>
+        <text x="280" y="122" textAnchor="middle" fill="hsl(145, 100%, 46%)" fontSize="9">atomicity</text>
+
+        {/* Arrow */}
+        <path d="M 344 80 L 388 80" stroke="hsl(215, 15%, 50%)" strokeWidth="2" markerEnd="url(#crud-arrow)" />
+
+        {/* MongoDB Atlas — collections, durability */}
+        <rect x="396" y="24" width="148" height="112" rx="8" fill="hsl(220, 13%, 14%)" stroke="hsl(30, 100%, 55%)" strokeWidth="2" />
+        <text x="470" y="48" textAnchor="middle" fill="hsl(30, 100%, 60%)" fontSize="11" fontWeight="600">MongoDB Atlas</text>
+        <text x="470" y="72" textAnchor="middle" fill="hsl(215, 15%, 65%)" fontSize="9">Collections</text>
+        <text x="470" y="88" textAnchor="middle" fill="hsl(215, 15%, 65%)" fontSize="9">&amp; documents</text>
+        <text x="470" y="108" textAnchor="middle" fill="hsl(215, 15%, 55%)" fontSize="8">Batch ops &amp; write concern</text>
+        <text x="470" y="122" textAnchor="middle" fill="hsl(215, 15%, 55%)" fontSize="8">(durability)</text>
+
+        <defs>
+          <marker id="crud-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="hsl(215, 15%, 50%)" />
+          </marker>
+        </defs>
+      </svg>
+    </div>
+  );
+}

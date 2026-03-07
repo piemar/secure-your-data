@@ -51,7 +51,7 @@ export const labGeospatialPerformanceDefinition: WorkshopLabDefinition = {
       id: 'lab-geospatial-performance-step-3',
       title: 'Step 3: Capture Best-Practice Guidance',
       narrative:
-        'Summarize best practices for geospatial modeling and query design for inclusion in SA playbooks.',
+        'Summarize best practices for geospatial modeling and query design for inclusion in playbooks.',
       instructions:
         '- Document 3–5 “dos and don’ts” for geospatial queries.\n- Highlight index choices, coordinate precision, and query bounds.\n- Map recommendations back to the GEOSPATIAL PoV capability.',
       estimatedTimeMinutes: 10,

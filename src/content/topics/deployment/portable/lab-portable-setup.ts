@@ -17,7 +17,7 @@ export const labPortableSetupDefinition: WorkshopLabDefinition = {
   estimatedTotalTimeMinutes: 45,
   tags: ['migration', 'atlas', 'aws', 'azure', 'live-migration', 'setup', 'multi-cloud'],
   prerequisites: [
-    'MongoDB Atlas account with SA credits',
+    'MongoDB Atlas account with credits',
     'Node.js and npm installed',
   ],
   povCapabilities: ['PORTABLE'],

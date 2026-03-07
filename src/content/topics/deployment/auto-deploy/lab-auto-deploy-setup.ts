@@ -16,7 +16,7 @@ export const labAutoDeploySetupDefinition: WorkshopLabDefinition = {
   estimatedTotalTimeMinutes: 30,
   tags: ['deployment', 'atlas-api', 'python', 'automation', 'setup'],
   prerequisites: [
-    'MongoDB Atlas account with SA credits',
+    'MongoDB Atlas account with credits',
   ],
   povCapabilities: ['AUTO-DEPLOY'],
   labFolderPath: 'Docs/pov-proof-exercises/proofs/11',

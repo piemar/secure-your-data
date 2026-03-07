@@ -56,7 +56,7 @@ export function NewPresentationView() {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      await exportToPPTX(pptxSlides, 'MongoDB-CSFLE-QE-SA-Enablement');
+      await exportToPPTX(pptxSlides, 'MongoDB-CSFLE-QE-Enablement');
       toast.success('Presentation exported successfully!');
     } catch (error) {
       console.error('Export failed:', error);
@@ -84,7 +84,7 @@ export function NewPresentationView() {
       {/* Top toolbar */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-background">
         <div className="flex items-center gap-4">
-          <h1 className="text-lg font-semibold text-gradient-green">SA Enablement: CSFLE & QE</h1>
+          <h1 className="text-lg font-semibold text-gradient-green">Enablement: CSFLE & QE</h1>
           
           {/* Slide navigation dropdown */}
           <DropdownMenu>

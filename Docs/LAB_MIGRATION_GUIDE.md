@@ -116,7 +116,7 @@ LabRunner loads the lab definition from ContentService and, for each step with a
 ### ✅ Preserved in enhancement metadata (`enhancements.ts`)
 
 - **Code blocks**: Full code, skeletons (guided/challenge/expert), inline hints
-- **Tips**: SA tips, best practices, competitorEquivalents
+- **Tips**: Pro tips, best practices, competitorEquivalents
 - **Troubleshooting**: Optional troubleshooting in enhancement
 - **Exercises**: Optional in enhancement metadata
 

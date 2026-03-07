@@ -350,11 +350,11 @@ export const pptxSlides: SlideData[] = [
           </h1>
           <h2 className="text-3xl font-semibold mb-2">& Queryable Encryption</h2>
           <p className="text-xl text-muted-foreground mt-6">Protecting Sensitive Data at the Application Layer</p>
-          <p className="text-lg text-primary mt-4">SA Enablement Session</p>
+          <p className="text-lg text-primary mt-4">Enablement Session</p>
         </div>
       </div>
     ),
-    speakerNotes: `Welcome to the CSFLE & Queryable Encryption SA Enablement Session.
+    speakerNotes: `Welcome to the CSFLE & Queryable Encryption Enablement Session.
 
 By the end of this session, you'll be able to:
 - Confidently discuss encryption solutions with customers
@@ -363,8 +363,8 @@ By the end of this session, you'll be able to:
 - Guide implementations for CSFLE and QE`,
     exportContent: {
       title: 'Client-Side Field Level Encryption & Queryable Encryption',
-      subtitle: 'Protecting Sensitive Data at the Application Layer\nSA Enablement Session',
-      notes: 'Welcome to the CSFLE & Queryable Encryption SA Enablement Session.',
+      subtitle: 'Protecting Sensitive Data at the Application Layer\nEnablement Session',
+      notes: 'Welcome to the CSFLE & Queryable Encryption Enablement Session.',
     },
   },
 
@@ -1940,7 +1940,7 @@ Prerequisites: Atlas M10+, AWS account with KMS, Node.js 18+, mongosh 2.0+`,
                 { name: 'CSFLE Documentation', url: 'mongodb.com/docs/manual/core/csfle' },
                 { name: 'Queryable Encryption Docs', url: 'mongodb.com/docs/manual/core/queryable-encryption' },
                 { name: 'GitHub Sample Apps', url: 'github.com/mongodb-university/csfle-guides' },
-                { name: 'SA Encryption Playbook', url: 'Confluence → SA Resources → Security' },
+                { name: 'Encryption Playbook', url: 'Confluence → Resources → Security' },
               ].map((item, i) => (
                 <div key={i} className="p-3 rounded-lg bg-card border border-border flex items-center justify-between">
                   <span className="text-sm font-medium">{item.name}</span>
@@ -1980,7 +1980,7 @@ Prerequisites: Atlas M10+, AWS account with KMS, Node.js 18+, mongosh 2.0+`,
 - CSFLE Documentation
 - Queryable Encryption Documentation
 - GitHub Sample Applications
-- Internal SA Encryption Playbook
+- Internal Encryption Playbook
 
 Action items:
 1. Complete both labs - hands-on experience is essential

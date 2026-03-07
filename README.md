@@ -232,7 +232,7 @@ This comprehensive guide includes:
 - All lab instructions
 - Code examples
 - Troubleshooting guides
-- SA quick reference cards
+- Quick reference cards
 - Migration and upgrade guides
 - Security best practices
 

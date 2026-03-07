@@ -59,7 +59,7 @@ export const labTextSearchExperienceDefinition: WorkshopLabDefinition = {
       narrative:
         'Adjust relevance scoring and sort rules to promote the most important results for your scenario.',
       instructions:
-        '- Experiment with boosting fields or using compound scoring.\n- Compare search output before and after tuning.\n- Capture recommended defaults for the SA playbook.',
+        '- Experiment with boosting fields or using compound scoring.\n- Compare search output before and after tuning.\n- Capture recommended defaults for the playbook.',
       estimatedTimeMinutes: 13,
       enhancementId: 'text-search.relevanceTuning',
       verificationId: 'text-search.verifyRelevanceTuning',
