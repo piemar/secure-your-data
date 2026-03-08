@@ -28,6 +28,12 @@ Quick pointers to the docs you need.
 
 ---
 
+## Architecture / refactoring
+
+- **[BROWSER_IDE_TERMINAL_REFACTOR_ARCHITECTURE.md](./BROWSER_IDE_TERMINAL_REFACTOR_ARCHITECTURE.md)** – Incremental plan to evolve the app toward a VS Code–like browser IDE with real terminal (xterm.js), Monaco, multi-language execution (Python, Node, Java, C#), placeholders/hints, command palette, and Warp-style hybrid UX.
+
+---
+
 ## Reference
 
 - **[LAB_IMPLEMENTATION_PATHS.md](./LAB_IMPLEMENTATION_PATHS.md)** – Content-driven path; all labs rendered via LabRunner; enhancement loader.
