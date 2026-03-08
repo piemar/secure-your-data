@@ -7,6 +7,8 @@ import { getLeaderboardEntries, heartbeat } from '@/utils/leaderboardUtils';
 import { postStepProgress } from '@/services/leaderboardApi';
 import { DifficultyLevel } from './DifficultyBadge';
 import { Lightbulb, BookOpen } from 'lucide-react';
+import { sessionManager } from '@/services/session';
+import type { TerminalSession } from '@/types/ide';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import type { LabStepPreviewConfig } from '@/types';
@@ -105,6 +107,23 @@ export function LabViewWithTabs({
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const stepToolbarRef = useRef<{ reset: () => void; openHelp: () => void } | null>(null);
   const [activeTab, setActiveTab] = useState<string>('overview');
+  const [stepTerminalSession, setStepTerminalSession] = useState<TerminalSession | null>(null);
+  const [pendingTerminalEchos, setPendingTerminalEchos] = useState<Array<{ code: string; language: string; filename?: string }>>([]);
+
+  // Step view uses its own terminal session (replaces Console); create when Steps tab is active
+  useEffect(() => {
+    if (activeTab !== 'steps') return;
+    let sessionId: string | null = null;
+    sessionManager.createSession().then((s) => {
+      sessionId = s.id;
+      setStepTerminalSession(s);
+    });
+    return () => {
+      if (sessionId) sessionManager.destroySession(sessionId);
+      setStepTerminalSession(null);
+    };
+  }, [activeTab]);
+
   const prevCompletedCountRef = useRef<number | null>(null);
 
   const [completedSteps, setCompletedSteps] = useState<number[]>(() => {
@@ -310,6 +329,17 @@ export function LabViewWithTabs({
             stepToolbarRef={stepToolbarRef}
             resetProgressCount={resetProgressCount}
             onResetStep={handleResetStep}
+            terminalSession={stepTerminalSession}
+            onRunEchoToTerminal={(payload) => {
+              if (!stepTerminalSession) {
+                setPendingTerminalEchos((prev) => [...prev, payload]);
+                return;
+              }
+              // Practice: terminal is bash. Send comment (bash ignores), then "mongosh \"uri\"" so
+              // bash starts mongosh, then the script so the new mongosh process reads and runs it.
+              const label = payload.filename ? `# --- run (${payload.language}): ${payload.filename} ---` : `# --- run (${payload.language}) ---`;
+              stepTerminalSession.write(label + '\n' + payload.code + '\n\n');
+            }}
           />
         </TabsContent>
 

@@ -35,14 +35,14 @@ services:
 
   # Create keyfile in mongo data volume first (replica set + auth requires it). Runs once then exits.
   mongo-keyfile-init:
-    image: mongo:8.0
+    image: mongo:8.2.5
     restart: "no"
     volumes:
       - mongo-data:/data/db
     entrypoint: ["/bin/sh", "-c", "if [ ! -f /data/db/keyfile ]; then openssl rand -base64 756 > /data/db/keyfile && chmod 400 /data/db/keyfile; fi"]
 
   mongo:
-    image: mongo:8.0
+    image: mongo:8.2.5
     restart: unless-stopped
     ports:
       - "27017:27017"
@@ -64,7 +64,7 @@ services:
 
   # One-time init: start replica set so encrypted collections are supported.
   mongo-init:
-    image: mongo:8.0
+    image: mongo:8.2.5
     restart: "no"
     depends_on:
       mongo:

@@ -15,7 +15,13 @@ export const labRichQueryEncryptedVsPlainDefinition: WorkshopLabDefinition = {
   difficulty: 'intermediate',
   estimatedTotalTimeMinutes: 35,
   tags: ['query', 'encryption', 'csfle', 'qe', 'rich-query'],
-  prerequisites: ['lab-csfle-fundamentals', 'lab-queryable-encryption'],
+  prerequisites: [
+    'lab-csfle-fundamentals',
+    'lab-queryable-encryption',
+    'MongoDB Atlas (M0+) or local MongoDB',
+    'Node.js 18+',
+    'mongosh installed; path in Workshop Settings for Run',
+  ],
   povCapabilities: ['RICH-QUERY', 'ENCRYPT-FIELDS', 'FLE-QUERYABLE-KMIP'],
   modes: ['lab', 'demo', 'challenge'],
   keyConcepts: [

@@ -58,7 +58,7 @@ export const LabSetupWizard: React.FC = () => {
     const { setSection } = useNavigation();
     const { runningInContainer } = useWorkshopConfig();
 
-    const defaultMongoUri = runningInContainer ? 'mongodb://mongo:27017' : 'mongodb://127.0.0.1:27017';
+    const defaultMongoUri = runningInContainer ? 'mongodb://root:example@mongo:27017' : 'mongodb://127.0.0.1:27017';
     const [phase, setPhase] = useState<SetupPhase>(mongoUri ? 'ready' : 'onboarding');
     const [localUri, setLocalUri] = useState(mongoUri || defaultMongoUri);
     const [uriFromWorkshop, setUriFromWorkshop] = useState(false);
@@ -104,13 +104,13 @@ export const LabSetupWizard: React.FC = () => {
         if (mongoUri) setLocalUri(mongoUri);
     }, [mongoUri]);
 
-    // When Docker: default URI to mongo:27017. When local dev with local session: default to 127.0.0.1:27017.
+    // When Docker: default URI to mongodb://root:example@mongo:27017. When local dev with local session: default to 127.0.0.1:27017.
     useEffect(() => {
         const session = getWorkshopSession();
         if (mongoUri) return;
         const useDockerUri = runningInContainer || session?.mongodbSource === 'local';
         if (useDockerUri) {
-            const uri = runningInContainer ? 'mongodb://mongo:27017' : 'mongodb://127.0.0.1:27017';
+            const uri = runningInContainer ? 'mongodb://root:example@mongo:27017' : 'mongodb://127.0.0.1:27017';
             setLocalUri(uri);
             setUriFromWorkshop(true);
         }
@@ -341,7 +341,7 @@ export const LabSetupWizard: React.FC = () => {
         <div className="space-y-2">
           <Input
             id="uri"
-            placeholder={getWorkshopSession()?.mongodbSource === 'local' ? 'mongodb://mongo:27017' : 'mongodb+srv://user:pass@cluster.mongodb.net/'}
+            placeholder={getWorkshopSession()?.mongodbSource === 'local' ? 'mongodb://root:example@mongo:27017' : 'mongodb+srv://user:pass@cluster.mongodb.net/'}
             value={localUri}
             onChange={(e) => { setLocalUri(e.target.value); setUriFromWorkshop(false); }}
             onBlur={() => { const v = localUri.trim(); if (v) setMongoUri(v); }}

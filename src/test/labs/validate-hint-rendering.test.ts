@@ -5,6 +5,7 @@
  * - Each hint's line is within the skeleton line range (1-based).
  * - The skeleton line at that index contains the hint's blankText (so the marker
  *   can be positioned; see InlineHintEditor findBlankPositions and HINT_AND_SKELETON_REFACTOR_PLAN.md).
+ * - At most one placeholder and one hint per row/code line (no two inlineHints with the same line).
  *
  * Visual validation: The "?" marker must appear exactly where the placeholder (_______) is rendered.
  * After running this test, validate in the browser: open Lab 1 Step 2 (CSFLE Apply Key Policy) and
@@ -30,8 +31,8 @@ interface ValidationFailure {
   hintIndex: number;
   hintLine: number;
   blankText: string;
-  reason: 'line_out_of_range' | 'blank_not_found_on_line';
-  skeletonLineCount: number;
+  reason: 'line_out_of_range' | 'blank_not_found_on_line' | 'multiple_hints_on_same_line';
+  skeletonLineCount?: number;
   linePreview?: string;
 }
 
@@ -42,6 +43,27 @@ function validateBlockHints(
 ): ValidationFailure[] {
   const failures: ValidationFailure[] = [];
   const lines = skeleton.split('\n');
+
+  // At most one hint per line
+  const lineToHintIndices = new Map<number, number[]>();
+  inlineHints.forEach((h, i) => {
+    const list = lineToHintIndices.get(h.line) ?? [];
+    list.push(i);
+    lineToHintIndices.set(h.line, list);
+  });
+  lineToHintIndices.forEach((indices, line) => {
+    if (indices.length > 1) {
+      indices.forEach((hintIndex) => {
+        failures.push({
+          ...context,
+          hintIndex,
+          hintLine: line,
+          blankText: inlineHints[hintIndex].blankText,
+          reason: 'multiple_hints_on_same_line',
+        });
+      });
+    }
+  });
 
   for (let i = 0; i < inlineHints.length; i++) {
     const h = inlineHints[i];
@@ -120,7 +142,8 @@ describe('Hint rendering validation (all labs)', () => {
       .map(
         (f) =>
           `  ${f.labId} / ${f.stepId} / ${f.enhancementId} block[${f.blockIndex}]${f.blockFilename ? ` (${f.blockFilename})` : ''} hint[${f.hintIndex}]: line ${f.hintLine} blankText "${f.blankText}" – ${f.reason}` +
-          (f.reason === 'line_out_of_range' ? ` (skeleton has ${f.skeletonLineCount} lines)` : '') +
+          (f.reason === 'line_out_of_range' && f.skeletonLineCount != null ? ` (skeleton has ${f.skeletonLineCount} lines)` : '') +
+          (f.reason === 'multiple_hints_on_same_line' ? ' (at most one hint per line)' : '') +
           (f.linePreview != null ? `\n    line preview: "${f.linePreview}..."` : '')
       )
       .join('\n');

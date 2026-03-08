@@ -30,7 +30,7 @@ const STORAGE_KEY = 'workshop_prereq_checklist';
 /** Shown when mongodbSource is 'local': how to use MongoDB in the Docker stack. */
 const LOCAL_MONGO_SETUP_INSTRUCTIONS = [
   'MongoDB runs in the workshop Docker stack (replica set for encryption support).',
-  'The app connects automatically using the URI above (e.g. mongodb://mongo:27017).',
+  'The app connects automatically using the URI above (e.g. mongodb://root:example@mongo:27017).',
   '── From your host (e.g. to inspect data) ──',
   'mongosh "mongodb://root:example@localhost:27017/?replicaSet=rs0"',
   '# Or without auth if you disabled it: mongosh "mongodb://localhost:27017/?replicaSet=rs0"',

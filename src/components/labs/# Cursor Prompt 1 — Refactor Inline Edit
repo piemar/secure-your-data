@@ -1,0 +1,256 @@
+# Cursor Prompt 1 — Refactor Inline Editor → Terminal Architecture
+
+## Goal
+
+Refactor the existing React application so that an inline editor becomes a terminal when the user clicks **Run**. The design should follow a clean architecture similar to modern developer tools such as VS Code, Replit, and GitHub Codespaces.
+
+The implementation must prioritize clarity, separation of concerns, extensibility, and production‑grade structure.
+
+---
+
+# UX Goal
+
+## Edit Mode
+
+User sees an inline code editor where they can write commands or scripts.
+
+Example:
+
+```
+echo "hello world"
+ls -la
+pwd
+```
+
+Editor capabilities:
+
+* syntax highlighting
+* multiline editing
+* cursor navigation
+* placeholders
+* optional inline hints
+
+## Run Mode
+
+When the user clicks **Run**:
+
+1. Capture editor contents
+2. Send commands to backend
+3. Replace editor with terminal
+4. Stream execution output
+5. Allow interactive terminal afterwards
+
+---
+
+# Required Frontend Architecture
+
+## Monaco Editor
+
+Use Monaco for inline editing.
+
+Features required:
+
+* shell syntax highlighting
+* multiline editing
+* retrieving editor contents
+* ability to hide/lock editor
+
+Libraries:
+
+```
+monaco-editor
+@monaco-editor/react
+```
+
+## xterm.js
+
+Use xterm.js for terminal execution.
+
+Libraries:
+
+```
+xterm
+xterm-addon-fit
+xterm-addon-web-links
+```
+
+Terminal must support:
+
+* streaming output
+* stdin input
+* resizing
+* persistent session
+
+---
+
+# UI State Model
+
+Implement a clear state machine.
+
+```
+type TerminalMode = "editing" | "running" | "terminal"
+```
+
+## editing
+
+Render:
+
+* Monaco editor
+* Run button
+
+## running
+
+Create backend execution session.
+
+## terminal
+
+Unmount editor and mount xterm terminal.
+
+---
+
+# Layout
+
+Editor and terminal share the same container.
+
+Structure:
+
+```
+TerminalContainer
+ ├─ EditorView
+ └─ TerminalView
+```
+
+This creates the illusion that the editor becomes the terminal.
+
+---
+
+# Backend Execution Engine
+
+Use node‑pty for shell execution.
+
+Requirements:
+
+* persistent shell session
+* bash/zsh support
+* streaming stdout/stderr
+* WebSocket transport
+
+Architecture:
+
+```
+Browser
+ ↓ websocket
+Execution Server
+ ↓
+node‑pty
+ ↓
+bash
+```
+
+---
+
+# Execution Flow
+
+When user clicks Run:
+
+1. Capture editor contents
+2. Send command via WebSocket
+3. Backend writes to pty
+4. stdout streamed back
+5. xterm writes output
+
+Flow:
+
+```
+Editor → Run → send command → pty.write() → stdout → xterm.write()
+```
+
+---
+
+# Implementation Rules
+
+Must support:
+
+* persistent sessions
+* streaming output
+* interactive commands
+* terminal resize
+
+Do NOT use:
+
+```
+child_process.exec
+```
+
+Always use node‑pty.
+
+---
+
+# Editor → Terminal Transition
+
+Run button workflow:
+
+1. Save editor content
+2. Hide editor
+3. Mount terminal
+4. Send command
+5. Stream output
+
+Optional:
+
+Add **Edit Again** button.
+
+---
+
+# Suggested Component Structure
+
+```
+components/
+  TerminalContainer.tsx
+  InlineEditor.tsx
+  TerminalView.tsx
+  RunButton.tsx
+
+hooks/
+  useTerminalSession.ts
+
+services/
+  terminalSocket.ts
+```
+
+---
+
+# Backend Structure
+
+```
+server/
+  ptyManager.ts
+  terminalSession.ts
+  websocketServer.ts
+```
+
+---
+
+# Bonus (Design For Later)
+
+Architecture should support future additions:
+
+* multiple terminals
+* notebook cells
+* Python / Node / Java / C# runtimes
+* sandboxed execution
+* collaborative editing
+
+---
+
+# Deliverables
+
+The refactor should produce:
+
+* Monaco inline editor
+* xterm streaming terminal
+* node‑pty backend
+* WebSocket streaming
+* modular React architecture
+
+Focus on building something similar to modern browser IDEs such as VS Code Web, Replit, or Codespaces.

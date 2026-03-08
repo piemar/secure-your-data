@@ -154,14 +154,15 @@ const results = db.customers.find({
 printjson(results);
 print("Query completed.");`,
         inlineHints: [
-          { line: 9, blankText: '_________', hint: "Filter by the customer's gender using a string literal.", answer: 'Female' },
-          { line: 12, blankText: '__________', hint: 'Use the last day of 1990 as the upper bound for the date of birth.', answer: '1990-12-31' },
-          { line: 18, blankText: '________', hint: 'This nested field indicates whether the insured person is a smoker.', answer: 'smoking' },
+          { line: 8, blankText: '_________', hint: "Filter by the customer's gender using a string literal.", answer: 'Female' },
+          { line: 11, blankText: '__________', hint: 'Use the last day of 1990 as the upper bound for the date of birth.', answer: '1990-12-31' },
+          { line: 17, blankText: '________', hint: 'This nested field indicates whether the insured person is a smoker.', answer: 'smoking' },
         ],
       },
     ],
     tips: [
       'Use the node tab to run with the MongoDB Node driver (.cjs), or the mongosh tab to run the same logic in the shell.',
+      'Run uses the mongosh path from Workshop Settings; set it if Run fails or you see "mongosh missing".',
       'This query mirrors the RICH-QUERY proof exercise compound criteria.',
       'Explain to the audience that all filtering happens server-side in MongoDB.',
     ],
@@ -307,9 +308,9 @@ const results = db.customers
 printjson(results);
 print("Query completed.");`,
         inlineHints: [
-          { line: 23, blankText: '_________', hint: 'Include the given name field in the projection.', answer: 'firstName' },
-          { line: 24, blankText: '_________', hint: 'Include the family name field in the projection.', answer: 'lastName' },
-          { line: 29, blankText: '_______', hint: 'Sort by the same date field you projected.', answer: 'dob' },
+          { line: 22, blankText: '_________', hint: 'Include the given name field in the projection.', answer: 'firstName' },
+          { line: 23, blankText: '_________', hint: 'Include the family name field in the projection.', answer: 'lastName' },
+          { line: 27, blankText: '_______', hint: 'Sort by the same date field you projected.', answer: 'dob' },
         ],
       },
     ],
@@ -1408,7 +1409,7 @@ run().catch(console.dir);`,
         inlineHints: [
           { line: 14, blankText: '_________', hint: 'Filter for active customers only.', answer: 'active' },
           { line: 17, blankText: '$_________', hint: 'Group by the numeric account balance field.', answer: 'accountBalance' },
-          { line: 22, blankText: '_________', hint: 'Use 1 to count each document in the bucket.', answer: '1' },
+          { line: 21, blankText: '_________', hint: 'Use 1 to count each document in the bucket.', answer: '1' },
         ],
       },
       {
@@ -1453,7 +1454,7 @@ print("Bucket aggregation completed.");`,
         inlineHints: [
           { line: 3, blankText: '_________', hint: 'Filter for active customers only.', answer: 'active' },
           { line: 6, blankText: '$_________', hint: 'Group by the numeric account balance field.', answer: 'accountBalance' },
-          { line: 11, blankText: '_________', hint: 'Use 1 to count each document in the bucket.', answer: '1' },
+          { line: 10, blankText: '_________', hint: 'Use 1 to count each document in the bucket.', answer: '1' },
         ],
       },
     ],

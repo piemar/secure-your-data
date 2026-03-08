@@ -24,7 +24,8 @@ export const lab1Definition: WorkshopLabDefinition = {
   prerequisites: [
     'MongoDB Atlas M10+ running MongoDB 7.0+',
     'AWS IAM User with KMS Management Permissions',
-    'Working Terminal with AWS CLI access'
+    'Working Terminal with AWS CLI access',
+    'mongosh (MongoDB Shell) installed; path configured in Workshop Settings so Run can execute mongosh blocks',
   ],
   keyConcepts: [
     { term: 'Client-Side Field Level Encryption (CSFLE)', explanation: 'Encrypts sensitive fields in the application before data reaches MongoDB.' },

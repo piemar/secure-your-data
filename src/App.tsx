@@ -8,10 +8,16 @@ import { WorkshopConfigProvider } from "./context/WorkshopConfigContext";
 import { LabProvider } from "./context/LabContext";
 import { RoleProvider } from "./contexts/RoleContext";
 import { WorkshopSessionProvider } from "./contexts/WorkshopSessionContext";
+import { CommandPalette } from "./components/command-palette/CommandPalette";
+import { LabEditorModal } from "./components/labs/LabEditorModal";
+import { IdeProvider } from "./context/IdeContext";
+import { IdeRunListener } from "./components/ide/IdeRunListener";
+import { registerDefaultActions } from "./services/hints";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+registerDefaultActions();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -20,9 +26,13 @@ const App = () => (
         <RoleProvider>
           <WorkshopSessionProvider>
             <LabProvider>
+              <IdeProvider>
               <TooltipProvider>
               <Toaster />
               <Sonner />
+              <IdeRunListener />
+              <CommandPalette />
+              <LabEditorModal />
               <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                 <Routes>
                   <Route path="/" element={<Index />} />
@@ -32,6 +42,7 @@ const App = () => (
                 </Routes>
               </BrowserRouter>
               </TooltipProvider>
+              </IdeProvider>
             </LabProvider>
           </WorkshopSessionProvider>
         </RoleProvider>

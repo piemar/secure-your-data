@@ -3,8 +3,13 @@ import Editor, { Monaco } from '@monaco-editor/react';
 import { InlineHintMarker, type InlineHint, type SkeletonTier } from './InlineHintMarker';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { MONACO_LAB_EDITOR_OPTIONS, defineLabDarkTheme, registerMongoshLanguage, getLabEditorTheme } from '@/lib/monacoLabEditorOptions';
+import { MONACO_LAB_EDITOR_OPTIONS, defineLabDarkTheme, registerLabLanguages, getLabEditorTheme } from '@/lib/monacoLabEditorOptions';
 import { useTheme } from 'next-themes';
+import type { IEditorSession } from '@/types/ide';
+import { createEditorSession } from '@/services/editor/editorSessionAdapter';
+import { noopDiagnosticsProvider } from '@/services/language/DiagnosticsProvider';
+import { applyDiagnosticsToModel, clearDiagnosticsFromModel } from '@/services/language/monacoDiagnostics';
+import { registerLabCompletionProviders } from '@/services/language/monacoCompletion';
 
 interface InlineHintEditorProps {
   code: string;
@@ -25,6 +30,10 @@ interface InlineHintEditorProps {
   equalHeightSplit?: boolean;
   /** When true, editor fills its container (flex-1 min-h-0) and uses height 100% for responsive layout with console pane. */
   fillContainer?: boolean;
+  /** Optional: called when editor is mounted with an IEditorSession wrapper (Phase 1 optional). */
+  onEditorSession?: (session: IEditorSession) => void;
+  /** Optional: virtual path for diagnostics (e.g. "lab/1/step/0/0"). Phase 4. */
+  documentPath?: string;
 }
 
 interface BlankPosition {
@@ -53,6 +62,8 @@ export function InlineHintEditor({
   onRevealAnswer,
   equalHeightSplit,
   fillContainer = false,
+  onEditorSession,
+  documentPath,
 }: InlineHintEditorProps) {
   const { resolvedTheme } = useTheme();
   // Allow editing so users can fill in blanks; skeleton is initial content only
@@ -166,12 +177,16 @@ export function InlineHintEditor({
   const handleEditorMount = useCallback((editor: any, monaco: Monaco) => {
     setEditorInstance(editor);
     setMonacoInstance(monaco);
-    
+
+    if (onEditorSession) {
+      onEditorSession(createEditorSession(editor));
+    }
+
     // Get actual line height from Monaco
     const options = editor.getOptions();
     const actualLineHeight = options.get(66) || 19; // 66 = EditorOption.lineHeight
     setLineHeight(actualLineHeight);
-    
+
     // Initialize scroll position (in case editor is pre-scrolled or in a scroll container)
     try {
       setScrollTop(editor.getScrollTop?.() ?? 0);
@@ -179,19 +194,18 @@ export function InlineHintEditor({
     } catch {
       // ignore
     }
-    
+
     // Track scroll position
     editor.onDidScrollChange((e: any) => {
       setScrollTop(e.scrollTop || 0);
       setScrollLeft(e.scrollLeft || 0);
     });
-    
+
     // Mark editor as ready after a short delay to ensure layout is complete
-    // This triggers a re-render so hint markers position correctly
     requestAnimationFrame(() => {
       setIsEditorReady(true);
     });
-  }, [setLineHeight]);
+  }, [setLineHeight, onEditorSession]);
 
   // Apply decorations for revealed answers (green highlight)
   useEffect(() => {
@@ -234,6 +248,17 @@ export function InlineHintEditor({
       }
     };
   }, [editorInstance, monacoInstance, inlineHints, revealedAnswers, displayCode]);
+
+  // Phase 4: wire diagnostics to model (re-run when path or provider changes)
+  useEffect(() => {
+    if (!editorInstance || !monacoInstance || !documentPath) return;
+    const model = editorInstance.getModel?.();
+    if (!model) return;
+    applyDiagnosticsToModel(monacoInstance, model, noopDiagnosticsProvider, documentPath);
+    return () => {
+      clearDiagnosticsFromModel(monacoInstance, model);
+    };
+  }, [editorInstance, monacoInstance, documentPath]);
 
   // Calculate pixel position for a line/column in the editor.
   // The "?" marker must appear exactly where the blank (___________) is rendered.
@@ -281,7 +306,8 @@ export function InlineHintEditor({
   // Configure Monaco before mount: lab-dark theme (matches app background) + CSS for green answers
   const handleBeforeMount = useCallback((monaco: Monaco) => {
     defineLabDarkTheme(monaco);
-    registerMongoshLanguage(monaco);
+    registerLabLanguages(monaco);
+    registerLabCompletionProviders(monaco);
     // Define custom CSS for the revealed answer decoration
     const styleElement = document.getElementById('monaco-answer-styles') || document.createElement('style');
     styleElement.id = 'monaco-answer-styles';

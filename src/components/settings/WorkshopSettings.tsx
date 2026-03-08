@@ -579,7 +579,7 @@ export const WorkshopSettings: React.FC = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="local">Local Docker (mongodb://mongo:27017)</SelectItem>
+                      <SelectItem value="local">Local Docker (mongodb://root:example@mongo:27017)</SelectItem>
                       <SelectItem value="atlas">Atlas (Connection String Required)</SelectItem>
                     </SelectContent>
                   </Select>

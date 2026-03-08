@@ -31,6 +31,8 @@ Quick pointers to the docs you need.
 ## Architecture / refactoring
 
 - **[BROWSER_IDE_TERMINAL_REFACTOR_ARCHITECTURE.md](./BROWSER_IDE_TERMINAL_REFACTOR_ARCHITECTURE.md)** – Incremental plan to evolve the app toward a VS Code–like browser IDE with real terminal (xterm.js), Monaco, multi-language execution (Python, Node, Java, C#), placeholders/hints, command palette, and Warp-style hybrid UX.
+- **[BROWSER_IDE_REFACTOR_IMPLEMENTATION_STATUS.md](./BROWSER_IDE_REFACTOR_IMPLEMENTATION_STATUS.md)** – Implementation status vs the architecture doc: what’s done (Phases 0–2, execution/hints/palette/types), partial (Phase 3–6), and recommended next steps.
+- **[CURRENT_EXECUTION_AND_EDITOR_MAP.md](./CURRENT_EXECUTION_AND_EDITOR_MAP.md)** – Phase 0 map: where run-node/run-mongosh/run-bash are called, Monaco mounts, output surface, and validation.
 
 ---
 
@@ -47,3 +49,12 @@ Quick pointers to the docs you need.
 - **[SA_MUST_KNOW_CONCEPTS.md](./SA_MUST_KNOW_CONCEPTS.md)** – CSFLE, QE, Right to Erasure concepts for SAs.
 - **Guides/** – Lab guides (e.g. Lab_1_CSFLE.md, Lab_2_QE.md, Lab_3_GDPR.md), security, migration.
 - **Enablement/** – Quick reference, patterns.
+
+---
+
+## Archive / plans (restored and historical)
+
+- **[archive/LAB_HOW_TO_USE_AND_WHERE_TO_RUN_PLAN.md](./archive/LAB_HOW_TO_USE_AND_WHERE_TO_RUN_PLAN.md)** – Plan for clarifying “copy code → run in your terminal/mongosh → Verify” (restored from git).
+- **[archive/WORKSHOP_FRAMEWORK_PLAN.md](./archive/WORKSHOP_FRAMEWORK_PLAN.md)** – Workshop framework and phases.
+- **[archive/COMPETITOR_SIDE_BY_SIDE_IMPLEMENTATION_PLAN.md](./archive/COMPETITOR_SIDE_BY_SIDE_IMPLEMENTATION_PLAN.md)** – Competitor comparison UX plan.
+- **archive/phases/** – Phase completion summaries (PHASE_0 through PHASE_17, etc.).

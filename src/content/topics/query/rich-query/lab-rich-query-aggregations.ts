@@ -15,7 +15,12 @@ export const labRichQueryAggregationsDefinition: WorkshopLabDefinition = {
   difficulty: 'intermediate',
   estimatedTotalTimeMinutes: 50,
   tags: ['query', 'aggregation', 'facets', 'analytics'],
-  prerequisites: ['lab-rich-query-basics'],
+  prerequisites: [
+    'lab-rich-query-basics',
+    'MongoDB Atlas (M0+) or local MongoDB',
+    'Node.js 18+',
+    'mongosh installed; path in Workshop Settings for Run',
+  ],
   povCapabilities: ['RICH-QUERY'],
   modes: ['lab', 'demo', 'challenge'],
   labFolderPath: 'Docs/pov-proof-exercises/proofs/01',

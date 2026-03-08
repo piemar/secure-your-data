@@ -3,12 +3,13 @@
 # To publish: docker build -f Dockerfile.full -t pierrepetersson/mongodb-workshop-sandbox:latest .
 FROM node:20-bookworm-slim
 
-# Install tools for AWS CLI and mongosh
+# Install tools for AWS CLI, mongosh, and a minimal editor (mongosh .edit() uses EDITOR; vi is not in slim)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     unzip \
     gnupg \
     ca-certificates \
+    nano \
     && rm -rf /var/lib/apt/lists/*
 
 # Install AWS CLI v2 (multi-arch: amd64 or aarch64)
@@ -46,11 +47,11 @@ RUN case "$TARGETARCH" in \
     && rm -rf /tmp/crypt_shared.tgz /tmp/mongo_crypt_shared_v1-*
 
 # Optional: Azure CLI and Google Cloud SDK for multi-cloud verification (allow failure on low disk / I/O errors)
-RUN apt-get update && (apt-get install -y --no-install-recommends azure-cli || true) && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && (apt-get install -y --no-install-recommends azure-cli || true) && (rm -rf /var/lib/apt/lists/* || true)
 RUN curl -sL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
     && echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee /etc/apt/sources.list.d/google-cloud-sdk.list \
     && (apt-get update && apt-get install -y --no-install-recommends google-cloud-cli || true) \
-    && rm -rf /var/lib/apt/lists/*
+    && (rm -rf /var/lib/apt/lists/* || true)
 
 # Install build deps for mongodb-client-encryption native addon (for local dev when node_modules is mounted).
 # If apt-get update fails with "invalid signature", refresh keyring then update normally.
@@ -58,7 +59,7 @@ RUN apt-get update -o Acquire::AllowInsecureRepositories=true || true \
     && apt-get install -y --no-install-recommends debian-archive-keyring gnupg ca-certificates \
     && apt-get update \
     && apt-get install -y --no-install-recommends python3 make g++ \
-    && rm -rf /var/lib/apt/lists/*
+    && (rm -rf /var/lib/apt/lists/* || true)
 
 # Workshop config: target cloud (aws | azure | gcp) and container mode
 ENV WORKSHOP_CLOUD=aws
@@ -79,5 +80,6 @@ COPY . .
 
 EXPOSE 8080
 
-# When node_modules is from an anonymous volume it can be empty on first run; install deps then rebuild native addon and start Vite
-CMD ["sh", "-c", "if [ ! -d node_modules ] || [ ! -f node_modules/mongodb/package.json ]; then npm ci; fi && npm rebuild mongodb-client-encryption 2>/dev/null || true && exec npm run dev -- --host 0.0.0.0 --port 8080"]
+# Compose mounts . over /usr/src/app and uses an anonymous volume for node_modules. Run npm ci when
+# deps are missing (e.g. empty volume or after switching to @xterm/xterm) so the volume matches package.json.
+CMD ["sh", "-c", "if [ ! -f node_modules/@xterm/xterm/package.json ]; then npm ci; fi && npm rebuild mongodb-client-encryption 2>/dev/null || true && exec npm run dev -- --host 0.0.0.0 --port 8080"]

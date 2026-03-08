@@ -365,6 +365,7 @@ print("Key Vault index created.");`,
     tips: [
       'Best practice: The unique partial index on keyAltNames is required by CSFLE. Use $exists (not exists) in partialFilterExpression.',
       'You can run the Key Vault setup either with node or via the Mongosh block. Use Run all or Run selection; no separate terminal needed.',
+      'Run uses the mongosh path from Workshop Settings; set it if Run fails or you see "mongosh missing".',
       'Mongosh return values (e.g. createIndex result) are always printed to the console. Shorthand commands (show dbs, show collections, use mydb, help) work when run in an interactive shell.',
     ],
   },

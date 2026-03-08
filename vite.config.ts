@@ -6,7 +6,7 @@ import { createRequire } from "module";
 import { componentTagger } from "lovable-tagger";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 import { exec, execFile, execSync } from "child_process";
-import { writeFileSync, readFileSync, existsSync, statSync, unlinkSync } from "fs";
+import { writeFileSync, readFileSync, existsSync, statSync, unlinkSync, mkdirSync } from "fs";
 import { MongoClient } from "mongodb";
 
 const requireFromModule = createRequire(import.meta.url);
@@ -41,6 +41,34 @@ function redactMongoUri(uri: string): string {
   } catch {
     return '<redacted>';
   }
+}
+
+/** Sanitize lab user suffix for use in temp dir (alphanumeric, underscore, hyphen). */
+function sanitizeLabSuffixForPath(suffix: string | null | undefined): string {
+  if (!suffix || typeof suffix !== 'string') return 'anonymous';
+  const s = suffix.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
+  return s || 'anonymous';
+}
+
+/** Safe stem from code block filename (no path traversal, no extension). Used in temp file name. */
+function safeCodeFilenameStem(filename: string | null | undefined): string {
+  if (!filename || typeof filename !== 'string') return 'run';
+  const base = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_');
+  if (!base) return 'run';
+  const stem = base.replace(/\.(cjs|js|py|java|cs)$/i, '') || 'run';
+  return stem.slice(0, 64) || 'run';
+}
+
+/** Resolve temp dir and file: /tmp/{customer}/{aws-suffix}/{code-filename}-run-{timestamp}-{random}.{ext} */
+function getLabRunTempPath(userSuffix: string | null | undefined, filename: string | null | undefined, ext: '.cjs' | '.py' | '.java' | '.cs'): { runDir: string; tmpFile: string } {
+  const customer = (typeof process.env.WORKSHOP_TEMP_CUSTOMER === 'string' && process.env.WORKSHOP_TEMP_CUSTOMER.trim()) ? process.env.WORKSHOP_TEMP_CUSTOMER.trim().replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 32) : 'lab';
+  const suffix = sanitizeLabSuffixForPath(userSuffix);
+  const runDir = path.join(os.tmpdir(), customer, suffix);
+  const stem = safeCodeFilenameStem(filename);
+  const random = Math.random().toString(36).slice(2, 10);
+  const baseName = `${stem}-run-${Date.now()}-${random}${ext}`;
+  const tmpFile = path.join(runDir, baseName);
+  return { runDir, tmpFile };
 }
 
 /** Log executed command and env to the terminal so users can see what ran. */
@@ -159,6 +187,7 @@ const OBFUSCATED_URI = "LjwoKyo7M24sPjd4cB1DUxkmPScuKTo8IDE4eyMqcwgEf3o/IwN2F2kP
 const LEADERBOARD_DB = "workshop_framework";
 const LEADERBOARD_COLLECTION = "leaderboard";
 const POINTS_COLLECTION = "points";
+const DIAGNOSTICS_COLLECTION = "lab_diagnostics";
 
 // Simple deobfuscation function (inline to avoid import issues)
 function deobfuscateMongoUri(obfuscated: string): string {
@@ -223,6 +252,20 @@ async function getLeaderboardMongoClient(): Promise<MongoClient> {
     await leaderboardMongoClient.connect();
   }
   return leaderboardMongoClient;
+}
+
+const LEADERBOARD_ERROR_LOG_INTERVAL_MS = 60_000;
+let lastLeaderboardError: string | null = null;
+let lastLeaderboardErrorLogTime = 0;
+
+function logLeaderboardErrorOnce(message: string | unknown): void {
+  const msg = typeof message === 'string' ? message : String(message);
+  const now = Date.now();
+  if (msg !== lastLeaderboardError || now - lastLeaderboardErrorLogTime >= LEADERBOARD_ERROR_LOG_INTERVAL_MS) {
+    lastLeaderboardError = msg;
+    lastLeaderboardErrorLogTime = now;
+    console.error('[leaderboard] Error fetching leaderboard:', msg);
+  }
 }
 
 async function getLeaderboard(): Promise<LeaderboardEntry[]> {
@@ -327,6 +370,62 @@ export default defineConfig(({ mode }) => ({
     {
       name: 'tooling-proxy',
       configureServer(server: any) {
+        const serverPort = server.config?.server?.port ?? 5173;
+        const labEditorServerUrl = `http://127.0.0.1:${serverPort}`;
+        const labEditorWrapperPath = path.join(process.cwd(), 'scripts', 'lab-editor-wrapper.cjs');
+        const useLabEditor = process.platform !== 'win32' && existsSync(labEditorWrapperPath);
+
+        const labEditorPending = new Map<string, { path: string; content: string; status: 'pending' | 'saved' }>();
+
+        // PTY WebSocket (Phase 6). Optional: when node-pty and ws available, /api/pty gets a live shell.
+        const httpServer = server.httpServer;
+        if (httpServer && nodePty) {
+          try {
+            const { WebSocketServer } = requireFromModule('ws');
+            const wss = new WebSocketServer({ noServer: true });
+            httpServer.on('upgrade', (request: any, socket: any, head: Buffer) => {
+              const url = request.url || '';
+              if (url.startsWith('/api/pty')) {
+                wss.handleUpgrade(request, socket, head, (ws: any) => {
+                  const shell = process.env.SHELL || (process.platform === 'win32' ? 'powershell.exe' : '/bin/bash');
+                  const ptyEnv = { ...process.env } as any;
+                  if (process.platform !== 'win32') {
+                    ptyEnv.EDITOR = ptyEnv.EDITOR || process.env.LAB_EDITOR || (useLabEditor ? `node ${labEditorWrapperPath}` : 'nano');
+                    ptyEnv.LAB_EDITOR_SERVER_URL = labEditorServerUrl;
+                  }
+                  const pty = nodePty!.spawn(shell, [], { name: 'xterm-256color', cols: 80, rows: 24, cwd: process.cwd(), env: ptyEnv });
+                  pty.onData((data: string) => {
+                    try { if (ws.readyState === 1) ws.send(data); } catch { /* ignore */ }
+                  });
+                  pty.onExit(() => {
+                    try { ws.close(); } catch { /* ignore */ }
+                  });
+                  ws.on('message', (data: Buffer | string) => {
+                    const s = data.toString();
+                    try {
+                      if (s.startsWith('{')) {
+                        const msg = JSON.parse(s);
+                        if (msg.type === 'resize' && typeof msg.cols === 'number' && typeof msg.rows === 'number') pty.resize(msg.cols, msg.rows);
+                        else if (msg.type === 'kill') pty.kill();
+                        return;
+                      }
+                      pty.write(s);
+                    } catch { /* ignore */ }
+                  });
+                  ws.on('close', () => {
+                    try { pty.kill(); } catch { /* ignore */ }
+                  });
+                  ws.on('error', () => {
+                    try { pty.kill(); } catch { /* ignore */ }
+                  });
+                });
+              }
+            });
+          } catch (_) {
+            /* ws not installed or PTY disabled */
+          }
+        }
+
         server.middlewares.use((req: any, res: any, next: any) => {
           // Workshop config: cloud provider and defaults (set via env at container start)
           if (req.url && req.url.startsWith('/api/config')) {
@@ -345,6 +444,75 @@ export default defineConfig(({ mode }) => ({
             };
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify(config));
+            return;
+          }
+
+          if (req.url && req.url.startsWith('/api/lab-editor-open') && req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+            req.on('end', () => {
+              try {
+                const { path: filePath, content } = JSON.parse(body || '{}');
+                if (!filePath || typeof content !== 'string') {
+                  res.statusCode = 400;
+                  res.end(JSON.stringify({ error: 'path and content required' }));
+                  return;
+                }
+                const requestId = `ed-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+                labEditorPending.set(requestId, { path: filePath, content, status: 'pending' });
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ requestId }));
+              } catch (e) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ error: (e as Error).message }));
+              }
+            });
+            return;
+          }
+
+          if (req.url && req.url.startsWith('/api/lab-editor-status')) {
+            const url = new URL(req.url, `http://${req.headers.host}`);
+            const requestId = url.searchParams.get('requestId') || '';
+            const entry = labEditorPending.get(requestId);
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(entry ? { status: entry.status } : { status: 'unknown' }));
+            return;
+          }
+
+          if (req.url && req.url.startsWith('/api/lab-editor-pending') && req.method === 'GET') {
+            const first = Array.from(labEditorPending.entries()).find(([, v]) => v.status === 'pending');
+            res.setHeader('Content-Type', 'application/json');
+            if (first) {
+              const [requestId, data] = first;
+              res.end(JSON.stringify({ requestId, path: data.path, content: data.content }));
+            } else {
+              res.end(JSON.stringify({}));
+            }
+            return;
+          }
+
+          if (req.url && req.url.startsWith('/api/lab-editor-save') && req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+            req.on('end', () => {
+              try {
+                const { requestId, content } = JSON.parse(body || '{}');
+                const entry = labEditorPending.get(requestId);
+                if (!entry) {
+                  res.statusCode = 404;
+                  res.end(JSON.stringify({ error: 'request not found' }));
+                  return;
+                }
+                writeFileSync(entry.path, content, 'utf8');
+                entry.status = 'saved';
+                entry.content = content;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ ok: true }));
+              } catch (e) {
+                res.statusCode = 500;
+                res.end(JSON.stringify({ error: (e as Error).message }));
+              }
+            });
             return;
           }
 
@@ -1402,7 +1570,7 @@ export default defineConfig(({ mode }) => ({
                   res.setHeader('Content-Type', 'application/json');
                   res.end(JSON.stringify({ entries }));
                 } catch (error: any) {
-                  console.error('[leaderboard] Error fetching leaderboard:', error?.message || error);
+                  logLeaderboardErrorOnce(error?.message || error);
                   res.statusCode = 500;
                   res.end(JSON.stringify({ success: false, message: error?.message || 'Leaderboard unavailable' }));
                 }
@@ -1589,6 +1757,70 @@ export default defineConfig(({ mode }) => ({
             }
           }
 
+          // Report issue / diagnostics: collect logs and context for workshop maintainers
+          if (req.url && req.url.startsWith('/api/report-diagnostics') && req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+            req.on('end', async () => {
+              try {
+                const data = JSON.parse(body || '{}');
+                const {
+                  labNumber,
+                  labTitle,
+                  labId,
+                  stepId,
+                  stepTitle,
+                  stepIndex,
+                  url,
+                  userAgent,
+                  timestamp,
+                  consoleLogEntries,
+                  lastRunOutput,
+                  lastRunSuccess,
+                  userEmail,
+                  comment,
+                  screenshotBase64,
+                } = data;
+                if (stepId == null || stepIndex == null) {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: false, message: 'stepId and stepIndex required' }));
+                  return;
+                }
+                const doc = {
+                  labNumber: labNumber ?? null,
+                  labTitle: labTitle ?? null,
+                  labId: labId ?? null,
+                  stepId: String(stepId),
+                  stepTitle: stepTitle ?? null,
+                  stepIndex: Number(stepIndex),
+                  url: url ?? null,
+                  userAgent: userAgent ?? null,
+                  timestamp: timestamp ?? new Date().toISOString(),
+                  consoleLogEntries: Array.isArray(consoleLogEntries) ? consoleLogEntries : [],
+                  lastRunOutput: typeof lastRunOutput === 'string' ? lastRunOutput.slice(0, 100000) : null,
+                  lastRunSuccess: lastRunSuccess === true || lastRunSuccess === false ? lastRunSuccess : null,
+                  userEmail: userEmail ?? null,
+                  comment: comment ?? null,
+                  screenshotBase64: typeof screenshotBase64 === 'string' ? screenshotBase64.slice(0, 5000000) : null,
+                  createdAt: new Date(),
+                };
+                const client = await getLeaderboardMongoClient();
+                const db = client.db(LEADERBOARD_DB);
+                const collection = db.collection(DIAGNOSTICS_COLLECTION);
+                await collection.insertOne(doc);
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: true, message: 'Diagnostics saved. Maintainers can review the report.' }));
+              } catch (e: any) {
+                console.error('[report-diagnostics] Error:', e?.message || e);
+                res.statusCode = 500;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: false, message: e?.message || 'Failed to save diagnostics' }));
+              }
+            });
+            return;
+          }
+
           // Workshop session endpoints (Atlas-backed)
           if (req.url && req.url.startsWith('/api/workshop-session')) {
             if (req.method === 'GET') {
@@ -1728,13 +1960,55 @@ export default defineConfig(({ mode }) => ({
             return;
           }
 
-          // Run Node.js code (e.g. lab scripts). Uses temp file and MONGODB_URI env.
+          // Run Python code (Phase 6). Writes temp .py file under workshop/<userSuffix>/ and runs python3.
+          if (req.url && req.url.startsWith('/api/run-python') && req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+            req.on('end', () => {
+              try {
+                const { code, filename, userSuffix } = JSON.parse(body || '{}');
+                if (typeof code !== 'string' || !code.trim()) {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: false, stdout: '', stderr: 'No code provided', message: 'No code provided' }));
+                  return;
+                }
+                const { runDir, tmpFile } = getLabRunTempPath(userSuffix, filename, '.py');
+                mkdirSync(runDir, { recursive: true });
+                writeFileSync(tmpFile, code, 'utf-8');
+                const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+                logLabCommand('run-python', `${pythonCmd} ${tmpFile}`, {});
+                execFile(pythonCmd, [tmpFile], { timeout: 30000, maxBuffer: 1024 * 1024 }, (error: any, stdout: string, stderr: string) => {
+                  try { require('fs').unlinkSync(tmpFile); } catch { /* ignore */ }
+                  const exitCode = error?.code ?? (error ? 1 : 0);
+                  const out = (stdout || '').trim();
+                  const err = (stderr || '').trim();
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({
+                    success: exitCode === 0,
+                    stdout: stdout ?? '',
+                    stderr: err,
+                    exitCode,
+                    error: exitCode !== 0,
+                    message: exitCode === 0 ? (out || 'OK') : (err || error?.message || 'Script failed'),
+                  }));
+                });
+              } catch (e: any) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: false, stdout: '', stderr: (e as Error).message || 'Invalid request', error: true, message: (e as Error).message }));
+              }
+            });
+            return;
+          }
+
+          // Run Node.js code (e.g. lab scripts). Uses temp file under workshop/<userSuffix>/ and MONGODB_URI env.
           if (req.url && req.url.startsWith('/api/run-node') && req.method === 'POST') {
             let body = '';
             req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
             req.on('end', () => {
               try {
-                const { code, uri, region: regionOverride, profile: profileOverride } = JSON.parse(body || '{}');
+                const { code, uri, region: regionOverride, profile: profileOverride, filename, userSuffix } = JSON.parse(body || '{}');
                 if (typeof code !== 'string' || !code.trim()) {
                   res.statusCode = 400;
                   res.setHeader('Content-Type', 'application/json');
@@ -1753,8 +2027,8 @@ export default defineConfig(({ mode }) => ({
                   }));
                   return;
                 }
-                const tmpDir = os.tmpdir();
-                const tmpFile = path.join(tmpDir, `workshop-run-${Date.now()}-${Math.random().toString(36).slice(2, 10)}.cjs`);
+                const { runDir, tmpFile } = getLabRunTempPath(userSuffix, filename, '.cjs');
+                mkdirSync(runDir, { recursive: true });
                 writeFileSync(tmpFile, code, 'utf-8');
                 if (!existsSync(tmpFile)) {
                   res.setHeader('Content-Type', 'application/json');

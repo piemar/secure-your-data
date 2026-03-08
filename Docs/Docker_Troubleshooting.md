@@ -1,5 +1,20 @@
 # Docker and lab troubleshooting
 
+## "Failed to resolve import @xterm/xterm" (Vite 500)
+
+The app uses **@xterm/xterm** and **@xterm/addon-fit**. In Docker, Compose mounts the repo and uses an anonymous volume for `node_modules`. The container runs `npm ci` when `node_modules/@xterm/xterm` is missing so the volume matches your `package.json`.
+
+1. **Local**  
+   Run `npm install` (or `npm ci`) at the project root so `node_modules` includes `@xterm/xterm` and `@xterm/addon-fit`. Commit `package-lock.json` so Docker gets the same tree.
+
+2. **Docker**  
+   If you still see the error, the anonymous volume may have old content. Recreate the app so the startup runs `npm ci` and repopulates the volume:  
+   `docker compose up app --force-recreate`  
+   If the volume still has stale deps, remove it and start again:  
+   `docker compose down` then `docker volume ls` to find the app’s node_modules volume (e.g. `secure-your-data_node_modules` or similar), then `docker volume rm <name>` if you want a clean volume, then `docker compose up app`.
+
+---
+
 ## "input/output error" when creating container (overlay2)
 
 If you see:

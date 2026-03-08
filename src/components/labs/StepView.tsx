@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2, BookOpen, Clock, Lock, Eye, Unlock, GitCompare, Play, RotateCcw, FileCode, PlayCircle, Layout, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2, BookOpen, Clock, Lock, Eye, Unlock, GitCompare, Play, RotateCcw, FileCode, PlayCircle, Layout, RefreshCw, Bug } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -35,8 +35,16 @@ import {
   storedToLogEntries,
 } from '@/services/labWorkspaceStorage';
 import { getVerificationService, type VerificationId } from '@/services/verificationService';
+import { executionService, formatForConsole, formatBashRunOutput } from '@/services/execution';
 import { getWorkshopSession } from '@/utils/workshopUtils';
 import { getLabUserSuffix } from '@/labs/stepEnhancementRegistry';
+import { toast } from 'sonner';
+import { useIdeContextOptional } from '@/context/IdeContext';
+import { createOutputSurface } from '@/services/execution/outputSurface';
+import { createDocumentStore } from '@/services/workspace';
+import { SuggestNextStep } from '@/components/hints/SuggestNextStep';
+import type { TerminalSession } from '@/types/ide';
+import { XtermTerminal } from '@/components/terminal/XtermTerminal';
 
 interface CodeBlock {
   filename: string;
@@ -120,18 +128,10 @@ interface StepViewProps {
   resetProgressCount?: number;
   /** Called when user resets the current step so parent can uncomplete it (e.g. remove from completedSteps) */
   onResetStep?: (stepIndex: number) => void;
-}
-
-/** Format run-bash API response for display; when stdout/stderr are empty, show a clear explanation. */
-function formatBashRunOutput(data: { stdout?: string; stderr?: string; success?: boolean; exitCode?: number }): string {
-  const stdout = (data.stdout || '').trim();
-  const stderr = (data.stderr || '').trim();
-  const exitCode = data.exitCode ?? (data.success ? 0 : 1);
-  const combined = [stderr, stdout].filter(Boolean).join('\n');
-  if (combined) return combined;
-  return data.success
-    ? `Commands completed successfully (exit code ${exitCode}).\nVariable assignments (e.g. KMS_KEY_ID=...) and heredocs (cat <<EOF > policy.json) produce no stdout—values are stored in the shell.`
-    : `Command failed (exit code ${exitCode}).${stderr ? `\n\n${stderr}` : ''}`;
+  /** When Run is used, called with the editor content so the lab can echo it to the Terminal (or switch to Terminal tab if no session). */
+  onRunEchoToTerminal?: (payload: { code: string; language: string; filename?: string }) => void;
+  /** When set, the bottom panel shows the terminal (xterm) instead of the log; run output is written here and status stays in the terminal header. */
+  terminalSession?: TerminalSession | null;
 }
 
 // Generate realistic MongoDB output based on code content with structured formatting
@@ -627,9 +627,13 @@ export function StepView({
   stepToolbarRef,
   resetProgressCount = 0,
   onResetStep,
+  onRunEchoToTerminal,
+  terminalSession: terminalSessionProp,
 }: StepViewProps) {
   const { userEmail, userSuffix, subtractPoints } = useLab();
+  const ide = useIdeContextOptional();
   const { resolvedTheme } = useTheme();
+  const currentStep = steps[currentStepIndex];
   const [helpOpen, setHelpOpen] = useState(false);
   const showCompetitorComparisons = getWorkshopSession()?.showCompetitorComparisons === true;
   const [previewPanelTab, setPreviewPanelTab] = useState<'preview' | 'compete'>(() =>
@@ -640,7 +644,6 @@ export function StepView({
   const [editorPanelCollapsed, setEditorPanelCollapsed] = useState(false);
   const [consolePanelCollapsed, setConsolePanelCollapsed] = useState(true); // default collapsed, aligned to bottom
   const editorConsoleGroupRef = useRef<ImperativePanelGroupHandle | null>(null);
-  const consoleOutputScrollRef = useRef<HTMLDivElement>(null);
   const [competitorPanelCollapsed, setCompetitorPanelCollapsed] = useState(false);
   const [selectedCompetitorId, setSelectedCompetitorId] = useState<string | null>(null);
   const [lastOutput, setLastOutput] = useState<string>('');
@@ -681,6 +684,64 @@ export function StepView({
       return {};
     }
   });
+
+  // Output surface abstraction (Phase 1). Do NOT write append() content to the terminal:
+  // the terminal is a live PTY; writing there sends input to the shell/mongosh and causes
+  // "Running: command not found" and "SyntaxError: Missing semicolon" when status/metadata
+  // (e.g. "[lab] Command: ...") are written. Only the echoed script is sent via onRunEchoToTerminal.
+  const outputSurface = useMemo(() => {
+    const base = createOutputSurface({
+      setLastOutput,
+      setLastOutputTime,
+      setLogEntries: (updater) => setLogEntries(updater),
+      setOutputSummary,
+      setOutputSuccess,
+    });
+    return {
+      append(output: string, options?: { success?: boolean; summary?: string }) {
+        base.append(output, options);
+      },
+      clear() {
+        base.clear();
+      },
+    };
+  }, []);
+
+  // Shared document store: create once per StepView mount and sync current step code for hint providers
+  const documentStoreRef = useRef<ReturnType<typeof createDocumentStore> | null>(null);
+
+  useEffect(() => {
+    if (!ide) return;
+    const primaryLang = currentStep?.codeBlocks?.[0]?.language ?? 'javascript';
+    ide.setHintContext({
+      labStepId: currentStep?.id,
+      labNumber,
+      labTitle,
+      stepIndex: currentStepIndex,
+      currentLanguage: primaryLang,
+      documentStore: documentStoreRef.current ?? ide.documentStore ?? undefined,
+    });
+  }, [ide, currentStep?.id, labNumber, labTitle, currentStepIndex, currentStep?.codeBlocks]);
+
+  useEffect(() => {
+    if (!ide) return;
+    if (!documentStoreRef.current) documentStoreRef.current = createDocumentStore();
+    ide.setDocumentStore(documentStoreRef.current);
+    return () => {
+      ide.setDocumentStore(null);
+    };
+  }, [ide]);
+
+  useEffect(() => {
+    const store = documentStoreRef.current;
+    if (!store) return;
+    const blocks = currentStep?.codeBlocks ?? [];
+    blocks.forEach((block, idx) => {
+      const key = `${currentStepIndex}-${idx}`;
+      const content = editableCodeByBlock[key] ?? block.code ?? '';
+      store.set(`lab/${labNumber}/step/${currentStepIndex}/${idx}`, content);
+    });
+  }, [currentStep?.codeBlocks, currentStepIndex, labNumber, editableCodeByBlock]);
 
   // Helper functions for tiered scoring
   const getMaxPoints = (tier: SkeletonTier): number => {
@@ -743,6 +804,43 @@ export function StepView({
     if (solutionRevealed) return block.code;
     return base;
   };
+
+  /** For mongosh/node blocks when solution is revealed: prepend shell line so "revealed solution" shows interpreter first then script. Run still sends script-only (strip before execution). */
+  const getDisplayCodeWithShellIfRevealed = (block: CodeBlock, tier: SkeletonTier, solutionRevealed: boolean, language: string | undefined, labMongoUri: string | undefined): string => {
+    const base = getDisplayCode(block, tier, solutionRevealed) || block?.code || '';
+    if ((language || '').toLowerCase() === 'mongosh' && solutionRevealed && labMongoUri?.trim()) {
+      return `mongosh "${labMongoUri}"\n${base}`;
+    }
+    if ((language || '').toLowerCase() === 'javascript' && solutionRevealed) {
+      return `node\n${base}`;
+    }
+    return base;
+  };
+
+  /** Strip leading "node" line so we send only the script to runNode (editor may show shell line when solution revealed). */
+  const stripNodeConnectionLine = (code: string): string => {
+    const firstLine = code.trimStart().split('\n')[0]?.trim() ?? '';
+    if (firstLine === 'node') {
+      const firstNewline = code.indexOf('\n');
+      if (firstNewline >= 0) return code.slice(firstNewline + 1).trimStart();
+      return '';
+    }
+    return code;
+  };
+
+  /** Strip leading "mongosh \"...\"" line so we send only the script to runMongosh (editor may show shell line when solution revealed). */
+  const stripMongoshConnectionLine = (code: string): string => {
+    const trimmed = code.trimStart();
+    if (/^mongosh\s+["']/.test(trimmed)) {
+      const firstNewline = code.indexOf('\n');
+      if (firstNewline >= 0) return code.slice(firstNewline + 1).trimStart();
+      return '';
+    }
+    return code;
+  };
+
+  /** Ensure code ends with a single newline when sending to run (backend/PTY expect it). */
+  const ensureTrailingNewline = (code: string): string => (code.trimEnd().length === 0 ? '' : code.trimEnd() + '\n');
 
   // Check if block has any skeleton tier
   const hasAnySkeleton = (block: CodeBlock): boolean => {
@@ -877,7 +975,6 @@ export function StepView({
     return lines.join('\n');
   }, []);
 
-  const currentStep = steps[currentStepIndex];
   const isCompleted = completedSteps.includes(currentStepIndex);
   /** Current step has verification (verificationId or onVerify); Next is gated on validation-after-run. */
   const currentStepNeedsVerification = Boolean(
@@ -928,13 +1025,18 @@ export function StepView({
     nodeIndex: number;
     mongoshBlock: CodeBlock;
     mongoshIndex: number;
+  } | {
+    type: 'twin';
+    blockA: CodeBlock;
+    indexA: number;
+    blockB: CodeBlock;
+    indexB: number;
   };
 
   const displaySlots = useMemo((): DisplaySlot[] => {
     const blocks = currentStep?.codeBlocks ?? [];
     const mongoshIndices = new Set(nodeMongoshPairs.values());
-    const nodeIndices = new Set(nodeMongoshPairs.keys());
-    return sortedCodeBlocksWithIndex
+    const raw = sortedCodeBlocksWithIndex
       .filter(({ originalIndex }) => !mongoshIndices.has(originalIndex))
       .map(({ block, originalIndex }) => {
         const mongoshIdx = nodeMongoshPairs.get(originalIndex);
@@ -944,9 +1046,21 @@ export function StepView({
         }
         return { type: 'single' as const, block, originalIndex };
       });
+    // When a step has exactly two single-block slots, show one tabbed editor instead of two stacked editors
+    if (raw.length === 2 && raw[0].type === 'single' && raw[1].type === 'single') {
+      return [{
+        type: 'twin',
+        blockA: raw[0].block,
+        indexA: raw[0].originalIndex,
+        blockB: raw[1].block,
+        indexB: raw[1].originalIndex,
+      }];
+    }
+    return raw;
   }, [currentStep?.codeBlocks, sortedCodeBlocksWithIndex, nodeMongoshPairs]);
 
   const [nodeMongoshViewByKey, setNodeMongoshViewByKey] = useState<Record<string, 'node' | 'mongosh'>>({});
+  const [twinViewByKey, setTwinViewByKey] = useState<Record<string, 'A' | 'B'>>({});
 
   // Sync editable code from display code when step/tier/reveal changes.
   // For blocks with a skeleton in guided mode: always show skeleton with only currently revealed answers
@@ -1193,18 +1307,6 @@ export function StepView({
     prevLogCountRef.current = logEntries.length;
   }, [logEntries.length]);
 
-  // Scroll console to bottom when new output is shown (terminal-like auto-scroll)
-  useEffect(() => {
-    const el = consoleOutputScrollRef.current;
-    if (!el) return;
-    const scrollToBottom = () => {
-      el.scrollTop = el.scrollHeight;
-    };
-    scrollToBottom();
-    const raf = requestAnimationFrame(scrollToBottom);
-    return () => cancelAnimationFrame(raf);
-  }, [logEntries, lastOutput]);
-
   // Helper to reveal an inline hint (conceptual)
   const revealInlineHint = useCallback((blockKey: string, hintIdx: number, tier: SkeletonTier) => {
     const alreadyRevealed = (revealedHints[blockKey] || []).includes(hintIdx);
@@ -1269,20 +1371,18 @@ export function StepView({
     subtractPoints(penalty);
   }, [subtractPoints]);
 
-  // Copy button should always copy full solution (even if skeleton shown)
+  // Copy button should always copy full solution (even if skeleton shown). For mongosh when solution revealed, include shell line first.
   const handleCopyCode = useCallback(async (blockIdx: number = 0) => {
     const block = currentStep.codeBlocks?.[blockIdx];
     const blockKey = `${currentStepIndex}-${blockIdx}`;
     const hasSkeleton = block ? hasAnySkeleton(block) : false;
     const isSolutionRevealed = alwaysShowSolutions || showSolution[blockKey] || !hasSkeleton;
     const tier = skeletonTier[blockKey] || 'guided';
-    
-    // Copy what's displayed: filled skeleton when solution revealed (skeleton + inlineHints), else tier skeleton
-    const code = getDisplayCode(block!, tier, isSolutionRevealed) || block?.code || '';
+    const code = getDisplayCodeWithShellIfRevealed(block!, tier, isSolutionRevealed, block?.language, labMongoUri);
     await navigator.clipboard.writeText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [currentStep.codeBlocks, currentStepIndex, alwaysShowSolutions, showSolution, skeletonTier]);
+  }, [currentStep.codeBlocks, currentStepIndex, alwaysShowSolutions, showSolution, skeletonTier, labMongoUri]);
 
   /** Real validation before Next: use step's onVerify or verificationId, else allow advance (no simulation). */
   const handleCheckProgress = useCallback(async (): Promise<boolean> => {
@@ -1344,11 +1444,7 @@ export function StepView({
       output = `Validation error: ${msg}`;
     }
 
-    setLastOutput(output);
-    setLastOutputTime(now);
-    setLogEntries(prev => [...prev, { time: now, output }]);
-    setOutputSummary(summary);
-    setOutputSuccess(success);
+    outputSurface.append(output, { success, summary });
     setValidationFailedByStep(prev => ({ ...prev, [currentStepIndex]: !success })); // red when failed, cleared when passed
     setConsolePanelCollapsed(false);
     // Persist validation result to this step's console log so it's kept when advancing and when returning to this step
@@ -1366,8 +1462,19 @@ export function StepView({
     const blockKey = `${currentStepIndex}-${blockIdx}`;
     const tier = skeletonTier[blockKey] || 'guided';
     const isSolutionRevealed = alwaysShowSolutions || !!showSolution[blockKey] || !hasAnySkeleton(block);
-    const code = (editableCodeByBlock[blockKey] ?? getDisplayCode(block!, tier, isSolutionRevealed)) || (block?.code ?? '');
+    let code = (editableCodeByBlock[blockKey] ?? getDisplayCode(block!, tier, isSolutionRevealed)) || (block?.code ?? '');
     const language = (block?.language || 'javascript').toLowerCase();
+    if (language === 'mongosh') code = stripMongoshConnectionLine(code);
+    if (language === 'javascript' || language === 'typescript') code = stripNodeConnectionLine(code);
+    code = ensureTrailingNewline(code);
+    // Echo to terminal with connection line so user sees full command (mongosh "uri" or node)
+    const codeForEcho =
+      language === 'mongosh' && labMongoUri?.trim()
+        ? `mongosh "${labMongoUri}"\n${code}`
+        : (language === 'javascript' || language === 'typescript')
+          ? `node\n${code}`
+          : code;
+    onRunEchoToTerminal?.({ code: codeForEcho, language, filename: block?.filename });
     setIsRunning(true);
     let result: { output: string; success: boolean; summary: string };
     const labAwsRegion = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_region') || '') : '';
@@ -1383,18 +1490,8 @@ export function StepView({
           };
         } else {
           const mongoshPath = typeof localStorage !== 'undefined' ? localStorage.getItem('workshop_mongosh_path') : null;
-          const res = await fetch('/api/run-mongosh', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, uri: labMongoUri, ...(mongoshPath && { mongoshPath }) }),
-          });
-          const data = await res.json();
-          const out = [data.stdout, data.stderr].filter(Boolean).join('\n') || data.message || '(no output)';
-          result = {
-            output: out,
-            success: data.success === true,
-            summary: data.success ? 'mongosh completed' : (data.message || 'mongosh failed'),
-          };
+          const runResult = await executionService.runMongosh({ code: ensureTrailingNewline(code), uri: labMongoUri, mongoshPath: mongoshPath ?? undefined });
+          result = { ...formatForConsole(runResult, 'mongosh') };
         }
       }
       // 2) Bash/shell → run-bash, or run "node <file>" via matching editor block (and any preceding commands via run-bash)
@@ -1422,47 +1519,27 @@ export function StepView({
             const beforeNode = commands.slice(0, nodeCmdIndex);
             if (beforeNode.length > 0) {
               const awsProfile = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
-              const res = await fetch('/api/run-bash', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ commands: beforeNode, profile: awsProfile || 'default', ...(labAwsRegion && { region: labAwsRegion }) }),
-              });
-              const data = await res.json();
-              outputs.push(formatBashRunOutput(data));
+              const bashResult = await executionService.runBash({ commands: beforeNode, profile: awsProfile || 'default', ...(labAwsRegion && { region: labAwsRegion }) });
+              outputs.push(formatBashRunOutput({ stdout: bashResult.stdout, stderr: bashResult.stderr, success: bashResult.success, exitCode: bashResult.exitCode }));
             }
             const labAwsProfile = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
-            const res = await fetch('/api/run-node', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ code: editorCode, uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }), profile: labAwsProfile || 'default' }),
-            });
-            const data = await res.json();
-            const stderr = (data.stderr || '').trim();
-            const stdout = (data.stdout || '').trim();
-            let out = [stderr, stdout].filter(Boolean).join('\n') || data.message || '(no output)';
-            if (data.success !== true && data.exitCode != null && data.exitCode !== 0 && !out.includes('exit code')) {
-              out += `\nExit code: ${data.exitCode}`;
-            }
-            outputs.push(out);
-            lastSuccess = data.success === true;
+            const nodeResult = await executionService.runNode({ code: ensureTrailingNewline(stripNodeConnectionLine(editorCode)), uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }), profile: labAwsProfile || 'default', filename: editorBlock?.filename, userSuffix: getLabUserSuffix() });
+            const nodeFormatted = formatForConsole(nodeResult, 'node');
+            outputs.push(nodeFormatted.output);
+            lastSuccess = nodeResult.success;
             result = {
               output: outputs.join('\n\n'),
               success: lastSuccess,
-              summary: lastSuccess ? 'Node completed' : (data.message?.split('\n')[0] || 'Node failed'),
+              summary: lastSuccess ? 'Node completed' : (nodeResult.message?.split('\n')[0] || 'Node failed'),
             };
           } else {
             const awsProfile = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
-            const res = await fetch('/api/run-bash', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ commands, profile: awsProfile || 'default', ...(labAwsRegion && { region: labAwsRegion }) }),
-            });
-            const data = await res.json();
-            const out = formatBashRunOutput(data);
+            const bashResult = await executionService.runBash({ commands, profile: awsProfile || 'default', ...(labAwsRegion && { region: labAwsRegion }) });
+            const out = formatBashRunOutput({ stdout: bashResult.stdout, stderr: bashResult.stderr, success: bashResult.success, exitCode: bashResult.exitCode });
             result = {
               output: out,
-              success: data.success === true,
-              summary: data.exitCode === 0 ? 'Command completed' : 'Command failed',
+              success: bashResult.success,
+              summary: bashResult.success ? 'Command completed' : 'Command failed',
             };
           }
         } else {
@@ -1475,40 +1552,16 @@ export function StepView({
         labMongoUri &&
         (code.includes('db.') || code.includes('.aggregate') || code.includes('$search') || code.includes('$find'))
       ) {
+        const scriptCode = ensureTrailingNewline(stripMongoshConnectionLine(code));
         const mongoshPath = typeof localStorage !== 'undefined' ? localStorage.getItem('workshop_mongosh_path') : null;
-        const res = await fetch('/api/run-mongosh', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code, uri: labMongoUri, ...(mongoshPath && { mongoshPath }) }),
-        });
-        const data = await res.json();
-        const out = [data.stdout, data.stderr].filter(Boolean).join('\n') || data.message || '(no output)';
-        result = {
-          output: out,
-          success: data.success === true,
-          summary: data.success ? 'mongosh completed' : (data.message || 'mongosh failed'),
-        };
+        const runResult = await executionService.runMongosh({ code: scriptCode, uri: labMongoUri, mongoshPath: mongoshPath ?? undefined });
+        result = { ...formatForConsole(runResult, 'mongosh') };
       }
       // 4) Node-like JavaScript → run-node (optional URI for MONGODB_URI env)
       else if ((language === 'javascript' || language === 'typescript') && code.trim().length > 0) {
         const labAwsProfile = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
-        const res = await fetch('/api/run-node', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code, uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }), profile: labAwsProfile || 'default' }),
-        });
-        const data = await res.json();
-        const stderr = (data.stderr || '').trim();
-        const stdout = (data.stdout || '').trim();
-        let out = [stderr, stdout].filter(Boolean).join('\n') || data.message || '(no output)';
-        if (data.success !== true && data.exitCode != null && data.exitCode !== 0 && !out.includes('exit code')) {
-          out += `\nExit code: ${data.exitCode}`;
-        }
-        result = {
-          output: out,
-          success: data.success === true,
-          summary: data.success ? 'Node completed' : (data.message?.split('\n')[0] || 'Node failed'),
-        };
+        const runResult = await executionService.runNode({ code: ensureTrailingNewline(code), uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }), profile: labAwsProfile || 'default', filename: block?.filename, userSuffix: getLabUserSuffix() });
+        result = { ...formatForConsole(runResult, 'node') };
       }
       // 5) Fallback: simulated output (e.g. no URI, or JSON index definitions)
       else {
@@ -1532,12 +1585,10 @@ export function StepView({
     const now = new Date();
     setLastOutput(result.output);
     setLastOutputTime(now);
-    setLogEntries(prev => [...prev, { time: now, output: result.output }]);
-    setOutputSummary(result.summary);
-    setOutputSuccess(result.success);
+    outputSurface.append(result.output, { summary: result.summary, success: result.success });
     setConsolePanelCollapsed(false);
     setIsRunning(false);
-  }, [currentStep?.codeBlocks, currentStep?.title, currentStepIndex, labMongoUri, editableCodeByBlock, skeletonTier, showSolution, alwaysShowSolutions]);
+  }, [currentStep?.codeBlocks, currentStep?.title, currentStepIndex, labMongoUri, editableCodeByBlock, skeletonTier, showSolution, alwaysShowSolutions, outputSurface, onRunEchoToTerminal]);
 
   /** Run all code blocks in order: for composite (node+mongosh) slots runs only the active tab; for single slots runs that block. Skips terminal-only blocks. After execution, runs validation when step has verificationId/onVerify; Next enabled only after validation passes. */
   const handleRunAll = useCallback(async () => {
@@ -1550,14 +1601,17 @@ export function StepView({
         const slotKey = `${currentStepIndex}-${slot.nodeIndex}`;
         const view = nodeMongoshViewByKey[slotKey] ?? 'mongosh';
         indicesToRun.push(view === 'mongosh' ? slot.mongoshIndex : slot.nodeIndex);
+      } else if (slot.type === 'twin') {
+        const twinKey = `${currentStepIndex}-twin`;
+        const view = twinViewByKey[twinKey] ?? 'A';
+        indicesToRun.push(view === 'A' ? slot.indexA : slot.indexB);
       } else {
         indicesToRun.push(slot.originalIndex);
       }
     }
     setIsRunning(true);
     setRunPhase('running');
-    const runStartTime = new Date();
-    setLogEntries(prev => [...prev, { time: runStartTime, output: 'Running script...' }]);
+    outputSurface.append('Running script...');
     setConsolePanelCollapsed(false);
     const outputs: string[] = [];
     let lastSuccess = true;
@@ -1568,18 +1622,27 @@ export function StepView({
       const blockKey = `${currentStepIndex}-${i}`;
       const tier = skeletonTier[blockKey] || 'guided';
       const isSolutionRevealed = alwaysShowSolutions || !!showSolution[blockKey] || !hasAnySkeleton(block);
-      const code = (editableCodeByBlock[blockKey] ?? getDisplayCode(block, tier, isSolutionRevealed)) || block.code || '';
+      let code = (editableCodeByBlock[blockKey] ?? getDisplayCode(block, tier, isSolutionRevealed)) || block.code || '';
       const language = (block.language || 'javascript').toLowerCase();
+      if (language === 'mongosh') code = stripMongoshConnectionLine(code);
+      if (language === 'javascript' || language === 'typescript') code = stripNodeConnectionLine(code);
+      code = ensureTrailingNewline(code);
+      const codeForEcho =
+        language === 'mongosh' && labMongoUri?.trim()
+          ? `mongosh "${labMongoUri}"\n${code}`
+          : (language === 'javascript' || language === 'typescript')
+            ? `node\n${code}`
+            : code;
+      onRunEchoToTerminal?.({ code: codeForEcho, language, filename: block.filename });
       try {
         if (language === 'mongosh' && code.trim().length > 0) {
           if (labMongoUri?.trim()) {
             const mongoshPath = typeof localStorage !== 'undefined' ? localStorage.getItem('workshop_mongosh_path') : null;
-            const res = await fetch('/api/run-mongosh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, uri: labMongoUri, ...(mongoshPath && { mongoshPath }) }) });
-            const data = await res.json();
-            const out = [data.stdout, data.stderr].filter(Boolean).join('\n') || data.message || '(no output)';
-            outputs.push(out);
-            lastSuccess = data.success === true;
-            lastSummary = data.success ? 'mongosh completed' : (data.message || 'mongosh failed');
+            const runResult = await executionService.runMongosh({ code, uri: labMongoUri, mongoshPath: mongoshPath ?? undefined });
+            const formatted = formatForConsole(runResult, 'mongosh');
+            outputs.push(formatted.output);
+            lastSuccess = runResult.success;
+            lastSummary = formatted.summary;
           } else {
             outputs.push('MongoDB URI required to run mongosh. Set it in Workshop Settings.');
             lastSuccess = false;
@@ -1606,32 +1669,36 @@ export function StepView({
               const beforeNode = commands.slice(0, nodeCmdIndex);
               if (beforeNode.length > 0) {
                 const awsProfile = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
-                const res = await fetch('/api/run-bash', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ commands: beforeNode, profile: awsProfile || 'default', ...(labAwsRegion && { region: labAwsRegion }) }) });
-                const data = await res.json();
-                outputs.push(formatBashRunOutput(data));
+                const bashResult = await executionService.runBash({ commands: beforeNode, profile: awsProfile || 'default', ...(labAwsRegion && { region: labAwsRegion }) });
+                outputs.push(formatBashRunOutput({ stdout: bashResult.stdout, stderr: bashResult.stderr, success: bashResult.success, exitCode: bashResult.exitCode }));
               }
               const labAwsProfileRun = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
-              const res = await fetch('/api/run-node', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: editorCode, uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }), profile: labAwsProfileRun || 'default' }) });
-              const data = await res.json();
-              const out = [(data.stderr || '').trim(), (data.stdout || '').trim()].filter(Boolean).join('\n') || data.message || '(no output)';
-              outputs.push(out);
-              lastSuccess = data.success === true;
-              lastSummary = data.success ? 'Node completed' : (data.message?.split('\n')[0] || 'Node failed');
+              const nodeResult = await executionService.runNode({ code: ensureTrailingNewline(stripNodeConnectionLine(editorCode)), uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }), profile: labAwsProfileRun || 'default', filename: editorBlock?.filename, userSuffix: getLabUserSuffix() });
+              const nodeFormatted = formatForConsole(nodeResult, 'node');
+              outputs.push(nodeFormatted.output);
+              lastSuccess = nodeResult.success;
+              lastSummary = nodeFormatted.summary;
             } else {
               const awsProfile = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
-              const res = await fetch('/api/run-bash', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ commands, profile: awsProfile || 'default', ...(labAwsRegion && { region: labAwsRegion }) }) });
-              const data = await res.json();
-              outputs.push(formatBashRunOutput(data));
+              const bashResult = await executionService.runBash({ commands, profile: awsProfile || 'default', ...(labAwsRegion && { region: labAwsRegion }) });
+              outputs.push(formatBashRunOutput({ stdout: bashResult.stdout, stderr: bashResult.stderr, success: bashResult.success, exitCode: bashResult.exitCode }));
+              lastSuccess = bashResult.success;
+              lastSummary = bashResult.success ? 'Command completed' : 'Command failed';
             }
           }
         } else if ((language === 'javascript' || language === 'typescript') && code.trim().length > 0) {
           const labAwsProfileRun = typeof localStorage !== 'undefined' ? (localStorage.getItem('lab_aws_profile') || '') : '';
-          const res = await fetch('/api/run-node', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }), profile: labAwsProfileRun || 'default' }) });
-          const data = await res.json();
-          const out = [(data.stderr || '').trim(), (data.stdout || '').trim()].filter(Boolean).join('\n') || data.message || '(no output)';
-          outputs.push(out);
-          lastSuccess = data.success === true;
-          lastSummary = data.success ? 'Node completed' : (data.message?.split('\n')[0] || 'Node failed');
+          const nodeResult = await executionService.runNode({ code, uri: labMongoUri || '', ...(labAwsRegion && { region: labAwsRegion }), profile: labAwsProfileRun || 'default', filename: block.filename, userSuffix: getLabUserSuffix() });
+          const nodeFormatted = formatForConsole(nodeResult, 'node');
+          outputs.push(nodeFormatted.output);
+          lastSuccess = nodeResult.success;
+          lastSummary = nodeFormatted.summary;
+        } else if ((language === 'python' || language === 'py') && code.trim().length > 0) {
+          const runResult = await executionService.runPython({ code, filename: block.filename, userSuffix: getLabUserSuffix() });
+          const formatted = formatForConsole(runResult, 'python');
+          outputs.push(formatted.output);
+          lastSuccess = runResult.success;
+          lastSummary = formatted.summary;
         } else {
           const sim = generateSimulatedOutput(code, currentStep.title);
           outputs.push(sim.output);
@@ -1646,18 +1713,13 @@ export function StepView({
       }
     }
     const combined = outputs.join('\n\n');
-    const now = new Date();
-    setLastOutput(combined);
-    setLastOutputTime(now);
-    setLogEntries(prev => [...prev, { time: now, output: combined }]);
-    setOutputSummary(lastSummary);
-    setOutputSuccess(lastSuccess);
+    outputSurface.append(combined, { summary: lastSummary, success: lastSuccess });
     setConsolePanelCollapsed(false);
 
     const needsVerification = Boolean(currentStep?.codeBlocks?.length && (currentStep.verificationId || currentStep.onVerify));
     if (needsVerification) {
       setRunPhase('validating');
-      setLogEntries(prev => [...prev, { time: new Date(), output: 'Validation started.' }]);
+      outputSurface.append('Validation started.');
       const passed = await handleCheckProgress();
       setStepValidatedSuccessByIndex(prev => ({ ...prev, [currentStepIndex]: passed }));
     } else {
@@ -1665,17 +1727,22 @@ export function StepView({
     }
     setRunPhase('idle');
     setIsRunning(false);
-  }, [currentStep?.codeBlocks, currentStep?.title, currentStep?.verificationId, currentStep?.onVerify, currentStepIndex, labMongoUri, editableCodeByBlock, skeletonTier, showSolution, alwaysShowSolutions, displaySlots, nodeMongoshViewByKey, handleCheckProgress]);
+  }, [currentStep?.codeBlocks, currentStep?.title, currentStep?.verificationId, currentStep?.onVerify, currentStepIndex, labMongoUri, editableCodeByBlock, skeletonTier, showSolution, alwaysShowSolutions, displaySlots, nodeMongoshViewByKey, twinViewByKey, handleCheckProgress, onRunEchoToTerminal]);
+
+  // IDE context: wire runAll to palette (must run after handleRunAll is defined)
+  useEffect(() => {
+    if (!ide) return;
+    ide.runAllRef.current = handleRunAll;
+    return () => {
+      ide.runAllRef.current = null;
+    };
+  }, [ide, handleRunAll]);
 
   /** Reset current step: clear console, reset inline editors to original skeleton (as on first load), clear persisted logs and solution state */
   const handleResetStep = useCallback(() => {
     // Uncomplete the step in parent first so the step indicator updates immediately
     onResetStep?.(currentStepIndex);
-    setLastOutput('');
-    setLastOutputTime(null);
-    setLogEntries([]);
-    setOutputSummary('');
-    setOutputSuccess(true);
+    outputSurface.clear();
     setConsolePanelCollapsed(true);
     setExpandedLogIndex(null);
     const w = loadLabWorkspace(labNumber, userEmail);
@@ -1755,6 +1822,47 @@ export function StepView({
     }
   };
 
+  /** Report issue: send logs and context to central DB for workshop maintainers */
+  const [reportSending, setReportSending] = useState(false);
+  const handleReportIssue = useCallback(async () => {
+    setReportSending(true);
+    try {
+      const payload = {
+        labNumber,
+        labTitle,
+        labId: currentStep?.id?.replace(/-step-.*$/, '') ?? undefined,
+        stepId: currentStep?.id,
+        stepTitle: currentStep?.title,
+        stepIndex: currentStepIndex,
+        url: typeof window !== 'undefined' ? window.location.href : '',
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+        timestamp: new Date().toISOString(),
+        consoleLogEntries: logEntries.slice(-30).map((e) => ({
+          time: e.time.toISOString(),
+          output: e.output.slice(0, 8000),
+        })),
+        lastRunOutput: lastOutput ? lastOutput.slice(0, 50000) : null,
+        lastRunSuccess: outputSuccess,
+        userEmail: userEmail ?? undefined,
+      };
+      const res = await fetch('/api/report-diagnostics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        toast.success(data.message ?? 'Report sent. Maintainers can review the logs and context.');
+      } else {
+        toast.error(data.message ?? 'Failed to send report. Try again or copy the console output.');
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to send report.');
+    } finally {
+      setReportSending(false);
+    }
+  }, [labNumber, labTitle, currentStep, currentStepIndex, logEntries, lastOutput, outputSuccess, userEmail]);
+
   const slideVariants = {
     enter: (direction: number) => ({
       x: direction > 0 ? 100 : -100,
@@ -1800,14 +1908,19 @@ export function StepView({
                     <div className="h-full min-h-0 flex flex-col border-r border-border overflow-hidden">
                       {editorPanelCollapsed && displaySlots.length > 0 ? (() => {
                         const firstSlot = displaySlots[0];
-                        const firstBlock = firstSlot.type === 'node-mongosh' ? firstSlot.nodeBlock : firstSlot.block;
-                        const firstIdx = firstSlot.type === 'node-mongosh' ? firstSlot.nodeIndex : firstSlot.originalIndex;
+                        const firstBlock = firstSlot.type === 'node-mongosh' ? firstSlot.nodeBlock : firstSlot.type === 'twin'
+                          ? (twinViewByKey[`${currentStepIndex}-twin`] ?? 'A') === 'A' ? firstSlot.blockA : firstSlot.blockB
+                          : firstSlot.block;
+                        const firstIdx = firstSlot.type === 'node-mongosh' ? firstSlot.nodeIndex : firstSlot.type === 'twin'
+                          ? (twinViewByKey[`${currentStepIndex}-twin`] ?? 'A') === 'A' ? firstSlot.indexA : firstSlot.indexB
+                          : firstSlot.originalIndex;
                         const firstKey = `${currentStepIndex}-${firstIdx}`;
                         const firstDisplayFilename = (() => {
                           const base = firstBlock.filename.includes(' (') ? firstBlock.filename.split(' (')[0].trim() : firstBlock.filename;
                           return base.replace(/^\d+\.\s*/, '').trim() || base;
                         })();
                         const firstIsNodeMongosh = firstSlot.type === 'node-mongosh';
+                        const firstIsTwin = firstSlot.type === 'twin';
                         const firstIsDriverOnly = firstSlot.type === 'single' && (
                           (firstBlock.filename?.toLowerCase().endsWith('.cjs') || firstBlock.filename?.toLowerCase().endsWith('.js')) && ['javascript', 'typescript'].includes((firstBlock.language || '').toLowerCase())
                           || ['python', 'py'].includes((firstBlock.language || '').toLowerCase())
@@ -1839,6 +1952,15 @@ export function StepView({
                                     <button type="button" onClick={() => setNodeMongoshViewByKey((prev) => ({ ...prev, [firstKey]: 'node' }))} className={cn("truncate", (nodeMongoshViewByKey[firstKey] ?? 'mongosh') === 'node' ? 'underline font-semibold' : 'opacity-80 hover:opacity-100')} title="Show Node script">node</button>
                                   </span>
                                 </>
+                              ) : firstIsTwin ? (
+                                <>
+                                  <FileCode className="w-3 h-3 flex-shrink-0 text-green-500" />
+                                  <span className="font-mono text-[8px] text-white flex items-center gap-1 truncate">
+                                    <button type="button" onClick={() => setTwinViewByKey((prev) => ({ ...prev, [`${currentStepIndex}-twin`]: 'A' }))} className={cn("truncate", (twinViewByKey[`${currentStepIndex}-twin`] ?? 'A') === 'A' ? 'underline font-semibold' : 'opacity-80 hover:opacity-100')} title={firstSlot.blockA.filename}>{(firstSlot.blockA.filename.includes(' (') ? firstSlot.blockA.filename.split(' (')[0].trim() : firstSlot.blockA.filename).replace(/^\d+\.\s*/, '').trim() || firstSlot.blockA.filename}</button>
+                                    <span className="text-muted-foreground flex-shrink-0">|</span>
+                                    <button type="button" onClick={() => setTwinViewByKey((prev) => ({ ...prev, [`${currentStepIndex}-twin`]: 'B' }))} className={cn("truncate", (twinViewByKey[`${currentStepIndex}-twin`] ?? 'A') === 'B' ? 'underline font-semibold' : 'opacity-80 hover:opacity-100')} title={firstSlot.blockB.filename}>{(firstSlot.blockB.filename.includes(' (') ? firstSlot.blockB.filename.split(' (')[0].trim() : firstSlot.blockB.filename).replace(/^\d+\.\s*/, '').trim() || firstSlot.blockB.filename}</button>
+                                  </span>
+                                </>
                               ) : (
                                 <>
                                   <FileCode className="w-3 h-3 flex-shrink-0 text-green-500" />
@@ -1847,7 +1969,7 @@ export function StepView({
                               )}
                             </div>
                             <div className="flex items-center gap-0.5 flex-shrink-0">
-                              {(firstIsShell || firstIsNodeMongosh || firstIsDriverOnly) && (
+                              {(firstIsShell || firstIsNodeMongosh || firstIsDriverOnly || firstIsTwin) && (
                                 <>
                                   {firstIsShell && <span className="text-[7px] text-muted-foreground/70 mr-0.5">—</span>}
                                   <TooltipProvider><Tooltip><TooltipTrigger asChild>
@@ -1863,7 +1985,7 @@ export function StepView({
                                 </Button>
                               </TooltipTrigger><TooltipContent side="bottom">Reset step</TooltipContent></Tooltip></TooltipProvider>
                               {firstHasSkeleton && !firstSolutionRevealed && (
-                                <Button variant="ghost" size="sm" onClick={() => revealSolution(firstIsNodeMongosh ? [`${currentStepIndex}-${firstSlot.nodeIndex}`, `${currentStepIndex}-${firstSlot.mongoshIndex}`] : firstKey, firstTier)} className="gap-0.5 h-3.5 text-[8px] px-1 text-destructive hover:text-destructive hover:bg-destructive/10">
+                                <Button variant="ghost" size="sm" onClick={() => revealSolution(firstIsNodeMongosh ? [`${currentStepIndex}-${firstSlot.nodeIndex}`, `${currentStepIndex}-${firstSlot.mongoshIndex}`] : firstIsTwin ? [`${currentStepIndex}-${firstSlot.indexA}`, `${currentStepIndex}-${firstSlot.indexB}`] : firstKey, firstTier)} className="gap-0.5 h-3.5 text-[8px] px-1 text-destructive hover:text-destructive hover:bg-destructive/10">
                                   <Eye className="w-2 h-2" /><span className="hidden sm:inline">Solution</span><span>(-{firstPenalty})</span>
                                 </Button>
                               )}
@@ -1897,7 +2019,7 @@ export function StepView({
                       const hasSkeleton = hasAnySkeleton(activeBlock);
                       const tier = skeletonTier[activeKey] || 'guided';
                       const isSolutionRevealed = alwaysShowSolutions || showSolution[activeKey] || !hasSkeleton;
-                      const displayCode = getDisplayCode(activeBlock, tier, isSolutionRevealed);
+                      const displayCode = getDisplayCodeWithShellIfRevealed(activeBlock, tier, isSolutionRevealed, activeBlock.language, labMongoUri);
                       const solutionPenalty = getSolutionPenalty(tier);
                       const handleBlockCodeChange = (v: string | undefined) => {
                         const value = v ?? '';
@@ -1969,6 +2091,84 @@ export function StepView({
                             revealedAnswers={revealedAnswers[activeKey] || []}
                             onRevealHint={(hintIdx) => revealInlineHint(activeKey, hintIdx, tier)}
                             onRevealAnswer={(hintIdx) => revealInlineAnswer(activeKey, hintIdx, tier)}
+                            documentPath={`lab/${labNumber}/step/${activeKey.replace('-', '/')}`}
+                            equalHeightSplit={false}
+                            fillContainer={true}
+                          />
+                        </div>
+                      );
+                    }
+
+                    if (slot.type === 'twin') {
+                      const { blockA, indexA, blockB, indexB } = slot;
+                      const twinKey = `${currentStepIndex}-twin`;
+                      const view = twinViewByKey[twinKey] ?? 'A';
+                      const activeBlock = view === 'A' ? blockA : blockB;
+                      const activeIndex = view === 'A' ? indexA : indexB;
+                      const activeKey = `${currentStepIndex}-${activeIndex}`;
+                      const hasSkeleton = hasAnySkeleton(activeBlock);
+                      const tier = skeletonTier[activeKey] || 'guided';
+                      const isSolutionRevealed = alwaysShowSolutions || showSolution[activeKey] || !hasSkeleton;
+                      const displayCode = getDisplayCodeWithShellIfRevealed(activeBlock, tier, isSolutionRevealed, activeBlock.language, labMongoUri);
+                      const solutionPenalty = getSolutionPenalty(tier);
+                      const handleBlockCodeChange = (v: string | undefined) => {
+                        setEditableCodeByBlock((prev) => ({ ...prev, [activeKey]: v ?? '' }));
+                      };
+                      const nameA = (blockA.filename.includes(' (') ? blockA.filename.split(' (')[0].trim() : blockA.filename).replace(/^\d+\.\s*/, '').trim() || blockA.filename;
+                      const nameB = (blockB.filename.includes(' (') ? blockB.filename.split(' (')[0].trim() : blockB.filename).replace(/^\d+\.\s*/, '').trim() || blockB.filename;
+                      return (
+                        <div key={`twin-${indexA}-${indexB}`} className={cn("flex flex-col flex-1 min-h-0", slotIndex > 0 && "border-t border-border")}>
+                          <div className="sticky top-0 z-10 flex-shrink-0 flex items-center justify-between gap-1.5 border border-border border-b bg-muted px-2 py-1 min-w-0 shadow-[0_1px_0_0_var(--border)]">
+                            <div className="flex items-center gap-1.5 min-w-0 truncate">
+                              {slotIndex === 0 && (
+                                <button type="button" onClick={() => setEditorPanelCollapsed(true)} className="flex-shrink-0 p-0.5 rounded hover:bg-muted/80 transition-colors" title="Collapse editor">
+                                  <ChevronUp className="w-3 h-3 text-muted-foreground" />
+                                </button>
+                              )}
+                              <FileCode className="w-3 h-3 flex-shrink-0 text-green-500" />
+                              <span className="font-mono text-[8px] text-white flex items-center gap-1 truncate">
+                                <button type="button" onClick={() => setTwinViewByKey((prev) => ({ ...prev, [twinKey]: 'A' }))} className={cn("truncate", view === 'A' ? 'underline font-semibold' : 'opacity-80 hover:opacity-100')} title={blockA.filename}>{nameA}</button>
+                                <span className="text-muted-foreground flex-shrink-0">|</span>
+                                <button type="button" onClick={() => setTwinViewByKey((prev) => ({ ...prev, [twinKey]: 'B' }))} className={cn("truncate", view === 'B' ? 'underline font-semibold' : 'opacity-80 hover:opacity-100')} title={blockB.filename}>{nameB}</button>
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-0.5 flex-shrink-0">
+                              <TooltipProvider><Tooltip><TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={handleRunAll} disabled={runAllDisabled} className="h-3.5 w-3.5 text-primary" title={runAllTooltip}>
+                                  {isRunning ? <Loader2 className="w-2 h-2 animate-spin" /> : <PlayCircle className="w-2 h-2" />}
+                                </Button>
+                              </TooltipTrigger><TooltipContent side="bottom">{runAllTooltip}</TooltipContent></Tooltip></TooltipProvider>
+                              <TooltipProvider><Tooltip><TooltipTrigger asChild>
+                                <Button variant="ghost" size="sm" onClick={() => stepToolbarRef?.current?.reset()} className="h-3.5 gap-0.5 px-1 text-[8px]" title="Reset step"><RotateCcw className="w-2 h-2" /><span className="hidden sm:inline">Reset</span></Button>
+                              </TooltipTrigger><TooltipContent side="bottom">Reset step</TooltipContent></Tooltip></TooltipProvider>
+                              {hasSkeleton && !isSolutionRevealed && (
+                                <Button variant="ghost" size="sm" onClick={() => revealSolution([`${currentStepIndex}-${indexA}`, `${currentStepIndex}-${indexB}`], tier)} className="gap-0.5 h-3.5 text-[8px] px-1 text-destructive hover:text-destructive hover:bg-destructive/10">
+                                  <Eye className="w-2 h-2" /><span className="hidden sm:inline">Solution</span><span>(-{solutionPenalty})</span>
+                                </Button>
+                              )}
+                              <Button variant="ghost" size="sm" onClick={() => handleCopyCode(activeIndex)} className="gap-0.5 h-3.5 text-[8px] px-1" title="Copy">
+                                {copied ? <Check className="w-2 h-2 text-green-500" /> : <Copy className="w-2 h-2" />}
+                                <span className="hidden xs:inline">{copied ? 'Copied!' : 'Copy'}</span>
+                              </Button>
+                            </div>
+                          </div>
+                          <InlineHintEditor
+                            key={`editor-${activeKey}-${isSolutionRevealed}`}
+                            code={displayCode}
+                            controlledValue={editableCodeByBlock[activeKey]}
+                            onCodeChange={handleBlockCodeChange}
+                            language={activeBlock.language}
+                            lineHeight={lineHeight}
+                            setLineHeight={setLineHeight}
+                            hasSkeleton={hasSkeleton}
+                            isSolutionRevealed={isSolutionRevealed}
+                            inlineHints={activeBlock.inlineHints}
+                            tier={tier}
+                            revealedHints={revealedHints[activeKey] || []}
+                            revealedAnswers={revealedAnswers[activeKey] || []}
+                            onRevealHint={(hintIdx) => revealInlineHint(activeKey, hintIdx, tier)}
+                            onRevealAnswer={(hintIdx) => revealInlineAnswer(activeKey, hintIdx, tier)}
+                            documentPath={`lab/${labNumber}/step/${activeKey.replace('-', '/')}`}
                             equalHeightSplit={false}
                             fillContainer={true}
                           />
@@ -1981,7 +2181,7 @@ export function StepView({
                     const hasSkeleton = hasAnySkeleton(block);
                     const tier = skeletonTier[blockKey] || 'guided';
                     const isSolutionRevealed = alwaysShowSolutions || showSolution[blockKey] || !hasSkeleton;
-                    const displayCode = getDisplayCode(block, tier, isSolutionRevealed);
+                    const displayCode = getDisplayCodeWithShellIfRevealed(block, tier, isSolutionRevealed, block.language, labMongoUri);
                     const solutionPenalty = getSolutionPenalty(tier);
                     const isTwoBlockPattern = displaySlots.length === 2;
                     const displayFilename = (() => {
@@ -2046,6 +2246,7 @@ export function StepView({
                             revealedAnswers={revealedAnswers[blockKey] || []}
                             onRevealHint={(hintIdx) => revealInlineHint(blockKey, hintIdx, tier)}
                             onRevealAnswer={(hintIdx) => revealInlineAnswer(blockKey, hintIdx, tier)}
+                            documentPath={`lab/${labNumber}/step/${blockKey.replace('-', '/')}`}
                             equalHeightSplit={false}
                             fillContainer={true}
                           />
@@ -2161,6 +2362,7 @@ export function StepView({
                           revealedAnswers={revealedAnswers[blockKey] || []}
                           onRevealHint={(hintIdx) => revealInlineHint(blockKey, hintIdx, tier)}
                           onRevealAnswer={(hintIdx) => revealInlineAnswer(blockKey, hintIdx, tier)}
+                          documentPath={`lab/${labNumber}/step/${blockKey.replace('-', '/')}`}
                           equalHeightSplit={isTwoBlockPattern}
                         />
 
@@ -2228,24 +2430,24 @@ export function StepView({
                     </div>
                   </ResizablePanel>
 
-                  {/* Divider splitter between Editor and Console — same visual weight as vertical splitter (thin draggable bar) */}
+                  {/* Divider splitter between Editor and Terminal */}
                   <ResizableHandle
                     withHandle
                     className="bg-border hover:bg-primary/50 transition-colors data-[panel-group-direction=vertical]:cursor-ns-resize shrink-0"
                   />
 
-              {/* Console panel: run output; collapsible, default collapsed; vertically resizable with editor above */}
+              {/* Terminal panel: run output (replaces Console); collapsible; status in header; body = xterm when session provided */}
               <ResizablePanel defaultSize={6} minSize={15} collapsible collapsedSize={6} className="min-h-0">
                 <div className="h-full min-h-0 flex flex-col bg-background/95">
                   <button
                     type="button"
                     onClick={() => setConsolePanelCollapsed((c) => !c)}
                     className="flex-shrink-0 flex items-center gap-2 px-2 py-1 border border-border border-b bg-muted/40 hover:bg-muted transition-colors text-left w-full"
-                    title={consolePanelCollapsed ? 'Expand console' : 'Collapse console'}
+                    title={consolePanelCollapsed ? 'Expand terminal' : 'Collapse terminal'}
                   >
                     {consolePanelCollapsed ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     <Terminal className="w-3.5 h-3.5 text-green-500" />
-                    <span className="text-[8px] font-medium text-white">Console</span>
+                    <span className="text-[8px] font-medium text-white">Terminal</span>
                     {runPhase === 'running' && (
                       <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-500/20 text-green-400 animate-pulse">
                         Running script…
@@ -2265,83 +2467,17 @@ export function StepView({
                       </span>
                     )}
                   </button>
-                  <div ref={consoleOutputScrollRef} className="flex-1 min-h-0 overflow-auto px-2 py-1.5 bg-[hsl(220,20%,6%)] font-mono text-xs text-white overflow-x-auto">
-                    {logEntries.length > 0 ? (
-                      <div className="space-y-2">
-                        {logEntries.map((entry, entryIndex) => {
-                          const lines = entry.output.split(/\r?\n/);
-                          const envLines: string[] = [];
-                          const outputLines: string[] = [];
-                          for (const line of lines) {
-                            if (/^\[lab\]\s*(Env:|Command:|Commands:)/i.test(line.trim()) || (line.includes('Env:') && line.trim().startsWith('[lab]'))) {
-                              envLines.push(line.replace(/^\[lab\]\s*/, '').trim());
-                            } else {
-                              outputLines.push(line.replace(/^\[lab\]\s*/, ''));
-                            }
-                          }
-                          const hasEnv = envLines.length > 0;
-                          const outputBlock = outputLines.join('\n').trim();
-                          return (
-                            <div key={entryIndex} className="rounded border border-white/5 overflow-hidden">
-                              {hasEnv && (
-                                <div className="px-1.5 py-1 bg-white/5 text-muted-foreground text-[10px] border-b border-white/5 whitespace-pre-wrap">
-                                  {envLines.join('\n')}
-                                </div>
-                              )}
-                              <pre className="px-1.5 py-1 whitespace-pre-wrap break-all text-white/95 leading-snug text-xs">
-                                {outputBlock || (hasEnv ? '' : entry.output)}
-                              </pre>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : lastOutput ? (
-                      (() => {
-                        const lines = lastOutput.split(/\r?\n/);
-                        const envLines: string[] = [];
-                        const outputLines: string[] = [];
-                        for (const line of lines) {
-                          if (/^\[lab\]\s*(Env:|Command:|Commands:)/i.test(line.trim()) || (line.includes('Env:') && line.trim().startsWith('[lab]'))) {
-                            envLines.push(line.replace(/^\[lab\]\s*/, '').trim());
-                          } else {
-                            outputLines.push(line.replace(/^\[lab\]\s*/, ''));
-                          }
-                        }
-                        const hasEnv = envLines.length > 0;
-                        const outputBlock = outputLines.join('\n').trim();
-                        return (
-                          <div className="rounded border border-white/5 overflow-hidden">
-                            {hasEnv && (
-                              <div className="px-1.5 py-1 bg-white/5 text-muted-foreground text-[10px] border-b border-white/5 whitespace-pre-wrap">
-                                {envLines.join('\n')}
-                              </div>
-                            )}
-                            <pre className="px-1.5 py-1 whitespace-pre-wrap break-all text-white/95 leading-snug text-xs">
-                              {outputBlock || (hasEnv ? '' : lastOutput)}
-                            </pre>
-                          </div>
-                        );
-                      })()
+                  <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                    {terminalSessionProp ? (
+                      <XtermTerminal
+                        session={terminalSessionProp}
+                        welcome="Lab terminal. Run the step to see output."
+                        className="flex-1 min-h-0"
+                      />
                     ) : (
-                      <pre className="whitespace-pre-wrap leading-snug text-white/60 text-xs">No output yet. Run the step to see results.</pre>
-                    )}
-                    {!outputSuccess && lastOutput && (
-                      <>
-                        {lastOutput.includes('MODULE_NOT_FOUND') && (
-                          <p className="mt-1.5 text-[10px] text-amber-400/90">
-                            {(lastOutput.includes('mongocrypt.node') || lastOutput.includes('mongodb-client-encryption')) ? (
-                              <>Tip: <code className="bg-white/10 px-0.5 rounded">mongodb-client-encryption</code> needs its native addon built. In Docker: rebuild the app image (Dockerfile has build deps), then <code className="bg-white/10 px-0.5 rounded">docker compose up -d --build app</code>. The container runs <code className="bg-white/10 px-0.5 rounded">npm rebuild mongodb-client-encryption</code> on startup to compile it.</>
-                            ) : (
-                              <>Tip: The run environment uses this app’s node_modules. If you see this in Docker, ensure the image has run <code className="bg-white/10 px-0.5 rounded">npm ci</code> so <code className="bg-white/10 px-0.5 rounded">mongodb</code> and <code className="bg-white/10 px-0.5 rounded">mongodb-client-encryption</code> are present.</>
-                            )}
-                          </p>
-                        )}
-                        {(lastOutput.includes('Whitelist') || lastOutput.includes('Connection Failed')) && (
-                          <p className="mt-1.5 text-[10px] text-amber-400/90">
-                            Tip: Using <strong>Atlas</strong>? Add your IP in Atlas → Network Access (or 0.0.0.0/0 for testing). Using <strong>Local Docker</strong>? In Workshop Settings choose “Local Docker”, then run <code className="bg-white/10 px-0.5 rounded">docker compose up -d mongo app</code> so MongoDB is running and the app uses the correct URI.
-                          </p>
-                        )}
-                      </>
+                      <div className="flex-1 min-h-0 overflow-auto px-2 py-1.5 bg-[hsl(220,20%,6%)] font-mono text-xs text-white flex items-center justify-center">
+                        <span className="text-white/50">Connecting to terminal…</span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -2547,6 +2683,27 @@ export function StepView({
               <ChevronLeft className="w-4 h-4" />
               Previous
             </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleReportIssue}
+                    disabled={reportSending}
+                    className="gap-1 text-muted-foreground hover:text-foreground"
+                    title="Send logs and context to maintainers"
+                  >
+                    {reportSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bug className="w-4 h-4" />}
+                    Report issue
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  Collect and send console logs, run output, and step context to the central database so workshop maintainers can see exactly what happened and fix issues.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            {ide && <SuggestNextStep className="mr-2" />}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>

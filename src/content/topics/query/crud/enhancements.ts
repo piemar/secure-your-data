@@ -72,9 +72,34 @@ run().catch(console.dir);`,
           { line: 19, blankText: '___________', hint: 'Method to add an array of documents in one call', answer: 'insertMany' },
         ],
       },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
+        code: `use crud_lab;
+const doc = { name: "Widget", quantity: 10, tags: ["a", "b"] };
+const result = db.items.insertOne(doc);
+print("Inserted id:", result.insertedId);
+const docs = [{ name: "Gadget", quantity: 5 }, { name: "Gizmo", quantity: 15 }];
+const manyResult = db.items.insertMany(docs);
+print("insertMany insertedIds:", JSON.stringify(manyResult.insertedIds));`,
+        skeleton: `_____ crud_lab;
+const doc = { name: "Widget", quantity: 10, tags: ["a", "b"] };
+const result = db.items.___________(doc);
+print("Inserted id:", result.insertedId);
+const docs = [{ name: "Gadget", quantity: 5 }, { name: "Gizmo", quantity: 15 }];
+const manyResult = db.items.___________(docs);
+print("insertMany insertedIds:", JSON.stringify(manyResult.insertedIds));`,
+        inlineHints: [
+          { line: 1, blankText: '_____', hint: 'Keyword to switch to a database by name', answer: 'use' },
+          { line: 3, blankText: '___________', hint: 'Method to add a single document to the collection', answer: 'insertOne' },
+          { line: 6, blankText: '___________', hint: 'Method to add an array of documents in one call', answer: 'insertMany' },
+        ],
+      },
     ],
     tips: [
       'Use Run all or Run selection in the editor to execute; no separate terminal block is needed.',
+      'Use the mongosh tab to run the same logic in the shell; Run echoes to the Terminal tab when you run.',
+      'Run uses the mongosh path from Workshop Settings; set it if Run fails or you see "mongosh missing".',
       'insertMany() returns { acknowledged, insertedIds }. MongoDB creates the collection if it does not exist.',
     ],
   },
@@ -123,7 +148,9 @@ async function run() {
   const client = await MongoClient.connect(uri);
   const db = client.db("crud_lab");
   const coll = db.collection("items");
-  const docs = await coll.______({}).________(2)._______(0).toArray();
+  const docs = await coll.______({})
+    .________(2)
+    ._______(0).toArray();
   console.log("Found (limit 2):", docs.length);
   const one = await coll.___________({ name: "Widget" });
   console.log("findOne:", one);
@@ -132,14 +159,37 @@ async function run() {
 run().catch(console.dir);`,
         inlineHints: [
           { line: 15, blankText: '______', hint: 'Method to query documents; returns a cursor', answer: 'find' },
-          { line: 15, blankText: '________', hint: 'Cursor method to cap the number of documents returned', answer: 'limit' },
-          { line: 15, blankText: '_______', hint: 'Cursor method to skip the first n documents (for pagination)', answer: 'skip' },
-          { line: 17, blankText: '___________', hint: 'Method to return a single document or null', answer: 'findOne' },
+          { line: 16, blankText: '________', hint: 'Cursor method to cap the number of documents returned', answer: 'limit' },
+          { line: 17, blankText: '_______', hint: 'Cursor method to skip the first n documents (for pagination)', answer: 'skip' },
+          { line: 19, blankText: '___________', hint: 'Method to return a single document or null', answer: 'findOne' },
+        ],
+      },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
+        code: `use crud_lab;
+const docs = db.items.find({}).limit(2).skip(0).toArray();
+print("Found (limit 2):", docs.length);
+const one = db.items.findOne({ name: "Widget" });
+printjson(one);`,
+        skeleton: `use crud_lab;
+const docs = db.items.______({})
+  .________(2)
+  ._______(0).toArray();
+print("Found (limit 2):", docs.length);
+const one = db.items.___________({ name: "Widget" });
+printjson(one);`,
+        inlineHints: [
+          { line: 2, blankText: '______', hint: 'Method to query documents; returns a cursor', answer: 'find' },
+          { line: 3, blankText: '________', hint: 'Cursor method to cap the number of documents returned', answer: 'limit' },
+          { line: 4, blankText: '_______', hint: 'Cursor method to skip the first n documents', answer: 'skip' },
+          { line: 6, blankText: '___________', hint: 'Method to return a single document or null', answer: 'findOne' },
         ],
       },
     ],
     tips: [
       'find(filter) returns a cursor; chain .limit(n).skip(n).toArray() for pagination.',
+      'Use the mongosh tab to run the same queries in the shell.',
       'findOne(filter) returns a Promise of the document or null; no cursor.',
     ],
   },
@@ -213,6 +263,26 @@ run().catch(console.dir);`,
           { line: 20, blankText: '___________', hint: 'Method to update all documents matching the filter', answer: 'updateMany' },
         ],
       },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
+        code: `use crud_lab;
+const r1 = db.items.updateOne({ name: "Widget" }, { $set: { quantity: 20 } });
+print("updateOne matched:", r1.matchedCount, "modified:", r1.modifiedCount);
+const r2 = db.items.updateMany({ quantity: { $lt: 10 } }, { $set: { status: "updated" } });
+print("updateMany matched:", r2.matchedCount, "modified:", r2.modifiedCount);`,
+        skeleton: `use crud_lab;
+const r1 = db.items.__________({ name: "Widget" },
+  { _____: { quantity: 20 } });
+print("updateOne matched:", r1.matchedCount, "modified:", r1.modifiedCount);
+const r2 = db.items.___________({ quantity: { $lt: 10 } }, { $set: { status: "updated" } });
+print("updateMany matched:", r2.matchedCount, "modified:", r2.modifiedCount);`,
+        inlineHints: [
+          { line: 2, blankText: '__________', hint: 'Method to update one document matching the filter', answer: 'updateOne' },
+          { line: 3, blankText: '_____', hint: 'Update operator to set the value of a field', answer: '$set' },
+          { line: 5, blankText: '___________', hint: 'Method to update all documents matching the filter', answer: 'updateMany' },
+        ],
+      },
     ],
     tips: [
       'updateOne(filter, update) updates at most one document; updateMany(filter, update) updates all matches.',
@@ -281,6 +351,31 @@ async function run() {
 run().catch(console.dir);`,
         inlineHints: [
           { line: 17, blankText: '___________', hint: 'Method to replace the first matching document with a full document', answer: 'replaceOne' },
+        ],
+      },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
+        code: `use crud_lab;
+const doc = db.items.findOne({ name: "Widget" });
+if (doc) {
+  const result = db.items.replaceOne(
+    { _id: doc._id },
+    { _id: doc._id, name: "WidgetV2", quantity: 99, replaced: true }
+  );
+  print("replaceOne matched:", result.matchedCount, "modified:", result.modifiedCount);
+}`,
+        skeleton: `use crud_lab;
+const doc = db.items.findOne({ name: "Widget" });
+if (doc) {
+  const result = db.items.___________(
+    { _id: doc._id },
+    { _id: doc._id, name: "WidgetV2", quantity: 99, replaced: true }
+  );
+  print("replaceOne matched:", result.matchedCount, "modified:", result.modifiedCount);
+}`,
+        inlineHints: [
+          { line: 4, blankText: '___________', hint: 'Method to replace the first matching document with a full document', answer: 'replaceOne' },
         ],
       },
     ],
@@ -352,6 +447,30 @@ run().catch(console.dir);`,
           { line: 18, blankText: '_________', hint: 'Option: when true, insert a document if no document matches the filter', answer: 'upsert' },
         ],
       },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
+        code: `use crud_lab;
+const result = db.items.updateOne(
+  { name: "NonExistent" },
+  { $set: { name: "Upserted", value: 1 } },
+  { upsert: true }
+);
+print("matchedCount:", result.matchedCount, "modifiedCount:", result.modifiedCount);
+if (result.upsertedId) print("upsertedId:", result.upsertedId);`,
+        skeleton: `use crud_lab;
+const result = db.items.__________(
+  { name: "NonExistent" },
+  { $set: { name: "Upserted", value: 1 } },
+  { _________: true }
+);
+print("matchedCount:", result.matchedCount, "modifiedCount:", result.modifiedCount);
+if (result.upsertedId) print("upsertedId:", result.upsertedId);`,
+        inlineHints: [
+          { line: 2, blankText: '__________', hint: 'Method to update one document; with upsert option can insert if no match', answer: 'updateOne' },
+          { line: 5, blankText: '_________', hint: 'Option: when true, insert a document if no document matches the filter', answer: 'upsert' },
+        ],
+      },
     ],
     tips: [
       'When no document matches, MongoDB inserts one. The new document combines equality fields from the filter with fields from the update ($set).',
@@ -413,6 +532,24 @@ run().catch(console.dir);`,
         inlineHints: [
           { line: 15, blankText: '__________', hint: 'Method to remove at most one document matching the filter', answer: 'deleteOne' },
           { line: 17, blankText: '___________', hint: 'Method to remove all documents matching the filter', answer: 'deleteMany' },
+        ],
+      },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
+        code: `use crud_lab;
+const resultOne = db.items.deleteOne({ name: "Gizmo" });
+print("deleteOne deleted:", resultOne.deletedCount);
+const resultMany = db.items.deleteMany({ name: "Widget" });
+print("deleteMany deleted:", resultMany.deletedCount);`,
+        skeleton: `use crud_lab;
+const resultOne = db.items.__________({ name: "Gizmo" });
+print("deleteOne deleted:", resultOne.deletedCount);
+const resultMany = db.items.___________({ name: "Widget" });
+print("deleteMany deleted:", resultMany.deletedCount);`,
+        inlineHints: [
+          { line: 2, blankText: '__________', hint: 'Method to remove at most one document matching the filter', answer: 'deleteOne' },
+          { line: 4, blankText: '___________', hint: 'Method to remove all documents matching the filter', answer: 'deleteMany' },
         ],
       },
     ],
@@ -482,6 +619,28 @@ run().catch(console.dir);`,
         inlineHints: [
           { line: 15, blankText: '__________', hint: 'Method to send multiple insert/update/delete operations in one round trip', answer: 'bulkWrite' },
           { line: 19, blankText: '_________', hint: 'Option: true = stop on first error, false = continue and report all errors', answer: 'ordered' },
+        ],
+      },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
+        code: `use crud_lab;
+const result = db.items.bulkWrite([
+  { insertOne: { document: { name: "Bulk1", qty: 1 } } },
+  { updateOne: { filter: { name: "Bulk1" }, update: { $set: { qty: 2 } } } },
+  { deleteOne: { filter: { name: "Bulk1" } } },
+], { ordered: true });
+print("insertedCount:", result.insertedCount, "modifiedCount:", result.modifiedCount, "deletedCount:", result.deletedCount);`,
+        skeleton: `use crud_lab;
+const result = db.items.__________([
+  { insertOne: { document: { name: "Bulk1", qty: 1 } } },
+  { updateOne: { filter: { name: "Bulk1" }, update: { $set: { qty: 2 } } } },
+  { deleteOne: { filter: { name: "Bulk1" } } },
+], { _________: true });
+print("insertedCount:", result.insertedCount, "modifiedCount:", result.modifiedCount, "deletedCount:", result.deletedCount);`,
+        inlineHints: [
+          { line: 2, blankText: '__________', hint: 'Method to send multiple insert/update/delete operations in one round trip', answer: 'bulkWrite' },
+          { line: 6, blankText: '_________', hint: 'Option: true = stop on first error, false = continue and report all errors', answer: 'ordered' },
         ],
       },
     ],

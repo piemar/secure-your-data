@@ -205,7 +205,7 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     useEffect(() => {
         const session = getWorkshopSession();
         if (session && !mongoUri && session.mongodbSource === 'local') {
-            const localUri = runningInContainer ? 'mongodb://mongo:27017' : 'mongodb://127.0.0.1:27017';
+            const localUri = runningInContainer ? 'mongodb://root:example@mongo:27017' : 'mongodb://127.0.0.1:27017';
             setMongoUri(localUri);
         }
     }, [mongoUri, runningInContainer]);

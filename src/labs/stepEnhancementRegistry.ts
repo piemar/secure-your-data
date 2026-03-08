@@ -114,8 +114,10 @@ function substitutePlaceholders(text: string | undefined): string | undefined {
   const prefix = getLabCollectionPrefix();
   const medicalDb = 'medical_' + suffix;
   const hrDb = 'hr_' + suffix;
+  const crudLabDb = 'crud_lab_' + suffix;
   return text
     .replace(/\bYOUR_SUFFIX\b/g, suffix)
+    .replace(/\bcrud_lab\b/g, crudLabDb)
     .replace(/\bALIAS_NAME\b/g, aliasName)
     .replace(/(?<!process\.env\.)\bAWS_REGION\b/g, awsRegion)
     .replace(/\bCRYPT_SHARED_LIB_PATH\b/g, cryptPath)

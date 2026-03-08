@@ -20,6 +20,7 @@ export const labMongodbCrudDefinition: WorkshopLabDefinition = {
     'MongoDB Atlas cluster (M0 or higher) or local MongoDB',
     'Node.js 18+',
     'MONGODB_URI environment variable set',
+    'mongosh (MongoDB Shell) installed; path configured in Workshop Settings so Run can execute mongosh blocks',
   ],
   povCapabilities: ['RICH-QUERY'],
   modes: ['lab', 'demo', 'challenge'],

@@ -200,3 +200,115 @@ export function getEditableLabOptions(
     ...overrides,
   };
 }
+
+/** Languages supported by the lab (Monaco + registry). Phase 3 optional. */
+export const MONACO_LAB_LANGUAGES = ['javascript', 'typescript', 'mongosh', 'bash', 'shell', 'python', 'java', 'csharp'] as const;
+
+/**
+ * Register Python language for syntax highlighting. Phase 3 optional.
+ */
+export function registerPythonLanguage(monaco: typeof import('monaco-editor')) {
+  try {
+    monaco.languages.register({ id: 'python' });
+    monaco.languages.setMonarchTokensProvider('python', {
+      defaultToken: '',
+      tokenPostfix: '.py',
+      keywords: ['and', 'as', 'assert', 'async', 'await', 'break', 'class', 'continue', 'def', 'del', 'elif', 'else', 'except', 'False', 'finally', 'for', 'from', 'global', 'if', 'import', 'in', 'is', 'lambda', 'None', 'nonlocal', 'not', 'or', 'pass', 'raise', 'return', 'True', 'try', 'while', 'with', 'yield'],
+      tokenizer: {
+        root: [
+          [/[a-zA-Z_][\w]*/, { cases: { '@keywords': 'keyword', '@default': 'identifier' } }],
+          [/\d+\.\d+/, 'number.float'],
+          [/\d+/, 'number'],
+          [/""".*"""/, 'string'],
+          [/'''.*'''/, 'string'],
+          [/"[^"]*"/, 'string'],
+          [/'[^']*'/, 'string'],
+          [/\/\/.*$/, 'comment'],
+          [/[{}()\[\]]/, '@brackets'],
+          [/[=><!~?:&|+\-*\/\^%]+/, 'operator'],
+          [/\s+/, 'white'],
+        ],
+      },
+    });
+  } catch (_) { /* ignore */ }
+}
+
+/**
+ * Register Java language for syntax highlighting. Phase 3 optional.
+ */
+export function registerJavaLanguage(monaco: typeof import('monaco-editor')) {
+  try {
+    monaco.languages.register({ id: 'java' });
+    monaco.languages.setMonarchTokensProvider('java', {
+      defaultToken: '',
+      tokenPostfix: '.java',
+      keywords: ['abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char', 'class', 'const', 'continue', 'default', 'do', 'double', 'else', 'enum', 'extends', 'final', 'finally', 'float', 'for', 'goto', 'if', 'implements', 'import', 'instanceof', 'int', 'interface', 'long', 'native', 'new', 'package', 'private', 'protected', 'public', 'return', 'short', 'static', 'strictfp', 'super', 'switch', 'synchronized', 'this', 'throw', 'throws', 'transient', 'try', 'void', 'volatile', 'while', 'true', 'false', 'null'],
+      tokenizer: {
+        root: [
+          [/[a-zA-Z_$][\w$]*/, { cases: { '@keywords': 'keyword', '@default': 'identifier' } }],
+          [/\d+\.\d+[fFdD]?/, 'number.float'],
+          [/\d+[lL]?/, 'number'],
+          [/\/\/.*$/, 'comment'],
+          [/\/\*/, 'comment', '@comment'],
+          [/"[^"]*"/, 'string'],
+          [/'\\.'/, 'string'],
+          [/[']/, 'string'],
+          [/[{}()\[\];.,]/, '@brackets'],
+          [/[=><!~?:&|+\-*\/\^%]+/, 'operator'],
+          [/\s+/, 'white'],
+        ],
+        comment: [[/[^\/*]+/, 'comment'], [/\*\//, 'comment', '@pop'], [/[\/*]/, 'comment']],
+      },
+    });
+  } catch (_) { /* ignore */ }
+}
+
+/**
+ * Register C# language for syntax highlighting. Phase 3 optional.
+ */
+export function registerCSharpLanguage(monaco: typeof import('monaco-editor')) {
+  try {
+    monaco.languages.register({ id: 'csharp' });
+    monaco.languages.setMonarchTokensProvider('csharp', {
+      defaultToken: '',
+      tokenPostfix: '.cs',
+      keywords: ['abstract', 'as', 'base', 'bool', 'break', 'byte', 'case', 'catch', 'char', 'checked', 'class', 'const', 'continue', 'decimal', 'default', 'delegate', 'do', 'double', 'else', 'enum', 'event', 'explicit', 'extern', 'false', 'finally', 'fixed', 'float', 'for', 'foreach', 'goto', 'if', 'implicit', 'in', 'int', 'interface', 'internal', 'is', 'lock', 'long', 'namespace', 'new', 'null', 'object', 'operator', 'out', 'override', 'params', 'private', 'protected', 'public', 'readonly', 'ref', 'return', 'sbyte', 'sealed', 'short', 'sizeof', 'stackalloc', 'static', 'string', 'struct', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'uint', 'ulong', 'unchecked', 'unsafe', 'ushort', 'using', 'virtual', 'void', 'volatile', 'while'],
+      tokenizer: {
+        root: [
+          [/[a-zA-Z_][\w]*/, { cases: { '@keywords': 'keyword', '@default': 'identifier' } }],
+          [/\d+\.\d+[fFdDmM]?/, 'number.float'],
+          [/\d+[lL]?/, 'number'],
+          [/\/\/.*$/, 'comment'],
+          [/\/\*/, 'comment', '@comment'],
+          [/@"/, 'string', '@verbatim'],
+          [/"[^"]*"/, 'string'],
+          [/'[^']*'/, 'string'],
+          [/[{}()\[\];.,]/, '@brackets'],
+          [/[=><!~?:&|+\-*\/\^%]+/, 'operator'],
+          [/\s+/, 'white'],
+        ],
+        comment: [[/[^\/*]+/, 'comment'], [/\*\//, 'comment', '@pop'], [/[\/*]/, 'comment']],
+        verbatim: [[/[^"]+/, 'string'], [/""/, 'string'], [/"/, 'string', '@pop']],
+      },
+    });
+  } catch (_) { /* ignore */ }
+}
+
+/**
+ * Register all lab languages (call from Editor beforeMount). Phase 3 optional.
+ */
+export function registerLabLanguages(monaco: typeof import('monaco-editor')) {
+  registerMongoshLanguage(monaco);
+  registerPythonLanguage(monaco);
+  registerJavaLanguage(monaco);
+  registerCSharpLanguage(monaco);
+}
+
+/**
+ * Return editor options for a given language (e.g. for dynamic language switch). Phase 3 optional.
+ */
+export function getEditorOptionsForLanguage(
+  _language: string
+): Partial<editor.IStandaloneEditorConstructionOptions> {
+  return {};
+}
