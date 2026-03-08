@@ -109,6 +109,7 @@ export function LabViewWithTabs({
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [stepTerminalSession, setStepTerminalSession] = useState<TerminalSession | null>(null);
   const [pendingTerminalEchos, setPendingTerminalEchos] = useState<Array<{ code: string; language: string; filename?: string }>>([]);
+  const stepSessionIdRef = useRef<string | null>(null);
 
   // Step view uses its own terminal session (replaces Console); create when Steps tab is active
   useEffect(() => {
@@ -116,10 +117,12 @@ export function LabViewWithTabs({
     let sessionId: string | null = null;
     sessionManager.createSession().then((s) => {
       sessionId = s.id;
+      stepSessionIdRef.current = s.id;
       setStepTerminalSession(s);
     });
     return () => {
       if (sessionId) sessionManager.destroySession(sessionId);
+      stepSessionIdRef.current = null;
       setStepTerminalSession(null);
     };
   }, [activeTab]);
@@ -331,14 +334,19 @@ export function LabViewWithTabs({
             onResetStep={handleResetStep}
             terminalSession={stepTerminalSession}
             onRunEchoToTerminal={(payload) => {
-              if (!stepTerminalSession) {
-                setPendingTerminalEchos((prev) => [...prev, payload]);
-                return;
+              // Recreate a fresh terminal session on each Run so we always start from bash and send
+              // full payload (e.g. mongosh "uri" + script); only the latest run is shown.
+              const codeToWrite = payload.code + '\n\n';
+              if (stepSessionIdRef.current) {
+                sessionManager.destroySession(stepSessionIdRef.current);
+                stepSessionIdRef.current = null;
               }
-              // Practice: terminal is bash. Send comment (bash ignores), then "mongosh \"uri\"" so
-              // bash starts mongosh, then the script so the new mongosh process reads and runs it.
-              const label = payload.filename ? `# --- run (${payload.language}): ${payload.filename} ---` : `# --- run (${payload.language}) ---`;
-              stepTerminalSession.write(label + '\n' + payload.code + '\n\n');
+              setStepTerminalSession(null);
+              sessionManager.createSession().then((s) => {
+                stepSessionIdRef.current = s.id;
+                setStepTerminalSession(s);
+                setTimeout(() => s.write(codeToWrite), 250);
+              });
             }}
           />
         </TabsContent>

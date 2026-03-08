@@ -260,6 +260,19 @@ export function InlineHintEditor({
     };
   }, [editorInstance, monacoInstance, documentPath]);
 
+  // Sync model when controlled value changes from parent (e.g. step reset). Ensures displayed content
+  // and tokenization match state so color coding refreshes and Run uses the current code.
+  useEffect(() => {
+    if (!editorInstance) return;
+    const model = editorInstance.getModel?.();
+    if (!model) return;
+    const current = model.getValue();
+    if (current === editorValue) return;
+    model.setValue(editorValue);
+    const langId = language === 'bash' ? 'shell' : language;
+    if (model.getLanguageId?.() !== langId) model.setLanguageId?.(langId);
+  }, [editorInstance, editorValue, language]);
+
   // Calculate pixel position for a line/column in the editor.
   // The "?" marker must appear exactly where the blank (___________) is rendered.
   const getPositionPixels = useCallback((lineNumber: number, column: number) => {
