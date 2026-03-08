@@ -31,10 +31,46 @@ export interface WorkshopSession {
   labIds?: string[];
   /** When true, show Compete tab and competitor comparison in labs (moderator-controlled; default false) */
   showCompetitorComparisons?: boolean;
+  /** Optional: email domain for this session (e.g. "acme.com"); used to suggest or auto-select session by participant email domain */
+  emailDomain?: string;
 }
 
 const WORKSHOP_SESSION_KEY = 'workshop_session';
+const WORKSHOP_SESSIONS_KEY = 'workshop_sessions';
+const WORKSHOP_CURRENT_ID_KEY = 'workshop_current_id';
 const LEADERBOARD_KEY = 'workshop_leaderboard';
+
+/** Migrate single-session storage to multi-session array + current id */
+function migrateToMultiSessionIfNeeded(): void {
+  try {
+    const legacy = localStorage.getItem(WORKSHOP_SESSION_KEY);
+    if (!legacy) return;
+    const session = JSON.parse(legacy) as WorkshopSession;
+    const list: WorkshopSession[] = [session];
+    localStorage.setItem(WORKSHOP_SESSIONS_KEY, JSON.stringify(list));
+    localStorage.setItem(WORKSHOP_CURRENT_ID_KEY, session.id);
+    localStorage.removeItem(WORKSHOP_SESSION_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+function getSessionsList(): WorkshopSession[] {
+  migrateToMultiSessionIfNeeded();
+  try {
+    const raw = localStorage.getItem(WORKSHOP_SESSIONS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+function setSessionsList(list: WorkshopSession[], currentId: string | null): void {
+  localStorage.setItem(WORKSHOP_SESSIONS_KEY, JSON.stringify(list));
+  if (currentId !== null) localStorage.setItem(WORKSHOP_CURRENT_ID_KEY, currentId);
+  else localStorage.removeItem(WORKSHOP_CURRENT_ID_KEY);
+}
 
 /**
  * Generate a unique session ID
@@ -44,23 +80,34 @@ function generateSessionId(): string {
 }
 
 /**
- * Get the current workshop session from localStorage (with Atlas sync on first load)
+ * Get the current workshop session (from multi-session list by current id).
+ * On first access with no local data, tries to load from Atlas.
  */
 export function getWorkshopSession(): WorkshopSession | null {
-  try {
-    const stored = localStorage.getItem(WORKSHOP_SESSION_KEY);
-    if (!stored) {
-      // Try to load from Atlas on first access (async, non-blocking)
-      loadWorkshopSessionFromAtlas().catch(() => {
-        // Already logged in loadWorkshopSessionFromAtlas
-      });
-      return null;
-    }
-    return JSON.parse(stored);
-  } catch (error) {
-    console.error('Failed to read workshop session:', error);
+  migrateToMultiSessionIfNeeded();
+  const currentId = localStorage.getItem(WORKSHOP_CURRENT_ID_KEY);
+  if (!currentId) {
+    loadWorkshopSessionFromAtlas().catch(() => {});
     return null;
   }
+  const list = getSessionsList();
+  return list.find((s) => s.id === currentId) ?? null;
+}
+
+/**
+ * Get all stored workshop sessions (for multi-workshop session picker).
+ */
+export function getAllWorkshopSessions(): WorkshopSession[] {
+  return getSessionsList();
+}
+
+/**
+ * Set the current workshop session by id (switch session).
+ */
+export function setCurrentWorkshopSession(sessionId: string): void {
+  const list = getSessionsList();
+  if (!list.some((s) => s.id === sessionId)) return;
+  localStorage.setItem(WORKSHOP_CURRENT_ID_KEY, sessionId);
 }
 
 /**
@@ -97,27 +144,32 @@ export async function loadWorkshopSessionFromAtlas(): Promise<WorkshopSession | 
     
     const data = await response.json();
     if (data.success && data.session) {
-      // Also cache in localStorage for fast reads
-      localStorage.setItem(WORKSHOP_SESSION_KEY, JSON.stringify(data.session));
-      return data.session;
+      const session = data.session as WorkshopSession;
+      const list = getSessionsList();
+      const idx = list.findIndex((s) => s.id === session.id);
+      if (idx >= 0) list[idx] = session;
+      else list.push(session);
+      setSessionsList(list, session.id);
+      return session;
     }
   } catch (error) {
     console.warn('Failed to load workshop session from Atlas:', error);
   }
-  
+
   return null;
 }
 
 /**
- * Save workshop session to localStorage and sync to Atlas
+ * Save workshop session to list and set as current; sync to Atlas.
  */
 async function saveWorkshopSession(session: WorkshopSession): Promise<void> {
   try {
-    localStorage.setItem(WORKSHOP_SESSION_KEY, JSON.stringify(session));
-    // Sync to Atlas in background (don't block on this)
-    syncWorkshopSessionToAtlas(session).catch(() => {
-      // Already logged in syncWorkshopSessionToAtlas
-    });
+    const list = getSessionsList();
+    const idx = list.findIndex((s) => s.id === session.id);
+    if (idx >= 0) list[idx] = session;
+    else list.push(session);
+    setSessionsList(list, session.id);
+    syncWorkshopSessionToAtlas(session).catch(() => {});
   } catch (error) {
     console.error('Failed to save workshop session:', error);
   }
@@ -169,6 +221,8 @@ export interface StartNewWorkshopOptions {
   programmingLanguage?: ProgrammingLanguage;
   templateId?: string;
   labIds?: string[];
+  /** Optional: participant email domain (e.g. "acme.com") for session selection by domain */
+  emailDomain?: string;
 }
 
 /**
@@ -204,6 +258,7 @@ export async function startNewWorkshop(
     programmingLanguage,
     templateId,
     labIds,
+    emailDomain,
   } = options;
 
   const currentSession = getWorkshopSession();
@@ -242,6 +297,7 @@ export async function startNewWorkshop(
     ...(programmingLanguage !== undefined && { programmingLanguage }),
     ...(templateId !== undefined && { templateId }),
     ...(labIds !== undefined && { labIds }),
+    ...(emailDomain !== undefined && emailDomain.trim() !== '' && { emailDomain: emailDomain.trim() }),
   };
 
   await saveWorkshopSession(newSession);
@@ -308,7 +364,7 @@ export function getParticipantCount(): number {
  * If no session exists (e.g. user went straight to Lab Setup), creates a minimal session so lab Run gets the URI.
  */
 export async function updateWorkshopSession(
-  updates: Partial<Pick<WorkshopSession, 'customerName' | 'workshopDate' | 'mongodbSource' | 'atlasConnectionString' | 'salesforceWorkloadName' | 'technicalChampionName' | 'technicalChampionEmail' | 'currentDatabase' | 'mode' | 'programmingLanguage' | 'templateId' | 'labIds' | 'showCompetitorComparisons'>>
+  updates: Partial<Pick<WorkshopSession, 'customerName' | 'workshopDate' | 'mongodbSource' | 'atlasConnectionString' | 'salesforceWorkloadName' | 'technicalChampionName' | 'technicalChampionEmail' | 'currentDatabase' | 'mode' | 'programmingLanguage' | 'templateId' | 'labIds' | 'showCompetitorComparisons' | 'emailDomain'>>
 ): Promise<void> {
   let session = getWorkshopSession();
   if (!session) {
@@ -331,11 +387,24 @@ export async function updateWorkshopSession(
 }
 
 /**
- * Delete a workshop session (moderator only). Clears current session from storage.
- * Call when moderator wants to remove the current session; does not touch archived leaderboards in other sessions.
+ * Delete the current workshop session. Sets current to another session in the list if any.
  */
 export async function deleteCurrentWorkshopSession(): Promise<void> {
-  localStorage.removeItem(WORKSHOP_SESSION_KEY);
+  const current = getWorkshopSession();
+  if (!current) return;
+  const list = getSessionsList().filter((s) => s.id !== current.id);
+  const nextId = list.length > 0 ? list[0].id : null;
+  setSessionsList(list, nextId);
+}
+
+/**
+ * Delete a workshop session by id (from multi-session list). If it was current, sets current to another.
+ */
+export function deleteWorkshopSessionById(sessionId: string): void {
+  const list = getSessionsList().filter((s) => s.id !== sessionId);
+  const currentId = localStorage.getItem(WORKSHOP_CURRENT_ID_KEY);
+  const nextId = currentId === sessionId ? (list[0]?.id ?? null) : currentId;
+  setSessionsList(list, nextId);
 }
 
 /**

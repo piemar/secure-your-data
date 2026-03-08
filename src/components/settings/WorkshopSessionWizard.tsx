@@ -32,6 +32,7 @@ import type { WorkshopTemplate } from '@/types';
 import { Calendar, ChevronLeft, ChevronRight, Building2, Settings, LayoutGrid } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TemplateBrowser } from './TemplateBrowser';
+import { DynamicTemplateBuilder } from './DynamicTemplateBuilder';
 
 const STEPS = [
   { id: 1, title: 'Customer & context', icon: Building2 },
@@ -73,6 +74,9 @@ export function WorkshopSessionWizard({
   const [currentDatabase, setCurrentDatabase] = useState(
     initialSession?.currentDatabase ?? ''
   );
+  const [emailDomain, setEmailDomain] = useState(
+    initialSession?.emailDomain ?? ''
+  );
 
   // Step 2
   const [mode, setModeState] = useState<WorkshopSessionMode>(
@@ -90,6 +94,7 @@ export function WorkshopSessionWizard({
 
   // Step 3
   const [selectedTemplate, setSelectedTemplate] = useState<WorkshopTemplate | null>(null);
+  const [showCustomBuilder, setShowCustomBuilder] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const resetForm = useCallback(() => {
@@ -102,11 +107,13 @@ export function WorkshopSessionWizard({
     setTechnicalChampionName(initialSession?.technicalChampionName ?? '');
     setTechnicalChampionEmail(initialSession?.technicalChampionEmail ?? '');
     setCurrentDatabase(initialSession?.currentDatabase ?? '');
+    setEmailDomain(initialSession?.emailDomain ?? '');
     setModeState((initialSession?.mode as WorkshopSessionMode) ?? 'lab');
     setProgrammingLanguage((initialSession?.programmingLanguage as ProgrammingLanguage) ?? 'node');
     setMongodbSource(initialSession?.mongodbSource ?? 'local');
     setAtlasConnectionString(initialSession?.atlasConnectionString ?? '');
     setSelectedTemplate(null);
+    setShowCustomBuilder(false);
   }, [initialSession]);
 
   const handleOpenChange = (next: boolean) => {
@@ -149,6 +156,7 @@ export function WorkshopSessionWizard({
         programmingLanguage,
         templateId: selectedTemplate?.id,
         labIds: selectedTemplate?.labIds,
+        emailDomain: emailDomain.trim() || undefined,
       };
       const newSession = await startNewWorkshop(options);
       setActiveTemplate(selectedTemplate);
@@ -245,6 +253,15 @@ export function WorkshopSessionWizard({
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="wizard-email-domain">Participant email domain (optional)</Label>
+              <Input
+                id="wizard-email-domain"
+                placeholder="e.g. acme.com — for session selection by domain"
+                value={emailDomain}
+                onChange={(e) => setEmailDomain(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
               <Label>Workshop date</Label>
               <Popover>
                 <PopoverTrigger asChild>
@@ -337,23 +354,41 @@ export function WorkshopSessionWizard({
         {/* Step 3: Template or labs */}
         {step === 3 && (
           <div className="space-y-4 py-2">
-            <p className="text-sm text-muted-foreground">
-              Choose a predefined template (industry or use case). You can also build a custom
-              template later in the Template tab.
-            </p>
-            <div className="min-h-[280px] border rounded-lg p-3 bg-muted/20">
-              <TemplateBrowser
-                pageSize={4}
-                onSelectTemplate={(t) => setSelectedTemplate(t)}
-              />
-            </div>
-            {selectedTemplate && (
-              <div className="p-3 rounded-lg border bg-muted/30">
-                <p className="text-sm font-medium">Selected: {selectedTemplate.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {selectedTemplate.labIds?.length ?? 0} labs · Default mode: {selectedTemplate.defaultMode}
-                </p>
+            {showCustomBuilder ? (
+              <div className="min-h-[320px] border rounded-lg p-3 bg-muted/10">
+                <DynamicTemplateBuilder
+                  onComplete={(template) => {
+                    setSelectedTemplate(template);
+                    setShowCustomBuilder(false);
+                  }}
+                  onCancel={() => setShowCustomBuilder(false)}
+                />
               </div>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Choose a predefined template or build a custom one (topics + labs).
+                </p>
+                <div className="flex gap-2 mb-2">
+                  <Button variant="outline" size="sm" onClick={() => setShowCustomBuilder(true)}>
+                    Build custom template (topics + labs)
+                  </Button>
+                </div>
+                <div className="min-h-[240px] border rounded-lg p-3 bg-muted/20">
+                  <TemplateBrowser
+                    pageSize={4}
+                    onSelectTemplate={(t) => setSelectedTemplate(t)}
+                  />
+                </div>
+                {selectedTemplate && (
+                  <div className="p-3 rounded-lg border bg-muted/30">
+                    <p className="text-sm font-medium">Selected: {selectedTemplate.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedTemplate.labIds?.length ?? 0} labs · Default mode: {selectedTemplate.defaultMode}
+                    </p>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

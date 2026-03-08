@@ -17,7 +17,7 @@ import { LabRunner } from '@/labs/LabRunner';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { useRole } from '@/contexts/RoleContext';
 import { useLab } from '@/context/LabContext';
-import { areLabsEnabled, loadWorkshopSessionFromAtlas } from '@/utils/workshopUtils';
+import { areLabsEnabled, loadWorkshopSessionFromAtlas, getAllWorkshopSessions, setCurrentWorkshopSession } from '@/utils/workshopUtils';
 import { Lock, AlertCircle, Check } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -28,7 +28,7 @@ import { defaultEncryptionWorkshopTemplate } from '@/content/workshop-templates/
 
 function ContentRouter() {
   const { currentSection, setSection } = useNavigation();
-  const { isLabAccessible, isLabCompleted, completedLabs } = useLab();
+  const { isLabAccessible, isLabCompleted, completedLabs, userEmail } = useLab();
   const { isModerator } = useRole();
   const { currentMode, activeTemplate, currentLabId, setCurrentLabId, setActiveTemplate } = useWorkshopSession();
   const location = useLocation();
@@ -36,12 +36,50 @@ function ContentRouter() {
   const [templateLabs, setTemplateLabs] = useState<WorkshopLabDefinition[] | null>(null);
   const [templateLabsLoading, setTemplateLabsLoading] = useState(false);
 
-  // Force attendees (non-moderators) to use the encryption workshop
+  // For attendees: if their email domain matches a workshop session's emailDomain, use that session and template; otherwise default to encryption workshop
   useEffect(() => {
-    if (!isModerator) {
+    if (isModerator) return;
+    const email = userEmail || (typeof localStorage !== 'undefined' ? localStorage.getItem('userEmail') : null);
+    const domain = email?.trim().split('@')[1]?.toLowerCase();
+    const allSessions = getAllWorkshopSessions();
+    const matchingSession = domain && allSessions.length > 0
+      ? allSessions.find((s) => s.emailDomain?.toLowerCase() === domain)
+      : null;
+    if (matchingSession) {
+      setCurrentWorkshopSession(matchingSession.id);
+      const session = matchingSession;
+      if (session.labIds && session.labIds.length > 0) {
+        getContentService().getTemplates().then((templates) => {
+          const byId = templates.find((t) => t.id === session.templateId);
+          if (byId) {
+            setActiveTemplate(byId);
+          } else {
+            setActiveTemplate({
+              id: session.templateId || `session-${session.id}`,
+              name: `${session.customerName} Workshop`,
+              description: `Workshop session for ${session.customerName}`,
+              labIds: session.labIds,
+              defaultMode: (session.mode as 'lab' | 'demo' | 'challenge') || 'lab',
+              allowedModes: ['lab', 'demo', 'challenge'],
+            });
+          }
+        }).catch(() => {
+          setActiveTemplate({
+            id: session.templateId || `session-${session.id}`,
+            name: `${session.customerName} Workshop`,
+            description: `Workshop session for ${session.customerName}`,
+            labIds: session.labIds,
+            defaultMode: (session.mode as 'lab' | 'demo' | 'challenge') || 'lab',
+            allowedModes: ['lab', 'demo', 'challenge'],
+          });
+        });
+      } else {
+        setActiveTemplate(defaultEncryptionWorkshopTemplate);
+      }
+    } else {
       setActiveTemplate(defaultEncryptionWorkshopTemplate);
     }
-  }, [isModerator, setActiveTemplate]);
+  }, [isModerator, userEmail, setActiveTemplate]);
 
   // Sync URL with navigation context
   useEffect(() => {

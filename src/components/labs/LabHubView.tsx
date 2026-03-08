@@ -28,9 +28,11 @@ export function LabHubView() {
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
+  // Refetch when template or its lab set changes (e.g. Encryption → "Test selected labs" with CRUD)
+  const templateLabIdsKey = activeTemplate?.labIds?.slice().sort().join(',') ?? '';
   useEffect(() => {
     loadData();
-  }, []);
+  }, [activeTemplate?.id, templateLabIdsKey, currentMode]);
 
   useEffect(() => {
     if (labs.length > 0 && topics.length > 0) {

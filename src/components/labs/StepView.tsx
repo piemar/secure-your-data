@@ -651,6 +651,10 @@ export function StepView({
   const [outputSuccess, setOutputSuccess] = useState<boolean>(true);
   /** Per-step: true if validation (Verify/Next) failed for that step index; used to show step indicator red. */
   const [validationFailedByStep, setValidationFailedByStep] = useState<Record<number, boolean>>({});
+  /** Per-step: true only after Run completed and validation passed for that step; gates Next button and step-dot navigation. */
+  const [stepValidatedSuccessByIndex, setStepValidatedSuccessByIndex] = useState<Record<number, boolean>>({});
+  /** Console header: 'running' | 'validating' for UX (Running script / Validation started). */
+  const [runPhase, setRunPhase] = useState<'idle' | 'running' | 'validating'>('idle');
   const [isRunning, setIsRunning] = useState(false);
   const [expandedLogIndex, setExpandedLogIndex] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -875,6 +879,14 @@ export function StepView({
 
   const currentStep = steps[currentStepIndex];
   const isCompleted = completedSteps.includes(currentStepIndex);
+  /** Current step has verification (verificationId or onVerify); Next is gated on validation-after-run. */
+  const currentStepNeedsVerification = Boolean(
+    currentStep?.codeBlocks?.length && (currentStep.verificationId || currentStep.onVerify)
+  );
+  /** Max step index user can navigate to: current or current+1 only if current step validated. */
+  const maxReachableStepIndex = currentStepNeedsVerification && !stepValidatedSuccessByIndex[currentStepIndex]
+    ? currentStepIndex
+    : currentStepIndex + 1;
 
   // Order code blocks: .cjs first so .cjs file appears in top editor when available
   const sortedCodeBlocksWithIndex = useMemo(() => {
@@ -1181,11 +1193,16 @@ export function StepView({
     prevLogCountRef.current = logEntries.length;
   }, [logEntries.length]);
 
-  // Scroll console to latest output when new output is shown
+  // Scroll console to bottom when new output is shown (terminal-like auto-scroll)
   useEffect(() => {
     const el = consoleOutputScrollRef.current;
     if (!el) return;
-    el.scrollTop = el.scrollHeight;
+    const scrollToBottom = () => {
+      el.scrollTop = el.scrollHeight;
+    };
+    scrollToBottom();
+    const raf = requestAnimationFrame(scrollToBottom);
+    return () => cancelAnimationFrame(raf);
   }, [logEntries, lastOutput]);
 
   // Helper to reveal an inline hint (conceptual)
@@ -1303,13 +1320,17 @@ export function StepView({
         const result = await verificationService.verify(currentStep.verificationId as VerificationId, ctx);
         success = result.success;
         summary = result.message;
-        // Context line should reflect what this step validates: CMK/alias for KMS steps, key vault for key-vault steps
+        // Only show encryption-related context (key vault, KMS, AWS) for steps that actually use it
         const vid = currentStep.verificationId || '';
-        const isKmsOnlyStep = vid === 'csfle.verifyCmkExists' || vid === 'csfle.verifyKeyPolicy';
-        const contextParts = isKmsOnlyStep
-          ? [ctx.alias ? `KMS alias: ${ctx.alias}` : null, awsProfile ? `AWS profile: ${awsProfile}` : null, awsRegion ? `region: ${awsRegion}` : null]
-          : [keyVaultDb ? `Key vault: ${keyVaultDb}` : null, awsProfile ? `AWS profile: ${awsProfile}` : null, awsRegion ? `region: ${awsRegion}` : null];
-        const contextLine = contextParts.filter(Boolean).join(' | ');
+        const isEncryptionVerification = vid.startsWith('csfle.') || vid.startsWith('qe.') || vid.startsWith('verify-encrypted') || vid.startsWith('verify-no-plaintext') || vid.startsWith('verify-queryable') || vid.startsWith('verify-indexes') || vid.startsWith('verify-access') || vid.startsWith('verify-query-performance');
+        let contextLine = '';
+        if (isEncryptionVerification) {
+          const isKmsOnlyStep = vid === 'csfle.verifyCmkExists' || vid === 'csfle.verifyKeyPolicy';
+          const contextParts = isKmsOnlyStep
+            ? [ctx.alias ? `KMS alias: ${ctx.alias}` : null, awsProfile ? `AWS profile: ${awsProfile}` : null, awsRegion ? `region: ${awsRegion}` : null]
+            : [keyVaultDb ? `Key vault: ${keyVaultDb}` : null, awsProfile ? `AWS profile: ${awsProfile}` : null, awsRegion ? `region: ${awsRegion}` : null];
+          contextLine = contextParts.filter(Boolean).join(' | ');
+        }
         output = contextLine ? `[lab] ${contextLine}\n${result.message}` : result.message;
       } else {
         success = true;
@@ -1518,7 +1539,7 @@ export function StepView({
     setIsRunning(false);
   }, [currentStep?.codeBlocks, currentStep?.title, currentStepIndex, labMongoUri, editableCodeByBlock, skeletonTier, showSolution, alwaysShowSolutions]);
 
-  /** Run all code blocks in order: for composite (node+mongosh) slots runs only the active tab; for single slots runs that block. Skips terminal-only blocks. */
+  /** Run all code blocks in order: for composite (node+mongosh) slots runs only the active tab; for single slots runs that block. Skips terminal-only blocks. After execution, runs validation when step has verificationId/onVerify; Next enabled only after validation passes. */
   const handleRunAll = useCallback(async () => {
     const blocks = currentStep?.codeBlocks ?? [];
     if (blocks.length === 0) return;
@@ -1534,6 +1555,10 @@ export function StepView({
       }
     }
     setIsRunning(true);
+    setRunPhase('running');
+    const runStartTime = new Date();
+    setLogEntries(prev => [...prev, { time: runStartTime, output: 'Running script...' }]);
+    setConsolePanelCollapsed(false);
     const outputs: string[] = [];
     let lastSuccess = true;
     let lastSummary = '';
@@ -1628,8 +1653,19 @@ export function StepView({
     setOutputSummary(lastSummary);
     setOutputSuccess(lastSuccess);
     setConsolePanelCollapsed(false);
+
+    const needsVerification = Boolean(currentStep?.codeBlocks?.length && (currentStep.verificationId || currentStep.onVerify));
+    if (needsVerification) {
+      setRunPhase('validating');
+      setLogEntries(prev => [...prev, { time: new Date(), output: 'Validation started.' }]);
+      const passed = await handleCheckProgress();
+      setStepValidatedSuccessByIndex(prev => ({ ...prev, [currentStepIndex]: passed }));
+    } else {
+      setStepValidatedSuccessByIndex(prev => ({ ...prev, [currentStepIndex]: true }));
+    }
+    setRunPhase('idle');
     setIsRunning(false);
-  }, [currentStep?.codeBlocks, currentStep?.title, currentStepIndex, labMongoUri, editableCodeByBlock, skeletonTier, showSolution, alwaysShowSolutions, displaySlots, nodeMongoshViewByKey]);
+  }, [currentStep?.codeBlocks, currentStep?.title, currentStep?.verificationId, currentStep?.onVerify, currentStepIndex, labMongoUri, editableCodeByBlock, skeletonTier, showSolution, alwaysShowSolutions, displaySlots, nodeMongoshViewByKey, handleCheckProgress]);
 
   /** Reset current step: clear console, reset inline editors to original skeleton (as on first load), clear persisted logs and solution state */
   const handleResetStep = useCallback(() => {
@@ -1687,6 +1723,7 @@ export function StepView({
       });
     }
     setValidationFailedByStep((prev) => ({ ...prev, [currentStepIndex]: false }));
+    setStepValidatedSuccessByIndex((prev) => ({ ...prev, [currentStepIndex]: false }));
   }, [labNumber, currentStepIndex, userEmail, currentStep?.codeBlocks, skeletonTier, onResetStep]);
 
   useEffect(() => {
@@ -1698,18 +1735,14 @@ export function StepView({
     return () => { stepToolbarRef.current = null; };
   }, [stepToolbarRef, handleResetStep]);
 
-  /** Next Step: ONLY runs validation (handleCheckProgress). Does NOT execute any code; user must use Run/Run all to run code. */
+  /** Next Step: Advance only if current step is validated (validation runs after Run, not on Next). No code execution here. */
   const handleNextStep = async () => {
-    if (currentStepIndex < steps.length - 1 && currentStep.codeBlocks?.length) {
-      const passed = await handleCheckProgress();
-      if (!passed) return; // Stay on step until validation passes
-      // Brief delay so the user sees the validation output in the console for this step before advancing
-      await new Promise((r) => setTimeout(r, 500));
-    }
+    if (currentStepNeedsVerification && !stepValidatedSuccessByIndex[currentStepIndex]) return;
     if (!isCompleted) {
       onComplete(currentStepIndex);
     }
     if (currentStepIndex < steps.length - 1) {
+      await new Promise((r) => setTimeout(r, 300));
       setDirection(1);
       onStepChange(currentStepIndex + 1);
     }
@@ -1755,7 +1788,7 @@ export function StepView({
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Read-only mode toggle removed - difficulty/solution controls are now per-block in header */}
 
-        {/* Layout: Left = Editor + Console (vertical split, resizable); Right = Preview */}
+        {/* Layout: Editor + Console (left); right area reserved for Compete & Preview tabs when enabled; step buttons in footer */}
         <div className="flex-1 overflow-hidden min-h-0">
           {currentStep.codeBlocks && currentStep.codeBlocks.length > 0 ? (
             <ResizablePanelGroup direction="horizontal" className="h-full">
@@ -2213,7 +2246,17 @@ export function StepView({
                     {consolePanelCollapsed ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     <Terminal className="w-3.5 h-3.5 text-green-500" />
                     <span className="text-[8px] font-medium text-white">Console</span>
-                    {outputSummary && (
+                    {runPhase === 'running' && (
+                      <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-500/20 text-green-400 animate-pulse">
+                        Running script…
+                      </span>
+                    )}
+                    {runPhase === 'validating' && (
+                      <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/20 text-amber-400 animate-pulse">
+                        Validation started…
+                      </span>
+                    )}
+                    {runPhase === 'idle' && outputSummary && (
                       <span className={cn(
                         "ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium",
                         outputSuccess ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
@@ -2222,41 +2265,65 @@ export function StepView({
                       </span>
                     )}
                   </button>
-                  <div ref={consoleOutputScrollRef} className="flex-1 min-h-0 overflow-auto px-2 py-1.5 bg-[hsl(220,20%,6%)] font-mono text-xs text-white">
+                  <div ref={consoleOutputScrollRef} className="flex-1 min-h-0 overflow-auto px-2 py-1.5 bg-[hsl(220,20%,6%)] font-mono text-xs text-white overflow-x-auto">
                     {logEntries.length > 0 ? (
-                      <div className="space-y-0.5">
-                        {logEntries.flatMap((entry, entryIndex) => {
-                          const timeStr = entry.time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
+                      <div className="space-y-2">
+                        {logEntries.map((entry, entryIndex) => {
                           const lines = entry.output.split(/\r?\n/);
-                          return lines.map((line, lineIndex) => {
-                            const key = `${entryIndex}-${lineIndex}`;
-                            const isExpanded = expandedLogIndex === key;
-                            return (
-                              <div key={key} className="rounded">
-                                <button
-                                  type="button"
-                                  onClick={() => setExpandedLogIndex(isExpanded ? null : key)}
-                                  className="w-full text-left px-1.5 py-0.5 hover:bg-white/5 rounded text-xs text-white leading-snug font-mono"
-                                >
-                                  <span className="text-muted-foreground">{timeStr}</span>
-                                  <span className="mx-1 text-muted-foreground">[lab]</span>
-                                  <span className="break-all">{line || ' '}</span>
-                                </button>
-                                {isExpanded && (
-                                  <div className="px-2 py-1.5 mt-0.5 mb-1 rounded bg-black/30 text-[11px] text-white/90 whitespace-pre-wrap break-all border border-white/10">
-                                    <div className="text-muted-foreground text-[10px] mb-0.5">Detail</div>
-                                    {line}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          });
+                          const envLines: string[] = [];
+                          const outputLines: string[] = [];
+                          for (const line of lines) {
+                            if (/^\[lab\]\s*(Env:|Command:|Commands:)/i.test(line.trim()) || (line.includes('Env:') && line.trim().startsWith('[lab]'))) {
+                              envLines.push(line.replace(/^\[lab\]\s*/, '').trim());
+                            } else {
+                              outputLines.push(line.replace(/^\[lab\]\s*/, ''));
+                            }
+                          }
+                          const hasEnv = envLines.length > 0;
+                          const outputBlock = outputLines.join('\n').trim();
+                          return (
+                            <div key={entryIndex} className="rounded border border-white/5 overflow-hidden">
+                              {hasEnv && (
+                                <div className="px-1.5 py-1 bg-white/5 text-muted-foreground text-[10px] border-b border-white/5 whitespace-pre-wrap">
+                                  {envLines.join('\n')}
+                                </div>
+                              )}
+                              <pre className="px-1.5 py-1 whitespace-pre-wrap break-all text-white/95 leading-snug text-xs">
+                                {outputBlock || (hasEnv ? '' : entry.output)}
+                              </pre>
+                            </div>
+                          );
                         })}
                       </div>
+                    ) : lastOutput ? (
+                      (() => {
+                        const lines = lastOutput.split(/\r?\n/);
+                        const envLines: string[] = [];
+                        const outputLines: string[] = [];
+                        for (const line of lines) {
+                          if (/^\[lab\]\s*(Env:|Command:|Commands:)/i.test(line.trim()) || (line.includes('Env:') && line.trim().startsWith('[lab]'))) {
+                            envLines.push(line.replace(/^\[lab\]\s*/, '').trim());
+                          } else {
+                            outputLines.push(line.replace(/^\[lab\]\s*/, ''));
+                          }
+                        }
+                        const hasEnv = envLines.length > 0;
+                        const outputBlock = outputLines.join('\n').trim();
+                        return (
+                          <div className="rounded border border-white/5 overflow-hidden">
+                            {hasEnv && (
+                              <div className="px-1.5 py-1 bg-white/5 text-muted-foreground text-[10px] border-b border-white/5 whitespace-pre-wrap">
+                                {envLines.join('\n')}
+                              </div>
+                            )}
+                            <pre className="px-1.5 py-1 whitespace-pre-wrap break-all text-white/95 leading-snug text-xs">
+                              {outputBlock || (hasEnv ? '' : lastOutput)}
+                            </pre>
+                          </div>
+                        );
+                      })()
                     ) : (
-                      <pre className="whitespace-pre-wrap leading-snug text-white/80 text-xs">
-                        {lastOutput || ''}
-                      </pre>
+                      <pre className="whitespace-pre-wrap leading-snug text-white/60 text-xs">No output yet. Run the step to see results.</pre>
                     )}
                     {!outputSuccess && lastOutput && (
                       <>
@@ -2412,111 +2479,110 @@ export function StepView({
         </div>
       </div>
 
-      {/* Footer Navigation - Always Visible */}
+      {/* Footer navigation: step dots + Previous / Run / Next — right area reserved for Compete & Preview tabs */}
       <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-t border-border bg-card">
-        <TooltipProvider delayDuration={200}>
-          <div className="flex items-center gap-1.5">
-            {steps.map((step, index) => (
-              <Tooltip key={index}>
+          <TooltipProvider delayDuration={200}>
+            <div className="flex items-center gap-1.5">
+              {steps.map((step, index) => {
+                const canNavigateToStep = index <= maxReachableStepIndex;
+                return (
+                  <Tooltip key={index}>
+                    <TooltipTrigger asChild>
+                      <motion.button
+                        onClick={() => {
+                          if (!canNavigateToStep) return;
+                          setDirection(index > currentStepIndex ? 1 : -1);
+                          onStepChange(index);
+                        }}
+                        whileHover={canNavigateToStep ? { scale: 1.1 } : undefined}
+                        whileTap={canNavigateToStep ? { scale: 0.95 } : undefined}
+                        className={cn(
+                          'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all',
+                          !canNavigateToStep && 'cursor-not-allowed opacity-60',
+                          index === currentStepIndex
+                            ? validationFailedByStep[index]
+                              ? 'bg-destructive text-destructive-foreground ring-2 ring-destructive/50'
+                              : 'bg-primary text-primary-foreground ring-2 ring-primary/30'
+                            : completedSteps.includes(index)
+                            ? 'bg-primary/20 text-primary'
+                            : canNavigateToStep
+                            ? 'bg-muted text-muted-foreground hover:bg-muted/80'
+                            : 'bg-muted text-muted-foreground'
+                        )}
+                      >
+                        {completedSteps.includes(index) ? (
+                          <CheckCircle2 className="w-4 h-4" />
+                        ) : (
+                          index + 1
+                        )}
+                      </motion.button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[200px]">
+                      <div className="space-y-1">
+                        <p className="font-medium text-sm">{step.title}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Clock className="w-3 h-3" />
+                          <span>{step.estimatedTime}</span>
+                          {completedSteps.includes(index) && (
+                            <span className="text-green-500 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" />
+                              Done
+                            </span>
+                          )}
+                          {index === currentStepIndex && validationFailedByStep[index] && (
+                            <span className="text-destructive flex items-center gap-1">
+                              Validation failed
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          </TooltipProvider>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handlePrevStep} disabled={currentStepIndex === 0} className="gap-1">
+              <ChevronLeft className="w-4 h-4" />
+              Previous
+            </Button>
+            <TooltipProvider>
+              <Tooltip>
                 <TooltipTrigger asChild>
-                  <motion.button
-                    onClick={() => {
-                      setDirection(index > currentStepIndex ? 1 : -1);
-                      onStepChange(index);
-                    }}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    className={cn(
-                      'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all',
-                      index === currentStepIndex
-                        ? validationFailedByStep[index]
-                          ? 'bg-destructive text-destructive-foreground ring-2 ring-destructive/50'
-                          : 'bg-primary text-primary-foreground ring-2 ring-primary/30'
-                        : completedSteps.includes(index)
-                        ? 'bg-primary/20 text-primary'
-                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                    )}
-                  >
-                    {completedSteps.includes(index) ? (
-                      <CheckCircle2 className="w-4 h-4" />
-                    ) : (
-                      index + 1
-                    )}
-                  </motion.button>
+                  <Button variant="outline" size="sm" onClick={handleRunAll} disabled={runAllDisabled} className="gap-1">
+                    {isRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                    Run
+                  </Button>
                 </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-[200px]">
-                  <div className="space-y-1">
-                    <p className="font-medium text-sm">{step.title}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Clock className="w-3 h-3" />
-                      <span>{step.estimatedTime}</span>
-                      {completedSteps.includes(index) && (
-                        <span className="text-green-500 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" />
-                          Done
-                        </span>
-                      )}
-                      {index === currentStepIndex && validationFailedByStep[index] && (
-                        <span className="text-destructive flex items-center gap-1">
-                          Validation failed
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </TooltipContent>
+                <TooltipContent side="top">{runAllTooltip}</TooltipContent>
               </Tooltip>
-            ))}
-          </div>
-        </TooltipProvider>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handlePrevStep}
-            disabled={currentStepIndex === 0}
-            className="gap-1"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Previous
-          </Button>
-          <TooltipProvider>
+            </TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRunAll}
-                  disabled={runAllDisabled}
-                  className="gap-1"
-                >
-                  {isRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                  Run
-                </Button>
+                <span className="inline-flex">
+                  <Button
+                    size="sm"
+                    onClick={handleNextStep}
+                    disabled={isRunning || (currentStepNeedsVerification && !stepValidatedSuccessByIndex[currentStepIndex])}
+                    className="gap-1"
+                  >
+                    {currentStepIndex === steps.length - 1 ? (
+                      <><CheckCircle2 className="w-4 h-4" /> Complete Lab</>
+                    ) : (
+                      <>Next Step <ChevronRight className="w-4 h-4" /></>
+                    )}
+                  </Button>
+                </span>
               </TooltipTrigger>
-              <TooltipContent side="top">{runAllTooltip}</TooltipContent>
+              <TooltipContent side="top">
+                {currentStepNeedsVerification && !stepValidatedSuccessByIndex[currentStepIndex]
+                  ? 'Run the step and pass validation to enable Next.'
+                  : 'Go to next step'}
+              </TooltipContent>
             </Tooltip>
-          </TooltipProvider>
-          <Button
-            size="sm"
-            onClick={handleNextStep}
-            disabled={isRunning}
-            className="gap-1"
-          >
-            {currentStepIndex === steps.length - 1 ? (
-              <>
-                <CheckCircle2 className="w-4 h-4" />
-                Complete Lab
-              </>
-            ) : (
-              <>
-                Next Step
-                <ChevronRight className="w-4 h-4" />
-              </>
-            )}
-          </Button>
+          </div>
         </div>
-      </div>
     </div>
   );
 }

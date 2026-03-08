@@ -49,7 +49,7 @@ class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
     const quests = await this.suggestQuestsForLabs(config.labIds);
     const flags = await this.suggestFlagsForLabs(config.labIds);
 
-    // Generate template
+    // Generate template (caller should set id and isCustom when saving as custom)
     const template: WorkshopTemplate = {
       id: `template-custom-${Date.now()}`,
       name: config.name || `Custom Workshop (${config.topicIds.join(', ')})`,
@@ -61,6 +61,7 @@ class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
       allowedModes: config.allowedModes,
       gamification: config.gamification,
       industry: config.industry,
+      isCustom: true,
     };
 
     return template;

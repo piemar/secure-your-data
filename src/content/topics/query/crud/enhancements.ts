@@ -3,7 +3,7 @@ import type { EnhancementMetadataRegistry } from '@/labs/enhancements/schema';
 /**
  * CRUD Enhancement Metadata
  *
- * MongoDB CRUD operations with the Node.js driver.
+ * CRUD operations with the MongoDB Node.js driver.
  * Source: MongoDB Manual - CRUD (https://www.mongodb.com/docs/manual/crud/)
  */
 

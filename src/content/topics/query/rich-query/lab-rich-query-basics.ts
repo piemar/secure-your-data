@@ -21,18 +21,27 @@ export const labRichQueryBasicsDefinition: WorkshopLabDefinition = {
   labFolderPath: 'Docs/pov-proof-exercises/proofs/01',
   defaultCompetitorId: 'postgresql',
   competitorIds: ['postgresql'],
+  whatYouWillBuild: [
+    'Compound find() filters with $and, $or, nested fields, and $elemMatch',
+    'Projections to return only needed fields and reduce payload size',
+    'Sort and pagination with sort(), limit(), and skip()',
+    'A compound index that matches your query shape and Explain Plan to verify IXSCAN',
+  ],
+  keyInsight:
+    'MongoDB uses a single filter syntax for reads, updates, and deletes; compound indexes that match your query predicate order give the best performance.',
+  keyConcepts: [
+    { term: 'Projection', explanation: 'Specifies which fields to return from find(); reduces network and memory by excluding unneeded data.' },
+    { term: '$elemMatch', explanation: 'Matches documents where at least one array element satisfies all given conditions.' },
+    { term: 'Compound index', explanation: 'An index on multiple fields; order matters—equality fields first, range field last for optimal use.' },
+    { term: 'IXSCAN vs COLLSCAN', explanation: 'Index scan uses an index; collection scan reads every document; Explain Plan shows which is used.' },
+  ],
   dataRequirements: [
     {
       id: 'customer-template',
       description: 'mgeneratejs template for insurance customer records',
       type: 'file',
       path: 'CustomerSingleView.json',
-
-      hints: [
-        'Review the step instructions and narrative above for what to do.',
-        'Check the lab folder path or source proof document for detailed guidance.',
-        'Use "Check my progress" or verification when available to confirm completion.',
-      ],      sizeHint: '~1KB template',
+      sizeHint: '~1KB template',
     },
     {
       id: 'customers-collection',
@@ -52,7 +61,6 @@ export const labRichQueryBasicsDefinition: WorkshopLabDefinition = {
         '- Use find() with $and / $or to combine conditions.\n- Filter on both top-level and nested fields (e.g. address.state).\n- Use array operators like $elemMatch to target specific elements.\n- Reference: proof 01 uses gender, dob range, address.state, and policies with $elemMatch.',
       estimatedTimeMinutes: 8,
       modes: ['lab', 'demo', 'challenge'],
-      verificationId: 'rich-query.verifyBasicFilters',
       points: 10,
       enhancementId: 'rich-query.compound-query',
       sourceProof: 'proofs/01/README.md',
@@ -72,7 +80,6 @@ export const labRichQueryBasicsDefinition: WorkshopLabDefinition = {
         '- Add projections to include only relevant fields (e.g. _id: 0, firstname: 1, lastname: 1, dob: 1).\n- Use sort() to order results by one or more fields.\n- Combine filters, projections, and sorts in a single query.',
       estimatedTimeMinutes: 8,
       modes: ['lab', 'demo', 'challenge'],
-      verificationId: 'rich-query.verifyProjectionAndSort',
       points: 10,
       enhancementId: 'rich-query.projection-sort',
       sourceProof: 'proofs/01/README.md',
@@ -92,7 +99,6 @@ export const labRichQueryBasicsDefinition: WorkshopLabDefinition = {
         '- Use limit() and skip() to page through results.\n- Combine pagination with filters and sorts.\n- Discuss trade-offs and when to use range-based pagination instead.',
       estimatedTimeMinutes: 9,
       modes: ['lab', 'demo', 'challenge'],
-      verificationId: 'rich-query.verifyPagination',
       points: 10,
       enhancementId: 'rich-query.pagination',
       sourceProof: 'proofs/01/README.md',
@@ -112,7 +118,6 @@ export const labRichQueryBasicsDefinition: WorkshopLabDefinition = {
         '- In Compass Indexes tab, create a compound index with the same fields as your query (most selective first, range last).\n- Run the same query and use Explain Plan: note IXSCAN vs COLLSCAN and docs examined.\n- Reference: proof 01 index (address.state, policies.policyType, policies.insured_person.smoking, gender, dob).',
       estimatedTimeMinutes: 10,
       modes: ['lab', 'challenge'],
-      verificationId: 'rich-query.verifyIndexUsage',
       points: 10,
       enhancementId: 'rich-query.index-explain',
       sourceProof: 'proofs/01/README.md',

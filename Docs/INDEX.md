@@ -22,6 +22,7 @@ Quick pointers to the docs you need.
 
 ## Moderator / workshop setup
 
+- **[WORKSHOP_TEMPLATE_STORAGE_AND_CUSTOM.md](./WORKSHOP_TEMPLATE_STORAGE_AND_CUSTOM.md)** – Where templates live (repo vs Atlas), custom templates, Predefined vs Custom when creating a session, promotion to default.
 - **[MODERATOR_DYNAMIC_TEMPLATE_GUIDE.md](./MODERATOR_DYNAMIC_TEMPLATE_GUIDE.md)** – How to use the Dynamic Template Builder (topics, capabilities, lab bundles, modes).
 - **[WORKSHOP_SESSION_AND_QUALITY_PRINCIPLES.md](./WORKSHOP_SESSION_AND_QUALITY_PRINCIPLES.md)** – Modes (Demo/Lab/Challenge), session lifecycle, quality bar.
 

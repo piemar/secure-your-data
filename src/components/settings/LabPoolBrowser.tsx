@@ -28,6 +28,12 @@ interface LabPoolBrowserProps {
   onAddLab?: (labId: string) => void;
   /** When provided, enables multi-select mode: checkboxes, Select All, Test Selected */
   onTestLabs?: (labIds: string[]) => void;
+  /** When provided, controlled selection for builder: checkboxes update parent via this callback */
+  onLabIdsChange?: (labIds: string[]) => void;
+  /** Optional title override (e.g. "Browse labs and topics") */
+  title?: string;
+  /** Optional description override */
+  description?: string;
   filterByCapabilities?: string[]; // POV capability IDs to filter by
   pageSize?: number;
 }
@@ -44,6 +50,9 @@ export const LabPoolBrowser: React.FC<LabPoolBrowserProps> = ({
   selectedLabIds = [],
   onAddLab,
   onTestLabs,
+  onLabIdsChange,
+  title,
+  description,
   filterByCapabilities = [],
   pageSize = DEFAULT_PAGE_SIZE,
 }) => {
@@ -58,7 +67,8 @@ export const LabPoolBrowser: React.FC<LabPoolBrowserProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedForTest, setSelectedForTest] = useState<Set<string>>(new Set());
 
-  const isMultiSelectMode = !!onTestLabs;
+  const isBuilderMode = !!onLabIdsChange;
+  const isMultiSelectMode = !!onTestLabs || isBuilderMode;
 
   useEffect(() => {
     loadData();
@@ -141,7 +151,7 @@ export const LabPoolBrowser: React.FC<LabPoolBrowserProps> = ({
       );
     }
 
-    // Exclude already selected labs (only when adding to template, not in multi-select test mode)
+    // Exclude already selected labs only when single-add mode (onAddLab), not in multi-select or builder mode
     if (!isMultiSelectMode && selectedLabIds.length > 0) {
       filtered = filtered.filter((lab) => !selectedLabIds.includes(lab.id));
     }
@@ -179,15 +189,19 @@ export const LabPoolBrowser: React.FC<LabPoolBrowserProps> = ({
     return <div className="text-center text-muted-foreground py-4">Loading lab pool...</div>;
   }
 
+  const displayTitle = title ?? 'Browse All Labs';
+  const displayDescription = description ?? 'Search and filter the complete lab library by topic, capability, or keywords.';
+  const selectionSet = isBuilderMode ? new Set(selectedLabIds) : selectedForTest;
+
   return (
     <div className="space-y-4">
       <div>
         <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
           <Filter className="w-5 h-5 text-primary" />
-          Browse All Labs
+          {displayTitle}
         </h3>
         <p className="text-sm text-muted-foreground mb-4">
-          Search and filter the complete lab library by topic, capability, or keywords.
+          {displayDescription}
         </p>
       </div>
 
@@ -252,8 +266,12 @@ export const LabPoolBrowser: React.FC<LabPoolBrowserProps> = ({
             variant="outline"
             size="sm"
             onClick={() => {
-              const all = new Set(filteredLabs.map((l) => l.id));
-              setSelectedForTest(all);
+              if (isBuilderMode) {
+                const merged = Array.from(new Set([...selectedLabIds, ...filteredLabs.map((l) => l.id)]));
+                onLabIdsChange?.(merged);
+              } else {
+                setSelectedForTest(new Set(filteredLabs.map((l) => l.id)));
+              }
             }}
           >
             <CheckSquare className="w-4 h-4 mr-1" />
@@ -262,12 +280,18 @@ export const LabPoolBrowser: React.FC<LabPoolBrowserProps> = ({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setSelectedForTest(new Set())}
+            onClick={() => {
+              if (isBuilderMode) {
+                onLabIdsChange?.([]);
+              } else {
+                setSelectedForTest(new Set());
+              }
+            }}
           >
             <Square className="w-4 h-4 mr-1" />
             Clear Selection
           </Button>
-          {selectedForTest.size > 0 && (
+          {!isBuilderMode && selectedForTest.size > 0 && (
             <Button
               variant="default"
               size="sm"
@@ -277,6 +301,11 @@ export const LabPoolBrowser: React.FC<LabPoolBrowserProps> = ({
             >
               Test Selected ({selectedForTest.size})
             </Button>
+          )}
+          {isBuilderMode && selectedLabIds.length > 0 && (
+            <span className="text-sm text-muted-foreground">
+              {selectedLabIds.length} lab{selectedLabIds.length !== 1 ? 's' : ''} selected for template
+            </span>
           )}
         </div>
       )}
@@ -305,14 +334,21 @@ export const LabPoolBrowser: React.FC<LabPoolBrowserProps> = ({
                   <div className="flex items-start justify-between gap-4">
                     {isMultiSelectMode && (
                       <Checkbox
-                        checked={selectedForTest.has(lab.id)}
+                        checked={selectionSet.has(lab.id)}
                         onCheckedChange={(checked) => {
-                          setSelectedForTest((prev) => {
-                            const next = new Set(prev);
-                            if (checked) next.add(lab.id);
-                            else next.delete(lab.id);
-                            return next;
-                          });
+                          if (isBuilderMode) {
+                            const next = checked
+                              ? [...selectedLabIds, lab.id]
+                              : selectedLabIds.filter((id) => id !== lab.id);
+                            onLabIdsChange?.(next);
+                          } else {
+                            setSelectedForTest((prev) => {
+                              const next = new Set(prev);
+                              if (checked) next.add(lab.id);
+                              else next.delete(lab.id);
+                              return next;
+                            });
+                          }
                         }}
                         className="mt-1"
                       />

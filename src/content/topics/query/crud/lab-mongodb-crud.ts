@@ -1,7 +1,7 @@
 import { WorkshopLabDefinition } from '@/types';
 
 /**
- * MongoDB CRUD
+ * CRUD Operations
  *
  * Covers all Create, Read, Update, and Delete operations with the MongoDB Node.js driver:
  * insertOne/insertMany, find/findOne/cursor/limit/skip, updateOne/updateMany, replaceOne,
@@ -10,9 +10,9 @@ import { WorkshopLabDefinition } from '@/types';
 export const labMongodbCrudDefinition: WorkshopLabDefinition = {
   id: 'lab-mongodb-crud',
   topicId: 'query',
-  title: 'MongoDB CRUD',
+  title: 'CRUD Operations',
   description:
-    'Learn all MongoDB CRUD operations: insertOne/insertMany, find/findOne with cursor and pagination, updateOne/updateMany, replaceOne, deleteOne/deleteMany, and bulkWrite with the Node.js driver.',
+    'Learn CRUD operations: insertOne/insertMany, find/findOne with cursor and pagination, updateOne/updateMany, replaceOne, deleteOne/deleteMany, and bulkWrite with the Node.js driver.',
   difficulty: 'beginner',
   estimatedTotalTimeMinutes: 51,
   tags: ['query', 'crud', 'driver', 'node', 'basics'],

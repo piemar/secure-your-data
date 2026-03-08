@@ -377,6 +377,8 @@ export interface WorkshopTemplate {
   industry?: string; // e.g. 'retail', 'financial-services'
   storyIntro?: string;
   storyOutro?: string;
+  /** True when template was built via Build custom template (SA); false or omitted for predefined templates from repo. Used to filter Predefined vs Custom when creating a session. */
+  isCustom?: boolean;
 }
 
 export interface WorkshopInstance {

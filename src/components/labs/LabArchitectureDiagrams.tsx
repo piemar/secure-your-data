@@ -805,7 +805,7 @@ export function WorkloadIsolationDiagram({ className }: DiagramProps) {
   );
 }
 
-/** MongoDB CRUD: high-level flow — Application → Driver → Database */
+/** CRUD Operations: high-level flow — Application → Driver → Database */
 export function CRUDOperationsDiagram({ className }: DiagramProps) {
   return (
     <div className={cn('w-full py-4', className)}>

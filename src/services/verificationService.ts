@@ -24,6 +24,14 @@ export type VerificationId =
   | "qe.verifyQEMetadata"
   | "qe.verifyRangeQuery"
   | "qe.verifyQERangeQuery"
+  // Rich Query (basics + aggregations)
+  | "rich-query.verifyBasicFilters"
+  | "rich-query.verifyProjectionAndSort"
+  | "rich-query.verifyPagination"
+  | "rich-query.verifyIndexUsage"
+  | "rich-query.verifyBasicAggregation"
+  | "rich-query.verifyProjectionAggregation"
+  | "rich-query.verifyFacets"
   // Flags
   | "verify-encrypted-collections"
   | "verify-no-plaintext-pii"
@@ -112,6 +120,20 @@ export class VerificationService {
       case "qe.verifyRangeQuery":
       case "qe.verifyQERangeQuery":
         return validatorUtils.checkQERangeQuery(ctx.db || "hr", ctx.coll || "employees", ctx.mongoUri);
+
+      // Rich Query verifications (run step code to validate; no server-side check yet)
+      case "rich-query.verifyBasicFilters":
+      case "rich-query.verifyProjectionAndSort":
+      case "rich-query.verifyPagination":
+      case "rich-query.verifyIndexUsage":
+      case "rich-query.verifyBasicAggregation":
+      case "rich-query.verifyProjectionAggregation":
+      case "rich-query.verifyFacets":
+        return {
+          success: true,
+          message:
+            "Run the step code (Node or Mongosh) and confirm the output. Automated verification for this step is not implemented; ensure your query or pipeline returns expected results.",
+        };
 
       // Flag verifications
       case "verify-encrypted-collections":

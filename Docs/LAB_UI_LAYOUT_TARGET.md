@@ -1,6 +1,6 @@
 # Lab UI Layout – Target
 
-**Status:** Target layout for future implementation. Current layout is sidebar + main content with StepView (editor + console + preview).
+**Status:** Target layout for future implementation. Right area is reserved for Compete & Preview tabs; step buttons (Previous, Run, Next, step dots) stay in the footer.
 
 ---
 
@@ -10,7 +10,7 @@
 - **Database Navigator** – Optional second column (tree of databases/collections) when the lab has `dataRequirements` with collections and the user has a MongoDB URI. Allows users to see which collections exist and inspect document shape (e.g. for CRUD labs).
 - **Vertical splitter** – Between navigator and editor.
 - **Inline Editor** – Step code blocks (Run all / Run selection), optional "Collections" or "Data" tab to show collection contents.
-- **Vertical splitter** – Between editor and preview.
+- **Vertical splitter** – Between editor and Compete.
 - **Compete** – Verification / Check progress, next step, etc. (in step toolbar).
 - **Preview** – Generic lab preview (table, chart, search, encryption demo) when the step has a `preview` config.
 
@@ -21,7 +21,7 @@ In short: **Sidebar | Database Navigator (tree) | Splitter | Inline Editor | Spl
 ## Current state
 
 - **MainLayout:** App sidebar + main content area.
-- **StepView:** Resizable horizontal panels: left = editor + console (vertical); right = preview. No Database Navigator; no "Collections" tab in the editor.
+- **StepView:** Resizable horizontal panels: **Editor + Console** (left) | **Preview panel** (right, when moderator enables competitor comparisons) with **Compete** and **Preview** tabs. Step navigation (dots, Previous, Run, Next) lives in the **footer**. Database Navigator and "Collections" tab in the editor are not yet implemented.
 
 ---
 

@@ -14,6 +14,7 @@ import { defaultEncryptionWorkshopTemplate } from '../content/workshop-templates
 import { retailEncryptionQuickstartTemplate } from '../content/workshop-templates/retail-encryption-quickstart';
 import { retailDataBreachSimulationTemplate } from '../content/workshop-templates/retail-data-breach-simulation';
 import { queryCapabilitiesWorkshopTemplate } from '../content/workshop-templates/query-capabilities-workshop';
+import { richQueryWorkshopTemplate } from '../content/workshop-templates/rich-query-workshop';
 import { stopTheLeakQuest } from '../content/quests/stop-the-leak';
 import { hardenTheSystemQuest } from '../content/quests/harden-the-system';
 import {
@@ -84,6 +85,7 @@ class InMemoryContentService implements ContentService {
     retailEncryptionQuickstartTemplate,
     retailDataBreachSimulationTemplate,
     queryCapabilitiesWorkshopTemplate,
+    richQueryWorkshopTemplate,
   ];
   private competitorScenarios: WorkshopCompetitorScenario[] = [
     encryptionComparisonScenario,

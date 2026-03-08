@@ -1928,25 +1928,31 @@ export default defineConfig(({ mode }) => ({
                   .replace(/\bshow\s+dbs\b/gi, 'db.adminCommand("listDatabases").databases.forEach(d => print(d.name))')
                   .replace(/\bshow\s+collections\b/gi, 'db.getCollectionNames().forEach(c => print(c))');
                 // Wrap bare expression lines in print() so db.getCollectionNames() etc. auto-print to console.
-                // Do not wrap lines that are part of a multi-line statement (end with ( or ,).
+                // Do not wrap lines that are part of a multi-line statement (end with (, ,, {, or [).
+                // Also treat db.X followed by .method(...) on next line as one multi-line statement.
                 const lines = script.split('\n');
                 const wrappedLines: string[] = [];
                 let i = 0;
                 while (i < lines.length) {
                   const line = lines[i];
                   const t = line.trim();
-                  const isMultiLineStart = /^\s*db\./.test(line) && !line.includes('print(') && /[,(]\s*$/.test(t);
-                  if (isMultiLineStart) {
+                  const isMultiLineStart = /^\s*db\./.test(line) && !line.includes('print(') && (/[,(]\s*$/.test(t) || /[\{\[]\s*$/.test(t));
+                  const nextNonEmpty = (idx: number) => { let j = idx + 1; while (j < lines.length && !lines[j].trim()) j++; return j < lines.length ? lines[j].trim() : ''; };
+                  const nextLineStartsWithDot = nextNonEmpty(i).startsWith('.');
+                  const isChainedMultiLine = /^\s*db\./.test(line) && !line.includes('print(') && !/[,(\[{\[]$/.test(t) && nextLineStartsWithDot;
+                  if (isMultiLineStart || isChainedMultiLine) {
                     const group: string[] = [line];
                     i += 1;
-                    while (i < lines.length && !/\)\s*;\s*$/.test(lines[i].trim())) {
-                      group.push(lines[i]);
+                    while (i < lines.length) {
+                      const currentLine = lines[i];
+                      group.push(currentLine);
                       i += 1;
+                      const ct = currentLine.trim();
+                      // End of statement: ); (e.g. }); ) or .method(...); (chain end)
+                      if (/\)\s*;\s*$/.test(ct) || (ct.endsWith(';') && /^\s*\./.test(currentLine))) break;
                     }
-                    if (i < lines.length) group.push(lines[i]);
-                    i += 1;
                     let inner = group.join('\n');
-                    inner = inner.replace(/\s*\)\s*;\s*$/, ')');
+                    inner = inner.replace(/\s*\)\s*;\s*$/, ')').replace(/\s*;\s*$/, '');
                     wrappedLines.push('print(' + inner + ')');
                     continue;
                   }

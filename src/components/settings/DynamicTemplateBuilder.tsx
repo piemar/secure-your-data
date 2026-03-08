@@ -9,14 +9,11 @@ import { Input } from '@/components/ui/input';
 import { WorkshopMode, WorkshopTemplate, WorkshopGamificationConfig } from '@/types';
 import { getContentService } from '@/services/contentService';
 import { getTemplateGeneratorService } from '@/services/templateGeneratorService';
+import { saveCustomTemplate, generateCustomTemplateId } from '@/services/customTemplatesService';
 import { useWorkshopSession } from '@/contexts/WorkshopSessionContext';
-import { TopicSelector } from './TopicSelector';
-import { CapabilityCoverageView } from './CapabilityCoverageView';
-import { TopicLabBundlePanel } from './TopicLabBundlePanel';
-import { LabSuggestionPanel } from './LabSuggestionPanel';
 import { LabPoolBrowser } from './LabPoolBrowser';
 import { ModePreview } from './ModePreview';
-import { ArrowLeft, ArrowRight, CheckCircle2, Sparkles, AlertTriangle, Zap } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Sparkles, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
@@ -26,15 +23,14 @@ interface DynamicTemplateBuilderProps {
   onCancel?: () => void;
 }
 
-type BuilderStep = 'topics' | 'capabilities' | 'labs' | 'modes' | 'review';
+type BuilderStep = 'labs' | 'modes' | 'review';
 
 export const DynamicTemplateBuilder: React.FC<DynamicTemplateBuilderProps> = ({
   onComplete,
   onCancel
 }) => {
   const { setActiveTemplate } = useWorkshopSession();
-  const [currentStep, setCurrentStep] = useState<BuilderStep>('topics');
-  const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([]);
+  const [currentStep, setCurrentStep] = useState<BuilderStep>('labs');
   const [selectedLabIds, setSelectedLabIds] = useState<string[]>([]);
   const [defaultMode, setDefaultMode] = useState<WorkshopMode>('lab');
   const [allowedModes, setAllowedModes] = useState<WorkshopMode[]>(['lab', 'demo']);
@@ -43,43 +39,12 @@ export const DynamicTemplateBuilder: React.FC<DynamicTemplateBuilderProps> = ({
   const [templateName, setTemplateName] = useState<string>('');
   const [templateDescription, setTemplateDescription] = useState<string>('');
 
-  const steps: BuilderStep[] = ['topics', 'capabilities', 'labs', 'modes', 'review'];
+  const steps: BuilderStep[] = ['labs', 'modes', 'review'];
   const currentStepIndex = steps.indexOf(currentStep);
 
-  // When selected topics change, remove labs that belong to deselected topics
-  React.useEffect(() => {
-    if (selectedTopicIds.length === 0) {
-      setSelectedLabIds([]);
-      return;
-    }
-    getContentService().getLabs().then(allLabs => {
-      const validTopicIds = new Set(selectedTopicIds);
-      const keep = selectedLabIds.filter(labId => {
-        const lab = allLabs.find(l => l.id === labId);
-        return lab && validTopicIds.has(lab.topicId);
-      });
-      if (keep.length !== selectedLabIds.length) {
-        setSelectedLabIds(keep);
-      }
-    });
-  }, [selectedTopicIds]);
-
-  // When entering Labs step, default to full bundle (all labs from selected topics) if none selected yet
-  const handleNext = async () => {
+  const handleNext = () => {
     if (currentStepIndex < steps.length - 1) {
-      const nextStep = steps[currentStepIndex + 1];
-      if (nextStep === 'labs' && selectedLabIds.length === 0 && selectedTopicIds.length > 0) {
-        const contentService = getContentService();
-        const bundleLabIds: string[] = [];
-        for (const topicId of selectedTopicIds) {
-          const labs = await contentService.getLabsByTopic(topicId);
-          labs.forEach(lab => {
-            if (!bundleLabIds.includes(lab.id)) bundleLabIds.push(lab.id);
-          });
-        }
-        setSelectedLabIds(bundleLabIds);
-      }
-      setCurrentStep(nextStep);
+      setCurrentStep(steps[currentStepIndex + 1]);
     }
   };
 
@@ -90,20 +55,25 @@ export const DynamicTemplateBuilder: React.FC<DynamicTemplateBuilderProps> = ({
   };
 
   const handleGenerateTemplate = async () => {
-    if (selectedTopicIds.length === 0) {
-      toast.error('Please select at least one topic');
-      return;
-    }
-
     if (selectedLabIds.length === 0) {
       toast.error('Please select at least one lab');
       return;
     }
 
+    const name = (templateName || '').trim() || 'My Custom Workshop';
+
     try {
+      const contentService = getContentService();
+      const allLabs = await contentService.getLabs();
+      const topicIds = [...new Set(
+        selectedLabIds
+          .map((id) => allLabs.find((l) => l.id === id)?.topicId)
+          .filter((id): id is string => !!id)
+      )];
+
       const generator = getTemplateGeneratorService();
       const template = await generator.generateTemplate({
-        topicIds: selectedTopicIds,
+        topicIds,
         labIds: selectedLabIds,
         defaultMode,
         allowedModes,
@@ -114,11 +84,10 @@ export const DynamicTemplateBuilder: React.FC<DynamicTemplateBuilderProps> = ({
           bonusPointsPerQuest: 50
         } : undefined,
         industry: industry || undefined,
-        name: templateName || undefined,
-        description: templateDescription || undefined
+        name,
+        description: (templateDescription || '').trim() || `Custom workshop with ${selectedLabIds.length} lab(s)`
       });
 
-      // Validate template
       const validation = await generator.validateTemplate(template);
       if (!validation.valid) {
         toast.error('Validation: ' + validation.errors.join(', '));
@@ -129,10 +98,15 @@ export const DynamicTemplateBuilder: React.FC<DynamicTemplateBuilderProps> = ({
         console.warn('Template warnings:', validation.warnings);
       }
 
+      // Ensure stable id and mark as custom; save to custom list so it appears under "Custom workshop templates"
+      template.id = generateCustomTemplateId(name);
+      template.isCustom = true;
+      saveCustomTemplate(template);
+
       setActiveTemplate(template);
       onComplete(template);
-      
-      toast.success('Template generated successfully!');
+
+      toast.success('Custom template saved. It will appear under "Custom workshop templates" when you create a session.');
     } catch (error) {
       console.error('Failed to generate template:', error);
       toast.error('Failed to generate template. Please try again.');
@@ -141,10 +115,6 @@ export const DynamicTemplateBuilder: React.FC<DynamicTemplateBuilderProps> = ({
 
   const canProceedToNext = () => {
     switch (currentStep) {
-      case 'topics':
-        return selectedTopicIds.length > 0;
-      case 'capabilities':
-        return true; // Always can proceed
       case 'labs':
         return selectedLabIds.length > 0;
       case 'modes':
@@ -199,137 +169,32 @@ export const DynamicTemplateBuilder: React.FC<DynamicTemplateBuilderProps> = ({
       <Card>
         <CardHeader>
           <CardTitle className="text-xl capitalize">
-            {currentStep === 'topics' && 'Step 1: Select Topics'}
-            {currentStep === 'capabilities' && 'Step 2: Review Capabilities'}
-            {currentStep === 'labs' && 'Step 3: Select Labs'}
-            {currentStep === 'modes' && 'Step 4: Configure Modes'}
-            {currentStep === 'review' && 'Step 5: Review & Generate'}
+            {currentStep === 'labs' && 'Step 1: Select Labs'}
+            {currentStep === 'modes' && 'Step 2: Configure Modes'}
+            {currentStep === 'review' && 'Step 3: Review & Generate'}
           </CardTitle>
           <CardDescription>
-            {currentStep === 'topics' && 'Choose which MongoDB topics to cover in your workshop'}
-            {currentStep === 'capabilities' && 'Review which PoV capabilities will be covered'}
             {currentStep === 'labs' && 'Select or customize the labs for your workshop'}
             {currentStep === 'modes' && 'Configure workshop modes and gamification'}
             {currentStep === 'review' && 'Review your configuration and generate the template'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Topics Step */}
-          {currentStep === 'topics' && (
-            <TopicSelector
-              selectedTopicIds={selectedTopicIds}
-              onSelectionChange={setSelectedTopicIds}
-            />
-          )}
-
-          {/* Capabilities Step */}
-          {currentStep === 'capabilities' && (
-            <CapabilityCoverageView selectedTopicIds={selectedTopicIds} />
-          )}
-
-          {/* Labs Step: topic-first bundles + smart suggestions + full library browser */}
+          {/* Labs Step: same component and UX as Browse All Labs */}
           {currentStep === 'labs' && (
-            <div className="space-y-6">
-              <TopicLabBundlePanel
-                selectedTopicIds={selectedTopicIds}
-                selectedMode={defaultMode}
-                selectedLabIds={selectedLabIds}
-                onLabIdsChange={setSelectedLabIds}
-              />
-              <LabSuggestionPanel
-                selectedTopicIds={selectedTopicIds}
-                selectedMode={defaultMode}
-                selectedLabIds={selectedLabIds}
-                onLabIdsChange={setSelectedLabIds}
-              />
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Browse Full Lab Library</CardTitle>
-                  <CardDescription>
-                    See all available labs across topics. Use this to add advanced labs beyond the recommended bundles.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <LabPoolBrowser
-                    selectedTopicIds={selectedTopicIds}
-                    selectedMode={defaultMode}
-                    selectedLabIds={selectedLabIds}
-                    onAddLab={(labId) => {
-                      if (!selectedLabIds.includes(labId)) {
-                        setSelectedLabIds([...selectedLabIds, labId]);
-                      }
-                    }}
-                  />
-                </CardContent>
-              </Card>
-            </div>
+            <LabPoolBrowser
+              title="Browse labs and topics"
+              description="Search and filter the complete lab library by topic, capability, or keywords. Select labs to include in your template."
+              selectedMode={defaultMode}
+              selectedLabIds={selectedLabIds}
+              onLabIdsChange={setSelectedLabIds}
+              pageSize={10}
+            />
           )}
 
           {/* Modes Step */}
           {currentStep === 'modes' && (
             <div className="space-y-6">
-              {/* Mode Presets */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Zap className="h-4 w-4" />
-                    Quick Presets
-                  </CardTitle>
-                  <CardDescription>
-                    Apply a preset configuration optimized for a specific mode
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <Button
-                      variant="outline"
-                      className="h-auto flex-col items-start p-4"
-                      onClick={() => {
-                        setDefaultMode('lab');
-                        setAllowedModes(['lab', 'demo']);
-                        setGamificationEnabled(false);
-                        toast.success('Applied Lab-focused preset');
-                      }}
-                    >
-                      <div className="font-semibold mb-1">Lab-Focused</div>
-                      <div className="text-xs text-muted-foreground text-left">
-                        Full hands-on experience with all steps
-                      </div>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="h-auto flex-col items-start p-4"
-                      onClick={() => {
-                        setDefaultMode('challenge');
-                        setAllowedModes(['challenge', 'lab']);
-                        setGamificationEnabled(true);
-                        toast.success('Applied Challenge-focused preset');
-                      }}
-                    >
-                      <div className="font-semibold mb-1">Challenge-Focused</div>
-                      <div className="text-xs text-muted-foreground text-left">
-                        Story-driven quests with flags and gamification
-                      </div>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="h-auto flex-col items-start p-4"
-                      onClick={() => {
-                        setDefaultMode('demo');
-                        setAllowedModes(['demo', 'lab']);
-                        setGamificationEnabled(false);
-                        toast.success('Applied Demo-focused preset');
-                      }}
-                    >
-                      <div className="font-semibold mb-1">Demo-Focused</div>
-                      <div className="text-xs text-muted-foreground text-left">
-                        Presentation mode with simplified content
-                      </div>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
               {/* Density Warnings */}
               {(() => {
                 const labCount = selectedLabIds.length;
@@ -448,18 +313,21 @@ export const DynamicTemplateBuilder: React.FC<DynamicTemplateBuilderProps> = ({
           {currentStep === 'review' && (
             <div className="space-y-4">
               <div>
-                <Label>Template Name (Optional)</Label>
+                <Label>Template name</Label>
                 <Input
-                  placeholder="My Custom Workshop"
+                  placeholder="e.g. Acme Encryption Workshop"
                   value={templateName}
                   onChange={(e) => setTemplateName(e.target.value)}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Required. Saved as a custom template so you can select it when creating a session. Default: &quot;My Custom Workshop&quot;.
+                </p>
               </div>
 
               <div>
-                <Label>Template Description (Optional)</Label>
+                <Label>Description (optional)</Label>
                 <Input
-                  placeholder="Description of this workshop"
+                  placeholder="Short description for the template list"
                   value={templateDescription}
                   onChange={(e) => setTemplateDescription(e.target.value)}
                 />
@@ -470,9 +338,6 @@ export const DynamicTemplateBuilder: React.FC<DynamicTemplateBuilderProps> = ({
                   <CardTitle className="text-base">Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
-                  <div>
-                    <span className="font-medium">Topics:</span> {selectedTopicIds.length}
-                  </div>
                   <div>
                     <span className="font-medium">Labs:</span> {selectedLabIds.length}
                   </div>
@@ -521,7 +386,7 @@ export const DynamicTemplateBuilder: React.FC<DynamicTemplateBuilderProps> = ({
           ) : (
             <Button onClick={handleGenerateTemplate} disabled={!canProceedToNext()}>
               <CheckCircle2 className="w-4 h-4 mr-1" />
-              Generate Template
+              Save as custom template
             </Button>
           )}
         </div>

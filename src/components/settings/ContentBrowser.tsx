@@ -16,12 +16,18 @@ export interface ContentBrowserProps {
   onTestLabs?: (labIds: string[]) => void;
   /** Called when user selects a workshop template */
   onSelectTemplate?: (template: WorkshopTemplate) => void;
+  /** When provided, enables multi-select workshops and calls with selected templates */
+  onSelectTemplates?: (templates: WorkshopTemplate[]) => void;
   /** Optional: pre-selected topic IDs for lab filtering */
   selectedTopicIds?: string[];
   /** Optional: pre-selected lab IDs (to exclude from results) */
   selectedLabIds?: string[];
   /** Optional: default browse mode */
   defaultMode?: BrowseMode;
+  /** Shown in Custom workshop tab: build custom template */
+  onBuildCustom?: () => void;
+  /** Shown in Custom workshop tab: import template */
+  onImport?: () => void;
 }
 
 /**
@@ -34,9 +40,12 @@ export const ContentBrowser: React.FC<ContentBrowserProps> = ({
   onAddLab,
   onTestLabs,
   onSelectTemplate,
+  onSelectTemplates,
   selectedTopicIds = [],
   selectedLabIds = [],
-  defaultMode = 'labs',
+  defaultMode = 'workshops',
+  onBuildCustom,
+  onImport,
 }) => {
   const [browseMode, setBrowseMode] = useState<BrowseMode>(defaultMode);
 
@@ -44,15 +53,25 @@ export const ContentBrowser: React.FC<ContentBrowserProps> = ({
     <div className="space-y-4">
       <Tabs value={browseMode} onValueChange={(v) => setBrowseMode(v as BrowseMode)}>
         <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="labs" className="flex items-center gap-2">
-            <Beaker className="w-4 h-4" />
-            Labs
-          </TabsTrigger>
           <TabsTrigger value="workshops" className="flex items-center gap-2">
             <LayoutTemplate className="w-4 h-4" />
             Workshops
           </TabsTrigger>
+          <TabsTrigger value="labs" className="flex items-center gap-2">
+            <Beaker className="w-4 h-4" />
+            Labs
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="workshops" className="mt-4">
+          <TemplateBrowser
+            onSelectTemplate={onSelectTemplate}
+            onSelectTemplates={onSelectTemplates}
+            pageSize={PAGE_SIZE}
+            onBuildCustom={onBuildCustom}
+            onImport={onImport}
+          />
+        </TabsContent>
 
         <TabsContent value="labs" className="mt-4">
           <LabPoolBrowser
@@ -60,13 +79,6 @@ export const ContentBrowser: React.FC<ContentBrowserProps> = ({
             selectedLabIds={selectedLabIds}
             onAddLab={onAddLab}
             onTestLabs={onTestLabs}
-            pageSize={PAGE_SIZE}
-          />
-        </TabsContent>
-
-        <TabsContent value="workshops" className="mt-4">
-          <TemplateBrowser
-            onSelectTemplate={onSelectTemplate}
             pageSize={PAGE_SIZE}
           />
         </TabsContent>
