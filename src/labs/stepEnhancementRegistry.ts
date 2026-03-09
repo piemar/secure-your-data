@@ -115,9 +115,11 @@ function substitutePlaceholders(text: string | undefined): string | undefined {
   const medicalDb = 'medical_' + suffix;
   const hrDb = 'hr_' + suffix;
   const crudLabDb = 'crud_lab_' + suffix;
+  const richQueryDb = 'rich_query_' + suffix;
   return text
     .replace(/\bYOUR_SUFFIX\b/g, suffix)
     .replace(/\bcrud_lab\b/g, crudLabDb)
+    .replace(/\brich_query\b/g, richQueryDb)
     .replace(/\bALIAS_NAME\b/g, aliasName)
     .replace(/(?<!process\.env\.)\bAWS_REGION\b/g, awsRegion)
     .replace(/\bCRYPT_SHARED_LIB_PATH\b/g, cryptPath)
@@ -143,6 +145,7 @@ function substituteHintAnswer(answer: string | undefined): string | undefined {
   if (answer === 'encryption') return prefix;
   if (answer === 'medical') return 'medical_' + suffix;
   if (answer === 'hr') return 'hr_' + suffix;
+  if (answer === 'rich_query') return 'rich_query_' + suffix;
   return answer;
 }
 

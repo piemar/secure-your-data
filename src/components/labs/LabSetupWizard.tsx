@@ -104,14 +104,28 @@ export const LabSetupWizard: React.FC = () => {
         if (mongoUri) setLocalUri(mongoUri);
     }, [mongoUri]);
 
-    // When Docker: default URI to mongodb://root:example@mongo:27017. When local dev with local session: default to 127.0.0.1:27017.
+    const DOCKER_MONGO_URI = 'mongodb://root:example@mongo:27017';
+    // When Docker: always set URI field to mongodb://root:example@mongo:27017 (credentials included). Replace any unauthenticated local URI.
     useEffect(() => {
+        if (!runningInContainer) return;
+        const session = getWorkshopSession();
+        const useDockerUri = session?.mongodbSource === 'local' || runningInContainer;
+        if (!useDockerUri) return;
+        const current = localUri || mongoUri || '';
+        const isUnauthenticatedLocal = !current || /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo):27017(\/|$)/.test(current.replace(/\s/g, ''));
+        if (isUnauthenticatedLocal) {
+            setLocalUri(DOCKER_MONGO_URI);
+            setUriFromWorkshop(true);
+        }
+    }, [runningInContainer, mongoUri, localUri]);
+
+    // When not in Docker but local session: default to 127.0.0.1 if no URI set.
+    useEffect(() => {
+        if (runningInContainer) return;
         const session = getWorkshopSession();
         if (mongoUri) return;
-        const useDockerUri = runningInContainer || session?.mongodbSource === 'local';
-        if (useDockerUri) {
-            const uri = runningInContainer ? 'mongodb://root:example@mongo:27017' : 'mongodb://127.0.0.1:27017';
-            setLocalUri(uri);
+        if (session?.mongodbSource === 'local') {
+            setLocalUri('mongodb://127.0.0.1:27017');
             setUriFromWorkshop(true);
         }
     }, [mongoUri, runningInContainer]);
@@ -341,7 +355,7 @@ export const LabSetupWizard: React.FC = () => {
         <div className="space-y-2">
           <Input
             id="uri"
-            placeholder={getWorkshopSession()?.mongodbSource === 'local' ? 'mongodb://root:example@mongo:27017' : 'mongodb+srv://user:pass@cluster.mongodb.net/'}
+            placeholder={getWorkshopSession()?.mongodbSource === 'local' || runningInContainer ? 'mongodb://root:example@mongo:27017' : 'mongodb+srv://user:pass@cluster.mongodb.net/'}
             value={localUri}
             onChange={(e) => { setLocalUri(e.target.value); setUriFromWorkshop(false); }}
             onBlur={() => { const v = localUri.trim(); if (v) setMongoUri(v); }}

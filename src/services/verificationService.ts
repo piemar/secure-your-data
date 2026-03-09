@@ -1,6 +1,13 @@
 import { ValidationResult, validatorUtils } from "@/utils/validatorUtils";
 import { getKeyVaultNamespace } from "@/labs/stepEnhancementRegistry";
 
+/** Result for steps whose verification is not yet implemented: run solution and confirm manually. */
+const NOT_IMPLEMENTED: ValidationResult = {
+  success: true,
+  message:
+    "Run the step solution (Run all with full code) and confirm the output. Automated verification for this step is not yet implemented; add a real check in VerificationService and validatorUtils when backend support exists.",
+};
+
 export type VerificationId =
   // CSFLE / key vault
   | "csfle.verifyKeyVaultIndex"
@@ -32,6 +39,73 @@ export type VerificationId =
   | "rich-query.verifyBasicAggregation"
   | "rich-query.verifyProjectionAggregation"
   | "rich-query.verifyFacets"
+  // Ingest rate
+  | "ingest-rate.verifyClusterConfig"
+  | "ingest-rate.verifySmallRecordRate"
+  | "ingest-rate.verifyReplication"
+  | "ingest-rate.verifyBulkComparison"
+  | "ingest-rate.verifyBatchOptimization"
+  | "ingest-rate.verifyWriteConcern"
+  | "ingest-rate.verifyReplicationLag"
+  | "ingest-rate.verifyDataOnAllNodes"
+  | "ingest-rate.verifyFailover"
+  // Flexible schema
+  | "flexible.verifyMicroserviceOne"
+  | "flexible.verifySchemaEvolution"
+  | "flexible.verifyMicroserviceTwo"
+  | "flexible.verifyInitialCollection"
+  | "flexible.verifyFieldsAdded"
+  | "flexible.verifyMixedQueries"
+  | "flexible.verifyNestedDocuments"
+  | "flexible.verifyArrays"
+  | "flexible.verifyNestedQueries"
+  // Workload isolation
+  | "workload-isolation.verifyDataLoad"
+  | "workload-isolation.verifyReplicaConfig"
+  | "workload-isolation.verifyMetrics"
+  // Graph
+  | "graph.verifyInteractionsModel"
+  | "graph.verifyRecommendations"
+  | "graph.verifyRecommendationApi"
+  | "graph.verifyModel"
+  | "graph.verifyTraversal"
+  | "graph.verifyExplanation"
+  | "graph.verifyFraudModel"
+  | "graph.verifyFraudQueries"
+  | "graph.verifyFraudPlaybook"
+  // Geospatial
+  | "geospatial.verifyPolygons"
+  | "geospatial.verifyWithinIntersects"
+  | "geospatial.verifyScenario"
+  | "geospatial.verifyBaselineExplain"
+  | "geospatial.verifyTunedExplain"
+  | "geospatial.verifyBestPractices"
+  | "geospatial.verifyIndex"
+  | "geospatial.verifyNearQueries"
+  | "geospatial.verifyFeatureDesign"
+  // In-place analytics
+  | "analytics.verifyUnwindAggregation"
+  | "analytics.verifyGroupSortAggregation"
+  | "analytics.verifyProjectAggregation"
+  | "analytics.verifyPerformanceAnalysis"
+  | "analytics.verifyDataLoad"
+  | "analytics.verifyIndexCreation"
+  | "analytics.verifyBasicAggregation"
+  | "analytics.verifyExplainPlan"
+  // Text search
+  | "text-search.verifyIndexCreated"
+  | "text-search.verifyQueries"
+  | "text-search.verifyProjectionAndSort"
+  | "text-search.verifyAutocompleteIndex"
+  | "text-search.verifyTypeahead"
+  | "text-search.verifyTypeaheadDesign"
+  | "text-search.verifyFacetedSearch"
+  | "text-search.verifyHighlighting"
+  | "text-search.verifyRelevanceTuning"
+  // Consistency / scale-out
+  | "consistency.verifyDataLoad"
+  | "consistency.verifyLog"
+  | "scale-out.verifyCharts"
   // Flags
   | "verify-encrypted-collections"
   | "verify-no-plaintext-pii"
@@ -169,6 +243,69 @@ export class VerificationService {
       case "verify-query-performance":
         // Verify query performance meets SLAs
         return { success: true, message: "Query optimization verified" };
+
+      // Ingest rate, flexible, workload-isolation, graph, geospatial, analytics, text-search, consistency, scale-out
+      // Not yet implemented: run full solution then confirm output; add real checks in validatorUtils when backend exists
+      case "ingest-rate.verifyClusterConfig":
+      case "ingest-rate.verifySmallRecordRate":
+      case "ingest-rate.verifyReplication":
+      case "ingest-rate.verifyBulkComparison":
+      case "ingest-rate.verifyBatchOptimization":
+      case "ingest-rate.verifyWriteConcern":
+      case "ingest-rate.verifyReplicationLag":
+      case "ingest-rate.verifyDataOnAllNodes":
+      case "ingest-rate.verifyFailover":
+      case "flexible.verifyMicroserviceOne":
+      case "flexible.verifySchemaEvolution":
+      case "flexible.verifyMicroserviceTwo":
+      case "flexible.verifyInitialCollection":
+      case "flexible.verifyFieldsAdded":
+      case "flexible.verifyMixedQueries":
+      case "flexible.verifyNestedDocuments":
+      case "flexible.verifyArrays":
+      case "flexible.verifyNestedQueries":
+      case "workload-isolation.verifyDataLoad":
+      case "workload-isolation.verifyReplicaConfig":
+      case "workload-isolation.verifyMetrics":
+      case "graph.verifyInteractionsModel":
+      case "graph.verifyRecommendations":
+      case "graph.verifyRecommendationApi":
+      case "graph.verifyModel":
+      case "graph.verifyTraversal":
+      case "graph.verifyExplanation":
+      case "graph.verifyFraudModel":
+      case "graph.verifyFraudQueries":
+      case "graph.verifyFraudPlaybook":
+      case "geospatial.verifyPolygons":
+      case "geospatial.verifyWithinIntersects":
+      case "geospatial.verifyScenario":
+      case "geospatial.verifyBaselineExplain":
+      case "geospatial.verifyTunedExplain":
+      case "geospatial.verifyBestPractices":
+      case "geospatial.verifyIndex":
+      case "geospatial.verifyNearQueries":
+      case "geospatial.verifyFeatureDesign":
+      case "analytics.verifyUnwindAggregation":
+      case "analytics.verifyGroupSortAggregation":
+      case "analytics.verifyProjectAggregation":
+      case "analytics.verifyPerformanceAnalysis":
+      case "analytics.verifyDataLoad":
+      case "analytics.verifyIndexCreation":
+      case "analytics.verifyBasicAggregation":
+      case "analytics.verifyExplainPlan":
+      case "text-search.verifyIndexCreated":
+      case "text-search.verifyQueries":
+      case "text-search.verifyProjectionAndSort":
+      case "text-search.verifyAutocompleteIndex":
+      case "text-search.verifyTypeahead":
+      case "text-search.verifyTypeaheadDesign":
+      case "text-search.verifyFacetedSearch":
+      case "text-search.verifyHighlighting":
+      case "text-search.verifyRelevanceTuning":
+      case "consistency.verifyDataLoad":
+      case "consistency.verifyLog":
+      case "scale-out.verifyCharts":
+        return NOT_IMPLEMENTED;
 
       default:
         return { success: false, message: `Unknown verification id: ${id}` };

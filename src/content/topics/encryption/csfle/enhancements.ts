@@ -24,6 +24,9 @@ KMS_KEY_ID=$(aws kms create-key \\
     --query 'KeyMetadata.KeyId' \\
     --output text)
 
+# If Step 1 failed (e.g. "Token has expired"), KMS_KEY_ID is empty. Do not run Step 2 or you will get "expected one argument".
+[ -z "$KMS_KEY_ID" ] && { echo "ERROR: Step 1 failed (e.g. SSO token expired). Run: aws sso login (or aws sso login --profile YOUR_PROFILE); then re-run this script from the top."; exit 1; }
+
 # 2. Create a human-readable alias (uses $KMS_KEY_ID from above)
 aws kms create-alias \\
     --alias-name "ALIAS_NAME" \\
@@ -36,7 +39,8 @@ echo "Alias Created: ALIAS_NAME"`,
 # ══════════════════════════════════════════════════════════════
 # The CMK is your "root of trust" - it wraps all your Data Encryption Keys.
 # It NEVER leaves AWS KMS (protected by hardware security modules).
-# If you see "Token has expired", run: aws sso login
+# If you see "Token has expired", run: aws sso login (or aws sso login --profile YOUR_PROFILE), then re-run from Step 1.
+# If Step 2 fails with "expected one argument" for --target-key-id, Step 1 did not set KMS_KEY_ID; fix Step 1 (e.g. refresh SSO) and re-run.
 #
 # TASK: Complete the AWS KMS command below (backslash continues the line).
 
@@ -44,6 +48,9 @@ KMS_KEY_ID=$(aws kms _________ \\
     --description "Lab 1 MongoDB Encryption Key" \\
     --query 'KeyMetadata._______' \\
     --output text)
+
+# If Step 1 failed (e.g. token expired), KMS_KEY_ID is empty; run: aws sso login, then re-run from Step 1.
+[ -z "$KMS_KEY_ID" ] && { echo "ERROR: Step 1 failed (e.g. SSO token expired). Run: aws sso login; then re-run from the top."; exit 1; }
 
 # ══════════════════════════════════════════════════════════════
 # STEP 2: Create a Human-Readable Alias
@@ -111,9 +118,9 @@ echo "Alias Created: ALIAS_NAME"`,
 
 `,
         inlineHints: [
-          { line: 10, blankText: '_________', hint: 'The AWS KMS command to create a new symmetric key', answer: 'create-key' },
-          { line: 12, blankText: '_______', hint: 'JMESPath query to extract the key identifier', answer: 'KeyId' },
-          { line: 23, blankText: '_____________', hint: 'AWS KMS command to assign a friendly name to a key', answer: 'create-alias' },
+          { line: 11, blankText: '_________', hint: 'The AWS KMS command to create a new symmetric key', answer: 'create-key' },
+          { line: 13, blankText: '_______', hint: 'JMESPath query to extract the key identifier', answer: 'KeyId' },
+          { line: 27, blankText: '_____________', hint: 'AWS KMS command to assign a friendly name to a key', answer: 'create-alias' },
         ],
         competitorEquivalents: {
           postgresql: {
@@ -136,6 +143,7 @@ echo "Alias Created: ALIAS_NAME"`,
     tips: [
       'The CMK never leaves the KMS Hardware Security Module (HSM). In customer conversations, you will explain that the CMK is the only key that never leaves the HSM.',
       'Use aliases for keys to allow easier rotation without code changes.',
+      'If you see "Token has expired" or "expected one argument" for --target-key-id: run aws sso login (or aws sso login --profile <name>) on your host, then re-run this step from the top. In Docker, ensure your .aws folder is mounted so the container sees the refreshed token.',
     ],
   },
 
@@ -424,7 +432,7 @@ run().catch(console.dir);`,
         skeleton: `// ══════════════════════════════════════════════════════════════
 // Generate Data Encryption Key (DEK) using Node.js
 // ══════════════════════════════════════════════════════════════
-// Create a file called "createKey.cjs" and run with: node createKey.cjs
+// Use Run all or Run selection to execute (no separate terminal needed).
 
 const { MongoClient, ClientEncryption } = require("mongodb");
 const { fromSSO } = require("@aws-sdk/credential-providers");
@@ -545,9 +553,30 @@ run().catch(console.dir);`,
           'cosmosdb-vcore': { language: 'javascript', code: `// Cosmos DB: Keys live in Azure Key Vault, not in a collection.`, workaroundNote: 'Key verification is via Azure Key Vault API, not a database collection.' },
         },
       },
+      {
+        filename: 'Mongosh',
+        language: 'mongosh',
+        code: `const keyVaultDb = db.getSiblingDB("encryption");
+const docs = keyVaultDb.getCollection("__keyVault").find({}).toArray();
+print("Key Vault documents:", docs.length);
+docs.forEach((d) => printjson(d));
+const count = keyVaultDb.getCollection("__keyVault").countDocuments({});
+print("Total keys:", count);`,
+        skeleton: `const keyVaultDb = db.getSiblingDB("____");
+const docs = keyVaultDb.getCollection("__keyVault").______({}).toArray();
+print("Key Vault documents:", docs.length);
+docs.forEach((d) => printjson(d));
+const count = keyVaultDb.getCollection("__keyVault").________________();
+print("Total keys:", count);`,
+        inlineHints: [
+          { line: 1, blankText: '____', hint: 'Database name for the key vault', answer: 'encryption' },
+          { line: 2, blankText: '______', hint: 'Method to read documents from a collection', answer: 'find' },
+          { line: 5, blankText: '________________', hint: 'Method to count documents in a collection', answer: 'countDocuments' },
+        ],
+      },
     ],
     tips: [
-      'This step confirms the DEK was successfully created and stored in the key vault. Use Run all or Run selection to execute the script.',
+      'This step confirms the DEK was successfully created and stored in the key vault. Use Run all or Run selection to execute the Node script or the Mongosh block (no separate terminal needed).',
       'If you see 0 keys, re-run createKey.cjs. If you see multiple keys, you may have run it more than once.',
     ],
   },

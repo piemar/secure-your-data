@@ -6,7 +6,7 @@ import { useLab } from '@/context/LabContext';
 import { getLeaderboardEntries, heartbeat } from '@/utils/leaderboardUtils';
 import { postStepProgress } from '@/services/leaderboardApi';
 import { DifficultyLevel } from './DifficultyBadge';
-import { Lightbulb, BookOpen } from 'lucide-react';
+import { Lightbulb, BookOpen, Bug, Loader2 } from 'lucide-react';
 import { sessionManager } from '@/services/session';
 import type { TerminalSession } from '@/types/ide';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -104,8 +104,22 @@ export function LabViewWithTabs({
 }: LabViewWithTabsProps) {
   const { startLab, completeLab, completeStep, userEmail, completedLabs, resetProgressCount } = useLab();
   const storageKey = `lab${labNumber}-progress`;
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const stepToolbarRef = useRef<{ reset: () => void; openHelp: () => void } | null>(null);
+  const [currentStepIndex, setCurrentStepIndex] = useState(() => {
+    if (typeof localStorage === 'undefined' || steps.length === 0) return 0;
+    const saved = localStorage.getItem(`lab${labNumber}-progress`);
+    if (!saved) return 0;
+    try {
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return 0;
+      let firstIncomplete = 0;
+      while (parsed.includes(firstIncomplete)) firstIncomplete++;
+      return Math.min(firstIncomplete, steps.length - 1);
+    } catch {
+      return 0;
+    }
+  });
+  const stepToolbarRef = useRef<{ reset: () => void; openHelp: () => void; reportIssue?: () => void } | null>(null);
+  const [reportSending, setReportSending] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [stepTerminalSession, setStepTerminalSession] = useState<TerminalSession | null>(null);
   const [pendingTerminalEchos, setPendingTerminalEchos] = useState<Array<{ code: string; language: string; filename?: string }>>([]);
@@ -119,6 +133,15 @@ export function LabViewWithTabs({
       sessionId = s.id;
       stepSessionIdRef.current = s.id;
       setStepTerminalSession(s);
+      // Set AWS profile and region from Lab Setup so ad-hoc aws commands in the terminal use them
+      if (typeof localStorage !== 'undefined') {
+        const parts: string[] = [];
+        const awsProfile = localStorage.getItem('lab_aws_profile');
+        const awsRegion = localStorage.getItem('lab_aws_region') || localStorage.getItem('aws_region');
+        if (awsProfile?.trim()) parts.push(`export AWS_PROFILE=${awsProfile.trim()}`);
+        if (awsRegion?.trim()) parts.push(`export AWS_DEFAULT_REGION=${awsRegion.trim()}`);
+        if (parts.length) setTimeout(() => s.write(parts.join('\n') + '\n'), 100);
+      }
     });
     return () => {
       if (sessionId) sessionManager.destroySession(sessionId);
@@ -256,9 +279,20 @@ export function LabViewWithTabs({
                 )}
               </div>
             )}
-            {/* Help right-adjusted on the same line; Atlas Capability moved to Preview panel header */}
+            {/* Help and Report issue right-adjusted on the same line */}
             {activeTab === 'steps' && (
               <div className="flex items-center gap-0.5 flex-shrink-0 ml-auto">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="sm" onClick={() => stepToolbarRef.current?.reportIssue?.()} disabled={reportSending} className="h-4 gap-0.5 px-1 text-[8px] text-muted-foreground hover:text-foreground" title="Send logs and context to maintainers">
+                        {reportSending ? <Loader2 className="w-2 h-2 animate-spin" /> : <Bug className="w-2 h-2" />}
+                        Report issue
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Collect and send console logs, run output, and step context to maintainers.</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -330,13 +364,23 @@ export function LabViewWithTabs({
             competitorIds={competitorIds}
             labMongoUri={labMongoUri}
             stepToolbarRef={stepToolbarRef}
+            onReportSendingChange={setReportSending}
             resetProgressCount={resetProgressCount}
             onResetStep={handleResetStep}
             terminalSession={stepTerminalSession}
             onRunEchoToTerminal={(payload) => {
               // Recreate a fresh terminal session on each Run so we always start from bash and send
               // full payload (e.g. mongosh "uri" + script); only the latest run is shown.
-              const codeToWrite = payload.code + '\n\n';
+              let codeToWrite = payload.code + '\n\n';
+              // Apply Lab Setup AWS profile and region so the shell uses them for aws CLI commands
+              if (typeof localStorage !== 'undefined') {
+                const parts: string[] = [];
+                const awsProfile = localStorage.getItem('lab_aws_profile');
+                const awsRegion = localStorage.getItem('lab_aws_region') || localStorage.getItem('aws_region');
+                if (awsProfile?.trim()) parts.push(`export AWS_PROFILE=${awsProfile.trim()}`);
+                if (awsRegion?.trim()) parts.push(`export AWS_DEFAULT_REGION=${awsRegion.trim()}`);
+                if (parts.length) codeToWrite = parts.join('\n') + '\n\n' + codeToWrite;
+              }
               if (stepSessionIdRef.current) {
                 sessionManager.destroySession(stepSessionIdRef.current);
                 stepSessionIdRef.current = null;

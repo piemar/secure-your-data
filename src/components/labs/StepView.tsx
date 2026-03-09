@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2, BookOpen, Clock, Lock, Eye, Unlock, GitCompare, Play, RotateCcw, FileCode, PlayCircle, Layout, RefreshCw, Bug } from 'lucide-react';
+import { ChevronDown, ChevronUp, Lightbulb, ChevronLeft, ChevronRight, CheckCircle2, Terminal, Copy, Check, Loader2, BookOpen, Clock, Lock, Eye, Unlock, GitCompare, Play, RotateCcw, FileCode, PlayCircle, Layout, RefreshCw } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -42,7 +42,6 @@ import { toast } from 'sonner';
 import { useIdeContextOptional } from '@/context/IdeContext';
 import { createOutputSurface } from '@/services/execution/outputSurface';
 import { createDocumentStore } from '@/services/workspace';
-import { SuggestNextStep } from '@/components/hints/SuggestNextStep';
 import type { TerminalSession } from '@/types/ide';
 import { XtermTerminal } from '@/components/terminal/XtermTerminal';
 
@@ -122,8 +121,10 @@ interface StepViewProps {
   competitorIds?: string[];
   /** MongoDB URI for lab Run (run-node / run-mongosh). When set, Run button calls real APIs when possible. */
   labMongoUri?: string;
-  /** When set, StepView assigns reset/check/openHelp so parent can render toolbar on same line as Overview/Steps */
-  stepToolbarRef?: React.MutableRefObject<{ reset: () => void; openHelp: () => void } | null>;
+  /** When set, StepView assigns reset/check/openHelp/reportIssue so parent can render toolbar on same line as Overview/Steps */
+  stepToolbarRef?: React.MutableRefObject<{ reset: () => void; openHelp: () => void; reportIssue?: () => void } | null>;
+  /** Called when report issue sending state changes so parent can show loading on Report issue button */
+  onReportSendingChange?: (sending: boolean) => void;
   /** Increments when user resets progress; StepView clears hints and reloads workspace when this changes */
   resetProgressCount?: number;
   /** Called when user resets the current step so parent can uncomplete it (e.g. remove from completedSteps) */
@@ -625,6 +626,7 @@ export function StepView({
   competitorIds,
   labMongoUri,
   stepToolbarRef,
+  onReportSendingChange,
   resetProgressCount = 0,
   onResetStep,
   onRunEchoToTerminal,
@@ -785,7 +787,7 @@ export function StepView({
     return lines.join('\n');
   }, []);
 
-  // Get display code based on tier. When solution is revealed and block has skeleton + inlineHints, show skeleton with all blanks filled (so solution is same structure as skeleton).
+  // Get display code based on tier. When solution is revealed, show full block.code (already substituted) so all placeholders and blanks are replaced.
   const getDisplayCode = (block: CodeBlock, tier: SkeletonTier, solutionRevealed: boolean): string => {
     const base = (() => {
       switch (tier) {
@@ -798,10 +800,7 @@ export function StepView({
           return block.skeleton || block.code;
       }
     })();
-    if (solutionRevealed && block.skeleton && block.inlineHints?.length) {
-      return fillAllBlanksInSkeleton(block.skeleton, block.inlineHints);
-    }
-    if (solutionRevealed) return block.code;
+    if (solutionRevealed && block.code) return block.code;
     return base;
   };
 
@@ -1080,10 +1079,7 @@ export function StepView({
         const revealed = revealedAnswers[blockKey] || [];
         const saved = next[blockKey];
         if (isSolutionRevealed) {
-          next[blockKey] =
-            block.skeleton && block.inlineHints?.length
-              ? fillAllBlanksInSkeleton(block.skeleton, block.inlineHints)
-              : (block.code ?? '');
+          next[blockKey] = block.code ?? '';
         } else if (hasAnySkeleton(block) && block.inlineHints?.length) {
           // Use saved content as base when it exists and is not corrupted, so edits persist when navigating between steps.
           const looksCorrupted = (code: string) =>
@@ -1113,10 +1109,7 @@ export function StepView({
         const isSolutionRevealed = alwaysShowSolutions || !!showSolution[blockKey] || !hasAnySkeleton(block);
         const revealed = revealedAnswers[blockKey] || [];
         if (isSolutionRevealed) {
-          next[blockKey] =
-            block.skeleton && block.inlineHints?.length
-              ? fillAllBlanksInSkeleton(block.skeleton, block.inlineHints)
-              : (block.code ?? '');
+          next[blockKey] = block.code ?? '';
         } else if (revealed.length > 0 && block.inlineHints?.length) {
           const skeleton = getDisplayCode(block, tier, false);
           const prevCode = prev[blockKey];
@@ -1464,15 +1457,19 @@ export function StepView({
     const isSolutionRevealed = alwaysShowSolutions || !!showSolution[blockKey] || !hasAnySkeleton(block);
     let code = (editableCodeByBlock[blockKey] ?? getDisplayCode(block!, tier, isSolutionRevealed)) || (block?.code ?? '');
     const language = (block?.language || 'javascript').toLowerCase();
+    // Bash/shell: if editor still has skeleton placeholders (e.g. _________), run the full solution so the command does not fail (e.g. aws kms create-key)
+    if ((language === 'bash' || language === 'shell') && block?.code && /_{5,}/.test(code)) {
+      code = block.code;
+    }
     if (language === 'mongosh') code = stripMongoshConnectionLine(code);
     if (language === 'javascript' || language === 'typescript') code = stripNodeConnectionLine(code);
     code = ensureTrailingNewline(code);
-    // Echo to terminal with connection line so user sees full command (mongosh "uri" or node)
+    // Same pattern as mongosh: start shell (node or mongosh), echo editor content, then exit (Ctrl+D for node, "exit" for mongosh).
     const codeForEcho =
       language === 'mongosh' && labMongoUri?.trim()
-        ? `mongosh "${labMongoUri}"\n${code}`
+        ? `mongosh "${labMongoUri}"\n${code.trimEnd()}\nexit\n`
         : (language === 'javascript' || language === 'typescript')
-          ? `node\n${code}`
+          ? `node\n${code.trimEnd()}\n\x04`
           : code;
     onRunEchoToTerminal?.({ code: codeForEcho, language, filename: block?.filename });
     setIsRunning(true);
@@ -1629,9 +1626,9 @@ export function StepView({
       code = ensureTrailingNewline(code);
       const codeForEcho =
         language === 'mongosh' && labMongoUri?.trim()
-          ? `mongosh "${labMongoUri}"\n${code}`
+          ? `mongosh "${labMongoUri}"\n${code.trimEnd()}\nexit\n`
           : (language === 'javascript' || language === 'typescript')
-            ? `node\n${code}`
+            ? `node\n${code.trimEnd()}\n\x04`
             : code;
       onRunEchoToTerminal?.({ code: codeForEcho, language, filename: block.filename });
       try {
@@ -1793,37 +1790,11 @@ export function StepView({
     setStepValidatedSuccessByIndex((prev) => ({ ...prev, [currentStepIndex]: false }));
   }, [labNumber, currentStepIndex, userEmail, currentStep?.codeBlocks, skeletonTier, onResetStep]);
 
-  useEffect(() => {
-    if (!stepToolbarRef) return;
-    stepToolbarRef.current = {
-      reset: handleResetStep,
-      openHelp: () => setHelpOpen(true),
-    };
-    return () => { stepToolbarRef.current = null; };
-  }, [stepToolbarRef, handleResetStep]);
-
-  /** Next Step: Advance only if current step is validated (validation runs after Run, not on Next). No code execution here. */
-  const handleNextStep = async () => {
-    if (currentStepNeedsVerification && !stepValidatedSuccessByIndex[currentStepIndex]) return;
-    if (!isCompleted) {
-      onComplete(currentStepIndex);
-    }
-    if (currentStepIndex < steps.length - 1) {
-      await new Promise((r) => setTimeout(r, 300));
-      setDirection(1);
-      onStepChange(currentStepIndex + 1);
-    }
-  };
-
-  const handlePrevStep = () => {
-    if (currentStepIndex > 0) {
-      setDirection(-1);
-      onStepChange(currentStepIndex - 1);
-    }
-  };
-
   /** Report issue: send logs and context to central DB for workshop maintainers */
   const [reportSending, setReportSending] = useState(false);
+  useEffect(() => {
+    onReportSendingChange?.(reportSending);
+  }, [reportSending, onReportSendingChange]);
   const handleReportIssue = useCallback(async () => {
     setReportSending(true);
     try {
@@ -1862,6 +1833,36 @@ export function StepView({
       setReportSending(false);
     }
   }, [labNumber, labTitle, currentStep, currentStepIndex, logEntries, lastOutput, outputSuccess, userEmail]);
+
+  useEffect(() => {
+    if (!stepToolbarRef) return;
+    stepToolbarRef.current = {
+      reset: handleResetStep,
+      openHelp: () => setHelpOpen(true),
+      reportIssue: handleReportIssue,
+    };
+    return () => { stepToolbarRef.current = null; };
+  }, [stepToolbarRef, handleResetStep, handleReportIssue]);
+
+  /** Next Step: Advance only if current step is validated (validation runs after Run, not on Next). No code execution here. */
+  const handleNextStep = async () => {
+    if (currentStepNeedsVerification && !stepValidatedSuccessByIndex[currentStepIndex]) return;
+    if (!isCompleted) {
+      onComplete(currentStepIndex);
+    }
+    if (currentStepIndex < steps.length - 1) {
+      await new Promise((r) => setTimeout(r, 300));
+      setDirection(1);
+      onStepChange(currentStepIndex + 1);
+    }
+  };
+
+  const handlePrevStep = () => {
+    if (currentStepIndex > 0) {
+      setDirection(-1);
+      onStepChange(currentStepIndex - 1);
+    }
+  };
 
   const slideVariants = {
     enter: (direction: number) => ({
@@ -1964,7 +1965,7 @@ export function StepView({
                               ) : (
                                 <>
                                   <FileCode className="w-3 h-3 flex-shrink-0 text-green-500" />
-                                  <span className="font-mono text-[8px] text-white truncate" title={firstBlock.filename}>{firstDisplayFilename}</span>
+                                  <span className="font-mono text-[8px] text-white truncate" title={firstBlock.filename}>{firstIsDriverOnly && (firstBlock.filename?.toLowerCase().endsWith('.cjs') || firstBlock.filename?.toLowerCase().endsWith('.js')) ? 'node' : firstDisplayFilename}</span>
                                 </>
                               )}
                             </div>
@@ -2208,7 +2209,7 @@ export function StepView({
                                 </button>
                               )}
                               <FileCode className="w-3.5 h-3.5 flex-shrink-0 text-green-500" />
-                              <span className="font-mono text-[8px] text-white truncate" title={block.filename}>{displayFilename}</span>
+                              <span className="font-mono text-[8px] text-white truncate" title={block.filename}>{isNodeBlock ? 'node' : displayFilename}</span>
                             </div>
                             <div className="flex items-center gap-0.5 flex-shrink-0">
                               <TooltipProvider><Tooltip><TooltipTrigger asChild>
@@ -2290,7 +2291,7 @@ export function StepView({
                             ) : (
                               <>
                                 <FileCode className="w-3 h-3 flex-shrink-0 text-green-500" />
-                                <span className="font-mono text-[8px] text-white truncate" title={block.filename}>{displayFilename}</span>
+                                <span className="font-mono text-[8px] text-white truncate" title={block.filename}>{isNodeBlock ? 'node' : displayFilename}</span>
                               </>
                             )}
                           </div>
@@ -2620,7 +2621,7 @@ export function StepView({
           <TooltipProvider delayDuration={200}>
             <div className="flex items-center gap-1.5">
               {steps.map((step, index) => {
-                const canNavigateToStep = index <= maxReachableStepIndex;
+                const canNavigateToStep = index <= maxReachableStepIndex || completedSteps.includes(index);
                 return (
                   <Tooltip key={index}>
                     <TooltipTrigger asChild>
@@ -2683,27 +2684,6 @@ export function StepView({
               <ChevronLeft className="w-4 h-4" />
               Previous
             </Button>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleReportIssue}
-                    disabled={reportSending}
-                    className="gap-1 text-muted-foreground hover:text-foreground"
-                    title="Send logs and context to maintainers"
-                  >
-                    {reportSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bug className="w-4 h-4" />}
-                    Report issue
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  Collect and send console logs, run output, and step context to the central database so workshop maintainers can see exactly what happened and fix issues.
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            {ide && <SuggestNextStep className="mr-2" />}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>

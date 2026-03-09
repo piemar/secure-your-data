@@ -202,10 +202,10 @@ export function EncryptionFlowVisual({ type = 'csfle', autoPlay = false }: Encry
           </p>
         </motion.div>
 
-        {/* Connecting lines to KMS */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ top: -60 }}>
+        {/* Connecting lines to KMS (path d must use numbers, not percentages) */}
+        <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ top: -60 }} viewBox="0 0 100 100" preserveAspectRatio="none">
           <motion.path
-            d="M 50% 80 L 50% 40"
+            d="M 50 80 L 50 40"
             stroke="currentColor"
             strokeWidth="2"
             strokeDasharray="4,4"

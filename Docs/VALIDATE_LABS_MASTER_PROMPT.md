@@ -50,6 +50,8 @@ Use the following checklist for **each lab** and, where applicable, **each step*
 
 ### Hint placement verification (required for labs with skeleton + inlineHints)
 
+**Placeholders and hint markers must be correct:** For every step that uses a skeleton with fill-in-the-blank placeholders, validation must confirm that (1) each placeholder has a matching `inlineHint` (correct `line` and `blankText`), (2) hint markers render (no missing markers), and (3) the "?" hint marker is positioned so it aligns with or is centered on the placeholder. Run the hint rendering test and perform a visual check so placeholders and hint markers are correct.
+
 Applies to **all** code blocks that use skeleton + inlineHints, including **Mongosh** blocks.
 
 1. **Programmatic:** Run the hint rendering test so every hint’s line and `blankText` match the skeleton:
@@ -68,6 +70,16 @@ Include in the fix plan: “Run hint validation test; fix any failures; ensure a
 - **Avoid:** One-sentence narratives, steps without hints where guidance is needed, missing keyConcepts or prerequisites, labs that feel sparse compared to CSFLE/QE. **Mongosh labs:** Labs with any Mongosh block must list mongosh in prerequisites and have a tip (per enhancement) that Run requires mongosh path in Workshop Settings—otherwise attendees see "mongosh missing" or Run failures.
 - **MongoDB docs:** Key concepts and terminology should align with MongoDB official documentation where relevant (not automatically checkable; note in plan if concepts seem vague or non-standard).
 - **Infrastructure:** Leaderboard uses the central obfuscated URI by default; lab content does not depend on a local leaderboard. Run execution for Node/Python uses temp paths with user suffix; Mongosh blocks require mongosh path and MongoDB URI (Workshop Settings).
+
+### Verification and solution tests
+
+- **Test coverage:** Run the lab step verification and solution test so every step with a `verificationId` is handled by `VerificationService` and every step (with or without verification) that has an enhancement with code blocks has at least one block with non-empty full solution code (`block.code`). This ensures "run full solution then verify" is possible for all steps.
+  ```bash
+  npm test -- --run src/test/labs/lab-step-verification-and-solution.test.ts
+  ```
+- **Verification quality:** Each step’s verification (when `verificationId` is set) should **validate something useful** (e.g. key vault index exists, DEK created, collection has expected data, query returns expected shape). A stub or `NOT_IMPLEMENTED` return is acceptable only when the backend/API does not yet support that check. In the fix plan, list steps whose verification is still stubbed and recommend implementing a real check in `VerificationService` and `validatorUtils` (and backend endpoints where needed) so the validator asserts meaningful state (e.g. collection exists, index exists, document count, encrypted field type).
+
+Include in the fix plan: "Run lab-step-verification-and-solution test; fix any failures; for steps with stubbed verification, add real checks when backend supports them."
 
 ---
 
@@ -233,10 +245,22 @@ Do not modify any lab or enhancement files; only produce the fix plan document.
 
 ---
 
+## Test cases: run full solution then verify
+
+For each lab and each step that has a **verificationId** and an **enhancementId**:
+
+1. **Solution code:** The enhancement must provide at least one code block with non-empty **full solution** (`block.code`), not only a skeleton. This is asserted by **`src/test/labs/lab-step-verification-and-solution.test.ts`** (run: `npm test -- lab-step-verification-and-solution`).
+2. **Verification implemented:** Every **verificationId** used in any lab step must be handled in **`VerificationService.verify()`** (no "Unknown verification id"). The same test fails if any ID is missing from the service.
+3. **Intended test pattern (integration/E2E):** For each step, the test case should: (a) run the step’s **full solution** script (from the enhancement’s code blocks—Node via run-node, Mongosh via run-mongosh, etc.), then (b) call the step’s **verification** with the appropriate context (URI, db, suffix, etc.). The verification result should be **success: true** when the solution was run correctly. This pattern ensures labs are testable and that validation is tied to real execution.
+4. **Validation quality:** Each verification handler in **`VerificationService`** and **`validatorUtils`** should validate something **useful** (e.g. key vault index exists, DEK created, collection has expected structure, query returns expected shape). Stub handlers that always return success with a message like "run the code to verify" are acceptable only as a temporary placeholder; the fix plan should list steps whose verification is still a stub and recommend implementing a real check (e.g. backend endpoint + validatorUtils) so the step actually validates the outcome of the solution.
+
+---
+
 ## After running
 
 - Open **`Docs/YYYY-MM-DD_FIX_PLAN.md`** and work through the recommended fixes (by lab or by theme).
 - Re-run this validation after making changes to confirm gaps are closed.
+- Run **`npm test -- lab-step-verification-and-solution`** to ensure every step with verificationId is handled and has solution code.
 - Optionally, run **`node scripts/validate-content.js`** for schema/reference validation in addition to this quality audit.
 
 **Related docs:** For the content model (lab definitions, enhancements, loader), see `Docs/METADATA_DRIVEN_ENHANCEMENT_SYSTEM_COMPLETE.md` and `Docs/LAB_MIGRATION_GUIDE.md`. For how labs are rendered (all content-driven via LabRunner), see `Docs/LAB_IMPLEMENTATION_PATHS.md`. For labs that require pre-loaded data (Load Sample Data, reset = original dataset), see **`Docs/LAB_SAMPLE_DATA_PLAN.md`**.

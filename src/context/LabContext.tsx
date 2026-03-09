@@ -201,12 +201,17 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const { runningInContainer } = useWorkshopConfig();
 
-    // Initialize MongoDB URI from workshop session only for local Docker (no credentials). Atlas URI must be provided per user.
+    const DOCKER_MONGO_URI = 'mongodb://root:example@mongo:27017';
+    // When running in Docker, always use URI with credentials. Replace any unauthenticated local URI.
     useEffect(() => {
         const session = getWorkshopSession();
-        if (session && !mongoUri && session.mongodbSource === 'local') {
-            const localUri = runningInContainer ? 'mongodb://root:example@mongo:27017' : 'mongodb://127.0.0.1:27017';
-            setMongoUri(localUri);
+        if (!session || session.mongodbSource !== 'local') return;
+        const current = mongoUri || '';
+        const isUnauthenticatedLocal = !current || /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo):27017(\/|$)/.test(current.replace(/\s/g, ''));
+        if (runningInContainer && isUnauthenticatedLocal) {
+            setMongoUri(DOCKER_MONGO_URI);
+        } else if (!mongoUri) {
+            setMongoUri(runningInContainer ? DOCKER_MONGO_URI : 'mongodb://127.0.0.1:27017');
         }
     }, [mongoUri, runningInContainer]);
 

@@ -1446,11 +1446,11 @@ export default defineConfig(({ mode }) => ({
           if (req.url && req.url.startsWith('/api/verify-datakey')) {
             const url = new URL(req.url, `http://${req.headers.host}`);
             let uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
-            const keyAltName = url.searchParams.get('keyAltName') || '';
+            const keyAltName = (url.searchParams.get('keyAltName') || '').trim();
             const keyVaultDbParam = (url.searchParams.get('keyVaultDb') || '').trim();
             const dbName = /^[a-zA-Z0-9_-]+$/.test(keyVaultDbParam) ? keyVaultDbParam : 'encryption';
             const collName = '__keyVault';
-            
+
             if (!uri) {
               res.statusCode = 400;
               res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required. Please configure it in Lab Setup.' }));
@@ -1458,55 +1458,39 @@ export default defineConfig(({ mode }) => ({
             }
             const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri.trim());
             const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : uri;
-            
+
             if (!keyAltName) {
               res.statusCode = 400;
               res.end(JSON.stringify({ success: false, message: 'Key Alt Name is required.' }));
               return;
             }
 
-            // Check if DEK exists by keyAltName (per-user key vault when keyVaultDb provided)
-            const script = `
-              var key = db.getSiblingDB('${dbName}').getCollection('${collName}').findOne({ keyAltNames: '${keyAltName}' });
-              var result = { exists: !!key };
-              if (key) {
-                result.keyId = key._id.toString();
-                result.masterKey = key.masterKey ? key.masterKey.provider : null;
-              }
-              print(JSON.stringify(result));
-            `;
-
-            const cmd = `mongosh "${effectiveUri.replace(/"/g, '\\"')}" --quiet --eval "${script.replace(/"/g, '\\"')}"`;
-
-            exec(cmd, (error: any, stdout: any, stderr: any) => {
-              if (error) {
-                res.statusCode = 500;
-                res.end(JSON.stringify({
-                  success: false,
-                  message: `Connection Failed: ${stderr || error.message}. Ensure IP is whitelisted.`
-                }));
-                return;
-              }
-
-              try {
-                const result = JSON.parse(stdout.trim());
-                if (result.exists) {
-                  res.end(JSON.stringify({
-                    success: true,
-                    message: `Step 5 verification: DEK "${keyAltName}" exists in ${dbName}.${collName} (Provider: ${result.masterKey || 'N/A'})`
-                  }));
-                } else {
-                  res.end(JSON.stringify({
-                    success: false,
-                    message: `Step 5 verification: DEK "${keyAltName}" not found in ${dbName}.${collName}. Complete Step 4 (Generate Data Encryption Keys) by running createKey.cjs, then click Check again.`
-                  }));
-                }
-              } catch (e: any) {
-                res.end(JSON.stringify({
-                  success: false,
-                  message: `Failed to parse database response: ${e.message}`
-                }));
-              }
+            MongoClient.connect(effectiveUri).then((client) => {
+              const db = client.db(dbName);
+              return db.collection(collName).findOne({ keyAltNames: { $in: [ keyAltName ] } })
+                .then((key) => {
+                  if (key) {
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({
+                      success: true,
+                      message: `Step 5 verification: DEK "${keyAltName}" exists in ${dbName}.${collName} (Provider: ${key.masterKey?.provider || 'N/A'})`
+                    }));
+                  } else {
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({
+                      success: false,
+                      message: `Step 5 verification: DEK "${keyAltName}" not found in ${dbName}.${collName}. Complete Step 4 (Generate Data Encryption Keys) by running createKey.cjs, then click Check again.`
+                    }));
+                  }
+                })
+                .finally(() => client.close());
+            }).catch((err: any) => {
+              res.setHeader('Content-Type', 'application/json');
+              res.statusCode = 500;
+              res.end(JSON.stringify({
+                success: false,
+                message: `Connection Failed: ${err?.message || err}. Ensure IP is whitelisted and MongoDB is reachable.`
+              }));
             });
             return;
           }
@@ -2002,7 +1986,7 @@ export default defineConfig(({ mode }) => ({
             return;
           }
 
-          // Run Node.js code (e.g. lab scripts). Uses temp file under workshop/<userSuffix>/ and MONGODB_URI env.
+          // Run Node.js code: use temp file so async scripts (e.g. createKey.cjs) run to completion. Terminal echo uses node+code+Ctrl+D for display.
           if (req.url && req.url.startsWith('/api/run-node') && req.method === 'POST') {
             let body = '';
             req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
@@ -2027,14 +2011,6 @@ export default defineConfig(({ mode }) => ({
                   }));
                   return;
                 }
-                const { runDir, tmpFile } = getLabRunTempPath(userSuffix, filename, '.cjs');
-                mkdirSync(runDir, { recursive: true });
-                writeFileSync(tmpFile, code, 'utf-8');
-                if (!existsSync(tmpFile)) {
-                  res.setHeader('Content-Type', 'application/json');
-                  res.end(JSON.stringify({ success: false, stdout: '', stderr: `Temp script not created: ${tmpFile}`, message: `Temp script not created: ${tmpFile}` }));
-                  return;
-                }
                 const nodeUri = (uri || '').trim();
                 const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(nodeUri);
                 const effectiveNodeUri = isLocalNoAuth && process.env.MONGODB_URI
@@ -2049,18 +2025,8 @@ export default defineConfig(({ mode }) => ({
                   AWS_PROFILE: awsProfile,
                   ...(awsRegion ? { AWS_REGION: awsRegion } : {}),
                 };
-                const nodeCmd = `${process.execPath} ${tmpFile}`;
-                const envSummary: Record<string, string> = {
-                  MONGODB_URI: redactMongoUri(effectiveNodeUri),
-                  AWS_PROFILE: awsProfile || 'default',
-                  cwd,
-                };
-                if (awsRegion) envSummary.AWS_REGION = awsRegion;
-                logLabCommand('run-node', nodeCmd, envSummary);
-                const envLine = `[lab] Command: ${nodeCmd}\n[lab] Env: MONGODB_URI=${redactMongoUri(effectiveNodeUri)} AWS_PROFILE=${awsProfile || 'default'}${awsRegion ? ` AWS_REGION=${awsRegion}` : ''} cwd=${cwd}\n`;
-                execFile(process.execPath, [tmpFile], { timeout: 30000, maxBuffer: 1024 * 1024, env, cwd }, (error: any, stdout: string, stderr: string) => {
-                  try { require('fs').unlinkSync(tmpFile); } catch { /* ignore */ }
-                  const exitCode = error?.code ?? (error ? 1 : 0);
+
+                const sendNodeResult = (stdout: string, stderr: string, exitCode: number, envLine: string) => {
                   const out = (stdout || '').trim();
                   const err = (stderr || '').trim();
                   const outWithEnv = envLine + (stdout || '');
@@ -2069,23 +2035,13 @@ export default defineConfig(({ mode }) => ({
                   const isSSOSessionInvalid = /CredentialsProviderError|SSO session token.*not found|SSO session.*invalid|was not found or is invalid/i.test(combined);
                   const isQueryTypeError = /MongoCryptCreateEncryptedCollectionError|queryType.*not a valid value|salary_.*queryType/i.test(combined);
                   const isKmsAliasNotFound = /NotFoundException|alias.*is not found|Alias.*not found/i.test(combined) && /alias|kms/i.test(combined);
-                  // When failed, prefer stderr/stdout so the Console shows the real Node error (e.g. module not found, connection refused)
                   let failedMessage = combined;
                   if (!failedMessage) {
-                    failedMessage = error?.message || 'Command failed';
-                    if (exitCode !== 0 && exitCode !== undefined) {
-                      failedMessage += ` (exit code ${exitCode}). Check that MongoDB is running and the URI is set in Lab Setup.`;
-                    }
+                    failedMessage = exitCode !== 0 ? `Command failed (exit code ${exitCode}). Check that MongoDB is running and the URI is set in Lab Setup.` : '';
                   }
-                  if (isExpiredToken || isSSOSessionInvalid) {
-                    failedMessage = failedMessage + EXPIRED_TOKEN_FIX;
-                  }
-                  if (isKmsAliasNotFound) {
-                    failedMessage = failedMessage + KMS_ALIAS_NOT_FOUND_FIX;
-                  }
-                  if (isQueryTypeError) {
-                    failedMessage = failedMessage + QUERY_TYPE_ERROR_FIX;
-                  }
+                  if (isExpiredToken || isSSOSessionInvalid) failedMessage = failedMessage + EXPIRED_TOKEN_FIX;
+                  if (isKmsAliasNotFound) failedMessage = failedMessage + KMS_ALIAS_NOT_FOUND_FIX;
+                  if (isQueryTypeError) failedMessage = failedMessage + QUERY_TYPE_ERROR_FIX;
                   let stderrOut = (stderr || '').trim();
                   if (isExpiredToken || isSSOSessionInvalid) stderrOut = stderrOut + EXPIRED_TOKEN_FIX;
                   if (isKmsAliasNotFound) stderrOut = stderrOut + KMS_ALIAS_NOT_FOUND_FIX;
@@ -2099,6 +2055,24 @@ export default defineConfig(({ mode }) => ({
                     error: exitCode !== 0,
                     message: exitCode === 0 ? (out || 'OK') : failedMessage,
                   }));
+                };
+
+                // Use temp file so async scripts (e.g. createKey.cjs) run to completion; terminal echo still uses node+Ctrl+D for display.
+                const { runDir, tmpFile } = getLabRunTempPath(userSuffix, filename, '.cjs');
+                mkdirSync(runDir, { recursive: true });
+                writeFileSync(tmpFile, code, 'utf-8');
+                if (!existsSync(tmpFile)) {
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: false, stdout: '', stderr: `Temp script not created: ${tmpFile}`, message: `Temp script not created: ${tmpFile}` }));
+                  return;
+                }
+                const nodeCmd = `${process.execPath} ${tmpFile}`;
+                const envLine = `[lab] Command: ${nodeCmd}\n[lab] Env: MONGODB_URI=${redactMongoUri(effectiveNodeUri)} AWS_PROFILE=${awsProfile || 'default'}${awsRegion ? ` AWS_REGION=${awsRegion}` : ''} cwd=${cwd}\n`;
+                logLabCommand('run-node', nodeCmd, { MONGODB_URI: redactMongoUri(effectiveNodeUri), AWS_PROFILE: awsProfile || 'default', cwd, ...(awsRegion ? { AWS_REGION: awsRegion } : {}) });
+                execFile(process.execPath, [tmpFile], { timeout: 30000, maxBuffer: 1024 * 1024, env, cwd }, (error: any, stdout: string, stderr: string) => {
+                  try { require('fs').unlinkSync(tmpFile); } catch { /* ignore */ }
+                  const exitCode = error?.code ?? (error ? 1 : 0);
+                  sendNodeResult(stdout || '', stderr || '', exitCode, envLine);
                 });
               } catch (e: any) {
                 res.statusCode = 400;

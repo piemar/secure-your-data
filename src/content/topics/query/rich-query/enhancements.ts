@@ -22,8 +22,17 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
-  const results = await db.collection("customers").find({
+  const db = client.db("rich_query");
+  const coll = db.collection("customers");
+  // Initialize data where it first appears (this step); drop then insert to ensure correct state
+  await coll.drop().catch(() => {});
+  await coll.insertMany([
+    { status: 'active', gender: 'Female', dob: new Date('1990-06-15'), address: { state: 'UT' }, accountBalance: 1500.50, policies: [{ policyType: 'life', premium: 100, insured_person: { smoking: true } }, { policyType: 'auto', premium: 200 }] },
+    { status: 'active', gender: 'Female', dob: new Date('1990-03-20'), address: { state: 'UT' }, accountBalance: 2200.75, policies: [{ policyType: 'life', premium: 150, insured_person: { smoking: false } }] },
+    { status: 'active', gender: 'Male', dob: new Date('1985-01-10'), address: { state: 'CA' }, accountBalance: 800.25, policies: [{ policyType: 'auto', premium: 180 }] },
+  ]);
+  console.log("Dropped and recreated sample customers for Rich Query labs.");
+  const results = await coll.find({
     gender: 'Female',
     dob: {
       $gte: new Date('1990-01-01'),
@@ -34,6 +43,39 @@ async function run() {
       $elemMatch: {
         policyType: 'life',
         'insured_person.smoking': true
+      }
+    }
+  }).toArray();
+  console.log(JSON.stringify(results, null, 2));
+  await client.close();
+}
+run().catch(console.dir);`,
+        skeleton: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
+
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("rich_query");
+  const coll = db.collection("customers");
+  await coll.drop().catch(() => {});
+  await coll.insertMany([
+    { status: 'active', gender: 'Female', dob: new Date('1990-06-15'), address: { state: 'UT' }, accountBalance: 1500.50, policies: [{ policyType: 'life', premium: 100, insured_person: { smoking: true } }] },
+    { status: 'active', gender: 'Female', dob: new Date('1990-03-20'), address: { state: 'UT' }, accountBalance: 2200.75, policies: [{ policyType: 'life', premium: 150 }] },
+    { status: 'active', gender: 'Male', dob: new Date('1985-01-10'), address: { state: 'CA' }, accountBalance: 800.25, policies: [{ policyType: 'auto', premium: 180 }] },
+  ]);
+  console.log("Dropped and recreated sample customers for Rich Query labs.");
+  const results = await coll.find({
+    gender: '_________',
+    dob: {
+      $gte: new Date('1990-01-01'),
+      $lte: new Date('__________')
+    },
+    'address.state': 'UT',
+    policies: {
+      $elemMatch: {
+        policyType: 'life',
+        'insured_person.________': true
       }
     }
   }).toArray();
@@ -60,46 +102,21 @@ WHERE c.gender = 'Female'
             workaroundNote: 'Requires JSONB and jsonb_array_elements for array subdocuments; no native nested document query like MongoDB $elemMatch.',
           },
         },
-        skeleton: `const { MongoClient } = require("mongodb");
-const uri = process.env.MONGODB_URI;
-if (!uri) throw new Error("MONGODB_URI not set");
-
-async function run() {
-  const client = await MongoClient.connect(uri);
-  const db = client.db("test");
-  const results = await db.collection("customers").find({
-    gender: '_________',
-    dob: {
-      $gte: new Date('1990-01-01'),
-      $lte: new Date('__________')
-    },
-    'address.state': 'UT',
-    policies: {
-      $elemMatch: {
-        policyType: 'life',
-        'insured_person.________': true
-      }
-    }
-  }).toArray();
-  console.log(JSON.stringify(results, null, 2));
-  await client.close();
-}
-run().catch(console.dir);`,
         inlineHints: [
           {
-            line: 9,
+            line: 17,
             blankText: '_________',
             hint: "Filter by the customer's gender using a string literal.",
             answer: 'Female',
           },
           {
-            line: 12,
+            line: 20,
             blankText: '__________',
             hint: 'Use the last day of 1990 as the upper bound for the date of birth.',
             answer: '1990-12-31',
           },
           {
-            line: 18,
+            line: 26,
             blankText: '________',
             hint: 'This nested field indicates whether the insured person is a smoker.',
             answer: 'smoking',
@@ -109,12 +126,20 @@ run().catch(console.dir);`,
       {
         filename: 'Mongosh',
         language: 'mongosh',
-        code: `// Find customers who are:
+        code: `// Data for rich_query.customers is initialized in Rich Query Basics Step 1 (compound-query); drop then insert to ensure correct state
+use rich_query;
+db.customers.drop();
+db.customers.insertMany([
+  { status: 'active', gender: 'Female', dob: ISODate('1990-06-15'), address: { state: 'UT' }, accountBalance: 1500.50, policies: [{ policyType: 'life', premium: 100, insured_person: { smoking: true } }, { policyType: 'auto', premium: 200 }] },
+  { status: 'active', gender: 'Female', dob: ISODate('1990-03-20'), address: { state: 'UT' }, accountBalance: 2200.75, policies: [{ policyType: 'life', premium: 150, insured_person: { smoking: false } }] },
+  { status: 'active', gender: 'Male', dob: ISODate('1985-01-10'), address: { state: 'CA' }, accountBalance: 800.25, policies: [{ policyType: 'auto', premium: 180 }] },
+]);
+print("Dropped and recreated sample customers for Rich Query labs.");
+// Find customers who are:
 // - Female
 // - Born in 1990
 // - Living in Utah
 // - Have at least one life insurance policy where the insured person is a smoker
-
 const results = db.customers.find({
   gender: 'Female',
   dob: {
@@ -131,12 +156,19 @@ const results = db.customers.find({
 }).toArray();
 printjson(results);
 print("Query completed.");`,
-        skeleton: `// Find customers who are:
+        skeleton: `use rich_query;
+db.customers.drop();
+db.customers.insertMany([
+  { status: 'active', gender: 'Female', dob: ISODate('1990-06-15'), address: { state: 'UT' }, accountBalance: 1500.50, policies: [{ policyType: 'life', premium: 100, insured_person: { smoking: true } }] },
+  { status: 'active', gender: 'Female', dob: ISODate('1990-03-20'), address: { state: 'UT' }, accountBalance: 2200.75, policies: [{ policyType: 'life', premium: 150 }] },
+  { status: 'active', gender: 'Male', dob: ISODate('1985-01-10'), address: { state: 'CA' }, accountBalance: 800.25, policies: [{ policyType: 'auto', premium: 180 }] },
+]);
+print("Dropped and recreated sample customers for Rich Query labs.");
+// Find customers who are:
 // - Female
 // - Born in 1990
 // - Living in Utah
 // - Have at least one life insurance policy where the insured person is a smoker
-
 const results = db.customers.find({
   gender: '_________',
   dob: {
@@ -154,9 +186,9 @@ const results = db.customers.find({
 printjson(results);
 print("Query completed.");`,
         inlineHints: [
-          { line: 8, blankText: '_________', hint: "Filter by the customer's gender using a string literal.", answer: 'Female' },
-          { line: 11, blankText: '__________', hint: 'Use the last day of 1990 as the upper bound for the date of birth.', answer: '1990-12-31' },
-          { line: 17, blankText: '________', hint: 'This nested field indicates whether the insured person is a smoker.', answer: 'smoking' },
+          { line: 15, blankText: '_________', hint: "Filter by the customer's gender using a string literal.", answer: 'Female' },
+          { line: 18, blankText: '__________', hint: 'Use the last day of 1990 as the upper bound for the date of birth.', answer: '1990-12-31' },
+          { line: 24, blankText: '________', hint: 'This nested field indicates whether the insured person is a smoker.', answer: 'smoking' },
         ],
       },
     ],
@@ -183,16 +215,22 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
-  const results = await db.collection("customers")
-    .find(
+  const db = client.db("rich_query");
+  const results = await db.collection("customers").find(
       {
         gender: 'Female',
         dob: { $gte: new Date('1990-01-01'), $lte: new Date('1990-12-31') },
         'address.state': 'UT',
         policies: { $elemMatch: { policyType: 'life', 'insured_person.smoking': true } }
       },
-      { projection: { _id: 0, firstName: 1, lastName: 1, dob: 1 } }
+      {
+        projection: {
+          _id: 0,
+          firstName: 1,
+          lastName: 1,
+          dob: 1
+        }
+      }
     )
     .sort({ dob: 1 })
     .toArray();
@@ -206,16 +244,22 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
-  const results = await db.collection("customers")
-    .find(
+  const db = client.db("rich_query");
+  const results = await db.collection("customers").find(
       {
         gender: 'Female',
         dob: { $gte: new Date('1990-01-01'), $lte: new Date('1990-12-31') },
         'address.state': 'UT',
         policies: { $elemMatch: { policyType: 'life', 'insured_person.smoking': true } }
       },
-      { projection: { _id: 0, _________: 1, _________: 1, dob: 1 } }
+      {
+        projection: {
+          _id: 0,
+          _________: 1,
+          _________: 1,
+          dob: 1
+        }
+      }
     )
     .sort({ _______: 1 })
     .toArray();
@@ -225,19 +269,19 @@ async function run() {
 run().catch(console.dir);`,
         inlineHints: [
           {
-            line: 16,
+            line: 18,
             blankText: '_________',
             hint: 'Include the given name field in the projection.',
             answer: 'firstName',
           },
           {
-            line: 16,
+            line: 19,
             blankText: '_________',
             hint: 'Include the family name field in the projection.',
             answer: 'lastName',
           },
           {
-            line: 18,
+            line: 24,
             blankText: '_______',
             hint: 'Sort by the same date field you projected.',
             answer: 'dob',
@@ -250,8 +294,7 @@ run().catch(console.dir);`,
         code: `// Same filter, but only return the fields the application needs
 // and order by date of birth.
 
-const results = db.customers
-  .find(
+const results = db.customers.find(
     {
       gender: 'Female',
       dob: {
@@ -280,8 +323,7 @@ print("Query completed.");`,
         skeleton: `// Same filter, but only return the fields the application needs
 // and order by date of birth.
 
-const results = db.customers
-  .find(
+const results = db.customers.find(
     {
       gender: 'Female',
       dob: {
@@ -308,9 +350,9 @@ const results = db.customers
 printjson(results);
 print("Query completed.");`,
         inlineHints: [
-          { line: 22, blankText: '_________', hint: 'Include the given name field in the projection.', answer: 'firstName' },
-          { line: 23, blankText: '_________', hint: 'Include the family name field in the projection.', answer: 'lastName' },
-          { line: 27, blankText: '_______', hint: 'Sort by the same date field you projected.', answer: 'dob' },
+          { line: 21, blankText: '_________', hint: 'Include the given name field in the projection.', answer: 'firstName' },
+          { line: 22, blankText: '_________', hint: 'Include the family name field in the projection.', answer: 'lastName' },
+          { line: 26, blankText: '_______', hint: 'Sort by the same date field you projected.', answer: 'dob' },
         ],
       },
     ],
@@ -336,7 +378,7 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
+  const db = client.db("rich_query");
   const pageSize = 20;
   const page = 2; // zero-based page index
   const results = await db.collection("customers")
@@ -355,7 +397,7 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
+  const db = client.db("rich_query");
   const pageSize = 20;
   const page = ______; // zero-based page index
   const results = await db.collection("customers")
@@ -427,7 +469,7 @@ print("Query completed.");`,
     sourceSection: 'Execution - TEST 1',
     codeBlocks: [
       {
-        filename: 'create-index.cjs',
+        filename: 'index-and-explain.cjs',
         language: 'javascript',
         code: `const { MongoClient } = require("mongodb");
 const uri = process.env.MONGODB_URI;
@@ -435,7 +477,7 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
+  const db = client.db("rich_query");
   await db.collection("customers").createIndex({
     'address.state': 1,
     'policies.policyType': 1,
@@ -444,35 +486,6 @@ async function run() {
     dob: 1
   });
   console.log("Index created.");
-  await client.close();
-}
-run().catch(console.dir);`,
-      },
-      {
-        filename: 'Mongosh',
-        language: 'mongosh',
-        code: `// Create a compound index that matches the query shape:
-// equality fields first, range field last.
-
-db.customers.createIndex({
-  'address.state': 1,
-  'policies.policyType': 1,
-  'policies.insured_person.smoking': 1,
-  gender: 1,
-  dob: 1
-});
-print("Index created.");`,
-      },
-      {
-        filename: 'explain-query.cjs',
-        language: 'javascript',
-        code: `const { MongoClient } = require("mongodb");
-const uri = process.env.MONGODB_URI;
-if (!uri) throw new Error("MONGODB_URI not set");
-
-async function run() {
-  const client = await MongoClient.connect(uri);
-  const db = client.db("test");
   const explain = await db.collection("customers")
     .find({
       gender: 'Female',
@@ -485,35 +498,82 @@ async function run() {
   await client.close();
 }
 run().catch(console.dir);`,
+        skeleton: `const { MongoClient } = require("mongodb");
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("MONGODB_URI not set");
+
+async function run() {
+  const client = await MongoClient.connect(uri);
+  const db = client.db("rich_query");
+  await db.collection("customers").createIndex({
+    'address.state': 1,
+    'policies.policyType': 1,
+    'policies.insured_person.smoking': 1,
+    gender: 1,
+    dob: 1
+  });
+  console.log("Index created.");
+  const explain = await db.collection("customers")
+    .find({
+      gender: 'Female',
+      dob: { $gte: new Date('1990-01-01'), $lte: new Date('1990-12-31') },
+      'address.state': 'UT',
+      policies: { $elemMatch: { policyType: 'life', 'insured_person.smoking': true } }
+    })
+    .explain('_________');
+  console.log(JSON.stringify(explain, null, 2));
+  await client.close();
+}
+run().catch(console.dir);`,
+        inlineHints: [
+          { line: 23, blankText: '_________', hint: 'Explain mode that returns execution stats (e.g. IXSCAN vs COLLSCAN).', answer: 'executionStats' },
+        ],
       },
       {
         filename: 'Mongosh',
         language: 'mongosh',
-        code: `// Compare COLLSCAN vs IXSCAN using explain().
-// Run createIndex first, then run this.
-
-const explainResult = db.customers
-  .find({
-    gender: 'Female',
-    dob: {
-      $gte: ISODate('1990-01-01'),
-      $lte: ISODate('1990-12-31')
-    },
-    'address.state': 'UT',
-    policies: {
-      $elemMatch: {
-        policyType: 'life',
-        'insured_person.smoking': true
-      }
-    }
-  })
-  .explain('executionStats');
+        code: `// Create compound index then run explain() in one script (equality fields first, range last).
+use rich_query;
+db.customers.createIndex({
+  'address.state': 1,
+  'policies.policyType': 1,
+  'policies.insured_person.smoking': 1,
+  gender: 1,
+  dob: 1
+});
+print("Index created.");
+const explainResult = db.customers.find({
+  gender: 'Female',
+  dob: { $gte: ISODate('1990-01-01'), $lte: ISODate('1990-12-31') },
+  'address.state': 'UT',
+  policies: { $elemMatch: { policyType: 'life', 'insured_person.smoking': true } }
+}).explain('executionStats');
 printjson(explainResult);
 print("Explain completed.");`,
+        skeleton: `use rich_query;
+db.customers.createIndex({
+  'address.state': 1,
+  'policies.policyType': 1,
+  'policies.insured_person.smoking': 1,
+  gender: 1,
+  dob: 1
+});
+print("Index created.");
+const explainResult = db.customers.find({
+  gender: 'Female',
+  dob: { $gte: ISODate('1990-01-01'), $lte: ISODate('1990-12-31') },
+  'address.state': 'UT',
+  policies: { $elemMatch: { policyType: 'life', 'insured_person.smoking': true } }
+}).explain('_________');
+printjson(explainResult);
+print("Explain completed.");`,
+        inlineHints: [
+          { line: 15, blankText: '_________', hint: 'Explain mode that returns execution stats (e.g. IXSCAN vs COLLSCAN).', answer: 'executionStats' },
+        ],
       },
     ],
     tips: [
-      'Use Run all or Run selection in the editor to run the query.',
+      'Use Run all or Run selection in the editor to run the full script (index creation then explain).',
       'Highlight the difference in docsExamined and executionTimeMillis before/after the index.',
       'Use screenshots from Compass Explain Plan to reinforce the IXSCAN vs COLLSCAN change.',
     ],
@@ -534,8 +594,10 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
-  const results = await db.collection("customers").aggregate([
+  const db = client.db("rich_query");
+  const coll = db.collection("customers");
+  // Data initialized in Rich Query Basics Step 1 (compound-query)
+  const results = await coll.aggregate([
     { $match: { 'address.state': 'UT', status: 'active' } },
     { $group: { _id: '$address.state', totalCustomers: { $sum: 1 }, totalValue: { $sum: '$accountBalance' } } },
     { $sort: { totalValue: -1 } }
@@ -550,10 +612,17 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
-  const results = await db.collection("customers").aggregate([
+  const db = client.db("rich_query");
+  const coll = db.collection("customers");
+  const results = await coll.aggregate([
     { $match: { 'address.state': 'UT', status: '_________' } },
-    { $group: { _id: '$address.state', totalCustomers: { $sum: _________ }, totalValue: { $sum: '$_________' } } },
+    {
+      $group: {
+        _id: '$address.state',
+        totalCustomers: { $sum: _________ },
+        totalValue: { $sum: '$_________' }
+      }
+    },
     { $sort: { totalValue: _________ } }
   ]).toArray();
   console.log(JSON.stringify(results, null, 2));
@@ -561,68 +630,27 @@ async function run() {
 }
 run().catch(console.dir);`,
         inlineHints: [
-          {
-            line: 9,
-            blankText: '_________',
-            hint: 'Filter for customers with active status.',
-            answer: 'active',
-          },
-          {
-            line: 10,
-            blankText: '_________',
-            hint: 'Use 1 to count each document in the group.',
-            answer: '1',
-          },
-          {
-            line: 10,
-            blankText: '$_________',
-            hint: 'Sum the account balance field for each customer.',
-            answer: 'accountBalance',
-          },
-          {
-            line: 11,
-            blankText: '_________',
-            hint: 'Sort in descending order (highest value first).',
-            answer: '-1',
-          },
+          { line: 10, blankText: '_________', hint: 'Filter for customers with active status.', answer: 'active' },
+          { line: 14, blankText: '_________', hint: 'Use 1 to count each document in the group.', answer: '1' },
+          { line: 15, blankText: '$_________', hint: 'Sum the account balance field for each customer.', answer: 'accountBalance' },
+          { line: 18, blankText: '_________', hint: 'Sort in descending order (highest value first).', answer: '-1' },
         ],
       },
       {
         filename: 'Mongosh',
         language: 'mongosh',
-        code: `// Build a simple aggregation pipeline with $match and $group
-// Compute counts and totals over a filtered subset of documents
-
+        code: `// Data initialized in Rich Query Basics Step 1 (compound-query)
+use rich_query;
 const results = db.customers.aggregate([
-  {
-    $match: {
-      'address.state': 'UT',
-      status: 'active'
-    }
-  },
-  {
-    $group: {
-      _id: '$address.state',
-      totalCustomers: { $sum: 1 },
-      totalValue: { $sum: '$accountBalance' }
-    }
-  },
-  {
-    $sort: { totalValue: -1 }
-  }
+  { $match: { 'address.state': 'UT', status: 'active' } },
+  { $group: { _id: '$address.state', totalCustomers: { $sum: 1 }, totalValue: { $sum: '$accountBalance' } } },
+  { $sort: { totalValue: -1 } }
 ]).toArray();
 printjson(results);
 print("Aggregation completed.");`,
-        skeleton: `// Build a simple aggregation pipeline with $match and $group
-// Compute counts and totals over a filtered subset of documents
-
+        skeleton: `use rich_query;
 const results = db.customers.aggregate([
-  {
-    $match: {
-      'address.state': 'UT',
-      status: '_________'
-    }
-  },
+  { $match: { 'address.state': 'UT', status: '_________' } },
   {
     $group: {
       _id: '$address.state',
@@ -630,22 +658,21 @@ const results = db.customers.aggregate([
       totalValue: { $sum: '$_________' }
     }
   },
-  {
-    $sort: { totalValue: _________ }
-  }
+  { $sort: { totalValue: _________ } }
 ]).toArray();
 printjson(results);
 print("Aggregation completed.");`,
         inlineHints: [
-          { line: 8, blankText: '_________', hint: 'Filter for customers with active status.', answer: 'active' },
-          { line: 14, blankText: '_________', hint: 'Use 1 to count each document in the group.', answer: '1' },
-          { line: 15, blankText: '$_________', hint: 'Sum the account balance field for each customer.', answer: 'accountBalance' },
-          { line: 19, blankText: '_________', hint: 'Sort in descending order (highest value first).', answer: '-1' },
+          { line: 3, blankText: '_________', hint: 'Filter for customers with active status.', answer: 'active' },
+          { line: 7, blankText: '_________', hint: 'Use 1 to count each document in the group.', answer: '1' },
+          { line: 8, blankText: '$_________', hint: 'Sum the account balance field for each customer.', answer: 'accountBalance' },
+          { line: 11, blankText: '_________', hint: 'Sort in descending order (highest value first).', answer: '-1' },
         ],
       },
     ],
     tips: [
       'Use Run all or Run selection in the editor to run the query.',
+      'The customers collection is initialized in Rich Query Basics Step 1; run that step first if you have no data.',
       'The $match stage filters documents before grouping, improving performance.',
       'Use $group to compute aggregations like counts, sums, and averages.',
       'Add $sort to order results by aggregated values.',
@@ -667,7 +694,7 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
+  const db = client.db("rich_query");
   const results = await db.collection("customers").aggregate([
     { $match: { status: 'active' } },
     { $group: { _id: '$address.state', count: { $sum: 1 }, avgBalance: { $avg: '$accountBalance' } } },
@@ -683,80 +710,49 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
+  const db = client.db("rich_query");
   const results = await db.collection("customers").aggregate([
     { $match: { status: 'active' } },
     { $group: { _id: '$address.state', count: { $sum: 1 }, avgBalance: { $avg: '$_________' } } },
-    { $project: { _id: 0, state: '$_id', customerCount: '$count', averageBalance: { $round: ['$_________', 2] }, status: '_________' } }
+    {
+      $project: {
+        _id: 0,
+        state: '$_id',
+        customerCount: '$count',
+        averageBalance: { $round: ['$_________', 2] },
+        status: '_________'
+      }
+    }
   ]).toArray();
   console.log(JSON.stringify(results, null, 2));
   await client.close();
 }
 run().catch(console.dir);`,
         inlineHints: [
-          {
-            line: 10,
-            blankText: '$_________',
-            hint: 'Calculate the average of the account balance field.',
-            answer: 'accountBalance',
-          },
-          {
-            line: 11,
-            blankText: '$_________',
-            hint: 'Round the average balance value.',
-            answer: 'avgBalance',
-          },
-          {
-            line: 11,
-            blankText: '_________',
-            hint: 'Add a static status field with the value "active".',
-            answer: 'active',
-          },
+          { line: 10, blankText: '$_________', hint: 'Calculate the average of the account balance field.', answer: 'accountBalance' },
+          { line: 16, blankText: '$_________', hint: 'Round the average balance value (reference the $group output field with $).', answer: '$avgBalance' },
+          { line: 17, blankText: '_________', hint: 'Add a static status field with the value "active".', answer: 'active' },
         ],
       },
       {
         filename: 'Mongosh',
         language: 'mongosh',
-        code: `// Use $project to rename and compute derived fields
-// Prepare results for downstream consumers like dashboards or APIs
-
+        code: `// Use same database as Step 1 (customers collection created there)
+use rich_query;
+// Use $project to rename and compute derived fields
 const results = db.customers.aggregate([
-  {
-    $match: { status: 'active' }
-  },
-  {
-    $group: {
-      _id: '$address.state',
-      count: { $sum: 1 },
-      avgBalance: { $avg: '$accountBalance' }
-    }
-  },
-  {
-    $project: {
-      _id: 0,
-      state: '$_id',
-      customerCount: '$count',
-      averageBalance: { $round: ['$avgBalance', 2] },
-      status: 'active'
-    }
-  }
+  { $match: { status: 'active' } },
+  { $group: { _id: '$address.state', count: { $sum: 1 }, avgBalance: { $avg: '$accountBalance' } } },
+  { $project: { _id: 0, state: '$_id', customerCount: '$count', averageBalance: { $round: ['$avgBalance', 2] }, status: 'active' } }
 ]).toArray();
 printjson(results);
 print("Aggregation completed.");`,
-        skeleton: `// Use $project to rename and compute derived fields
-// Prepare results for downstream consumers like dashboards or APIs
-
+        skeleton: `// Use same database as Step 1 (run Step 1 first to create customers)
+use rich_query;
+// Use $project to rename and compute derived fields
 const results = db.customers.aggregate([
-  {
-    $match: { status: 'active' }
-  },
-  {
-    $group: {
-      _id: '$address.state',
-      count: { $sum: 1 },
-      avgBalance: { $avg: '$_________' }
-    }
-  },
+  { $match: { status: '_________' } },
+  { $group: { _id: '$address.state', count: { $sum: 1 }, avgBalance: { $avg: '$_________' } } },
   {
     $project: {
       _id: 0,
@@ -770,14 +766,15 @@ const results = db.customers.aggregate([
 printjson(results);
 print("Aggregation completed.");`,
         inlineHints: [
-          { line: 12, blankText: '$_________', hint: 'Calculate the average of the account balance field.', answer: 'accountBalance' },
-          { line: 20, blankText: '$_________', hint: 'Round the average balance value.', answer: 'avgBalance' },
-          { line: 21, blankText: '_________', hint: 'Add a static status field with the value "active".', answer: 'active' },
+          { line: 5, blankText: '_________', hint: 'Filter for customers with active status.', answer: 'active' },
+          { line: 6, blankText: '$_________', hint: 'Calculate the average of the account balance field.', answer: 'accountBalance' },
+          { line: 12, blankText: '$_________', hint: 'Round the average balance value (reference the $group output field with $).', answer: '$avgBalance' },
+          { line: 13, blankText: '_________', hint: 'Add a static status field with the value "active".', answer: 'active' },
         ],
       },
     ],
     tips: [
-      'Use Run all or Run selection in the editor to run the query.',
+      'Run Step 1 first so the customers collection exists; then run this step.',
       'Use $project to reshape output documents for your application.',
       'Computed fields can use expressions like $round, $cond, and $divide.',
       'Hide internal fields by setting _id: 0 or excluding fields.',
@@ -799,7 +796,7 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
+  const db = client.db("rich_query");
   const results = await db.collection("customers").aggregate([
     { $match: { status: 'active' } },
     {
@@ -826,7 +823,7 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
+  const db = client.db("rich_query");
   const results = await db.collection("customers").aggregate([
     { $match: { status: 'active' } },
     {
@@ -954,7 +951,7 @@ print("Facet aggregation completed.");`,
         inlineHints: [
           { line: 15, blankText: '$_________', hint: 'Sum the account balance field.', answer: 'accountBalance' },
           { line: 18, blankText: '_________', hint: 'Sort in descending order (highest count first).', answer: '-1' },
-          { line: 22, blankText: '$_________', hint: 'Array field name to unwind (path is prefixed with $).', answer: 'policies' },
+          { line: 22, blankText: '$_________', hint: 'Array field name to unwind (path is prefixed with $).', answer: '$policies' },
           { line: 28, blankText: '$policies._________', hint: 'Calculate the average premium for each policy type.', answer: 'premium' },
         ],
       },
@@ -982,7 +979,7 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
+  const db = client.db("rich_query");
   const results = await db.collection("customers").aggregate([
     { $match: { status: 'active' } },
     { $unwind: { path: '$policies' } },
@@ -999,7 +996,7 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
+  const db = client.db("rich_query");
   const results = await db.collection("customers").aggregate([
     { $match: { status: '_________' } },
     { $unwind: { path: '$_________' } },
@@ -1012,7 +1009,7 @@ async function run() {
 run().catch(console.dir);`,
         inlineHints: [
           { line: 9, blankText: '_________', hint: 'Filter to active customers only.', answer: 'active' },
-          { line: 10, blankText: '$_________', hint: 'Array field to deconstruct (path is prefixed with $ automatically).', answer: 'policies' },
+          { line: 10, blankText: '$_________', hint: 'Array field to deconstruct (path must be $-prefixed, e.g. $policies).', answer: '$policies' },
           { line: 11, blankText: '_________', hint: 'Use 1 to count each unwound document.', answer: '1' },
           { line: 11, blankText: '$policies._________', hint: 'Average this numeric field from each policy.', answer: 'premium' },
           { line: 12, blankText: '_________', hint: 'Sort descending so highest count is first.', answer: '-1' },
@@ -1086,7 +1083,7 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
+  const db = client.db("rich_query");
   const results = await db.collection("customers").aggregate([
     { $match: { status: 'active' } },
     { $group: { _id: '$address.state', totalCustomers: { $sum: 1 }, totalValue: { $sum: '$accountBalance' } } },
@@ -1103,7 +1100,7 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
+  const db = client.db("rich_query");
   const results = await db.collection("customers").aggregate([
     { $match: { status: 'active' } },
     { $group: { _id: '$address.state', totalCustomers: { $sum: 1 }, totalValue: { $sum: '$_________' } } },
@@ -1186,7 +1183,7 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
+  const db = client.db("rich_query");
   const results = await db.collection("customers").aggregate([
     { $match: { status: 'active', 'address.state': 'UT' } },
     { $count: 'totalActive' }
@@ -1201,7 +1198,7 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
+  const db = client.db("rich_query");
   const results = await db.collection("customers").aggregate([
     { $match: { status: '_________', 'address.state': '_________' } },
     { $count: '_________' }
@@ -1355,7 +1352,7 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
+  const db = client.db("rich_query");
   const results = await db.collection("customers").aggregate([
     { $match: { status: 'active' } },
     {
@@ -1386,7 +1383,7 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
+  const db = client.db("rich_query");
   const results = await db.collection("customers").aggregate([
     { $match: { status: '_________' } },
     {
@@ -1408,7 +1405,7 @@ async function run() {
 run().catch(console.dir);`,
         inlineHints: [
           { line: 14, blankText: '_________', hint: 'Filter for active customers only.', answer: 'active' },
-          { line: 17, blankText: '$_________', hint: 'Group by the numeric account balance field.', answer: 'accountBalance' },
+          { line: 17, blankText: '$_________', hint: 'Group by the numeric account balance field (must be $-prefixed path).', answer: '$accountBalance' },
           { line: 21, blankText: '_________', hint: 'Use 1 to count each document in the bucket.', answer: '1' },
         ],
       },
@@ -1453,7 +1450,7 @@ printjson(results);
 print("Bucket aggregation completed.");`,
         inlineHints: [
           { line: 3, blankText: '_________', hint: 'Filter for active customers only.', answer: 'active' },
-          { line: 6, blankText: '$_________', hint: 'Group by the numeric account balance field.', answer: 'accountBalance' },
+          { line: 6, blankText: '$_________', hint: 'Group by the numeric account balance field (must be $-prefixed path).', answer: '$accountBalance' },
           { line: 10, blankText: '_________', hint: 'Use 1 to count each document in the bucket.', answer: '1' },
         ],
       },
@@ -1485,9 +1482,10 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
+  const db = client.db("rich_query");
   const results = await db.collection("customers").aggregate([
-    { $match: { status: 'active' }, $limit: 5 },
+    { $match: { status: 'active' } },
+    { $limit: 5 },
     {
       $lookup: {
         from: 'state_info',
@@ -1512,9 +1510,10 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
+  const db = client.db("rich_query");
   const results = await db.collection("customers").aggregate([
-    { $match: { status: 'active' }, $limit: 5 },
+    { $match: { status: 'active' } },
+    { $limit: 5 },
     {
       $lookup: {
         from: '_________',
@@ -1529,9 +1528,9 @@ async function run() {
 }
 run().catch(console.dir);`,
         inlineHints: [
-          { line: 17, blankText: '_________', hint: 'The collection to join from (e.g. state_info).', answer: 'state_info' },
-          { line: 18, blankText: '_________.state', hint: 'The field on customers that holds the state code (nested under address).', answer: 'address' },
-          { line: 20, blankText: '_________', hint: 'The output array field name for the joined documents.', answer: 'stateDetails' },
+          { line: 18, blankText: '_________', hint: 'The collection to join from (e.g. state_info).', answer: 'state_info' },
+          { line: 19, blankText: '_________.state', hint: 'The field on customers that holds the state code (nested under address).', answer: 'address' },
+          { line: 21, blankText: '_________', hint: 'The output array field name for the joined documents.', answer: 'stateDetails' },
         ],
       },
       {
@@ -1539,7 +1538,8 @@ run().catch(console.dir);`,
         language: 'mongosh',
         code: `// Join customers with state_info using $lookup
 const results = db.customers.aggregate([
-  { $match: { status: 'active' }, $limit: 5 },
+  { $match: { status: 'active' } },
+  { $limit: 5 },
   {
     $lookup: {
       from: 'state_info',
@@ -1553,7 +1553,8 @@ printjson(results);
 print("Lookup completed.");`,
         skeleton: `// Join customers with state_info using $lookup
 const results = db.customers.aggregate([
-  { $match: { status: 'active' }, $limit: 5 },
+  { $match: { status: 'active' } },
+  { $limit: 5 },
   {
     $lookup: {
       from: '_________',
@@ -1599,13 +1600,13 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
+  const db = client.db("rich_query");
   await db.collection("customers").aggregate([
     { $match: { status: 'active' } },
     { $group: { _id: '$address.state', count: { $sum: 1 }, totalBalance: { $sum: '$accountBalance' } } },
     {
       $merge: {
-        into: { db: 'test', coll: 'summary_YOUR_SUFFIX' },
+        into: { db: 'rich_query', coll: 'summary_YOUR_SUFFIX' },
         whenNotMatched: 'insert'
       }
     }
@@ -1625,13 +1626,13 @@ if (!uri) throw new Error("MONGODB_URI not set");
 
 async function run() {
   const client = await MongoClient.connect(uri);
-  const db = client.db("test");
+  const db = client.db("rich_query");
   await db.collection("customers").aggregate([
     { $match: { status: '_________' } },
     { $group: { _id: '$address.state', count: { $sum: 1 }, totalBalance: { $sum: '$_________' } } },
     {
       $merge: {
-        into: { db: 'test', coll: 'summary_YOUR_SUFFIX' },
+        into: { db: 'rich_query', coll: 'summary_YOUR_SUFFIX' },
         whenNotMatched: '_________'
       }
     }
@@ -1655,7 +1656,7 @@ const results = db.customers.aggregate([
   { $group: { _id: '$address.state', count: { $sum: 1 }, totalBalance: { $sum: '$accountBalance' } } },
   {
     $merge: {
-      into: { db: 'test', coll: 'summary_YOUR_SUFFIX' },
+      into: { db: 'rich_query', coll: 'summary_YOUR_SUFFIX' },
       whenNotMatched: 'insert'
     }
   }
@@ -1668,7 +1669,7 @@ const results = db.customers.aggregate([
   { $group: { _id: '$address.state', count: { $sum: 1 }, totalBalance: { $sum: '$_________' } } },
   {
     $merge: {
-      into: { db: 'test', coll: 'summary_YOUR_SUFFIX' },
+      into: { db: 'rich_query', coll: 'summary_YOUR_SUFFIX' },
       whenNotMatched: '_________'
     }
   }

@@ -427,7 +427,7 @@ export function deleteWorkshopSessionById(sessionId: string): void {
  * Get the MongoDB URI to use for lab execution (Run in browser).
  * Used by StepView when calling /api/run-node or /api/run-mongosh.
  * Returns atlas connection string when session uses Atlas, or default local URI when session uses local.
- * For local: use mongodb://root:example@mongo:27017 when running in Docker, 127.0.0.1:27017 when running standalone (e.g. npm run dev).
+ * For local: use mongodb://root:example@mongo:27017 when running in Docker, mongodb://127.0.0.1:27017 when standalone (e.g. npm run dev).
  */
 export function getLabMongoUri(runningInContainer?: boolean): string {
   const session = getWorkshopSession();
