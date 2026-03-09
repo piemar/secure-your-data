@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Calendar, Users, Power, AlertTriangle, Trash2, Sparkles, Database, Download, Upload } from 'lucide-react';
+import { Settings, Calendar, Users, Power, AlertTriangle, Trash2, Sparkles, Database, Download, Upload, Search } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,7 +18,9 @@ import {
   getWorkshopSession,
   getAllWorkshopSessions,
   setCurrentWorkshopSession,
-  deleteWorkshopSessionById,
+  loadWorkshopSessionFromAtlas,
+  deleteWorkshopSessionInAtlas,
+  deleteWorkshopSessionsInAtlas,
   areLabsEnabled,
   setLabsEnabled,
   cloneWorkshopSession,
@@ -35,6 +37,7 @@ import { DynamicTemplateBuilder } from './DynamicTemplateBuilder';
 import { ContentBrowser } from './ContentBrowser';
 import { WorkshopSessionWizard } from './WorkshopSessionWizard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export const WorkshopSettings: React.FC = () => {
   const { currentMode, setMode, activeTemplate, setActiveTemplate, setWorkshopInstance, setCurrentLabId, isDemoMode, isLabMode, isChallengeMode } = useWorkshopSession();
@@ -48,6 +51,13 @@ export const WorkshopSettings: React.FC = () => {
   const [sessionWizardInitialSession, setSessionWizardInitialSession] = useState<WorkshopSession | null>(null);
   const [showCloneSessionDialog, setShowCloneSessionDialog] = useState(false);
   const importInputRef = React.useRef<HTMLInputElement>(null);
+  const [sessionSearch, setSessionSearch] = useState('');
+  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
+  const [sessionPage, setSessionPage] = useState(1);
+  /** When set, the delete-session confirmation dialog is open; single = one session, multiple = ids to delete */
+  const [deleteSessionDialog, setDeleteSessionDialog] = useState<null | { single: WorkshopSession } | { multiple: string[] }>(null);
+
+  const SESSION_PAGE_SIZE = 10;
 
   const handleExportTemplate = () => {
     if (!activeTemplate) {
@@ -109,19 +119,37 @@ export const WorkshopSettings: React.FC = () => {
   };
 
 
-  // Load session data and all sessions (multi-workshop)
+  // Always refresh session list from central Atlas, then update UI state
   useEffect(() => {
-    const loadSession = () => {
-      setSession(getWorkshopSession());
-      setAllSessions(getAllWorkshopSessions());
-      setLabsEnabledState(areLabsEnabled());
-      setParticipantCount(getParticipantCount());
+    const refreshFromCentral = () => {
+      loadWorkshopSessionFromAtlas().then(() => {
+        setSession(getWorkshopSession());
+        setAllSessions(getAllWorkshopSessions());
+        setLabsEnabledState(areLabsEnabled());
+        setParticipantCount(getParticipantCount());
+      });
     };
 
-    loadSession();
-    const interval = setInterval(loadSession, 5000);
+    refreshFromCentral();
+    const interval = setInterval(refreshFromCentral, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  // Clamp session list page when list or search filter shrinks
+  useEffect(() => {
+    const sorted = [...allSessions].sort((a, b) => new Date(b.workshopDate).getTime() - new Date(a.workshopDate).getTime());
+    const q = sessionSearch.trim().toLowerCase();
+    const filtered = q
+      ? sorted.filter(
+          (s) =>
+            s.customerName?.toLowerCase().includes(q) ||
+            (s.emailDomain && s.emailDomain.toLowerCase().includes(q)) ||
+            format(new Date(s.workshopDate), 'MMM d, yyyy').toLowerCase().includes(q)
+        )
+      : sorted;
+    const totalPages = Math.max(1, Math.ceil(filtered.length / SESSION_PAGE_SIZE));
+    setSessionPage((p) => (p > totalPages ? totalPages : p));
+  }, [allSessions, sessionSearch]);
 
   const handleToggleLabs = async (enabled: boolean) => {
     await setLabsEnabled(enabled);
@@ -159,12 +187,17 @@ export const WorkshopSettings: React.FC = () => {
   };
 
   const handleResetLeaderboard = async () => {
-    if (!window.confirm('Are you sure you want to reset the leaderboard? This will clear all participant scores but keep the workshop session active.')) {
+    if (!window.confirm('Are you sure you want to reset the leaderboard? This will clear all participant scores for the current workshop session.')) {
+      return;
+    }
+    const sessionId = session?.id;
+    if (!sessionId) {
+      toast.error('No workshop session selected');
       return;
     }
     try {
       const { postResetLeaderboardAll } = await import('@/services/leaderboardApi');
-      await postResetLeaderboardAll();
+      await postResetLeaderboardAll(sessionId);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to reset leaderboard on server. Check that the server is running and MongoDB is configured.');
       return;
@@ -224,7 +257,7 @@ export const WorkshopSettings: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* All workshop sessions — switch or delete sessions */}
+      {/* All workshop sessions — search, switch, multi-delete, pagination */}
       {allSessions.length > 0 && (
         <Card>
           <CardHeader>
@@ -236,69 +269,165 @@ export const WorkshopSettings: React.FC = () => {
               Switch to another session (e.g. by customer + date). The leaderboard shown is for the current session.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {allSessions
-                .slice()
-                .sort((a, b) => new Date(b.workshopDate).getTime() - new Date(a.workshopDate).getTime())
-                .map((s) => (
-                  <li
-                    key={s.id}
-                    className={cn(
-                      'flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3',
-                      session?.id === s.id ? 'border-primary bg-primary/5' : 'border-border'
-                    )}
-                  >
-                    <div className="min-w-0">
-                      <span className="font-medium">{s.customerName}</span>
-                      <span className="text-muted-foreground text-sm ml-2">
-                        {format(new Date(s.workshopDate), 'MMM d, yyyy')}
-                      </span>
-                      {s.emailDomain && (
-                        <Badge variant="outline" className="ml-2 text-[10px]">
-                          @{s.emailDomain}
-                        </Badge>
-                      )}
-                      {session?.id === s.id && (
-                        <Badge className="ml-2 bg-primary">Current</Badge>
-                      )}
-                    </div>
-                    <div className="flex gap-1.5">
-                      {session?.id !== s.id && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setCurrentWorkshopSession(s.id);
-                            setSession(getWorkshopSession());
-                            setAllSessions(getAllWorkshopSessions());
-                            setLabsEnabledState(areLabsEnabled());
-                            setParticipantCount(getParticipantCount());
-                            toast.success(`Switched to ${s.customerName} (${format(new Date(s.workshopDate), 'MMM d, yyyy')})`);
-                          }}
-                        >
-                          Switch to
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => {
-                          if (!window.confirm(`Delete session "${s.customerName}" (${format(new Date(s.workshopDate), 'MMM d, yyyy')})?`)) return;
-                          deleteWorkshopSessionById(s.id);
-                          setSession(getWorkshopSession());
-                          setAllSessions(getAllWorkshopSessions());
-                          setLabsEnabledState(areLabsEnabled());
-                          toast.success('Session deleted');
-                        }}
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[200px] max-w-sm">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name, date, or domain..."
+                  value={sessionSearch}
+                  onChange={(e) => {
+                    setSessionSearch(e.target.value);
+                    setSessionPage(1);
+                  }}
+                  className="pl-8"
+                />
+              </div>
+              {selectedSessionIds.size > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() =>
+                    setDeleteSessionDialog({ multiple: Array.from(selectedSessionIds) })
+                  }
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Delete selected ({selectedSessionIds.size})
+                </Button>
+              )}
+            </div>
+            {(() => {
+              const sorted = [...allSessions].sort((a, b) => new Date(b.workshopDate).getTime() - new Date(a.workshopDate).getTime());
+              const q = sessionSearch.trim().toLowerCase();
+              const filtered = q
+                ? sorted.filter(
+                    (s) =>
+                      s.customerName?.toLowerCase().includes(q) ||
+                      (s.emailDomain && s.emailDomain.toLowerCase().includes(q)) ||
+                      format(new Date(s.workshopDate), 'MMM d, yyyy').toLowerCase().includes(q)
+                  )
+                : sorted;
+              const totalPages = Math.max(1, Math.ceil(filtered.length / SESSION_PAGE_SIZE));
+              const page = Math.min(sessionPage, totalPages);
+              const start = (page - 1) * SESSION_PAGE_SIZE;
+              const pageSessions = filtered.slice(start, start + SESSION_PAGE_SIZE);
+              const pageIds = new Set(pageSessions.map((s) => s.id));
+              const allOnPageSelected = pageSessions.length > 0 && pageSessions.every((s) => selectedSessionIds.has(s.id));
+
+              return (
+                <>
+                  <ul className="space-y-2">
+                    {pageSessions.map((s) => (
+                      <li
+                        key={s.id}
+                        className={cn(
+                          'flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3',
+                          session?.id === s.id ? 'border-primary bg-primary/5' : 'border-border'
+                        )}
                       >
-                        Delete
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Checkbox
+                            checked={selectedSessionIds.has(s.id)}
+                            onCheckedChange={(checked) => {
+                              setSelectedSessionIds((prev) => {
+                                const next = new Set(prev);
+                                if (checked) next.add(s.id);
+                                else next.delete(s.id);
+                                return next;
+                              });
+                            }}
+                            aria-label={`Select ${s.customerName}`}
+                          />
+                          <div className="min-w-0">
+                            <span className="font-medium">{s.customerName}</span>
+                            <span className="text-muted-foreground text-sm ml-2">
+                              {format(new Date(s.workshopDate), 'MMM d, yyyy')}
+                            </span>
+                            {s.emailDomain && (
+                              <Badge variant="outline" className="ml-2 text-[10px]">
+                                @{s.emailDomain}
+                              </Badge>
+                            )}
+                            {session?.id === s.id && (
+                              <Badge className="ml-2 bg-primary">Current</Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-1.5">
+                          {session?.id !== s.id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                setCurrentWorkshopSession(s.id);
+                                await loadWorkshopSessionFromAtlas();
+                                setSession(getWorkshopSession());
+                                setAllSessions(getAllWorkshopSessions());
+                                setLabsEnabledState(areLabsEnabled());
+                                setParticipantCount(getParticipantCount());
+                                toast.success(`Switched to ${s.customerName} (${format(new Date(s.workshopDate), 'MMM d, yyyy')})`);
+                              }}
+                            >
+                              Switch to
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setDeleteSessionDialog({ single: s })}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-sm text-muted-foreground">
+                      {filtered.length} session(s){q ? ` matching "${sessionSearch}"` : ''}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={page <= 1}
+                        onClick={() => setSessionPage((p) => Math.max(1, p - 1))}
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-sm whitespace-nowrap">
+                        Page {page} of {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={page >= totalPages}
+                        onClick={() => setSessionPage((p) => Math.min(totalPages, p + 1))}
+                      >
+                        Next
                       </Button>
                     </div>
-                  </li>
-                ))}
-            </ul>
+                  </div>
+                  {pageSessions.length > 0 && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Checkbox
+                        checked={allOnPageSelected}
+                        onCheckedChange={(checked) => {
+                          setSelectedSessionIds((prev) => {
+                            const next = new Set(prev);
+                            pageSessions.forEach((s) => (checked ? next.add(s.id) : next.delete(s.id)));
+                            return next;
+                          });
+                        }}
+                        aria-label="Select all on page"
+                      />
+                      <span>Select all on this page</span>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
       )}
@@ -325,6 +454,65 @@ export const WorkshopSettings: React.FC = () => {
             </Button>
             <Button onClick={handleCloneSessionConfirm}>
               Clone session
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete session(s) confirmation — same style as reset progress dialog */}
+      <Dialog
+        open={deleteSessionDialog !== null}
+        onOpenChange={(open) => !open && setDeleteSessionDialog(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete workshop session(s)</DialogTitle>
+            <DialogDescription>
+              {deleteSessionDialog && 'single' in deleteSessionDialog
+                ? `Delete session "${deleteSessionDialog.single.customerName}" (${format(new Date(deleteSessionDialog.single.workshopDate), 'MMM d, yyyy')})? This cannot be undone.`
+                : deleteSessionDialog && 'multiple' in deleteSessionDialog
+                  ? `Delete ${deleteSessionDialog.multiple.length} selected session(s)? This cannot be undone.`
+                  : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteSessionDialog(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (!deleteSessionDialog) return;
+                if ('single' in deleteSessionDialog) {
+                  const s = deleteSessionDialog.single;
+                  const ok = await deleteWorkshopSessionInAtlas(s.id);
+                  if (!ok) {
+                    toast.error('Failed to delete session');
+                    return;
+                  }
+                  setSelectedSessionIds((prev) => {
+                    const next = new Set(prev);
+                    next.delete(s.id);
+                    return next;
+                  });
+                  toast.success('Session deleted');
+                } else {
+                  const ids = deleteSessionDialog.multiple;
+                  const { deletedCount } = await deleteWorkshopSessionsInAtlas(ids);
+                  setSelectedSessionIds(new Set());
+                  toast.success(deletedCount > 0 ? `Deleted ${deletedCount} session(s)` : 'No sessions deleted');
+                }
+                setDeleteSessionDialog(null);
+                await loadWorkshopSessionFromAtlas();
+                setSession(getWorkshopSession());
+                setAllSessions(getAllWorkshopSessions());
+                setLabsEnabledState(areLabsEnabled());
+                setParticipantCount(getParticipantCount());
+              }}
+            >
+              {deleteSessionDialog && 'multiple' in deleteSessionDialog && deleteSessionDialog.multiple.length > 1
+                ? `Delete ${deleteSessionDialog.multiple.length} sessions`
+                : 'Delete session'}
             </Button>
           </DialogFooter>
         </DialogContent>

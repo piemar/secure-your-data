@@ -28,12 +28,42 @@ interface ValidationFailure {
   enhancementId: string;
   blockIndex: number;
   blockFilename?: string;
-  hintIndex: number;
+  hintIndex?: number;
   hintLine: number;
   blankText: string;
-  reason: 'line_out_of_range' | 'blank_not_found_on_line' | 'multiple_hints_on_same_line';
+  reason:
+    | 'line_out_of_range'
+    | 'blank_not_found_on_line'
+    | 'multiple_hints_on_same_line'
+    | 'skeleton_has_no_placeholders_but_has_hints'
+    | 'placeholder_has_no_matching_hint'
+    | 'multiple_placeholders_on_same_line';
   skeletonLineCount?: number;
   linePreview?: string;
+}
+
+/** Placeholder = optional $ + run of 5+ underscores + optional .suffix (e.g. _________ or $_________ or _________.state). Avoids matching stray __ in code. */
+const PLACEHOLDER_REGEX = /(\$?)_{5,}(\.\w+)?/g;
+
+/** Collect (1-based line number, exact placeholder string) from skeleton; at most one per line. */
+function getPlaceholdersInSkeleton(skeleton: string): Array<{ line: number; blankText: string }> {
+  const result: Array<{ line: number; blankText: string }> = [];
+  const lines = skeleton.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const matches: string[] = [];
+    let m: RegExpExecArray | null;
+    PLACEHOLDER_REGEX.lastIndex = 0;
+    while ((m = PLACEHOLDER_REGEX.exec(line)) !== null) {
+      matches.push(m[0]); // full match e.g. "_________" or "$_________" or "_________.state"
+    }
+    if (matches.length > 1) {
+      matches.forEach((blankText) => result.push({ line: i + 1, blankText }));
+    } else if (matches.length === 1) {
+      result.push({ line: i + 1, blankText: matches[0] });
+    }
+  }
+  return result;
 }
 
 function validateBlockHints(
@@ -43,6 +73,61 @@ function validateBlockHints(
 ): ValidationFailure[] {
   const failures: ValidationFailure[] = [];
   const lines = skeleton.split('\n');
+  const placeholders = getPlaceholdersInSkeleton(skeleton);
+
+  // No orphaned hints: if skeleton has no placeholders, inlineHints must be empty
+  if (placeholders.length === 0 && inlineHints.length > 0) {
+    inlineHints.forEach((h, i) => {
+      failures.push({
+        ...context,
+        hintIndex: i,
+        hintLine: h.line,
+        blankText: h.blankText,
+        reason: 'skeleton_has_no_placeholders_but_has_hints',
+      });
+    });
+    return failures;
+  }
+
+  // Multiple placeholders on same line (skeleton has 2+ blanks on one line)
+  const lineToPlaceholders = new Map<number, string[]>();
+  placeholders.forEach(({ line, blankText }) => {
+    const list = lineToPlaceholders.get(line) ?? [];
+    list.push(blankText);
+    lineToPlaceholders.set(line, list);
+  });
+  lineToPlaceholders.forEach((blankTexts, line) => {
+    if (blankTexts.length > 1) {
+      blankTexts.forEach((blankText) => {
+        failures.push({
+          ...context,
+          hintLine: line,
+          blankText,
+          reason: 'multiple_placeholders_on_same_line',
+        });
+      });
+    }
+  });
+
+  // Every placeholder must have exactly one matching hint (line + blankText)
+  const hintKey = (line: number, blankText: string) => `${line}:${blankText}`;
+  const matchedHints = new Set<string>();
+  placeholders.forEach(({ line, blankText }) => {
+    const key = hintKey(line, blankText);
+    const hasMatch = inlineHints.some((h) => h.line === line && h.blankText === blankText);
+    if (!hasMatch) {
+      failures.push({
+        ...context,
+        hintLine: line,
+        blankText,
+        reason: 'placeholder_has_no_matching_hint',
+      });
+    } else {
+      inlineHints.forEach((h) => {
+        if (h.line === line && h.blankText === blankText) matchedHints.add(hintKey(h.line, h.blankText));
+      });
+    }
+  });
 
   // At most one hint per line
   const lineToHintIndices = new Map<number, number[]>();
@@ -114,8 +199,11 @@ describe('Hint rendering validation (all labs)', () => {
 
         metadata.codeBlocks.forEach((block: BlockLike, blockIndex: number) => {
           const skeleton = block.skeleton;
-          const hints = block.inlineHints;
-          if (!skeleton || !hints?.length) return;
+          const hints = block.inlineHints ?? [];
+          if (!skeleton) return;
+          // Run validation when there are placeholders and/or hints (catch orphaned hints and missing hints)
+          const hasPlaceholders = getPlaceholdersInSkeleton(skeleton).length > 0;
+          if (!hasPlaceholders && hints.length === 0) return;
 
           const blockFailures = validateBlockHints(skeleton, hints, {
             labId: lab.id,
@@ -141,9 +229,12 @@ describe('Hint rendering validation (all labs)', () => {
     const report = allFailures
       .map(
         (f) =>
-          `  ${f.labId} / ${f.stepId} / ${f.enhancementId} block[${f.blockIndex}]${f.blockFilename ? ` (${f.blockFilename})` : ''} hint[${f.hintIndex}]: line ${f.hintLine} blankText "${f.blankText}" – ${f.reason}` +
+          `  ${f.labId} / ${f.stepId} / ${f.enhancementId} block[${f.blockIndex}]${f.blockFilename ? ` (${f.blockFilename})` : ''}${f.hintIndex != null ? ` hint[${f.hintIndex}]` : ''}: line ${f.hintLine} blankText "${f.blankText}" – ${f.reason}` +
           (f.reason === 'line_out_of_range' && f.skeletonLineCount != null ? ` (skeleton has ${f.skeletonLineCount} lines)` : '') +
           (f.reason === 'multiple_hints_on_same_line' ? ' (at most one hint per line)' : '') +
+          (f.reason === 'skeleton_has_no_placeholders_but_has_hints' ? ' (remove inlineHints or add placeholders to skeleton)' : '') +
+          (f.reason === 'placeholder_has_no_matching_hint' ? ' (add one inlineHint with this line and blankText)' : '') +
+          (f.reason === 'multiple_placeholders_on_same_line' ? ' (at most one placeholder per line)' : '') +
           (f.linePreview != null ? `\n    line preview: "${f.linePreview}..."` : '')
       )
       .join('\n');

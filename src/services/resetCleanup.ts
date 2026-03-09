@@ -188,13 +188,22 @@ export async function finishResetProgress(
 ): Promise<void> {
   try {
     if (userEmail) {
-      const { postResetProgress } = await import('@/services/leaderboardApi');
-      await postResetProgress(userEmail);
+      const { getWorkshopSession } = await import('@/utils/workshopUtils');
+      const sessionId = getWorkshopSession()?.id;
+      if (sessionId) {
+        const { postResetProgress } = await import('@/services/leaderboardApi');
+        await postResetProgress(sessionId, userEmail);
+      }
     }
   } catch {
     // Proceed with local reset even if API fails
   }
-  localStorage.removeItem('workshop_leaderboard');
+  const { getWorkshopSession } = await import('@/utils/workshopUtils');
+  const sessionId = getWorkshopSession()?.id;
+  if (sessionId) {
+    const { clearLeaderboardCacheForSession } = await import('@/utils/leaderboardUtils');
+    clearLeaderboardCacheForSession(sessionId);
+  }
   resetProgress();
   localStorage.removeItem('lab1-progress');
   localStorage.removeItem('lab2-progress');

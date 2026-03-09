@@ -1099,6 +1099,19 @@ export function StepView({
   const [nodeMongoshViewByKey, setNodeMongoshViewByKey] = useState<Record<string, 'node' | 'mongosh' | 'csharp'>>({});
   const [twinViewByKey, setTwinViewByKey] = useState<Record<string, 'A' | 'B'>>({});
 
+  // Default active tab for node/mongosh/csharp slots: use session's target programming language when that tab exists, else mongosh.
+  const session = getWorkshopSession();
+  const sessionProgrammingLanguage = session?.programmingLanguage;
+  const getDefaultViewForSlot = useCallback((slotType: 'node-mongosh' | 'node-mongosh-csharp'): 'node' | 'mongosh' | 'csharp' => {
+    if (slotType === 'node-mongosh-csharp') {
+      if (sessionProgrammingLanguage === 'csharp') return 'csharp';
+      if (sessionProgrammingLanguage === 'node') return 'node';
+      return 'mongosh';
+    }
+    if (sessionProgrammingLanguage === 'node') return 'node';
+    return 'mongosh';
+  }, [sessionProgrammingLanguage]);
+
   // Sync editable code from display code when step/tier/reveal changes.
   // For blocks with a skeleton in guided mode: always show skeleton with only currently revealed answers
   // (so we never show persisted content that had answers filled in from a previous session).
@@ -1499,12 +1512,17 @@ export function StepView({
     if ((language === 'bash' || language === 'shell') && block?.code && /_{5,}/.test(code)) {
       code = block.code;
     }
+    // C#: skeleton blanks (e.g. .Include("_________") or .Sort.___________()) are invalid or fail at build; run full solution so dotnet run succeeds
+    const isCSharp = language === 'csharp' || language === 'c#';
+    if (isCSharp && block?.code && /_{4,}/.test(code)) {
+      code = block.code;
+    }
     if (language === 'mongosh') code = stripMongoshConnectionLine(code);
     if (language === 'javascript' || language === 'typescript') code = stripNodeConnectionLine(code);
     code = ensureTrailingNewline(code);
 
     // C# with terminal: prepare project, send only "export MONGODB_URI" + "dotnet run --project <path>" so real output appears in terminal.
-    if (language === 'csharp' && code.trim().length > 0 && onRunEchoToTerminal) {
+    if ((language === 'csharp' || language === 'c#') && code.trim().length > 0 && onRunEchoToTerminal) {
       setIsRunning(true);
       let runResult: { output: string; success: boolean; summary: string };
       try {
@@ -1543,7 +1561,7 @@ export function StepView({
         ? `mongosh "${labMongoUri}"\n${code.trimEnd()}\nexit\n`
         : (language === 'javascript' || language === 'typescript')
           ? `node\n${code.trimEnd()}\n\x04`
-          : language === 'csharp'
+          : (language === 'csharp' || language === 'c#')
             ? `echo 'Running C# code (dotnet run in project directory)'\n`
             : code;
     onRunEchoToTerminal?.({ code: codeForEcho, language, filename: block?.filename });
@@ -1676,11 +1694,11 @@ export function StepView({
     for (const slot of displaySlots) {
       if (slot.type === 'node-mongosh-csharp') {
         const slotKey = `${currentStepIndex}-${slot.nodeIndex}`;
-        const view = nodeMongoshViewByKey[slotKey] ?? 'mongosh';
+        const view = nodeMongoshViewByKey[slotKey] ?? getDefaultViewForSlot('node-mongosh-csharp');
         indicesToRun.push(view === 'mongosh' ? slot.mongoshIndex : view === 'csharp' ? slot.csharpIndex : slot.nodeIndex);
       } else if (slot.type === 'node-mongosh') {
         const slotKey = `${currentStepIndex}-${slot.nodeIndex}`;
-        const view = nodeMongoshViewByKey[slotKey] ?? 'mongosh';
+        const view = nodeMongoshViewByKey[slotKey] ?? getDefaultViewForSlot('node-mongosh');
         indicesToRun.push(view === 'mongosh' ? slot.mongoshIndex : slot.nodeIndex);
       } else if (slot.type === 'twin') {
         const twinKey = `${currentStepIndex}-twin`;
@@ -1705,6 +1723,8 @@ export function StepView({
       const isSolutionRevealed = alwaysShowSolutions || !!showSolution[blockKey] || !hasAnySkeleton(block);
       let code = (editableCodeByBlock[blockKey] ?? getDisplayCode(block, tier, isSolutionRevealed)) || block.code || '';
       const language = (block.language || 'javascript').toLowerCase();
+      const isCSharp = language === 'csharp' || language === 'c#';
+      if (isCSharp && block.code && /_{4,}/.test(code)) code = block.code;
       if (language === 'mongosh') code = stripMongoshConnectionLine(code);
       if (language === 'javascript' || language === 'typescript') code = stripNodeConnectionLine(code);
       code = ensureTrailingNewline(code);
@@ -1713,10 +1733,10 @@ export function StepView({
           ? `mongosh "${labMongoUri}"\n${code.trimEnd()}\nexit\n`
           : (language === 'javascript' || language === 'typescript')
             ? `node\n${code.trimEnd()}\n\x04`
-            : language === 'csharp'
+            : isCSharp
               ? `echo 'Running C# code (dotnet run in project directory)'\n`
               : code;
-      if (!(language === 'csharp' && code.trim().length > 0 && onRunEchoToTerminal)) {
+      if (!(isCSharp && code.trim().length > 0 && onRunEchoToTerminal)) {
         onRunEchoToTerminal?.({ code: codeForEcho, language, filename: block.filename });
       }
       try {
@@ -1784,7 +1804,7 @@ export function StepView({
           outputs.push(formatted.output);
           lastSuccess = runResult.success;
           lastSummary = formatted.summary;
-        } else if (language === 'csharp' && code.trim().length > 0) {
+        } else if ((language === 'csharp' || language === 'c#') && code.trim().length > 0) {
           if (onRunEchoToTerminal) {
             try {
               const prep = await prepareCSharpProject({ code, uri: labMongoUri || '', filename: block.filename, userSuffix: getLabUserSuffix() });
@@ -1844,7 +1864,7 @@ export function StepView({
     }
     setRunPhase('idle');
     setIsRunning(false);
-  }, [currentStep?.codeBlocks, currentStep?.title, currentStep?.verificationId, currentStep?.onVerify, currentStepIndex, labMongoUri, editableCodeByBlock, skeletonTier, showSolution, alwaysShowSolutions, displaySlots, nodeMongoshViewByKey, twinViewByKey, handleCheckProgress, onRunEchoToTerminal]);
+  }, [currentStep?.codeBlocks, currentStep?.title, currentStep?.verificationId, currentStep?.onVerify, currentStepIndex, labMongoUri, editableCodeByBlock, skeletonTier, showSolution, alwaysShowSolutions, displaySlots, nodeMongoshViewByKey, twinViewByKey, getDefaultViewForSlot, handleCheckProgress, onRunEchoToTerminal]);
 
   // IDE context: wire runAll to palette (must run after handleRunAll is defined)
   useEffect(() => {
@@ -2032,7 +2052,7 @@ export function StepView({
                         const firstIsNodeMongoshCsharp = firstSlot.type === 'node-mongosh-csharp';
                         const firstIsNodeMongosh = firstSlot.type === 'node-mongosh' || firstIsNodeMongoshCsharp;
                         const firstSlotKey = firstSlot.type === 'node-mongosh' || firstSlot.type === 'node-mongosh-csharp' ? `${currentStepIndex}-${firstSlot.nodeIndex}` : '';
-                        const firstView = firstIsNodeMongosh ? (nodeMongoshViewByKey[firstSlotKey] ?? 'mongosh') : undefined;
+                        const firstView = firstIsNodeMongosh ? (nodeMongoshViewByKey[firstSlotKey] ?? getDefaultViewForSlot(firstSlot.type === 'node-mongosh-csharp' ? 'node-mongosh-csharp' : 'node-mongosh')) : undefined;
                         const firstBlock = firstSlot.type === 'node-mongosh-csharp'
                           ? (firstView === 'csharp' ? firstSlot.csharpBlock : firstView === 'node' ? firstSlot.nodeBlock : firstSlot.mongoshBlock)
                           : firstSlot.type === 'node-mongosh'
@@ -2079,13 +2099,13 @@ export function StepView({
                                 <>
                                   <FileCode className="w-3 h-3 flex-shrink-0 text-green-500" />
                                   <span className="font-mono text-[8px] text-white flex items-center gap-1 truncate">
-                                    <button type="button" onClick={() => setNodeMongoshViewByKey((prev) => ({ ...prev, [firstSlotKey]: 'mongosh' }))} className={cn("truncate", (nodeMongoshViewByKey[firstSlotKey] ?? 'mongosh') === 'mongosh' ? 'underline font-semibold' : 'opacity-80 hover:opacity-100')} title="Show Mongosh script">mongosh</button>
+                                    <button type="button" onClick={() => setNodeMongoshViewByKey((prev) => ({ ...prev, [firstSlotKey]: 'mongosh' }))} className={cn("truncate", (nodeMongoshViewByKey[firstSlotKey] ?? getDefaultViewForSlot(firstSlot.type === 'node-mongosh-csharp' ? 'node-mongosh-csharp' : 'node-mongosh')) === 'mongosh' ? 'underline font-semibold' : 'opacity-80 hover:opacity-100')} title="Show Mongosh script">mongosh</button>
                                     <span className="text-muted-foreground flex-shrink-0">!</span>
-                                    <button type="button" onClick={() => setNodeMongoshViewByKey((prev) => ({ ...prev, [firstSlotKey]: 'node' }))} className={cn("truncate", (nodeMongoshViewByKey[firstSlotKey] ?? 'mongosh') === 'node' ? 'underline font-semibold' : 'opacity-80 hover:opacity-100')} title="Show Node script">node</button>
+                                    <button type="button" onClick={() => setNodeMongoshViewByKey((prev) => ({ ...prev, [firstSlotKey]: 'node' }))} className={cn("truncate", (nodeMongoshViewByKey[firstSlotKey] ?? getDefaultViewForSlot(firstSlot.type === 'node-mongosh-csharp' ? 'node-mongosh-csharp' : 'node-mongosh')) === 'node' ? 'underline font-semibold' : 'opacity-80 hover:opacity-100')} title="Show Node script">node</button>
                                     {firstIsNodeMongoshCsharp && (
                                       <>
                                         <span className="text-muted-foreground flex-shrink-0">!</span>
-                                        <button type="button" onClick={() => setNodeMongoshViewByKey((prev) => ({ ...prev, [firstSlotKey]: 'csharp' }))} className={cn("truncate", (nodeMongoshViewByKey[firstSlotKey] ?? 'mongosh') === 'csharp' ? 'underline font-semibold' : 'opacity-80 hover:opacity-100')} title="Show C# script">C#</button>
+                                        <button type="button" onClick={() => setNodeMongoshViewByKey((prev) => ({ ...prev, [firstSlotKey]: 'csharp' }))} className={cn("truncate", (nodeMongoshViewByKey[firstSlotKey] ?? getDefaultViewForSlot('node-mongosh-csharp')) === 'csharp' ? 'underline font-semibold' : 'opacity-80 hover:opacity-100')} title="Show C# script">C#</button>
                                       </>
                                     )}
                                   </span>
@@ -2148,7 +2168,7 @@ export function StepView({
                     if (slot.type === 'node-mongosh') {
                       const { nodeBlock, nodeIndex, mongoshBlock, mongoshIndex } = slot;
                       const slotKey = `${currentStepIndex}-${nodeIndex}`;
-                      const view = nodeMongoshViewByKey[slotKey] ?? 'mongosh';
+                      const view = nodeMongoshViewByKey[slotKey] ?? getDefaultViewForSlot('node-mongosh');
                       const activeBlock = view === 'mongosh' ? mongoshBlock : nodeBlock;
                       const activeIndex = view === 'mongosh' ? mongoshIndex : nodeIndex;
                       const activeKey = `${currentStepIndex}-${activeIndex}`;
@@ -2240,7 +2260,7 @@ export function StepView({
                     if (slot.type === 'node-mongosh-csharp') {
                       const { nodeBlock, nodeIndex, mongoshBlock, mongoshIndex, csharpBlock, csharpIndex } = slot;
                       const slotKey = `${currentStepIndex}-${nodeIndex}`;
-                      const view = nodeMongoshViewByKey[slotKey] ?? 'mongosh';
+                      const view = nodeMongoshViewByKey[slotKey] ?? getDefaultViewForSlot('node-mongosh-csharp');
                       const activeBlock = view === 'csharp' ? csharpBlock : view === 'mongosh' ? mongoshBlock : nodeBlock;
                       const activeIndex = view === 'csharp' ? csharpIndex : view === 'mongosh' ? mongoshIndex : nodeIndex;
                       const activeKey = `${currentStepIndex}-${activeIndex}`;

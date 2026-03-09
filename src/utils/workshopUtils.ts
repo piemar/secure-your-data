@@ -1,4 +1,4 @@
-import { getLeaderboardEntries, type LeaderboardEntry } from './leaderboardUtils';
+import { getLeaderboardEntries, clearLeaderboardCacheForSession, type LeaderboardEntry } from './leaderboardUtils';
 import { getMetricsService } from '@/services/metricsService';
 import type { SessionContext } from '@/types/ide';
 
@@ -39,7 +39,6 @@ export interface WorkshopSession {
 const WORKSHOP_SESSION_KEY = 'workshop_session';
 const WORKSHOP_SESSIONS_KEY = 'workshop_sessions';
 const WORKSHOP_CURRENT_ID_KEY = 'workshop_current_id';
-const LEADERBOARD_KEY = 'workshop_leaderboard';
 
 /** Migrate single-session storage to multi-session array + current id */
 function migrateToMultiSessionIfNeeded(): void {
@@ -148,8 +147,8 @@ async function syncWorkshopSessionToAtlas(session: WorkshopSession): Promise<voi
 }
 
 /**
- * Load workshop session from API (Atlas) and cache in localStorage.
- * Call on app load so attendees see the moderator's session and labs-enabled state.
+ * Load all workshop sessions from central Atlas and replace local list.
+ * Call on app load, when opening session picker, and when switching session so the UI always reflects the central database.
  */
 export async function loadWorkshopSessionFromAtlas(): Promise<WorkshopSession | null> {
   try {
@@ -157,17 +156,16 @@ export async function loadWorkshopSessionFromAtlas(): Promise<WorkshopSession | 
     if (!response.ok) {
       return null;
     }
-    
+
     const data = await response.json();
-    if (data.success && data.session) {
-      const session = data.session as WorkshopSession;
-      const list = getSessionsList();
-      const idx = list.findIndex((s) => s.id === session.id);
-      if (idx >= 0) list[idx] = session;
-      else list.push(session);
-      setSessionsList(list, session.id);
-      return session;
-    }
+    if (!data.success) return null;
+
+    const sessions = Array.isArray(data.sessions) ? (data.sessions as WorkshopSession[]) : [];
+    const currentId = typeof localStorage !== 'undefined' ? localStorage.getItem(WORKSHOP_CURRENT_ID_KEY) : null;
+    const stillExists = currentId && sessions.some((s) => s.id === currentId);
+    const newCurrentId = stillExists ? currentId : (sessions[0]?.id ?? null);
+    setSessionsList(sessions, newCurrentId);
+    return newCurrentId ? sessions.find((s) => s.id === newCurrentId) ?? null : null;
   } catch (error) {
     console.warn('Failed to load workshop session from Atlas:', error);
   }
@@ -292,8 +290,7 @@ export async function startNewWorkshop(
     });
   }
 
-  // Clear current leaderboard
-  localStorage.setItem(LEADERBOARD_KEY, JSON.stringify([]));
+  // New session starts with empty leaderboard (per-session cache is keyed by session id).
 
   // Create new session
   const newSession: WorkshopSession = {
@@ -354,10 +351,11 @@ export async function cloneWorkshopSession(): Promise<WorkshopSession | null> {
 }
 
 /**
- * Reset the current leaderboard without starting a new session
+ * Reset the current leaderboard without starting a new session (clears cache for current session).
  */
 export function resetLeaderboard(): void {
-  localStorage.setItem(LEADERBOARD_KEY, JSON.stringify([]));
+  const session = getWorkshopSession();
+  if (session) clearLeaderboardCacheForSession(session.id);
 }
 
 /**
@@ -415,12 +413,46 @@ export async function deleteCurrentWorkshopSession(): Promise<void> {
 
 /**
  * Delete a workshop session by id (from multi-session list). If it was current, sets current to another.
+ * Local-only; use deleteWorkshopSessionInAtlas when central Atlas is the source of truth.
  */
 export function deleteWorkshopSessionById(sessionId: string): void {
   const list = getSessionsList().filter((s) => s.id !== sessionId);
   const currentId = localStorage.getItem(WORKSHOP_CURRENT_ID_KEY);
   const nextId = currentId === sessionId ? (list[0]?.id ?? null) : currentId;
   setSessionsList(list, nextId);
+}
+
+/**
+ * Delete one workshop session in central Atlas. Returns true if the API succeeded.
+ * Call loadWorkshopSessionFromAtlas() after to refresh the list.
+ */
+export async function deleteWorkshopSessionInAtlas(sessionId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/workshop-session?id=${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
+    const data = await res.json();
+    return res.ok && data.success;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Delete multiple workshop sessions in central Atlas. Call loadWorkshopSessionFromAtlas() after to refresh.
+ */
+export async function deleteWorkshopSessionsInAtlas(sessionIds: string[]): Promise<{ deletedCount: number }> {
+  if (sessionIds.length === 0) return { deletedCount: 0 };
+  try {
+    const res = await fetch('/api/workshop-session', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: sessionIds }),
+    });
+    const data = await res.json();
+    if (res.ok && data.success) return { deletedCount: data.deletedCount ?? 0 };
+  } catch {
+    // ignore
+  }
+  return { deletedCount: 0 };
 }
 
 /**

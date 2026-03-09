@@ -15,9 +15,12 @@ import { Input } from '@/components/ui/input';
 import { useLab } from '@/context/LabContext';
 import { useRole } from '@/contexts/RoleContext';
 import { heartbeat, type LeaderboardEntry } from '@/utils/leaderboardUtils';
+import { getWorkshopSession, getAllWorkshopSessions } from '@/utils/workshopUtils';
 import { runCleanupForParticipant } from '@/services/resetCleanup';
 import type { CleanupResult } from '@/services/resetCleanup';
 import { toast } from 'sonner';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format } from 'date-fns';
 
 const PAGE_SIZE = 25;
 const POLL_INTERVAL_MS = 5000;
@@ -43,6 +46,8 @@ interface DeleteResult {
 export function Leaderboard() {
   const { userEmail } = useLab();
   const { isModerator } = useRole();
+  const currentSession = getWorkshopSession();
+  const allSessions = getAllWorkshopSessions();
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,24 +58,28 @@ export function Leaderboard() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteDialogPhase, setDeleteDialogPhase] = useState<DeleteDialogPhase>('confirm');
   const [deleteDialogResults, setDeleteDialogResults] = useState<DeleteResult[]>([]);
+  /** Moderator only: which session's leaderboard to show; '__current__' = current session, 'all' = all sessions */
+  const [viewSessionId, setViewSessionId] = useState<string | 'all'>('__current__');
+
+  const effectiveViewSessionId = viewSessionId === '__current__' ? (currentSession?.id ?? 'all') : viewSessionId;
 
   const updateLeaderboard = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const { syncLeaderboardFromApi, getSortedLeaderboard } = await import('@/utils/leaderboardUtils');
-      await syncLeaderboardFromApi();
-      const entries = getSortedLeaderboard();
+      await syncLeaderboardFromApi(effectiveViewSessionId);
+      const entries = getSortedLeaderboard(effectiveViewSessionId === 'all' ? 'all' : effectiveViewSessionId);
       setLeaderboard(entries);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Leaderboard unavailable';
       setError(message);
       const { getSortedLeaderboard } = await import('@/utils/leaderboardUtils');
-      setLeaderboard(getSortedLeaderboard());
+      setLeaderboard(getSortedLeaderboard(effectiveViewSessionId === 'all' ? 'all' : effectiveViewSessionId));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [effectiveViewSessionId]);
 
   useEffect(() => {
     updateLeaderboard();
@@ -84,7 +93,7 @@ export function Leaderboard() {
       }
     }, POLL_INTERVAL_MS);
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'workshop_leaderboard') {
+      if (e.key?.startsWith('workshop_leaderboard_')) {
         updateLeaderboard();
       }
     };
@@ -137,8 +146,15 @@ export function Leaderboard() {
           }
         }
 
+        const sessionId = effectiveViewSessionId === 'all'
+          ? (entry?.sessionId)
+          : effectiveViewSessionId;
+        if (!sessionId) {
+          results.push({ email, status: 'error', message: 'Unknown session' });
+          continue;
+        }
         try {
-          await postDeleteLeaderboardEntry(email);
+          await postDeleteLeaderboardEntry(sessionId, email);
           results.push({ email, status: 'success', cleanupResults: cleanupResults.length ? cleanupResults : undefined });
         } catch (e) {
           results.push({
@@ -164,7 +180,7 @@ export function Leaderboard() {
     } finally {
       setDeleting(false);
     }
-  }, [selectedEmails, updateLeaderboard, leaderboard, userEmail]);
+  }, [selectedEmails, updateLeaderboard, leaderboard, userEmail, effectiveViewSessionId]);
 
   const handleDeleteSelected = useCallback(() => {
     openDeleteDialog();
@@ -250,12 +266,47 @@ export function Leaderboard() {
             <Trophy className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold">Leaderboard</h1>
           </div>
-          <p className="text-muted-foreground">See how you rank against other participants</p>
+          <p className="text-muted-foreground">
+            {effectiveViewSessionId === 'all'
+              ? 'All workshop sessions (moderator view)'
+              : 'See how you rank against other participants in this workshop'}
+          </p>
           <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1" title="The list refreshes from the server every few seconds.">
             <Info className="w-3 h-3" />
             Refreshes every {POLL_INTERVAL_MS / 1000}s.
           </p>
         </div>
+
+        {isModerator && (
+          <div className="mb-4">
+            <label className="text-sm font-medium text-muted-foreground block mb-1">View leaderboard for</label>
+            <Select
+              value={viewSessionId}
+              onValueChange={(v) => {
+                setViewSessionId(v as string | 'all');
+                setCurrentPage(0);
+              }}
+            >
+              <SelectTrigger className="w-full max-w-xs">
+                <SelectValue placeholder="Current session" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__current__">
+                  Current: {currentSession ? `${currentSession.customerName} (${format(new Date(currentSession.workshopDate), 'MMM d, yyyy')})` : '—'}
+                </SelectItem>
+                {allSessions
+                  .filter((s) => s.id !== currentSession?.id)
+                  .sort((a, b) => new Date(b.workshopDate).getTime() - new Date(a.workshopDate).getTime())
+                  .map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.customerName} ({format(new Date(s.workshopDate), 'MMM d, yyyy')})
+                    </SelectItem>
+                  ))}
+                <SelectItem value="all">All sessions</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div className="mb-6">
           <div className="relative max-w-sm">
@@ -427,6 +478,14 @@ export function Leaderboard() {
                             {(entry.firstName != null || entry.lastName != null) && (
                               <span className="truncate">{entry.email}</span>
                             )}
+                            {effectiveViewSessionId === 'all' && entry.sessionId && (() => {
+                              const s = allSessions.find((x) => x.id === entry.sessionId);
+                              return (
+                                <span className="text-xs bg-muted px-2 py-0.5 rounded">
+                                  {s ? `${s.customerName} (${format(new Date(s.workshopDate), 'MMM d')})` : entry.sessionId}
+                                </span>
+                              );
+                            })()}
                             <span className="flex items-center gap-1">
                               <TrendingUp className="w-4 h-4 flex-shrink-0" />
                               {entry.score} pts

@@ -10,18 +10,74 @@ const LAB_LIGHT_COMMENT = '#1e6b34';
 /** Dark orange-brown for strings in light theme – better contrast */
 const LAB_LIGHT_STRING = '#af4a0d';
 
+/** C# token colors for lab-dark: match VS Code default (Dark+) so methods = variables = pale grey, keywords/types = blue/teal, strings = orange, numbers = green. */
+const LAB_DARK_CSHARP_RULES: Array<{ token: string; foreground: string; fontStyle?: string }> = [
+  { token: 'keyword.control.mongosh', foreground: '4EC9B0', fontStyle: 'bold' },
+  { token: 'type', foreground: '4EC9B0' },
+  { token: 'type.cs', foreground: '4EC9B0' },
+  { token: 'keyword', foreground: '569CD6' },
+  { token: 'keyword.cs', foreground: '569CD6' },
+  { token: 'string', foreground: 'CE9178' },
+  { token: 'string.cs', foreground: 'CE9178' },
+  { token: 'comment', foreground: '6A9955' },
+  { token: 'comment.cs', foreground: '6A9955' },
+  { token: 'comment.line', foreground: '6A9955' },
+  { token: 'comment.block', foreground: '6A9955' },
+  { token: 'number', foreground: 'B5CEA8' },
+  { token: 'number.cs', foreground: 'B5CEA8' },
+  { token: 'number.float', foreground: 'B5CEA8' },
+  { token: 'number.float.cs', foreground: 'B5CEA8' },
+  { token: 'entity.name.function', foreground: 'D4D4D4' },
+  { token: 'entity.name.function.cs', foreground: 'D4D4D4' },
+  { token: 'identifier', foreground: 'D4D4D4' },
+  { token: 'identifier.cs', foreground: 'D4D4D4' },
+  { token: 'delimiter', foreground: 'D4D4D4' },
+  { token: 'delimiter.cs', foreground: 'D4D4D4' },
+  { token: 'operator', foreground: 'D4D4D4' },
+  { token: 'operator.cs', foreground: 'D4D4D4' },
+  { token: '@brackets', foreground: 'D4D4D4' },
+  { token: 'brackets.cs', foreground: 'D4D4D4' },
+];
+
+/** C# / .NET-style token colors for lab-light (readable on white). */
+const LAB_LIGHT_CSHARP_RULES: Array<{ token: string; foreground: string; fontStyle?: string }> = [
+  { token: 'keyword.control.mongosh', foreground: '0d652d', fontStyle: 'bold' },
+  { token: 'type', foreground: '0d652d' },
+  { token: 'type.cs', foreground: '0d652d' },
+  { token: 'keyword', foreground: '0000FF' },
+  { token: 'keyword.cs', foreground: '0000FF' },
+  { token: 'string', foreground: LAB_LIGHT_STRING },
+  { token: 'string.cs', foreground: LAB_LIGHT_STRING },
+  { token: 'comment', foreground: LAB_LIGHT_COMMENT },
+  { token: 'comment.cs', foreground: LAB_LIGHT_COMMENT },
+  { token: 'comment.line', foreground: LAB_LIGHT_COMMENT },
+  { token: 'comment.block', foreground: LAB_LIGHT_COMMENT },
+  { token: 'number', foreground: '098658' },
+  { token: 'number.cs', foreground: '098658' },
+  { token: 'number.float', foreground: '098658' },
+  { token: 'number.float.cs', foreground: '098658' },
+  { token: 'entity.name.function', foreground: '1f1f1f' },
+  { token: 'entity.name.function.cs', foreground: '1f1f1f' },
+  { token: 'identifier', foreground: '1f1f1f' },
+  { token: 'identifier.cs', foreground: '1f1f1f' },
+  { token: 'delimiter', foreground: '1f1f1f' },
+  { token: 'delimiter.cs', foreground: '1f1f1f' },
+  { token: 'operator', foreground: '1f1f1f' },
+  { token: 'operator.cs', foreground: '1f1f1f' },
+  { token: '@brackets', foreground: '1f1f1f' },
+  { token: 'brackets.cs', foreground: '1f1f1f' },
+];
+
 /**
  * Define custom Monaco themes that match the app's dark and light backgrounds.
- * Light theme overrides comment and string colors for clear contrast on white.
+ * Includes full C#/.NET token rules so lab C# blocks use correct colors without needing an edit.
  * Call from Editor beforeMount so all lab editors can use either theme.
  */
 export function defineLabDarkTheme(monaco: typeof import('monaco-editor')) {
   monaco.editor.defineTheme('lab-dark', {
     base: 'vs-dark',
     inherit: true,
-    rules: [
-      { token: 'keyword.control.mongosh', foreground: '4EC9B0', fontStyle: 'bold' },
-    ],
+    rules: LAB_DARK_CSHARP_RULES,
     colors: {
       'editor.background': LAB_EDITOR_BACKGROUND_DARK,
     },
@@ -29,13 +85,7 @@ export function defineLabDarkTheme(monaco: typeof import('monaco-editor')) {
   monaco.editor.defineTheme('lab-light', {
     base: 'vs',
     inherit: true,
-    rules: [
-      { token: 'keyword.control.mongosh', foreground: '0d652d', fontStyle: 'bold' },
-      { token: 'comment', foreground: LAB_LIGHT_COMMENT },
-      { token: 'comment.line', foreground: LAB_LIGHT_COMMENT },
-      { token: 'comment.block', foreground: LAB_LIGHT_COMMENT },
-      { token: 'string', foreground: LAB_LIGHT_STRING },
-    ],
+    rules: LAB_LIGHT_CSHARP_RULES,
     colors: {
       'editor.background': LAB_EDITOR_BACKGROUND_LIGHT,
     },
@@ -264,18 +314,36 @@ export function registerJavaLanguage(monaco: typeof import('monaco-editor')) {
 }
 
 /**
- * Register C# language for syntax highlighting. Phase 3 optional.
+ * Register C# language for syntax highlighting in the lab inline editor.
+ * Uses Monarch grammar so C# tabs get keywords, types, strings, comments colored.
  */
 export function registerCSharpLanguage(monaco: typeof import('monaco-editor')) {
   try {
     monaco.languages.register({ id: 'csharp' });
+    const csharpKeywords = ['abstract', 'as', 'base', 'bool', 'break', 'byte', 'case', 'catch', 'char', 'checked', 'class', 'const', 'continue', 'decimal', 'default', 'delegate', 'do', 'double', 'else', 'enum', 'event', 'explicit', 'extern', 'false', 'finally', 'fixed', 'float', 'for', 'foreach', 'goto', 'if', 'implicit', 'in', 'int', 'interface', 'internal', 'is', 'lock', 'long', 'namespace', 'new', 'null', 'object', 'operator', 'out', 'override', 'params', 'private', 'protected', 'public', 'readonly', 'ref', 'return', 'sbyte', 'sealed', 'short', 'sizeof', 'stackalloc', 'static', 'string', 'struct', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'uint', 'ulong', 'unchecked', 'unsafe', 'ushort', 'using', 'var', 'virtual', 'void', 'volatile', 'while'];
+    const csharpTypeKeywords = ['BsonDocument', 'BsonArray', 'BsonValue', 'MongoClient', 'MongoDatabase', 'MongoCollection', 'FilterDefinition', 'Builders', 'CreateIndexModel', 'ExplainVerbosity', 'IndexKeysDefinition', 'UpdateDefinition', 'ProjectionDefinition', 'SortDefinition', 'IAggregateFluent', 'List', 'Dictionary', 'DateTime', 'InvalidOperationException', 'Environment', 'Console', 'Array'];
     monaco.languages.setMonarchTokensProvider('csharp', {
-      defaultToken: '',
+      defaultToken: 'identifier',
       tokenPostfix: '.cs',
-      keywords: ['abstract', 'as', 'base', 'bool', 'break', 'byte', 'case', 'catch', 'char', 'checked', 'class', 'const', 'continue', 'decimal', 'default', 'delegate', 'do', 'double', 'else', 'enum', 'event', 'explicit', 'extern', 'false', 'finally', 'fixed', 'float', 'for', 'foreach', 'goto', 'if', 'implicit', 'in', 'int', 'interface', 'internal', 'is', 'lock', 'long', 'namespace', 'new', 'null', 'object', 'operator', 'out', 'override', 'params', 'private', 'protected', 'public', 'readonly', 'ref', 'return', 'sbyte', 'sealed', 'short', 'sizeof', 'stackalloc', 'static', 'string', 'struct', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'uint', 'ulong', 'unchecked', 'unsafe', 'ushort', 'using', 'virtual', 'void', 'volatile', 'while'],
+      keywords: csharpKeywords,
+      typeKeywords: csharpTypeKeywords,
       tokenizer: {
         root: [
-          [/[a-zA-Z_][\w]*/, { cases: { '@keywords': 'keyword', '@default': 'identifier' } }],
+          // Method call: identifier before ( or < (generic) — color as function like .NET IDEs; keywords/types unchanged
+          [/[a-zA-Z_][\w]*(?=\s*[(<])/, {
+            cases: {
+              '@keywords': 'keyword',
+              '@typeKeywords': 'type.cs',
+              '@default': 'entity.name.function',
+            },
+          }],
+          [/[a-zA-Z_][\w]*/, {
+            cases: {
+              '@keywords': 'keyword',
+              '@typeKeywords': 'type.cs',
+              '@default': 'identifier',
+            },
+          }],
           [/\d+\.\d+[fFdDmM]?/, 'number.float'],
           [/\d+[lL]?/, 'number'],
           [/\/\/.*$/, 'comment'],
@@ -283,7 +351,7 @@ export function registerCSharpLanguage(monaco: typeof import('monaco-editor')) {
           [/@"/, 'string', '@verbatim'],
           [/"[^"]*"/, 'string'],
           [/'[^']*'/, 'string'],
-          [/[{}()\[\];.,]/, '@brackets'],
+          [/[{}()\[\];.,<>]/, '@brackets'],
           [/[=><!~?:&|+\-*\/\^%]+/, 'operator'],
           [/\s+/, 'white'],
         ],

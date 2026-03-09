@@ -5,6 +5,7 @@ import { StepView } from './StepView';
 import { useLab } from '@/context/LabContext';
 import { getLeaderboardEntries, heartbeat } from '@/utils/leaderboardUtils';
 import { postStepProgress } from '@/services/leaderboardApi';
+import { getWorkshopSession } from '@/utils/workshopUtils';
 import { DifficultyLevel } from './DifficultyBadge';
 import { Lightbulb, BookOpen, Bug, Loader2 } from 'lucide-react';
 import { sessionManager } from '@/services/session';
@@ -211,8 +212,9 @@ export function LabViewWithTabs({
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify(completedSteps));
 
-    if (userEmail) {
-      postStepProgress(userEmail, labNumber, completedSteps);
+    const sessionId = getWorkshopSession()?.id;
+    if (sessionId && userEmail) {
+      postStepProgress(sessionId, userEmail, labNumber, completedSteps);
     }
 
     const allComplete = completedSteps.length === steps.length;

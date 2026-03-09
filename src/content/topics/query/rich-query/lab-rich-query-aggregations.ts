@@ -20,6 +20,7 @@ export const labRichQueryAggregationsDefinition: WorkshopLabDefinition = {
     'MongoDB Atlas (M0+) or local MongoDB',
     'Node.js 18+',
     'mongosh installed; path in Workshop Settings for Run',
+    'Optional: .NET SDK 10.0+ to run the C# tab (install from https://dotnet.microsoft.com/download; verify with `dotnet --version`)',
   ],
   povCapabilities: ['RICH-QUERY'],
   modes: ['lab', 'demo', 'challenge'],

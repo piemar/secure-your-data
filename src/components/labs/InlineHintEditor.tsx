@@ -45,6 +45,14 @@ interface BlankPosition {
   hint: InlineHint;
 }
 
+/** Monaco uses "csharp" as language id; normalize "C#" / "c#" from content so highlighting works. */
+function normalizeLabLanguage(lang: string): string {
+  const l = (lang || '').toLowerCase();
+  if (l === 'c#' || l === 'csharp') return 'csharp';
+  if (l === 'bash') return 'shell';
+  return lang || 'javascript';
+}
+
 export function InlineHintEditor({
   code,
   controlledValue,
@@ -139,24 +147,35 @@ export function InlineHintEditor({
     return positions;
   }, []);
 
-  // Generate code with revealed answers filled in
+  // Generate code with revealed answers filled in. Replace by exact blankText in hint order
+  // (with searchFrom per line) so the correct blank is replaced and multiple blanks per line work.
   const displayCode = useMemo(() => {
     if (!inlineHints || revealedAnswers.length === 0) return code;
-    
     const lines = code.split('\n');
-    
-    // For each revealed answer, replace the blank with the answer
+    const searchFromByLine = new Map<number, number>();
     inlineHints.forEach((hint, hintIdx) => {
-      if (revealedAnswers.includes(hintIdx)) {
-        const lineIndex = hint.line - 1;
-        if (lineIndex >= 0 && lineIndex < lines.length) {
-          const lineText = lines[lineIndex];
-          // Replace the blank pattern with the answer
-          lines[lineIndex] = lineText.replace(/_{5,}/, hint.answer);
+      if (!revealedAnswers.includes(hintIdx)) return;
+      const lineIndex = hint.line - 1;
+      if (lineIndex < 0 || lineIndex >= lines.length) return;
+      const lineText = lines[lineIndex];
+      const blankText = hint.blankText;
+      if (blankText) {
+        const fromIndex = searchFromByLine.get(hint.line) ?? 0;
+        const idx = lineText.indexOf(blankText, fromIndex);
+        if (idx !== -1) {
+          lines[lineIndex] = lineText.slice(0, idx) + hint.answer + lineText.slice(idx + blankText.length);
+          searchFromByLine.set(hint.line, idx + hint.answer.length);
+        }
+      } else {
+        // Fallback: first run of 5+ underscores on this line
+        const idx = lineText.search(/_{5,}/);
+        if (idx !== -1) {
+          const match = lineText.match(/_{5,}/);
+          const len = match ? match[0].length : 0;
+          lines[lineIndex] = lineText.slice(0, idx) + hint.answer + lineText.slice(idx + len);
         }
       }
     });
-    
     return lines.join('\n');
   }, [code, inlineHints, revealedAnswers]);
 
@@ -201,11 +220,24 @@ export function InlineHintEditor({
       setScrollLeft(e.scrollLeft || 0);
     });
 
+    // Force syntax highlighting on first paint: set language and re-set value so Monaco tokenizes immediately (avoids "1 edit to see colors")
+    const model = editor.getModel?.();
+    if (model) {
+      const langId = normalizeLabLanguage(language);
+      if (model.getLanguageId?.() !== langId) model.setLanguageId?.(langId);
+      const val = model.getValue();
+      if (val) {
+        requestAnimationFrame(() => {
+          model.setValue(val);
+        });
+      }
+    }
+
     // Mark editor as ready after a short delay to ensure layout is complete
     requestAnimationFrame(() => {
       setIsEditorReady(true);
     });
-  }, [setLineHeight, onEditorSession]);
+  }, [setLineHeight, onEditorSession, language]);
 
   // Apply decorations for revealed answers (green highlight)
   useEffect(() => {
@@ -269,7 +301,7 @@ export function InlineHintEditor({
     const current = model.getValue();
     if (current === editorValue) return;
     model.setValue(editorValue);
-    const langId = language === 'bash' ? 'shell' : language;
+    const langId = normalizeLabLanguage(language);
     if (model.getLanguageId?.() !== langId) model.setLanguageId?.(langId);
   }, [editorInstance, editorValue, language]);
 
@@ -361,7 +393,7 @@ export function InlineHintEditor({
     >
       <Editor
         height={useFillHeight ? "100%" : `${calculatedHeight}px`}
-        language={language === 'bash' ? 'shell' : language}
+        language={normalizeLabLanguage(language)}
         value={editorValue}
         onChange={(v) => !isReadOnly && onCodeChange?.(v ?? '')}
         theme={getLabEditorTheme(resolvedTheme)}

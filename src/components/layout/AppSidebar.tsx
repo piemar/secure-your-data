@@ -147,16 +147,24 @@ export function AppSidebar({ isMobileOverlay = false, onMobileNavigate }: AppSid
       });
   };
 
-  // Calculate user rank, progress, and check lab status (sync from MongoDB periodically)
+  // Calculate user rank, progress, and check lab status (sync from MongoDB periodically; per current session)
   useEffect(() => {
     const updateStatus = async () => {
+      const { getWorkshopSession } = await import('@/utils/workshopUtils');
+      const sessionId = getWorkshopSession()?.id;
+      if (!sessionId) {
+        setTotalParticipants(0);
+        setUserRank(0);
+        setLabsEnabled(areLabsEnabled());
+        return;
+      }
       const { syncLeaderboardFromApi, getSortedLeaderboard } = await import('@/utils/leaderboardUtils');
       try {
-        await syncLeaderboardFromApi();
+        await syncLeaderboardFromApi(sessionId);
       } catch {
         // Leaderboard API unavailable; use cached data
       }
-      const leaderboard = getSortedLeaderboard();
+      const leaderboard = getSortedLeaderboard(sessionId);
       setTotalParticipants(leaderboard.length);
       const rank = leaderboard.findIndex(e => e.email === userEmail) + 1;
       setUserRank(rank);

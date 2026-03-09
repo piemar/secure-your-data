@@ -149,11 +149,14 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const email = userEmail || (typeof localStorage !== 'undefined' ? localStorage.getItem('userEmail') : null);
         if (!email) return;
         const hydrate = async () => {
-            try {
-                const { syncLeaderboardFromApi } = await import('@/utils/leaderboardUtils');
-                await syncLeaderboardFromApi();
-            } catch {
-                // Leaderboard API unavailable; use existing localStorage
+            const sessionId = getWorkshopSession()?.id;
+            if (sessionId) {
+                try {
+                    const { syncLeaderboardFromApi } = await import('@/utils/leaderboardUtils');
+                    await syncLeaderboardFromApi(sessionId);
+                } catch {
+                    // Leaderboard API unavailable; use existing localStorage
+                }
             }
             const { getLeaderboardEntries } = await import('@/utils/leaderboardUtils');
             const entries = getLeaderboardEntries();

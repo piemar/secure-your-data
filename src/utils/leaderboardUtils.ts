@@ -1,48 +1,53 @@
 export interface LeaderboardEntry {
+  sessionId?: string; // Set when from API; optional for backward compat
   email: string;
   firstName?: string;
   lastName?: string;
   score: number;
   completedLabs: number[];
-  /** Per-lab step completion: lab number -> array of completed step indices (synced to server) */
   completedStepsByLab?: Record<number, number[]>;
-  labTimes: Record<number, number>; // lab number -> time spent in ms
+  labTimes: Record<number, number>;
   lastActive: number;
-  hintsUsed: number; // Total hints revealed
-  solutionsRevealed: number; // Total solutions revealed early
+  hintsUsed?: number;
+  solutionsRevealed?: number;
 }
 
-const LEADERBOARD_STORAGE_KEY = 'workshop_leaderboard';
+const LEADERBOARD_STORAGE_KEY_PREFIX = 'workshop_leaderboard_';
+
+function getStorageKey(sessionId: string | 'all'): string {
+  return `${LEADERBOARD_STORAGE_KEY_PREFIX}${sessionId}`;
+}
+
+/** Resolve sessionId for current workshop (from localStorage to avoid circular deps). */
+function getCurrentSessionId(): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  return localStorage.getItem('workshop_current_id');
+}
 
 /**
- * Sync leaderboard from MongoDB (via /api/leaderboard) into localStorage.
- * Call this on app init and periodically so UI shows server-backed data.
- * Does not overwrite localStorage when API returns empty (keeps local progress if server/DB unavailable).
+ * Sync leaderboard from MongoDB (via /api/leaderboard) into localStorage for the given session (or 'all').
  */
-export async function syncLeaderboardFromApi(): Promise<void> {
+export async function syncLeaderboardFromApi(sessionId: string | 'all'): Promise<void> {
   try {
     const { fetchLeaderboardFromApi } = await import('@/services/leaderboardApi');
-    const entries = await fetchLeaderboardFromApi();
-    if (entries.length > 0) {
-      try {
-        localStorage.setItem(LEADERBOARD_STORAGE_KEY, JSON.stringify(entries));
-      } catch {
-        // Ignore quota or disabled localStorage
-      }
+    const entries = await fetchLeaderboardFromApi(sessionId);
+    try {
+      localStorage.setItem(getStorageKey(sessionId), JSON.stringify(entries));
+    } catch {
+      // Ignore quota or disabled localStorage
     }
   } catch (e) {
-    // Rethrow so Leaderboard can show "Leaderboard unavailable" when MongoDB is not configured
     throw e;
   }
 }
 
 /**
- * Get all leaderboard entries from localStorage
- * (synced from MongoDB via syncLeaderboardFromApi / after each write).
+ * Get leaderboard entries from localStorage for a session. If sessionId is omitted, uses current workshop session.
  */
-export function getLeaderboardEntries(): LeaderboardEntry[] {
+export function getLeaderboardEntries(sessionId?: string): LeaderboardEntry[] {
+  const sid = sessionId ?? getCurrentSessionId() ?? '';
   try {
-    const stored = localStorage.getItem(LEADERBOARD_STORAGE_KEY);
+    const stored = localStorage.getItem(getStorageKey(sid));
     if (!stored) return [];
     return JSON.parse(stored);
   } catch (error) {
@@ -51,24 +56,26 @@ export function getLeaderboardEntries(): LeaderboardEntry[] {
   }
 }
 
-/**
- * Save leaderboard entries to localStorage
- */
-function saveLeaderboardEntries(entries: LeaderboardEntry[]): void {
+function saveLeaderboardEntries(sessionId: string, entries: LeaderboardEntry[]): void {
   try {
-    localStorage.setItem(LEADERBOARD_STORAGE_KEY, JSON.stringify(entries));
+    localStorage.setItem(getStorageKey(sessionId), JSON.stringify(entries));
   } catch (error) {
     console.error('Failed to save leaderboard to localStorage:', error);
   }
 }
 
-/**
- * Get or create a leaderboard entry for a user
- */
-function getOrCreateEntry(email: string): LeaderboardEntry {
-  const entries = getLeaderboardEntries();
+/** Clear cached leaderboard for a session (e.g. after moderator reset). */
+export function clearLeaderboardCacheForSession(sessionId: string): void {
+  try {
+    localStorage.setItem(getStorageKey(sessionId), '[]');
+  } catch {
+    // ignore
+  }
+}
+
+function getOrCreateEntry(sessionId: string, email: string): LeaderboardEntry {
+  const entries = getLeaderboardEntries(sessionId);
   let entry = entries.find(e => e.email === email);
-  
   if (!entry) {
     entry = {
       email,
@@ -80,21 +87,15 @@ function getOrCreateEntry(email: string): LeaderboardEntry {
       solutionsRevealed: 0,
     };
     entries.push(entry);
-    saveLeaderboardEntries(entries);
+    saveLeaderboardEntries(sessionId, entries);
   }
-  
   return entry;
 }
 
-/**
- * Update a leaderboard entry
- */
-function updateEntry(email: string, updates: Partial<LeaderboardEntry>): void {
-  const entries = getLeaderboardEntries();
+function updateEntry(sessionId: string, email: string, updates: Partial<LeaderboardEntry>): void {
+  const entries = getLeaderboardEntries(sessionId);
   const index = entries.findIndex(e => e.email === email);
-  
   if (index === -1) {
-    // Create new entry
     const newEntry: LeaderboardEntry = {
       email,
       score: 0,
@@ -107,55 +108,41 @@ function updateEntry(email: string, updates: Partial<LeaderboardEntry>): void {
     };
     entries.push(newEntry);
   } else {
-    // Update existing entry
     entries[index] = {
       ...entries[index],
       ...updates,
-      lastActive: Date.now()
+      lastActive: Date.now(),
     };
   }
-  
-  saveLeaderboardEntries(entries);
+  saveLeaderboardEntries(sessionId, entries);
 }
 
-/**
- * Add points to a user's score
- * Writes to MongoDB via /api/leaderboard/add-points, then updates localStorage.
- */
 export function addPoints(email: string, points: number, labNumber: number): void {
   if (!email) return;
+  const sessionId = getCurrentSessionId();
+  if (!sessionId) return;
 
-  const entry = getOrCreateEntry(email);
+  const entry = getOrCreateEntry(sessionId, email);
   const newScore = entry.score + points;
-
-  // Persist to MongoDB (Atlas) via server API
   import('@/services/leaderboardApi').then(({ postAddPoints }) => {
-    postAddPoints(email, `step-${labNumber}`, labNumber, points, false);
+    postAddPoints(sessionId, email, `step-${labNumber}`, labNumber, points, false);
   });
-
-  updateEntry(email, {
-    score: newScore
-  });
+  updateEntry(sessionId, email, { score: newScore });
 }
 
-/**
- * Mark a lab as completed
- * Writes to MongoDB via /api/leaderboard/complete-lab, then updates localStorage.
- */
 export function completeLab(email: string, labNumber: number, score: number): void {
   if (!email) return;
+  const sessionId = getCurrentSessionId();
+  if (!sessionId) return;
 
-  const entry = getOrCreateEntry(email);
+  const entry = getOrCreateEntry(sessionId, email);
   const completedLabs = entry.completedLabs.includes(labNumber)
     ? entry.completedLabs
     : [...entry.completedLabs, labNumber];
-
-  // Persist to MongoDB (Atlas) via server API (score = total score)
   import('@/services/leaderboardApi').then(({ postCompleteLab }) => {
-    postCompleteLab(email, labNumber, score);
+    postCompleteLab(sessionId, email, labNumber, score);
   });
 
-  // Calculate lab time from LabContext's labStartTimes
   const labTimes = { ...entry.labTimes };
   try {
     const savedStartTimes = localStorage.getItem('labStartTimes');
@@ -163,47 +150,40 @@ export function completeLab(email: string, labNumber: number, score: number): vo
       const startTimes = JSON.parse(savedStartTimes);
       if (startTimes[labNumber]) {
         const start = startTimes[labNumber];
-        const end = Date.now();
-        const elapsed = end - start;
+        const elapsed = Date.now() - start;
         labTimes[labNumber] = (labTimes[labNumber] || 0) + elapsed;
       }
     }
-  } catch (error) {
-    console.error('Failed to read lab start times:', error);
+  } catch {
+    // ignore
   }
-
-  updateEntry(email, {
+  updateEntry(sessionId, email, {
     completedLabs,
-    score: Math.max(entry.score, score), // Use the higher score
-    labTimes
+    score: Math.max(entry.score, score),
+    labTimes,
   });
 }
 
-/**
- * Record when a lab is started
- * Writes to MongoDB via /api/leaderboard/start-lab, then updates localStorage.
- */
 export function startLab(email: string, labNumber: number): void {
   if (!email) return;
+  const sessionId = getCurrentSessionId();
+  if (!sessionId) return;
 
   import('@/services/leaderboardApi').then(({ postStartLab }) => {
-    postStartLab(email, labNumber);
+    postStartLab(sessionId, email, labNumber);
   });
-
-  const entry = getOrCreateEntry(email);
+  const entry = getOrCreateEntry(sessionId, email);
   if (!entry.labTimes[labNumber]) {
-    updateEntry(email, {
-      labTimes: { ...entry.labTimes, [labNumber]: 0 }
+    updateEntry(sessionId, email, {
+      labTimes: { ...entry.labTimes, [labNumber]: 0 },
     });
   }
 }
 
-/**
- * Send heartbeat to update lastActive timestamp and track lab time
- * Writes to MongoDB via /api/leaderboard/heartbeat, then updates localStorage.
- */
 export function heartbeat(email: string, labNumber?: number): void {
   if (!email) return;
+  const sessionId = getCurrentSessionId();
+  if (!sessionId) return;
 
   const attendeeName = typeof localStorage !== 'undefined' ? localStorage.getItem('workshop_attendee_name') || '' : '';
   const nameParts = attendeeName.trim().split(/\s+/);
@@ -211,72 +191,60 @@ export function heartbeat(email: string, labNumber?: number): void {
   const lastName = nameParts.slice(1).join(' ') || undefined;
 
   import('@/services/leaderboardApi').then(({ postHeartbeat }) => {
-    postHeartbeat(email, labNumber, firstName, lastName);
+    postHeartbeat(sessionId, email, labNumber, firstName, lastName);
   });
 
-  const entry = getOrCreateEntry(email);
+  const entry = getOrCreateEntry(sessionId, email);
   const updates: Partial<LeaderboardEntry> = {
     lastActive: Date.now(),
     ...(firstName !== undefined && { firstName }),
     ...(lastName !== undefined && { lastName }),
   };
-
-  // If labNumber is provided, update the lab time
   if (labNumber !== undefined) {
     try {
       const savedStartTimes = localStorage.getItem('labStartTimes');
       if (savedStartTimes) {
         const startTimes = JSON.parse(savedStartTimes);
         if (startTimes[labNumber]) {
-          const start = startTimes[labNumber];
-          const now = Date.now();
-          const elapsed = now - start;
+          const elapsed = Date.now() - startTimes[labNumber];
           const labTimes = { ...entry.labTimes };
           labTimes[labNumber] = (labTimes[labNumber] || 0) + elapsed;
           updates.labTimes = labTimes;
         }
       }
-    } catch (error) {
-      console.error('Failed to read lab start times:', error);
+    } catch {
+      // ignore
     }
   }
-
-  updateEntry(email, updates);
+  updateEntry(sessionId, email, updates);
 }
 
-/**
- * Track when a user reveals a hint
- */
 export function trackHintUsage(email: string, hintPenalty: number): void {
   if (!email) return;
-  
-  const entry = getOrCreateEntry(email);
-  updateEntry(email, {
-    hintsUsed: (entry.hintsUsed || 0) + 1,
-    score: entry.score - hintPenalty
+  const sessionId = getCurrentSessionId();
+  if (!sessionId) return;
+  const entry = getOrCreateEntry(sessionId, email);
+  updateEntry(sessionId, email, {
+    hintsUsed: (entry.hintsUsed ?? 0) + 1,
+    score: entry.score - hintPenalty,
   });
 }
 
-/**
- * Track when a user reveals a solution early
- */
 export function trackSolutionReveal(email: string, solutionPenalty: number = 5): void {
   if (!email) return;
-  
-  const entry = getOrCreateEntry(email);
-  updateEntry(email, {
-    solutionsRevealed: (entry.solutionsRevealed || 0) + 1,
-    score: entry.score - solutionPenalty
+  const sessionId = getCurrentSessionId();
+  if (!sessionId) return;
+  const entry = getOrCreateEntry(sessionId, email);
+  updateEntry(sessionId, email, {
+    solutionsRevealed: (entry.solutionsRevealed ?? 0) + 1,
+    score: entry.score - solutionPenalty,
   });
 }
 
-/**
- * Get leaderboard entries sorted by score
- */
-export function getSortedLeaderboard(): LeaderboardEntry[] {
-  const entries = getLeaderboardEntries();
+/** Get leaderboard entries for a session (default current) sorted by score. */
+export function getSortedLeaderboard(sessionId?: string): LeaderboardEntry[] {
+  const entries = getLeaderboardEntries(sessionId);
   return [...entries].sort((a, b) => {
-    // Sort by score first, then by completed labs count
     if (b.score !== a.score) return b.score - a.score;
     return b.completedLabs.length - a.completedLabs.length;
   });

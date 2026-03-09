@@ -240,6 +240,7 @@ function getLeaderboardMongoUri(): string {
 
 
 interface LeaderboardEntry {
+  sessionId: string;
   email: string;
   firstName?: string;
   lastName?: string;
@@ -251,6 +252,7 @@ interface LeaderboardEntry {
 }
 
 interface PointEntry {
+  sessionId: string;
   email: string;
   stepId: string;
   labNumber: number;
@@ -288,25 +290,24 @@ function logLeaderboardErrorOnce(message: string | unknown): void {
   }
 }
 
-async function getLeaderboard(): Promise<LeaderboardEntry[]> {
+async function getLeaderboard(sessionId: string | 'all'): Promise<LeaderboardEntry[]> {
   const client = await getLeaderboardMongoClient();
   const db = client.db(LEADERBOARD_DB);
   const collection = db.collection<LeaderboardEntry>(LEADERBOARD_COLLECTION);
-  const entries = await collection.find({}).toArray();
+  const filter = sessionId === 'all' ? {} : { sessionId };
+  const entries = await collection.find(filter).toArray();
   return entries;
 }
 
-async function updateLeaderboardEntry(email: string, updates: Partial<LeaderboardEntry>): Promise<LeaderboardEntry> {
+async function updateLeaderboardEntry(sessionId: string, email: string, updates: Partial<LeaderboardEntry>): Promise<LeaderboardEntry> {
   try {
     const client = await getLeaderboardMongoClient();
     const db = client.db(LEADERBOARD_DB);
     const collection = db.collection<LeaderboardEntry>(LEADERBOARD_COLLECTION);
 
-    // $set: apply updates and always refresh lastActive
     const setPayload = { ...updates, lastActive: Date.now() };
-
-    // $setOnInsert: only default fields that are NOT in updates (MongoDB forbids same path in both)
     const setOnInsertPayload: Record<string, unknown> = {
+      sessionId,
       email,
       score: 0,
       completedLabs: [],
@@ -316,44 +317,44 @@ async function updateLeaderboardEntry(email: string, updates: Partial<Leaderboar
     for (const key of Object.keys(updates)) {
       delete setOnInsertPayload[key];
     }
-    delete setOnInsertPayload.lastActive; // always set via $set
+    delete setOnInsertPayload.lastActive;
 
     const result = await collection.findOneAndUpdate(
-      { email },
+      { sessionId, email },
       { $set: setPayload, $setOnInsert: setOnInsertPayload },
       { upsert: true, returnDocument: 'after' }
     );
 
-    return result || { email, score: 0, completedLabs: [], labTimes: {}, lastActive: Date.now() };
+    return result || { sessionId, email, score: 0, completedLabs: [], labTimes: {}, lastActive: Date.now() };
   } catch (error) {
     console.error('Error updating leaderboard entry:', error);
-    return { email, score: 0, completedLabs: [], labTimes: {}, lastActive: Date.now() };
+    return { sessionId, email, score: 0, completedLabs: [], labTimes: {}, lastActive: Date.now() };
   }
 }
 
-async function clearAllLeaderboardEntries(): Promise<void> {
+async function clearAllLeaderboardEntries(sessionId: string): Promise<void> {
   const client = await getLeaderboardMongoClient();
   const db = client.db(LEADERBOARD_DB);
   const collection = db.collection(LEADERBOARD_COLLECTION);
-  await collection.deleteMany({});
+  await collection.deleteMany({ sessionId });
 }
 
-/** Delete a single leaderboard entry by email (moderator only). Call after reset if desired. */
-async function deleteLeaderboardEntry(email: string): Promise<boolean> {
+/** Delete a single leaderboard entry by sessionId and email (moderator only). */
+async function deleteLeaderboardEntry(sessionId: string, email: string): Promise<boolean> {
   const client = await getLeaderboardMongoClient();
   const db = client.db(LEADERBOARD_DB);
   const collection = db.collection(LEADERBOARD_COLLECTION);
-  const result = await collection.deleteOne({ email });
+  const result = await collection.deleteOne({ sessionId, email });
   return (result.deletedCount ?? 0) > 0;
 }
 
-async function addPointEntry(email: string, stepId: string, labNumber: number, points: number, assisted: boolean): Promise<void> {
+async function addPointEntry(sessionId: string, email: string, stepId: string, labNumber: number, points: number, assisted: boolean): Promise<void> {
   try {
     const client = await getLeaderboardMongoClient();
     const db = client.db(LEADERBOARD_DB);
     const collection = db.collection<PointEntry>(POINTS_COLLECTION);
-    
     await collection.insertOne({
+      sessionId,
       email,
       stepId,
       labNumber,
@@ -1605,11 +1606,17 @@ export default defineConfig(({ mode }) => ({
 
           if (req.url && req.url.startsWith('/api/leaderboard')) {
             if (req.method === 'GET') {
-              // Get all leaderboard entries from MongoDB (single read, no per-user writes)
-              // Lab times are updated by heartbeat and start-lab/complete-lab; no need to recalc on every GET.
               (async () => {
                 try {
-                  const entries = await getLeaderboard();
+                  const url = new URL(req.url!, `http://${req.headers.host || 'localhost'}`);
+                  const sessionId = url.searchParams.get('sessionId');
+                  if (!sessionId || sessionId.trim() === '') {
+                    res.statusCode = 400;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ success: false, message: 'sessionId query parameter required' }));
+                    return;
+                  }
+                  const entries = await getLeaderboard(sessionId === 'all' ? 'all' : sessionId);
                   res.setHeader('Content-Type', 'application/json');
                   res.end(JSON.stringify({ entries }));
                 } catch (error: any) {
@@ -1627,19 +1634,20 @@ export default defineConfig(({ mode }) => ({
               req.on('end', async () => {
                 try {
                   const data = JSON.parse(body || '{}');
+                  const sessionId = data?.sessionId;
                   const email = data?.email;
-                  if (!email || typeof email !== 'string') {
+                  if (!sessionId || typeof sessionId !== 'string' || !email || typeof email !== 'string') {
                     res.statusCode = 400;
-                    res.end(JSON.stringify({ success: false, message: 'email required' }));
+                    res.end(JSON.stringify({ success: false, message: 'sessionId and email required' }));
                     return;
                   }
-                  await updateLeaderboardEntry(email, {
+                  await updateLeaderboardEntry(sessionId, email, {
                     score: 0,
                     completedLabs: [],
                     completedStepsByLab: {},
                     labTimes: {}
                   });
-                  const deleted = await deleteLeaderboardEntry(email);
+                  const deleted = await deleteLeaderboardEntry(sessionId, email);
                   res.setHeader('Content-Type', 'application/json');
                   res.end(JSON.stringify({ success: true, deleted }));
                 } catch (e: any) {
@@ -1656,17 +1664,22 @@ export default defineConfig(({ mode }) => ({
               req.on('end', async () => {
                 try {
                   const data = JSON.parse(body);
+                  const sessionId = data?.sessionId;
+                  if (!sessionId || typeof sessionId !== 'string') {
+                    res.statusCode = 400;
+                    res.end(JSON.stringify({ success: false, message: 'sessionId required' }));
+                    return;
+                  }
                   
                   if (req.url?.includes('/start-lab')) {
                     const { email, labNumber, timestamp } = data;
-                    const entries = await getLeaderboard();
+                    const entries = await getLeaderboard(sessionId);
                     const currentEntry = entries.find(e => e.email === email);
                     const currentLabTimes = currentEntry?.labTimes || {};
-                    // If lab already started, don't reset - just update lastActive
                     if (!currentLabTimes[labNumber]) {
                       currentLabTimes[labNumber] = timestamp;
                     }
-                    const entry = await updateLeaderboardEntry(email, {
+                    const entry = await updateLeaderboardEntry(sessionId, email, {
                       labTimes: currentLabTimes
                     });
                     res.setHeader('Content-Type', 'application/json');
@@ -1676,20 +1689,18 @@ export default defineConfig(({ mode }) => ({
                   
                   if (req.url?.includes('/complete-lab')) {
                     const { email, labNumber, score, timestamp } = data;
-                    const entries = await getLeaderboard();
+                    const entries = await getLeaderboard(sessionId);
                     const currentEntry = entries.find(e => e.email === email);
                     const completedLabs = currentEntry?.completedLabs || [];
                     if (!completedLabs.includes(labNumber)) {
                       completedLabs.push(labNumber);
                     }
-                    // Calculate final time for this lab
                     const labTimes = currentEntry?.labTimes || {};
                     const labStartTime = labTimes[labNumber] || timestamp;
                     const labDuration = timestamp - labStartTime;
                     labTimes[labNumber] = labDuration;
-                    // Client sends total score (same as localStorage logic: use higher of current or sent)
                     const newScore = Math.max(currentEntry?.score ?? 0, score ?? 0);
-                    const entry = await updateLeaderboardEntry(email, {
+                    const entry = await updateLeaderboardEntry(sessionId, email, {
                       completedLabs,
                       score: newScore,
                       labTimes
@@ -1701,22 +1712,19 @@ export default defineConfig(({ mode }) => ({
                   
                   if (req.url?.includes('/add-points')) {
                     const { email, stepId, labNumber, points, assisted } = data;
-                    // Add point entry to MongoDB
-                    await addPointEntry(email, stepId, labNumber, points, assisted);
-                    // Update leaderboard score
-                    const entries = await getLeaderboard();
+                    await addPointEntry(sessionId, email, stepId, labNumber, points, assisted);
+                    const entries = await getLeaderboard(sessionId);
                     const currentEntry = entries.find(e => e.email === email);
                     const newScore = (currentEntry?.score || 0) + points;
-                    await updateLeaderboardEntry(email, { score: newScore });
+                    await updateLeaderboardEntry(sessionId, email, { score: newScore });
                     res.setHeader('Content-Type', 'application/json');
                     res.end(JSON.stringify({ success: true }));
                     return;
                   }
                   
-                  // Heartbeat endpoint to update active time (and optional firstName/lastName)
                   if (req.url?.includes('/heartbeat')) {
                     const { email, labNumber, firstName, lastName } = data;
-                    const entries = await getLeaderboard();
+                    const entries = await getLeaderboard(sessionId);
                     const currentEntry = entries.find(e => e.email === email);
                     const heartbeatUpdates: Partial<LeaderboardEntry> = {};
                     if (currentEntry && currentEntry.labTimes[labNumber] && !currentEntry.completedLabs.includes(labNumber)) {
@@ -1732,14 +1740,13 @@ export default defineConfig(({ mode }) => ({
                       heartbeatUpdates.lastName = String(lastName).trim();
                     }
                     if (Object.keys(heartbeatUpdates).length > 0) {
-                      await updateLeaderboardEntry(email, heartbeatUpdates);
+                      await updateLeaderboardEntry(sessionId, email, heartbeatUpdates);
                     }
                     res.setHeader('Content-Type', 'application/json');
                     res.end(JSON.stringify({ success: true }));
                     return;
                   }
                   
-                  // Step progress: persist per-lab completed step indices for this user (restored on login)
                   if (req.url?.includes('/step-progress')) {
                     const { email, labNumber, completedSteps } = data;
                     if (!email || typeof email !== 'string' || typeof labNumber !== 'number' || !Array.isArray(completedSteps)) {
@@ -1747,17 +1754,16 @@ export default defineConfig(({ mode }) => ({
                       res.end(JSON.stringify({ success: false, message: 'email, labNumber, and completedSteps (array) required' }));
                       return;
                     }
-                    const entries = await getLeaderboard();
+                    const entries = await getLeaderboard(sessionId);
                     const currentEntry = entries.find(e => e.email === email);
                     const existing = currentEntry?.completedStepsByLab || {};
                     const updated = { ...existing, [labNumber]: completedSteps };
-                    await updateLeaderboardEntry(email, { completedStepsByLab: updated });
+                    await updateLeaderboardEntry(sessionId, email, { completedStepsByLab: updated });
                     res.setHeader('Content-Type', 'application/json');
                     res.end(JSON.stringify({ success: true }));
                     return;
                   }
                   
-                  // Reset progress: only this user's leaderboard entry (score 0, no completed labs, no lab times). Other users are unchanged.
                   if (req.url?.includes('/reset') && !req.url?.includes('/reset-all')) {
                     const { email } = data;
                     if (!email || typeof email !== 'string') {
@@ -1765,7 +1771,7 @@ export default defineConfig(({ mode }) => ({
                       res.end(JSON.stringify({ success: false, message: 'email required' }));
                       return;
                     }
-                    await updateLeaderboardEntry(email, {
+                    await updateLeaderboardEntry(sessionId, email, {
                       score: 0,
                       completedLabs: [],
                       completedStepsByLab: {},
@@ -1776,10 +1782,9 @@ export default defineConfig(({ mode }) => ({
                     return;
                   }
                   
-                  // Reset full leaderboard (moderator): clear all entries in MongoDB.
                   if (req.url?.includes('/reset-all')) {
                     try {
-                      await clearAllLeaderboardEntries();
+                      await clearAllLeaderboardEntries(sessionId);
                       res.setHeader('Content-Type', 'application/json');
                       res.end(JSON.stringify({ success: true }));
                     } catch (e: any) {
@@ -1864,30 +1869,23 @@ export default defineConfig(({ mode }) => ({
             return;
           }
 
-          // Workshop session endpoints (Atlas-backed)
+          // Workshop session endpoints (Atlas-backed) — central source of truth; client always refreshes from here
           if (req.url && req.url.startsWith('/api/workshop-session')) {
             if (req.method === 'GET') {
-              // Get current workshop session from Atlas
+              // Return all workshop sessions from Atlas (client replaces local list with this)
               (async () => {
                 try {
                   const client = await getLeaderboardMongoClient();
                   const db = client.db(LEADERBOARD_DB);
                   const collection = db.collection('workshop_sessions');
-                  
-                  // Get the most recent active session (or latest if none active)
-                  const session = await collection.findOne(
-                    {},
-                    { sort: { startedAt: -1 } }
-                  );
-                  
+                  const cursor = collection.find({}).sort({ startedAt: -1 });
+                  const sessions = await cursor.toArray();
+                  const sessionData = sessions.map((doc) => {
+                    const { _id, ...rest } = doc;
+                    return rest;
+                  });
                   res.setHeader('Content-Type', 'application/json');
-                  if (session) {
-                    // Remove _id from response
-                    const { _id, ...sessionData } = session;
-                    res.end(JSON.stringify({ success: true, session: sessionData }));
-                  } else {
-                    res.end(JSON.stringify({ success: true, session: null }));
-                  }
+                  res.end(JSON.stringify({ success: true, sessions: sessionData }));
                 } catch (error: any) {
                   res.statusCode = 500;
                   res.end(JSON.stringify({ success: false, message: error.message }));
@@ -1923,6 +1921,38 @@ export default defineConfig(({ mode }) => ({
                   
                   res.setHeader('Content-Type', 'application/json');
                   res.end(JSON.stringify({ success: true, session }));
+                } catch (e: any) {
+                  res.statusCode = 400;
+                  res.end(JSON.stringify({ success: false, message: e.message }));
+                }
+              });
+              return;
+            }
+
+            if (req.method === 'DELETE') {
+              const url = new URL(req.url!, `http://${req.headers.host || 'localhost'}`);
+              const singleId = url.searchParams.get('id');
+              let body = '';
+              req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+              req.on('end', async () => {
+                try {
+                  let ids: string[] = [];
+                  if (singleId) ids = [singleId];
+                  else if (body) {
+                    const data = JSON.parse(body) as { ids?: string[] };
+                    if (Array.isArray(data.ids)) ids = data.ids.filter((id): id is string => typeof id === 'string');
+                  }
+                  if (ids.length === 0) {
+                    res.statusCode = 400;
+                    res.end(JSON.stringify({ success: false, message: 'id (query) or ids (body) required' }));
+                    return;
+                  }
+                  const client = await getLeaderboardMongoClient();
+                  const db = client.db(LEADERBOARD_DB);
+                  const collection = db.collection('workshop_sessions');
+                  const result = await collection.deleteMany({ id: { $in: ids } });
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: true, deletedCount: result.deletedCount }));
                 } catch (e: any) {
                   res.statusCode = 400;
                   res.end(JSON.stringify({ success: false, message: e.message }));
@@ -2441,6 +2471,8 @@ export default defineConfig(({ mode }) => ({
                   i += 1;
                 }
                 script = wrappedLines.join('\n');
+                // Wrap in try/catch so script errors (e.g. db undefined, syntax) are printed to stdout when using --file
+                script = 'try {\n' + script + '\n} catch (e) { print("Mongosh script error: " + e.message); if (e.stack) print(e.stack); throw e; }\n';
                 const tempPath = path.join(os.tmpdir(), `mongosh-${Date.now()}-${Math.random().toString(36).slice(2)}.js`);
                 try {
                   writeFileSync(tempPath, script, 'utf8');
@@ -2457,7 +2489,8 @@ export default defineConfig(({ mode }) => ({
                   try { unlinkSync(tempPath); } catch (_) { /* ignore */ }
                   const exitCode = error?.code ?? (error ? 1 : 0);
                   const isMongoshNotFound = error && (error.code === 'ENOENT' || /posix_spawnp|not found|ENOENT/i.test(error.message || ''));
-                  const out = isMongoshNotFound ? mongoshNotFoundMessage : ([stdout || '', stderr || ''].filter(Boolean).join('\n').trim() || (error?.message || ''));
+                  let out = isMongoshNotFound ? mongoshNotFoundMessage : ([stdout || '', stderr || ''].filter(Boolean).join('\n').trim() || (error?.message || ''));
+                  if (exitCode !== 0 && out && !isMongoshNotFound) out = `Mongosh exited with code ${exitCode}. Output:\n${out}`;
                   sendResult(out, '', exitCode, error);
                 });
               } catch (e: any) {

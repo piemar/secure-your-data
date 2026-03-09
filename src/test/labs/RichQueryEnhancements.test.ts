@@ -48,5 +48,56 @@ describe('Rich Query step enhancements', () => {
     expect(block?.code).toContain('region');
     expect(block?.code).toContain('encrypted');
   });
+
+  describe('Rich Query C# code blocks (Basics + Advanced)', () => {
+    const richQueryCSharpEnhancements: Array<{
+      id: string;
+      mustContain: string[];
+    }> = [
+      {
+        id: 'rich-query.compound-query',
+        mustContain: ['MongoClient', 'GetDatabase', 'BsonDocument', 'Filter.', 'Find('],
+      },
+      {
+        id: 'rich-query.projection-sort',
+        mustContain: ['MongoClient', 'GetDatabase', 'Find(', 'Sort', 'Project'],
+      },
+      {
+        id: 'rich-query.pagination',
+        mustContain: ['Limit', 'Skip', 'Find('],
+      },
+      {
+        id: 'rich-query.index-explain',
+        mustContain: ['Index', 'Explain', 'executionStats'],
+      },
+      {
+        id: 'rich-query.bucket',
+        mustContain: ['Aggregate', 'bucket', 'BsonDocument'],
+      },
+      {
+        id: 'rich-query.lookup',
+        mustContain: ['Aggregate', 'lookup', 'BsonDocument'],
+      },
+      {
+        id: 'rich-query.merge',
+        mustContain: ['Aggregate', 'merge', 'YOUR_SUFFIX'],
+      },
+    ];
+
+    richQueryCSharpEnhancements.forEach(({ id, mustContain }) => {
+      it(`${id} has a C# block with expected content`, async () => {
+        const enh = await getStepEnhancement(id);
+        expect(enh).toBeDefined();
+        expect(enh?.codeBlocks).toBeDefined();
+        const csharpBlock = enh!.codeBlocks!.find((b) => b.language === 'csharp');
+        expect(csharpBlock, `Enhancement ${id} should have a code block with language 'csharp'`).toBeDefined();
+        expect(csharpBlock!.code).toBeDefined();
+        expect(csharpBlock!.code!.length).toBeGreaterThan(0);
+        mustContain.forEach((sub) => {
+          expect(csharpBlock!.code, `C# block for ${id} should contain "${sub}"`).toContain(sub);
+        });
+      });
+    });
+  });
 });
 

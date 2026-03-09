@@ -20,31 +20,30 @@ export const enhancements: EnhancementMetadataRegistry = {
 const uri = process.env.MONGODB_URI;
 if (!uri) throw new Error("MONGODB_URI not set");
 
+function createCustomer(status, gender, dob, state, accountBalance, policies) {
+  return { status, gender, dob, address: { state }, accountBalance, policies };
+}
+
 async function run() {
   const client = await MongoClient.connect(uri);
   const db = client.db("rich_query");
   const coll = db.collection("customers");
-  // Initialize data where it first appears (this step); drop then insert to ensure correct state
   await coll.drop().catch(() => {});
-  await coll.insertMany([
-    { status: 'active', gender: 'Female', dob: new Date('1990-06-15'), address: { state: 'UT' }, accountBalance: 1500.50, policies: [{ policyType: 'life', premium: 100, insured_person: { smoking: true } }, { policyType: 'auto', premium: 200 }] },
-    { status: 'active', gender: 'Female', dob: new Date('1990-03-20'), address: { state: 'UT' }, accountBalance: 2200.75, policies: [{ policyType: 'life', premium: 150, insured_person: { smoking: false } }] },
-    { status: 'active', gender: 'Male', dob: new Date('1985-01-10'), address: { state: 'CA' }, accountBalance: 800.25, policies: [{ policyType: 'auto', premium: 180 }] },
-  ]);
-  console.log("Dropped and recreated sample customers for Rich Query labs.");
+  const docs = [
+    createCustomer('active', 'Female', new Date('1990-06-15'), 'UT', 1500.50, [{ policyType: 'life', premium: 100, insured_person: { smoking: true } }, { policyType: 'auto', premium: 200 }]),
+    createCustomer('active', 'Female', new Date('1990-03-20'), 'UT', 2200.75, [{ policyType: 'life', premium: 150, insured_person: { smoking: false } }]),
+    createCustomer('active', 'Male', new Date('1985-01-10'), 'UT', 800.25, [{ policyType: 'auto', premium: 180 }]),
+  ];
+  for (let i = 3; i < 200; i++) {
+    docs.push(createCustomer('active', i % 2 === 0 ? 'Female' : 'Male', new Date(1980 + (i % 20), i % 12, 1), 'UT', 500 + i * 10, [{ policyType: 'auto', premium: 100 + (i % 50) }]));
+  }
+  await coll.insertMany(docs);
+  console.log("Dropped and recreated 200 sample customers (state UT) for Rich Query labs.");
   const results = await coll.find({
     gender: 'Female',
-    dob: {
-      $gte: new Date('1990-01-01'),
-      $lte: new Date('1990-12-31')
-    },
+    dob: { $gte: new Date('1990-01-01'), $lte: new Date('1990-12-31') },
     'address.state': 'UT',
-    policies: {
-      $elemMatch: {
-        policyType: 'life',
-        'insured_person.smoking': true
-      }
-    }
+    policies: { $elemMatch: { policyType: 'life', 'insured_person.smoking': true } }
   }).toArray();
   console.log(JSON.stringify(results, null, 2));
   await client.close();
@@ -54,30 +53,30 @@ run().catch(console.dir);`,
 const uri = process.env.MONGODB_URI;
 if (!uri) throw new Error("MONGODB_URI not set");
 
+function createCustomer(status, gender, dob, state, accountBalance, policies) {
+  return { status, gender, dob, address: { state }, accountBalance, policies };
+}
+
 async function run() {
   const client = await MongoClient.connect(uri);
   const db = client.db("rich_query");
   const coll = db.collection("customers");
   await coll.drop().catch(() => {});
-  await coll.insertMany([
-    { status: 'active', gender: 'Female', dob: new Date('1990-06-15'), address: { state: 'UT' }, accountBalance: 1500.50, policies: [{ policyType: 'life', premium: 100, insured_person: { smoking: true } }] },
-    { status: 'active', gender: 'Female', dob: new Date('1990-03-20'), address: { state: 'UT' }, accountBalance: 2200.75, policies: [{ policyType: 'life', premium: 150 }] },
-    { status: 'active', gender: 'Male', dob: new Date('1985-01-10'), address: { state: 'CA' }, accountBalance: 800.25, policies: [{ policyType: 'auto', premium: 180 }] },
-  ]);
-  console.log("Dropped and recreated sample customers for Rich Query labs.");
+  const docs = [
+    createCustomer('active', 'Female', new Date('1990-06-15'), 'UT', 1500.50, [{ policyType: 'life', premium: 100, insured_person: { smoking: true } }, { policyType: 'auto', premium: 200 }]),
+    createCustomer('active', 'Female', new Date('1990-03-20'), 'UT', 2200.75, [{ policyType: 'life', premium: 150, insured_person: { smoking: false } }]),
+    createCustomer('active', 'Male', new Date('1985-01-10'), 'UT', 800.25, [{ policyType: 'auto', premium: 180 }]),
+  ];
+  for (let i = 3; i < 200; i++) {
+    docs.push(createCustomer('active', i % 2 === 0 ? 'Female' : 'Male', new Date(1980 + (i % 20), i % 12, 1), 'UT', 500 + i * 10, [{ policyType: 'auto', premium: 100 + (i % 50) }]));
+  }
+  await coll.insertMany(docs);
+  console.log("Dropped and recreated 200 sample customers (state UT) for Rich Query labs.");
   const results = await coll.find({
     gender: '_________',
-    dob: {
-      $gte: new Date('1990-01-01'),
-      $lte: new Date('__________')
-    },
+    dob: { $gte: new Date('1990-01-01'), $lte: new Date('__________') },
     'address.state': 'UT',
-    policies: {
-      $elemMatch: {
-        policyType: 'life',
-        'insured_person.________': true
-      }
-    }
+    policies: { $elemMatch: { policyType: 'life', 'insured_person.________': true } }
   }).toArray();
   console.log(JSON.stringify(results, null, 2));
   await client.close();
@@ -103,92 +102,63 @@ WHERE c.gender = 'Female'
           },
         },
         inlineHints: [
-          {
-            line: 17,
-            blankText: '_________',
-            hint: "Filter by the customer's gender using a string literal.",
-            answer: 'Female',
-          },
-          {
-            line: 20,
-            blankText: '__________',
-            hint: 'Use the last day of 1990 as the upper bound for the date of birth.',
-            answer: '1990-12-31',
-          },
-          {
-            line: 26,
-            blankText: '________',
-            hint: 'This nested field indicates whether the insured person is a smoker.',
-            answer: 'smoking',
-          },
+          { line: 25, blankText: '_________', hint: "Filter by the customer's gender using a string literal.", answer: 'Female' },
+          { line: 26, blankText: '__________', hint: 'Use the last day of 1990 as the upper bound for the date of birth.', answer: '1990-12-31' },
+          { line: 28, blankText: '________', hint: 'This nested field indicates whether the insured person is a smoker.', answer: 'smoking' },
         ],
       },
       {
         filename: 'Mongosh',
         language: 'mongosh',
-        code: `// Data for rich_query.customers is initialized in Rich Query Basics Step 1 (compound-query); drop then insert to ensure correct state
-use rich_query;
+        code: `// Step 1: Create 200 customers in rich_query.customers (drop first), then run compound query. State always UT.
+db = db.getSiblingDB('rich_query');
+function createCustomer(status, gender, dob, state, accountBalance, policies) {
+  return { status, gender, dob, address: { state }, accountBalance, policies };
+}
 db.customers.drop();
-db.customers.insertMany([
-  { status: 'active', gender: 'Female', dob: ISODate('1990-06-15'), address: { state: 'UT' }, accountBalance: 1500.50, policies: [{ policyType: 'life', premium: 100, insured_person: { smoking: true } }, { policyType: 'auto', premium: 200 }] },
-  { status: 'active', gender: 'Female', dob: ISODate('1990-03-20'), address: { state: 'UT' }, accountBalance: 2200.75, policies: [{ policyType: 'life', premium: 150, insured_person: { smoking: false } }] },
-  { status: 'active', gender: 'Male', dob: ISODate('1985-01-10'), address: { state: 'CA' }, accountBalance: 800.25, policies: [{ policyType: 'auto', premium: 180 }] },
-]);
-print("Dropped and recreated sample customers for Rich Query labs.");
-// Find customers who are:
-// - Female
-// - Born in 1990
-// - Living in Utah
-// - Have at least one life insurance policy where the insured person is a smoker
+const docs = [];
+docs.push(createCustomer('active', 'Female', ISODate('1990-06-15'), 'UT', 1500.50, [{ policyType: 'life', premium: 100, insured_person: { smoking: true } }, { policyType: 'auto', premium: 200 }]));
+docs.push(createCustomer('active', 'Female', ISODate('1990-03-20'), 'UT', 2200.75, [{ policyType: 'life', premium: 150, insured_person: { smoking: false } }]));
+docs.push(createCustomer('active', 'Male', ISODate('1985-01-10'), 'UT', 800.25, [{ policyType: 'auto', premium: 180 }]));
+for (let i = 3; i < 200; i++) {
+  docs.push(createCustomer('active', i % 2 === 0 ? 'Female' : 'Male', new Date(1980 + (i % 20), i % 12, 1), 'UT', 500 + i * 10, [{ policyType: 'auto', premium: 100 + (i % 50) }]));
+}
+db.customers.insertMany(docs);
+print("Dropped and recreated 200 sample customers (state UT) for Rich Query labs.");
 const results = db.customers.find({
   gender: 'Female',
-  dob: {
-    $gte: ISODate('1990-01-01'),
-    $lte: ISODate('1990-12-31')
-  },
+  dob: { $gte: ISODate('1990-01-01'), $lte: ISODate('1990-12-31') },
   'address.state': 'UT',
-  policies: {
-    $elemMatch: {
-      policyType: 'life',
-      'insured_person.smoking': true
-    }
-  }
+  policies: { $elemMatch: { policyType: 'life', 'insured_person.smoking': true } }
 }).toArray();
 printjson(results);
 print("Query completed.");`,
-        skeleton: `use rich_query;
+        skeleton: `db = db.getSiblingDB('rich_query');
+function createCustomer(status, gender, dob, state, accountBalance, policies) {
+  return { status, gender, dob, address: { state }, accountBalance, policies };
+}
 db.customers.drop();
-db.customers.insertMany([
-  { status: 'active', gender: 'Female', dob: ISODate('1990-06-15'), address: { state: 'UT' }, accountBalance: 1500.50, policies: [{ policyType: 'life', premium: 100, insured_person: { smoking: true } }] },
-  { status: 'active', gender: 'Female', dob: ISODate('1990-03-20'), address: { state: 'UT' }, accountBalance: 2200.75, policies: [{ policyType: 'life', premium: 150 }] },
-  { status: 'active', gender: 'Male', dob: ISODate('1985-01-10'), address: { state: 'CA' }, accountBalance: 800.25, policies: [{ policyType: 'auto', premium: 180 }] },
-]);
-print("Dropped and recreated sample customers for Rich Query labs.");
-// Find customers who are:
-// - Female
-// - Born in 1990
-// - Living in Utah
-// - Have at least one life insurance policy where the insured person is a smoker
+const docs = [];
+docs.push(createCustomer('active', 'Female', ISODate('1990-06-15'), 'UT', 1500.50, [{ policyType: 'life', premium: 100, insured_person: { smoking: true } }, { policyType: 'auto', premium: 200 }]));
+docs.push(createCustomer('active', 'Female', ISODate('1990-03-20'), 'UT', 2200.75, [{ policyType: 'life', premium: 150, insured_person: { smoking: false } }]));
+docs.push(createCustomer('active', 'Male', ISODate('1985-01-10'), 'UT', 800.25, [{ policyType: 'auto', premium: 180 }]));
+for (let i = 3; i < 200; i++) {
+  docs.push(createCustomer('active', i % 2 === 0 ? 'Female' : 'Male', new Date(1980 + (i % 20), i % 12, 1), 'UT', 500 + i * 10, [{ policyType: 'auto', premium: 100 + (i % 50) }]));
+}
+db.customers.insertMany(docs);
+print("Dropped and recreated 200 sample customers (state UT) for Rich Query labs.");
 const results = db.customers.find({
   gender: '_________',
-  dob: {
-    $gte: ISODate('1990-01-01'),
-    $lte: ISODate('__________')
-  },
+  dob: { $gte: ISODate('1990-01-01'), $lte: ISODate('__________') },
   'address.state': 'UT',
-  policies: {
-    $elemMatch: {
-      policyType: 'life',
-      'insured_person.________': true
-    }
-  }
+  policies: { $elemMatch: { policyType: 'life', 'insured_person.________': true } }
 }).toArray();
 printjson(results);
 print("Query completed.");`,
         inlineHints: [
-          { line: 15, blankText: '_________', hint: "Filter by the customer's gender using a string literal.", answer: 'Female' },
-          { line: 18, blankText: '__________', hint: 'Use the last day of 1990 as the upper bound for the date of birth.', answer: '1990-12-31' },
-          { line: 24, blankText: '________', hint: 'This nested field indicates whether the insured person is a smoker.', answer: 'smoking' },
+          { line: 16, blankText: '_________', hint: "Filter by the customer's gender using a string literal.", answer: 'Female' },
+          { line: 17, blankText: '__________', hint: 'Use the last day of 1990 as the upper bound for the date of birth.', answer: '1990-12-31' },
+          { line: 19, blankText: '________', hint: 'This nested field indicates whether the insured person is a smoker.', answer: 'smoking' },
         ],
       },
       {
@@ -199,19 +169,43 @@ using System.Collections.Generic;
 using MongoDB.Bson;
 using MongoDB.Driver;
 
+// Generate one customer document (keeps sample-data code maintainable and scalable)
+BsonDocument CreateCustomer(string status, string gender, DateTime dob, string state, double accountBalance, BsonArray policies) {
+  var doc = new BsonDocument();
+  doc.Add("status", status);
+  doc.Add("gender", gender);
+  doc.Add("dob", dob);
+  doc.Add("address", new BsonDocument("state", state));
+  doc.Add("accountBalance", accountBalance);
+  doc.Add("policies", policies);
+  return doc;
+}
+
 var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
 if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
 var client = new MongoClient(uri);
 var db = client.GetDatabase("rich_query");
 var coll = db.GetCollection<BsonDocument>("customers");
-coll.Drop();
-var docs = new List<BsonDocument> {
-  new BsonDocument { { "status", "active" }, { "gender", "Female" }, { "dob", new DateTime(1990, 6, 15) }, { "address", new BsonDocument { { "state", "UT" } } }, { "accountBalance", 1500.50 }, { "policies", new BsonArray { new BsonDocument { { "policyType", "life" }, { "premium", 100 }, { "insured_person", new BsonDocument { { "smoking", true } } } }, new BsonDocument { { "policyType", "auto" }, { "premium", 200 } } } } },
-  new BsonDocument { { "status", "active" }, { "gender", "Female" }, { "dob", new DateTime(1990, 3, 20) }, { "address", new BsonDocument { { "state", "UT" } } }, { "accountBalance", 2200.75 }, { "policies", new BsonArray { new BsonDocument { { "policyType", "life" }, { "premium", 150 }, { "insured_person", new BsonDocument { { "smoking", false } } } } } },
-  new BsonDocument { { "status", "active" }, { "gender", "Male" }, { "dob", new DateTime(1985, 1, 10) }, { "address", new BsonDocument { { "state", "CA" } } }, { "accountBalance", 800.25 }, { "policies", new BsonArray { new BsonDocument { { "policyType", "auto" }, { "premium", 180 } } } } },
-};
+db.DropCollection("customers");
+
+var docs = new List<BsonDocument>();
+// First 3: seed data that will match the compound query (Female, 1990, UT, life policy with smoking)
+var p1a = new BsonDocument(); p1a.Add("policyType", "life"); p1a.Add("premium", 100); p1a.Add("insured_person", new BsonDocument("smoking", true));
+var p1b = new BsonDocument(); p1b.Add("policyType", "auto"); p1b.Add("premium", 200);
+var policies1 = new BsonArray(); policies1.Add(p1a); policies1.Add(p1b);
+docs.Add(CreateCustomer("active", "Female", new DateTime(1990, 6, 15), "UT", 1500.50, policies1));
+var p2 = new BsonArray(); var p2a = new BsonDocument(); p2a.Add("policyType", "life"); p2a.Add("premium", 150); p2a.Add("insured_person", new BsonDocument("smoking", false)); p2.Add(p2a);
+docs.Add(CreateCustomer("active", "Female", new DateTime(1990, 3, 20), "UT", 2200.75, p2));
+var p3 = new BsonArray(); var p3a = new BsonDocument(); p3a.Add("policyType", "auto"); p3a.Add("premium", 180); p3.Add(p3a);
+docs.Add(CreateCustomer("active", "Male", new DateTime(1985, 1, 10), "UT", 800.25, p3));
+// Remaining 197: varied customers (state UT; won't all match the filter) so we have 200 total
+for (int i = 3; i < 200; i++) {
+  var ps = new BsonArray();
+  var pol = new BsonDocument(); pol.Add("policyType", "auto"); pol.Add("premium", 100 + (i % 50)); ps.Add(pol);
+  docs.Add(CreateCustomer("active", i % 2 == 0 ? "Female" : "Male", new DateTime(1980 + (i % 20), (i % 12) + 1, 1), "UT", 500 + i * 10, ps));
+}
 coll.InsertMany(docs);
-Console.WriteLine("Dropped and recreated sample customers for Rich Query labs.");
+Console.WriteLine("Dropped and recreated 200 sample customers (state UT) for Rich Query labs.");
 var filter = Builders<BsonDocument>.Filter.And(
   Builders<BsonDocument>.Filter.Eq("gender", "Female"),
   Builders<BsonDocument>.Filter.Gte("dob", new DateTime(1990, 1, 1)),
@@ -223,26 +217,47 @@ var filter = Builders<BsonDocument>.Filter.And(
   ))
 );
 var results = coll.Find(filter).ToList();
-Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(results, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));
 Console.WriteLine("Query completed.");`,
         skeleton: `// Compound query: same as mongosh — Female, born 1990, UT, life policy with smoker
 using System.Collections.Generic;
 using MongoDB.Bson;
 using MongoDB.Driver;
 
+BsonDocument CreateCustomer(string status, string gender, DateTime dob, string state, double accountBalance, BsonArray policies) {
+  var doc = new BsonDocument();
+  doc.Add("status", status);
+  doc.Add("gender", gender);
+  doc.Add("dob", dob);
+  doc.Add("address", new BsonDocument("state", state));
+  doc.Add("accountBalance", accountBalance);
+  doc.Add("policies", policies);
+  return doc;
+}
+
 var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
 if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
 var client = new MongoClient(uri);
 var db = client.GetDatabase("rich_query");
 var coll = db.GetCollection<BsonDocument>("customers");
-coll.Drop();
-var docs = new List<BsonDocument> {
-  new BsonDocument { { "status", "active" }, { "gender", "Female" }, { "dob", new DateTime(1990, 6, 15) }, { "address", new BsonDocument { { "state", "UT" } } }, { "accountBalance", 1500.50 }, { "policies", new BsonArray { new BsonDocument { { "policyType", "life" }, { "insured_person", new BsonDocument { { "smoking", true } } } } } },
-  new BsonDocument { { "status", "active" }, { "gender", "Female" }, { "dob", new DateTime(1990, 3, 20) }, { "address", new BsonDocument { { "state", "UT" } } }, { "accountBalance", 2200.75 }, { "policies", new BsonArray { new BsonDocument { { "policyType", "life" }, { "insured_person", new BsonDocument { { "smoking", false } } } } } },
-  new BsonDocument { { "status", "active" }, { "gender", "Male" }, { "dob", new DateTime(1985, 1, 10) }, { "address", new BsonDocument { { "state", "CA" } } }, { "accountBalance", 800.25 }, { "policies", new BsonArray { new BsonDocument { { "policyType", "auto" }, { "premium", 180 } } } } },
-};
+db.DropCollection("customers");
+
+var docs = new List<BsonDocument>();
+var p1a = new BsonDocument(); p1a.Add("policyType", "life"); p1a.Add("premium", 100); p1a.Add("insured_person", new BsonDocument("smoking", true));
+var p1b = new BsonDocument(); p1b.Add("policyType", "auto"); p1b.Add("premium", 200);
+var policies1 = new BsonArray(); policies1.Add(p1a); policies1.Add(p1b);
+docs.Add(CreateCustomer("active", "Female", new DateTime(1990, 6, 15), "UT", 1500.50, policies1));
+var p2 = new BsonArray(); var p2a = new BsonDocument(); p2a.Add("policyType", "life"); p2a.Add("premium", 150); p2a.Add("insured_person", new BsonDocument("smoking", false)); p2.Add(p2a);
+docs.Add(CreateCustomer("active", "Female", new DateTime(1990, 3, 20), "UT", 2200.75, p2));
+var p3 = new BsonArray(); var p3a = new BsonDocument(); p3a.Add("policyType", "auto"); p3a.Add("premium", 180); p3.Add(p3a);
+docs.Add(CreateCustomer("active", "Male", new DateTime(1985, 1, 10), "UT", 800.25, p3));
+for (int i = 3; i < 200; i++) {
+  var ps = new BsonArray();
+  var pol = new BsonDocument(); pol.Add("policyType", "auto"); pol.Add("premium", 100 + (i % 50)); ps.Add(pol);
+  docs.Add(CreateCustomer("active", i % 2 == 0 ? "Female" : "Male", new DateTime(1980 + (i % 20), (i % 12) + 1, 1), "UT", 500 + i * 10, ps));
+}
 coll.InsertMany(docs);
-Console.WriteLine("Dropped and recreated sample customers for Rich Query labs.");
+Console.WriteLine("Dropped and recreated 200 sample customers (state UT) for Rich Query labs.");
 var filter = Builders<BsonDocument>.Filter.And(
   Builders<BsonDocument>.Filter.Eq("gender", "_________"),
   Builders<BsonDocument>.Filter.Gte("dob", new DateTime(1990, 1, 1)),
@@ -254,10 +269,10 @@ var filter = Builders<BsonDocument>.Filter.And(
   ))
 );
 var results = coll.Find(filter).ToList();
-Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(results, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));`,
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));`,
         inlineHints: [
-          { line: 22, blankText: '_________', hint: "Filter by the customer's gender using a string literal.", answer: 'Female' },
-          { line: 28, blankText: '________', hint: 'Nested field indicating whether the insured person is a smoker.', answer: 'smoking' },
+          { line: 41, blankText: '_________', hint: "Filter by the customer's gender using a string literal.", answer: 'Female' },
+          { line: 47, blankText: '________', hint: 'Nested field indicating whether the insured person is a smoker.', answer: 'smoking' },
         ],
       },
     ],
@@ -446,7 +461,7 @@ var filter = Builders<BsonDocument>.Filter.And(
 );
 var projection = Builders<BsonDocument>.Projection.Exclude("_id").Include("firstName").Include("lastName").Include("dob");
 var results = db.GetCollection<BsonDocument>("customers").Find(filter).Project(projection).Sort(Builders<BsonDocument>.Sort.Ascending("dob")).ToList();
-Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(results, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));`,
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));`,
         skeleton: `// Projection and sort: same as mongosh
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -469,12 +484,12 @@ var projection = Builders<BsonDocument>.Projection.Exclude("_id")
   .Include("_________")
   .Include("_________")
   .Include("dob");
-var results = db.GetCollection<BsonDocument>("customers").Find(filter).Project(projection).Sort(Builders<BsonDocument>.Sort.___________("dob")).ToList();
-Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(results, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));`,
+var results = db.GetCollection<BsonDocument>("customers").Find(filter).Project(projection).Sort(Builders<BsonDocument>.Sort._________("dob")).ToList();
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));`,
         inlineHints: [
-          { line: 21, blankText: '_________', hint: 'Include the given name field in the projection.', answer: 'firstName' },
-          { line: 22, blankText: '_________', hint: 'Include the family name field in the projection.', answer: 'lastName' },
-          { line: 24, blankText: '___________', hint: 'Sort ascending by the given field.', answer: 'Ascending' },
+          { line: 20, blankText: '_________', hint: 'Include the given name field in the projection.', answer: 'firstName' },
+          { line: 21, blankText: '_________', hint: 'Include the family name field in the projection.', answer: 'lastName' },
+          { line: 23, blankText: '_________', hint: 'Sort ascending by the given field (use Descending for descending order).', answer: 'Ascending' },
         ],
       },
     ],
@@ -595,7 +610,7 @@ var results = db.GetCollection<BsonDocument>("customers")
   .Skip(page * pageSize)
   .Limit(pageSize)
   .ToList();
-Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(results, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));
 Console.WriteLine("Query completed.");`,
         skeleton: `// Pagination: same as mongosh
 using MongoDB.Bson;
@@ -613,11 +628,11 @@ var results = db.GetCollection<BsonDocument>("customers")
   .______(page * pageSize)
   .______(pageSize)
   .ToList();
-Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(results, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));`,
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));`,
         inlineHints: [
-          { line: 11, blankText: '______', hint: 'Zero-based page index (e.g. 2 for third page).', answer: '2' },
-          { line: 16, blankText: '______', hint: 'Cursor method to skip the first n documents.', answer: 'Skip' },
-          { line: 17, blankText: '______', hint: 'Cursor method to cap the number of documents returned.', answer: 'Limit' },
+          { line: 10, blankText: '______', hint: 'Zero-based page index (e.g. 2 for third page).', answer: '2' },
+          { line: 14, blankText: '______', hint: 'Cursor method to skip the first n documents.', answer: 'Skip' },
+          { line: 15, blankText: '______', hint: 'Cursor method to cap the number of documents returned.', answer: 'Limit' },
         ],
       },
     ],
@@ -699,7 +714,7 @@ run().catch(console.dir);`,
         filename: 'Mongosh',
         language: 'mongosh',
         code: `// Create compound index then run explain() in one script (equality fields first, range last).
-use rich_query;
+db = db.getSiblingDB('rich_query');
 db.customers.createIndex({
   'address.state': 1,
   'policies.policyType': 1,
@@ -716,7 +731,7 @@ const explainResult = db.customers.find({
 }).explain('executionStats');
 printjson(explainResult);
 print("Explain completed.");`,
-        skeleton: `use rich_query;
+        skeleton: `db = db.getSiblingDB('rich_query');
 db.customers.createIndex({
   'address.state': 1,
   'policies.policyType': 1,
@@ -735,6 +750,73 @@ printjson(explainResult);
 print("Explain completed.");`,
         inlineHints: [
           { line: 15, blankText: '_________', hint: 'Explain mode that returns execution stats (e.g. IXSCAN vs COLLSCAN).', answer: 'executionStats' },
+        ],
+      },
+      {
+        filename: 'index-and-explain.cs',
+        language: 'csharp',
+        code: `// Create compound index then run explain via RunCommand (same logic as mongosh).
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var indexKeys = Builders<BsonDocument>.IndexKeys
+  .Ascending("address.state")
+  .Ascending("policies.policyType")
+  .Ascending("policies.insured_person.smoking")
+  .Ascending("gender")
+  .Ascending("dob");
+coll.Indexes.CreateOne(new CreateIndexModel<BsonDocument>(indexKeys));
+Console.WriteLine("Index created.");
+var filterDoc = new BsonDocument {
+  { "gender", "Female" },
+  { "dob", new BsonDocument { { "$gte", new BsonDateTime(new DateTime(1990, 1, 1)) }, { "$lte", new BsonDateTime(new DateTime(1990, 12, 31)) } } },
+  { "address.state", "UT" },
+  { "policies", new BsonDocument { { "$elemMatch", new BsonDocument { { "policyType", "life" }, { "insured_person.smoking", true } } } } }
+};
+var explainCmd = new BsonDocument {
+  { "explain", new BsonDocument { { "find", "customers" }, { "filter", filterDoc } } },
+  { "verbosity", "executionStats" }
+};
+var explain = db.RunCommand<BsonDocument>(explainCmd);
+Console.WriteLine(explain.ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));
+Console.WriteLine("Explain completed.");`,
+        skeleton: `// Create compound index then run explain via RunCommand (same logic as mongosh).
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var indexKeys = Builders<BsonDocument>.IndexKeys
+  .Ascending("address.state")
+  .Ascending("policies.policyType")
+  .Ascending("policies.insured_person.smoking")
+  .Ascending("gender")
+  .Ascending("dob");
+coll.Indexes.CreateOne(new CreateIndexModel<BsonDocument>(indexKeys));
+Console.WriteLine("Index created.");
+var filterDoc = new BsonDocument {
+  { "gender", "Female" },
+  { "dob", new BsonDocument { { "$gte", new BsonDateTime(new DateTime(1990, 1, 1)) }, { "$lte", new BsonDateTime(new DateTime(1990, 12, 31)) } } },
+  { "address.state", "UT" },
+  { "policies", new BsonDocument { { "$elemMatch", new BsonDocument { { "policyType", "life" }, { "insured_person.smoking", true } } } } }
+};
+var explainCmd = new BsonDocument {
+  { "explain", new BsonDocument { { "find", "customers" }, { "filter", filterDoc } } },
+  { "verbosity", "_________" }
+};
+var explain = db.RunCommand<BsonDocument>(explainCmd);
+Console.WriteLine(explain.ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));
+Console.WriteLine("Explain completed.");`,
+        inlineHints: [
+          { line: 26, blankText: '_________', hint: 'Explain verbosity that returns execution stats (e.g. IXSCAN vs COLLSCAN).', answer: 'executionStats' },
         ],
       },
     ],
@@ -806,7 +888,7 @@ run().catch(console.dir);`,
         filename: 'Mongosh',
         language: 'mongosh',
         code: `// Data initialized in Rich Query Basics Step 1 (compound-query)
-use rich_query;
+db = db.getSiblingDB('rich_query');
 const results = db.customers.aggregate([
   { $match: { 'address.state': 'UT', status: 'active' } },
   { $group: { _id: '$address.state', totalCustomers: { $sum: 1 }, totalValue: { $sum: '$accountBalance' } } },
@@ -814,7 +896,7 @@ const results = db.customers.aggregate([
 ]).toArray();
 printjson(results);
 print("Aggregation completed.");`,
-        skeleton: `use rich_query;
+        skeleton: `db = db.getSiblingDB('rich_query');
 const results = db.customers.aggregate([
   { $match: { 'address.state': 'UT', status: '_________' } },
   {
@@ -833,6 +915,64 @@ print("Aggregation completed.");`,
           { line: 7, blankText: '_________', hint: 'Use 1 to count each document in the group.', answer: '1' },
           { line: 8, blankText: '$_________', hint: 'Sum the account balance field for each customer.', answer: 'accountBalance' },
           { line: 11, blankText: '_________', hint: 'Sort in descending order (highest value first).', answer: '-1' },
+        ],
+      },
+      {
+        filename: 'basic-aggregation.cs',
+        language: 'csharp',
+        code: `// Step 1: $match + $group + $sort (same logic as mongosh).
+using System.Collections.Generic;
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var pipeline = new List<BsonDocument>
+{
+  new BsonDocument("$match", new BsonDocument { { "address.state", "UT" }, { "status", "active" } }),
+  new BsonDocument("$group", new BsonDocument
+  {
+    { "_id", "$address.state" },
+    { "totalCustomers", new BsonDocument("$sum", 1) },
+    { "totalValue", new BsonDocument("$sum", "$accountBalance") }
+  }),
+  new BsonDocument("$sort", new BsonDocument("totalValue", -1))
+};
+var results = coll.Aggregate<BsonDocument>(pipeline).ToList();
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));
+Console.WriteLine("Aggregation completed.");`,
+        skeleton: `// Step 1: $match + $group + $sort (same logic as mongosh).
+using System.Collections.Generic;
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var pipeline = new List<BsonDocument>
+{
+  new BsonDocument("$match", new BsonDocument { { "address.state", "UT" }, { "status", "_________" } }),
+  new BsonDocument("$group", new BsonDocument
+  {
+    { "_id", "$address.state" },
+    { "totalCustomers", new BsonDocument("$sum", _________) },
+    { "totalValue", new BsonDocument("$sum", "$_________") }
+  }),
+  new BsonDocument("$sort", new BsonDocument("totalValue", _________))
+};
+var results = coll.Aggregate<BsonDocument>(pipeline).ToList();
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));
+Console.WriteLine("Aggregation completed.");`,
+        inlineHints: [
+          { line: 13, blankText: '_________', hint: 'Filter for customers with active status.', answer: 'active' },
+          { line: 17, blankText: '_________', hint: 'Use 1 to count each document in the group.', answer: '1' },
+          { line: 18, blankText: '$_________', hint: 'Sum the account balance field for each customer.', answer: 'accountBalance' },
+          { line: 20, blankText: '_________', hint: 'Sort in descending order (highest value first).', answer: '-1' },
         ],
       },
     ],
@@ -904,7 +1044,7 @@ run().catch(console.dir);`,
         filename: 'Mongosh',
         language: 'mongosh',
         code: `// Use same database as Step 1 (customers collection created there)
-use rich_query;
+db = db.getSiblingDB('rich_query');
 // Use $project to rename and compute derived fields
 const results = db.customers.aggregate([
   { $match: { status: 'active' } },
@@ -914,7 +1054,7 @@ const results = db.customers.aggregate([
 printjson(results);
 print("Aggregation completed.");`,
         skeleton: `// Use same database as Step 1 (run Step 1 first to create customers)
-use rich_query;
+db = db.getSiblingDB('rich_query');
 // Use $project to rename and compute derived fields
 const results = db.customers.aggregate([
   { $match: { status: '_________' } },
@@ -936,6 +1076,77 @@ print("Aggregation completed.");`,
           { line: 6, blankText: '$_________', hint: 'Calculate the average of the account balance field.', answer: 'accountBalance' },
           { line: 12, blankText: '$_________', hint: 'Round the average balance value (reference the $group output field with $).', answer: '$avgBalance' },
           { line: 13, blankText: '_________', hint: 'Add a static status field with the value "active".', answer: 'active' },
+        ],
+      },
+      {
+        filename: 'projection-aggregation.cs',
+        language: 'csharp',
+        code: `// Step 2: $match + $group + $project (same logic as mongosh).
+using System.Collections.Generic;
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var pipeline = new List<BsonDocument>
+{
+  new BsonDocument("$match", new BsonDocument("status", "active")),
+  new BsonDocument("$group", new BsonDocument
+  {
+    { "_id", "$address.state" },
+    { "count", new BsonDocument("$sum", 1) },
+    { "avgBalance", new BsonDocument("$avg", "$accountBalance") }
+  }),
+  new BsonDocument("$project", new BsonDocument
+  {
+    { "_id", 0 },
+    { "state", "$_id" },
+    { "customerCount", "$count" },
+    { "averageBalance", new BsonDocument("$round", new BsonArray { "$avgBalance", 2 }) },
+    { "status", "active" }
+  })
+};
+var results = coll.Aggregate<BsonDocument>(pipeline).ToList();
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));
+Console.WriteLine("Aggregation completed.");`,
+        skeleton: `// Step 2: $match + $group + $project (same logic as mongosh).
+using System.Collections.Generic;
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var pipeline = new List<BsonDocument>
+{
+  new BsonDocument("$match", new BsonDocument("status", "active")),
+  new BsonDocument("$group", new BsonDocument
+  {
+    { "_id", "$address.state" },
+    { "count", new BsonDocument("$sum", 1) },
+    { "avgBalance", new BsonDocument("$avg", "$_________") }
+  }),
+  new BsonDocument("$project", new BsonDocument
+  {
+    { "_id", 0 },
+    { "state", "$_id" },
+    { "customerCount", "$count" },
+    { "averageBalance", new BsonDocument("$round", new BsonArray { "$_________", 2 }) },
+    { "status", "_________" }
+  })
+};
+var results = coll.Aggregate<BsonDocument>(pipeline).ToList();
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));
+Console.WriteLine("Aggregation completed.");`,
+        inlineHints: [
+          { line: 18, blankText: '$_________', hint: 'Calculate the average of the account balance field.', answer: 'accountBalance' },
+          { line: 25, blankText: '$_________', hint: 'Round the average balance value (reference the $group output field with $).', answer: 'avgBalance' },
+          { line: 26, blankText: '_________', hint: 'Add a static status field with the value "active".', answer: 'active' },
         ],
       },
     ],
@@ -1011,30 +1222,10 @@ async function run() {
 }
 run().catch(console.dir);`,
         inlineHints: [
-          {
-            line: 13,
-            blankText: '$_________',
-            hint: 'Sum the account balance field.',
-            answer: 'accountBalance',
-          },
-          {
-            line: 14,
-            blankText: '_________',
-            hint: 'Sort in descending order (highest count first).',
-            answer: '-1',
-          },
-          {
-            line: 17,
-            blankText: '$_________',
-            hint: 'Unwind the policies array to process each policy separately (use $ prefix for field path).',
-            answer: '$policies',
-          },
-          {
-            line: 18,
-            blankText: '$policies._________',
-            hint: 'Calculate the average premium for each policy type.',
-            answer: 'premium',
-          },
+          { line: 14, blankText: '$_________', hint: 'Sum the account balance field.', answer: 'accountBalance' },
+          { line: 15, blankText: '_________', hint: 'Sort in descending order (highest count first).', answer: '-1' },
+          { line: 18, blankText: '$_________', hint: 'Unwind the policies array to process each policy separately (use $ prefix for field path).', answer: '$policies' },
+          { line: 19, blankText: '$policies._________', hint: 'Calculate the average premium for each policy type.', answer: 'premium' },
         ],
       },
       {
@@ -1042,7 +1233,7 @@ run().catch(console.dir);`,
         language: 'mongosh',
         code: `// Run multiple aggregations in a single pipeline using $facet
 // Feed multiple dashboards from one query
-
+db = db.getSiblingDB('rich_query');
 const results = db.customers.aggregate([
   {
     $match: { status: 'active' }
@@ -1079,7 +1270,7 @@ printjson(results);
 print("Facet aggregation completed.");`,
         skeleton: `// Run multiple aggregations in a single pipeline using $facet
 // Feed multiple dashboards from one query
-
+db = db.getSiblingDB('rich_query');
 const results = db.customers.aggregate([
   {
     $match: { status: 'active' }
@@ -1115,10 +1306,86 @@ const results = db.customers.aggregate([
 printjson(results);
 print("Facet aggregation completed.");`,
         inlineHints: [
-          { line: 15, blankText: '$_________', hint: 'Sum the account balance field.', answer: 'accountBalance' },
-          { line: 18, blankText: '_________', hint: 'Sort in descending order (highest count first).', answer: '-1' },
-          { line: 22, blankText: '$_________', hint: 'Array field name to unwind (path is prefixed with $).', answer: '$policies' },
-          { line: 28, blankText: '$policies._________', hint: 'Calculate the average premium for each policy type.', answer: 'premium' },
+          { line: 16, blankText: '$_________', hint: 'Sum the account balance field.', answer: 'accountBalance' },
+          { line: 19, blankText: '_________', hint: 'Sort in descending order (highest count first).', answer: '-1' },
+          { line: 23, blankText: '$_________', hint: 'Array field name to unwind (path is prefixed with $).', answer: '$policies' },
+          { line: 29, blankText: '$policies._________', hint: 'Calculate the average premium for each policy type.', answer: 'premium' },
+        ],
+      },
+      {
+        filename: 'facet-aggregation.cs',
+        language: 'csharp',
+        code: `// Step 5: $facet — multiple aggregations in one pipeline (same logic as mongosh).
+using System.Collections.Generic;
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var pipeline = new List<BsonDocument>
+{
+  new BsonDocument("$match", new BsonDocument("status", "active")),
+  new BsonDocument("$facet", new BsonDocument
+  {
+    { "byRegion", new BsonArray
+      {
+        new BsonDocument("$group", new BsonDocument { { "_id", "$address.state" }, { "count", new BsonDocument("$sum", 1) }, { "totalValue", new BsonDocument("$sum", "$accountBalance") } }),
+        new BsonDocument("$sort", new BsonDocument("count", -1))
+      }
+    },
+    { "byProduct", new BsonArray
+      {
+        new BsonDocument("$unwind", new BsonDocument("path", "$policies")),
+        new BsonDocument("$group", new BsonDocument { { "_id", "$policies.policyType" }, { "count", new BsonDocument("$sum", 1) }, { "avgPremium", new BsonDocument("$avg", "$policies.premium") } }),
+        new BsonDocument("$sort", new BsonDocument("count", -1))
+      }
+    }
+  })
+};
+var results = coll.Aggregate<BsonDocument>(pipeline).ToList();
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));
+Console.WriteLine("Facet aggregation completed.");`,
+        skeleton: `// Step 5: $facet — multiple aggregations in one pipeline (same logic as mongosh).
+using System.Collections.Generic;
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var pipeline = new List<BsonDocument>
+{
+  new BsonDocument("$match", new BsonDocument("status", "active")),
+  new BsonDocument("$facet", new BsonDocument
+  {
+    { "byRegion", new BsonArray
+      {
+        new BsonDocument("$group", new BsonDocument { { "_id", "$address.state" }, { "count", new BsonDocument("$sum", 1) }, { "totalValue", new BsonDocument("$sum", "$_________") } }),
+        new BsonDocument("$sort", new BsonDocument("count", _________))
+      }
+    },
+    { "byProduct", new BsonArray
+      {
+        new BsonDocument("$unwind", new BsonDocument("path", "$_________")),
+        new BsonDocument("$group", new BsonDocument { { "_id", "$policies.policyType" }, { "count", new BsonDocument("$sum", 1) }, { "avgPremium", new BsonDocument("$avg", "$policies._________") } }),
+        new BsonDocument("$sort", new BsonDocument("count", -1))
+      }
+    }
+  })
+};
+var results = coll.Aggregate<BsonDocument>(pipeline).ToList();
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));
+Console.WriteLine("Facet aggregation completed.");`,
+        inlineHints: [
+          { line: 18, blankText: '$_________', hint: 'Sum the account balance field.', answer: 'accountBalance' },
+          { line: 19, blankText: '_________', hint: 'Sort in descending order (highest count first).', answer: '-1' },
+          { line: 24, blankText: '$_________', hint: 'Array field name to unwind (path is prefixed with $).', answer: 'policies' },
+          { line: 25, blankText: '$policies._________', hint: 'Calculate the average premium for each policy type.', answer: 'premium' },
         ],
       },
     ],
@@ -1166,7 +1433,13 @@ async function run() {
   const results = await db.collection("customers").aggregate([
     { $match: { status: '_________' } },
     { $unwind: { path: '$_________' } },
-    { $group: { _id: '$policies.policyType', count: { $sum: _________ }, avgPremium: { $avg: '$policies._________' } } },
+    {
+      $group: {
+        _id: '$policies.policyType',
+        count: { $sum: _________ },
+        avgPremium: { $avg: '$policies._________' }
+      }
+    },
     { $sort: { count: _________ } }
   ]).toArray();
   console.log(JSON.stringify(results, null, 2));
@@ -1174,11 +1447,11 @@ async function run() {
 }
 run().catch(console.dir);`,
         inlineHints: [
-          { line: 9, blankText: '_________', hint: 'Filter to active customers only.', answer: 'active' },
-          { line: 10, blankText: '$_________', hint: 'Array field to deconstruct (path must be $-prefixed, e.g. $policies).', answer: '$policies' },
-          { line: 11, blankText: '_________', hint: 'Use 1 to count each unwound document.', answer: '1' },
-          { line: 11, blankText: '$policies._________', hint: 'Average this numeric field from each policy.', answer: 'premium' },
-          { line: 12, blankText: '_________', hint: 'Sort descending so highest count is first.', answer: '-1' },
+          { line: 10, blankText: '_________', hint: 'Filter to active customers only.', answer: 'active' },
+          { line: 11, blankText: '$_________', hint: 'Array field to deconstruct (path must be $-prefixed, e.g. $policies).', answer: '$policies' },
+          { line: 14, blankText: '_________', hint: 'Use 1 to count each unwound document.', answer: '1' },
+          { line: 15, blankText: '$policies._________', hint: 'Average this numeric field from each policy.', answer: 'premium' },
+          { line: 17, blankText: '_________', hint: 'Sort descending so highest count is first.', answer: '-1' },
         ],
       },
       {
@@ -1186,7 +1459,7 @@ run().catch(console.dir);`,
         language: 'mongosh',
         code: `// STEP 3: Unwind Arrays with $unwind
 // Deconstruct the policies array and aggregate per policy type.
-
+db = db.getSiblingDB('rich_query');
 const results = db.customers.aggregate([
   { $match: { status: 'active' } },
   { $unwind: { path: '$policies' } },
@@ -1203,7 +1476,7 @@ printjson(results);
 print("Unwind aggregation completed.");`,
         skeleton: `// STEP 3: Unwind Arrays with $unwind
 // TASK: Fill in the $match filter, $unwind path (field name; path is prefixed with $), and $group accumulators.
-
+db = db.getSiblingDB('rich_query');
 const results = db.customers.aggregate([
   { $match: { status: '_________' } },
   { $unwind: { path: '$_________' } },
@@ -1224,6 +1497,67 @@ print("Unwind aggregation completed.");`,
           { line: 10, blankText: '_________', hint: 'Use 1 to count each unwound document.', answer: '1' },
           { line: 11, blankText: '$policies._________', hint: 'Average this numeric field from each policy.', answer: 'premium' },
           { line: 14, blankText: '_________', hint: 'Sort descending so highest count is first.', answer: '-1' },
+        ],
+      },
+      {
+        filename: 'unwind-aggregation.cs',
+        language: 'csharp',
+        code: `// Step 3: $unwind + $group (same logic as mongosh).
+using System.Collections.Generic;
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var pipeline = new List<BsonDocument>
+{
+  new BsonDocument("$match", new BsonDocument("status", "active")),
+  new BsonDocument("$unwind", new BsonDocument("path", "$policies")),
+  new BsonDocument("$group", new BsonDocument
+  {
+    { "_id", "$policies.policyType" },
+    { "count", new BsonDocument("$sum", 1) },
+    { "avgPremium", new BsonDocument("$avg", "$policies.premium") }
+  }),
+  new BsonDocument("$sort", new BsonDocument("count", -1))
+};
+var results = coll.Aggregate<BsonDocument>(pipeline).ToList();
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));
+Console.WriteLine("Unwind aggregation completed.");`,
+        skeleton: `// Step 3: $unwind + $group (same logic as mongosh).
+using System.Collections.Generic;
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var pipeline = new List<BsonDocument>
+{
+  new BsonDocument("$match", new BsonDocument("status", "_________")),
+  new BsonDocument("$unwind", new BsonDocument("path", "$_________")),
+  new BsonDocument("$group", new BsonDocument
+  {
+    { "_id", "$policies.policyType" },
+    { "count", new BsonDocument("$sum", _________) },
+    { "avgPremium", new BsonDocument("$avg", "$policies._________") }
+  }),
+  new BsonDocument("$sort", new BsonDocument("count", _________))
+};
+var results = coll.Aggregate<BsonDocument>(pipeline).ToList();
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));
+Console.WriteLine("Unwind aggregation completed.");`,
+        inlineHints: [
+          { line: 13, blankText: '_________', hint: 'Filter to active customers only.', answer: 'active' },
+          { line: 14, blankText: '$_________', hint: 'Array field name to unwind (path is prefixed with $).', answer: 'policies' },
+          { line: 18, blankText: '_________', hint: 'Use 1 to count each unwound document.', answer: '1' },
+          { line: 19, blankText: '_________', hint: 'Average this numeric field from each policy (e.g. premium).', answer: 'premium' },
+          { line: 21, blankText: '_________', hint: 'Sort descending so highest count is first.', answer: '-1' },
         ],
       },
     ],
@@ -1288,7 +1622,7 @@ run().catch(console.dir);`,
         language: 'mongosh',
         code: `// STEP 4: Top N with $sort and $limit
 // Return only the top 5 states by total account value.
-
+db = db.getSiblingDB('rich_query');
 const results = db.customers.aggregate([
   { $match: { status: 'active' } },
   {
@@ -1305,7 +1639,7 @@ printjson(results);
 print("Top N aggregation completed.");`,
         skeleton: `// STEP 4: Top N with $sort and $limit
 // TASK: Add $sort and $limit to return the top 5 states.
-
+db = db.getSiblingDB('rich_query');
 const results = db.customers.aggregate([
   { $match: { status: 'active' } },
   {
@@ -1324,6 +1658,65 @@ print("Top N aggregation completed.");`,
           { line: 10, blankText: '$_________', hint: 'Sum this field to get total value per state.', answer: 'accountBalance' },
           { line: 13, blankText: '_________', hint: 'Use -1 for descending (highest total first).', answer: '-1' },
           { line: 14, blankText: '_________', hint: 'Return only the top 5 groups.', answer: '5' },
+        ],
+      },
+      {
+        filename: 'top-n-aggregation.cs',
+        language: 'csharp',
+        code: `// Step 4: Top N with $sort + $limit (same logic as mongosh).
+using System.Collections.Generic;
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var pipeline = new List<BsonDocument>
+{
+  new BsonDocument("$match", new BsonDocument("status", "active")),
+  new BsonDocument("$group", new BsonDocument
+  {
+    { "_id", "$address.state" },
+    { "totalCustomers", new BsonDocument("$sum", 1) },
+    { "totalValue", new BsonDocument("$sum", "$accountBalance") }
+  }),
+  new BsonDocument("$sort", new BsonDocument("totalValue", -1)),
+  new BsonDocument("$limit", 5)
+};
+var results = coll.Aggregate<BsonDocument>(pipeline).ToList();
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));
+Console.WriteLine("Top N aggregation completed.");`,
+        skeleton: `// Step 4: Top N with $sort + $limit (same logic as mongosh).
+using System.Collections.Generic;
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var pipeline = new List<BsonDocument>
+{
+  new BsonDocument("$match", new BsonDocument("status", "active")),
+  new BsonDocument("$group", new BsonDocument
+  {
+    { "_id", "$address.state" },
+    { "totalCustomers", new BsonDocument("$sum", 1) },
+    { "totalValue", new BsonDocument("$sum", "$_________") }
+  }),
+  new BsonDocument("$sort", new BsonDocument("totalValue", _________)),
+  new BsonDocument("$limit", _________)
+};
+var results = coll.Aggregate<BsonDocument>(pipeline).ToList();
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));
+Console.WriteLine("Top N aggregation completed.");`,
+        inlineHints: [
+          { line: 18, blankText: '$_________', hint: 'Sum this field to get total value per state.', answer: 'accountBalance' },
+          { line: 20, blankText: '_________', hint: 'Use -1 for descending (highest total first).', answer: '-1' },
+          { line: 21, blankText: '_________', hint: 'Return only the top 5 groups.', answer: '5' },
         ],
       },
     ],
@@ -1366,7 +1759,10 @@ async function run() {
   const client = await MongoClient.connect(uri);
   const db = client.db("rich_query");
   const results = await db.collection("customers").aggregate([
-    { $match: { status: '_________', 'address.state': '_________' } },
+    { $match: {
+      status: '_________',
+      'address.state': '_________'
+    } },
     { $count: '_________' }
   ]).toArray();
   console.log(JSON.stringify(results, null, 2));
@@ -1374,9 +1770,9 @@ async function run() {
 }
 run().catch(console.dir);`,
         inlineHints: [
-          { line: 9, blankText: '_________', hint: 'Filter by this status value.', answer: 'active' },
-          { line: 9, blankText: '_________', hint: 'Filter by state (e.g. UT).', answer: 'UT' },
-          { line: 10, blankText: '_________', hint: 'Output field name for the count (e.g. totalActive).', answer: 'totalActive' },
+          { line: 10, blankText: '_________', hint: 'Filter by this status value.', answer: 'active' },
+          { line: 11, blankText: '_________', hint: 'Filter by state (e.g. UT).', answer: 'UT' },
+          { line: 13, blankText: '_________', hint: 'Output field name for the count (e.g. totalActive).', answer: 'totalActive' },
         ],
       },
       {
@@ -1384,26 +1780,93 @@ run().catch(console.dir);`,
         language: 'mongosh',
         code: `// STEP 6: Document count with $count
 // Count documents that match the filter.
-
+db = db.getSiblingDB('rich_query');
 const results = db.customers.aggregate([
-  { $match: { status: 'active', 'address.state': 'UT' } },
-  { $count: 'totalActive' }
+  { $match: {
+    status: '_________',
+    'address.state': '_________'
+  } },
+  { $count: '_________' }
 ]).toArray();
 printjson(results);
 print("Count aggregation completed.");`,
         skeleton: `// STEP 6: Document count with $count
 // TASK: Add $match filter and $count output field name.
-
+db = db.getSiblingDB('rich_query');
 const results = db.customers.aggregate([
-  { $match: { status: '_________', 'address.state': '_________' } },
+  { $match: {
+    status: '_________',
+    'address.state': '_________'
+  } },
+  { $count: '_________' }
+]).toArray();
+printjson(results);
+print("Count aggregation completed.");`,
+        skeleton: `// STEP 6: Document count with $count
+// TASK: Add $match filter and $count output field name.
+db = db.getSiblingDB('rich_query');
+const results = db.customers.aggregate([
+  { $match: {
+    status: '_________',
+    'address.state': '_________'
+  } },
   { $count: '_________' }
 ]).toArray();
 printjson(results);
 print("Count aggregation completed.");`,
         inlineHints: [
-          { line: 5, blankText: '_________', hint: 'Filter by this status value.', answer: 'active' },
-          { line: 5, blankText: '_________', hint: 'Filter by state (e.g. UT).', answer: 'UT' },
-          { line: 6, blankText: '_________', hint: 'Output field name for the count (e.g. totalActive).', answer: 'totalActive' },
+          { line: 7, blankText: '_________', hint: 'Filter by this status value.', answer: 'active' },
+          { line: 8, blankText: '_________', hint: 'Filter by state (e.g. UT).', answer: 'UT' },
+          { line: 10, blankText: '_________', hint: 'Output field name for the count (e.g. totalActive).', answer: 'totalActive' },
+        ],
+      },
+      {
+        filename: 'count-aggregation.cs',
+        language: 'csharp',
+        code: `// Step 6: $match + $count (same logic as mongosh).
+using System.Collections.Generic;
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var pipeline = new List<BsonDocument>
+{
+  new BsonDocument("$match", new BsonDocument { { "status", "active" }, { "address.state", "UT" } }),
+  new BsonDocument("$count", "totalActive")
+};
+var results = coll.Aggregate<BsonDocument>(pipeline).ToList();
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));
+Console.WriteLine("Count aggregation completed.");`,
+        skeleton: `// Step 6: $match + $count (same logic as mongosh).
+using System.Collections.Generic;
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var pipeline = new List<BsonDocument>
+{
+  new BsonDocument("$match", new BsonDocument
+  {
+    { "status", "_________" },
+    { "address.state", "_________" }
+  }),
+  new BsonDocument("$count", "_________")
+};
+var results = coll.Aggregate<BsonDocument>(pipeline).ToList();
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));
+Console.WriteLine("Count aggregation completed.");`,
+        inlineHints: [
+          { line: 15, blankText: '_________', hint: 'Filter by this status value.', answer: 'active' },
+          { line: 16, blankText: '_________', hint: 'Filter by state (e.g. UT).', answer: 'UT' },
+          { line: 18, blankText: '_________', hint: 'Output field name for the count (e.g. totalActive).', answer: 'totalActive' },
         ],
       },
     ],
@@ -1620,6 +2083,72 @@ print("Bucket aggregation completed.");`,
           { line: 10, blankText: '_________', hint: 'Use 1 to count each document in the bucket.', answer: '1' },
         ],
       },
+      {
+        filename: 'bucket-histogram.cs',
+        language: 'csharp',
+        code: `// Build a histogram with $bucket (same logic as mongosh).
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var pipeline = new List<BsonDocument>
+{
+  new BsonDocument("$match", new BsonDocument("status", "active")),
+  new BsonDocument("$bucket", new BsonDocument
+  {
+    { "groupBy", "$accountBalance" },
+    { "boundaries", new BsonArray { 0, 1000, 5000, 10000, 50000 } },
+    { "default", "other" },
+    { "output", new BsonDocument
+      {
+        { "count", new BsonDocument("$sum", 1) },
+        { "minBalance", new BsonDocument("$min", "$accountBalance") },
+        { "maxBalance", new BsonDocument("$max", "$accountBalance") }
+      }
+    }
+  })
+};
+var results = coll.Aggregate<BsonDocument>(pipeline).ToList();
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));
+Console.WriteLine("Bucket aggregation completed.");`,
+        skeleton: `// Build a histogram with $bucket (same logic as mongosh).
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var pipeline = new List<BsonDocument>
+{
+  new BsonDocument("$match", new BsonDocument("status", "_________")),
+  new BsonDocument("$bucket", new BsonDocument
+  {
+    { "groupBy", "$_________" },
+    { "boundaries", new BsonArray { 0, 1000, 5000, 10000, 50000 } },
+    { "default", "other" },
+    { "output", new BsonDocument
+      {
+        { "count", new BsonDocument("$sum", _________) },
+        { "minBalance", new BsonDocument("$min", "$accountBalance") },
+        { "maxBalance", new BsonDocument("$max", "$accountBalance") }
+      }
+    }
+  })
+};
+var results = coll.Aggregate<BsonDocument>(pipeline).ToList();
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));`,
+        inlineHints: [
+          { line: 12, blankText: '_________', hint: 'Filter for active customers only.', answer: 'active' },
+          { line: 15, blankText: '$_________', hint: 'Group by the numeric account balance field (must be $-prefixed path).', answer: 'accountBalance' },
+          { line: 20, blankText: '_________', hint: 'Use 1 to count each document in the bucket.', answer: '1' },
+        ],
+      },
     ],
     tips: [
       'Use Run all or Run selection in the editor to run the pipeline.',
@@ -1738,6 +2267,62 @@ print("Lookup completed.");`,
           { line: 9, blankText: '_________', hint: 'The output array field name for the joined documents.', answer: 'stateDetails' },
         ],
       },
+      {
+        filename: 'lookup-join.cs',
+        language: 'csharp',
+        code: `// Join customers with state_info using $lookup (same logic as mongosh).
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var pipeline = new List<BsonDocument>
+{
+  new BsonDocument("$match", new BsonDocument("status", "active")),
+  new BsonDocument("$limit", 5),
+  new BsonDocument("$lookup", new BsonDocument
+  {
+    { "from", "state_info" },
+    { "localField", "address.state" },
+    { "foreignField", "_id" },
+    { "as", "stateDetails" }
+  })
+};
+var results = coll.Aggregate<BsonDocument>(pipeline).ToList();
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));
+Console.WriteLine("Lookup completed.");`,
+        skeleton: `// Join customers with state_info using $lookup (same logic as mongosh).
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var pipeline = new List<BsonDocument>
+{
+  new BsonDocument("$match", new BsonDocument("status", "active")),
+  new BsonDocument("$limit", 5),
+  new BsonDocument("$lookup", new BsonDocument
+  {
+    { "from", "_________" },
+    { "localField", "_________.state" },
+    { "foreignField", "_id" },
+    { "as", "_________" }
+  })
+};
+var results = coll.Aggregate<BsonDocument>(pipeline).ToList();
+Console.WriteLine(new BsonArray(results).ToJson(new MongoDB.Bson.IO.JsonWriterSettings { Indent = true }));`,
+        inlineHints: [
+          { line: 16, blankText: '_________', hint: 'The collection to join from (e.g. state_info).', answer: 'state_info' },
+          { line: 17, blankText: '_________.state', hint: 'The field on customers that holds the state code (nested under address).', answer: 'address' },
+          { line: 19, blankText: '_________', hint: 'The output array field name for the joined documents.', answer: 'stateDetails' },
+        ],
+      },
     ],
     tips: [
       'Use Run all or Run selection in the editor to run the pipeline.',
@@ -1846,6 +2431,67 @@ print("Merge completed. Check the summary_YOUR_SUFFIX collection.");`,
           { line: 3, blankText: '_________', hint: 'Filter for active customers before grouping.', answer: 'active' },
           { line: 4, blankText: '$_________', hint: 'Sum this field per group (account balance).', answer: 'accountBalance' },
           { line: 8, blankText: '_________', hint: 'Use "insert" to add new documents that do not exist in the target.', answer: 'insert' },
+        ],
+      },
+      {
+        filename: 'merge-output.cs',
+        language: 'csharp',
+        code: `// Write pipeline results with $merge (same logic as mongosh). Use YOUR_SUFFIX for multi-tenancy.
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var pipeline = new List<BsonDocument>
+{
+  new BsonDocument("$match", new BsonDocument("status", "active")),
+  new BsonDocument("$group", new BsonDocument
+  {
+    { "_id", "$address.state" },
+    { "count", new BsonDocument("$sum", 1) },
+    { "totalBalance", new BsonDocument("$sum", "$accountBalance") }
+  }),
+  new BsonDocument("$merge", new BsonDocument
+  {
+    { "into", new BsonDocument { { "db", "rich_query" }, { "coll", "summary_YOUR_SUFFIX" } } },
+    { "whenNotMatched", "insert" }
+  })
+};
+coll.Aggregate<BsonDocument>(pipeline).ToList();
+Console.WriteLine("Merge completed. Check the summary_YOUR_SUFFIX collection.");`,
+        skeleton: `// Write pipeline results with $merge. Use YOUR_SUFFIX in the output collection name.
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+var pipeline = new List<BsonDocument>
+{
+  new BsonDocument("$match", new BsonDocument("status", "_________")),
+  new BsonDocument("$group", new BsonDocument
+  {
+    { "_id", "$address.state" },
+    { "count", new BsonDocument("$sum", 1) },
+    { "totalBalance", new BsonDocument("$sum", "$_________") }
+  }),
+  new BsonDocument("$merge", new BsonDocument
+  {
+    { "into", new BsonDocument { { "db", "rich_query" }, { "coll", "summary_YOUR_SUFFIX" } } },
+    { "whenNotMatched", "_________" }
+  })
+};
+coll.Aggregate<BsonDocument>(pipeline).ToList();
+Console.WriteLine("Merge completed. Check the summary_YOUR_SUFFIX collection.");`,
+        inlineHints: [
+          { line: 12, blankText: '_________', hint: 'Filter for active customers before grouping.', answer: 'active' },
+          { line: 17, blankText: '$_________', hint: 'Sum this field per group (account balance).', answer: 'accountBalance' },
+          { line: 22, blankText: '_________', hint: 'Use "insert" to add new documents that do not exist in the target.', answer: 'insert' },
         ],
       },
     ],

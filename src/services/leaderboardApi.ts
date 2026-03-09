@@ -9,8 +9,9 @@ import type { LeaderboardEntry } from '@/utils/leaderboardUtils';
 
 const API_BASE = '/api/leaderboard';
 
-export async function fetchLeaderboardFromApi(): Promise<LeaderboardEntry[]> {
-  const res = await fetch(API_BASE);
+/** Fetch leaderboard for a session, or pass 'all' for moderator view (all sessions). */
+export async function fetchLeaderboardFromApi(sessionId: string | 'all'): Promise<LeaderboardEntry[]> {
+  const res = await fetch(`${API_BASE}?sessionId=${encodeURIComponent(sessionId)}`);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg = data?.message || 'Leaderboard unavailable';
@@ -19,12 +20,12 @@ export async function fetchLeaderboardFromApi(): Promise<LeaderboardEntry[]> {
   return data.entries ?? [];
 }
 
-export async function postStartLab(email: string, labNumber: number): Promise<void> {
+export async function postStartLab(sessionId: string, email: string, labNumber: number): Promise<void> {
   try {
     await fetch(`${API_BASE}/start-lab`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, labNumber, timestamp: Date.now() }),
+      body: JSON.stringify({ sessionId, email, labNumber, timestamp: Date.now() }),
     });
   } catch {
     // Ignore; localStorage fallback will be used
@@ -32,6 +33,7 @@ export async function postStartLab(email: string, labNumber: number): Promise<vo
 }
 
 export async function postCompleteLab(
+  sessionId: string,
   email: string,
   labNumber: number,
   score: number
@@ -41,6 +43,7 @@ export async function postCompleteLab(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        sessionId,
         email,
         labNumber,
         score,
@@ -53,6 +56,7 @@ export async function postCompleteLab(
 }
 
 export async function postAddPoints(
+  sessionId: string,
   email: string,
   stepId: string,
   labNumber: number,
@@ -64,6 +68,7 @@ export async function postAddPoints(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        sessionId,
         email,
         stepId,
         labNumber,
@@ -77,13 +82,14 @@ export async function postAddPoints(
 }
 
 export async function postHeartbeat(
+  sessionId: string,
   email: string,
   labNumber?: number,
   firstName?: string,
   lastName?: string
 ): Promise<void> {
   try {
-    const body: Record<string, unknown> = { email, labNumber };
+    const body: Record<string, unknown> = { sessionId, email, labNumber };
     if (firstName !== undefined) body.firstName = firstName;
     if (lastName !== undefined) body.lastName = lastName;
     await fetch(`${API_BASE}/heartbeat`, {
@@ -96,10 +102,8 @@ export async function postHeartbeat(
   }
 }
 
-/**
- * Persist step-level progress for a lab to the server (so it can be restored on login / other devices).
- */
 export async function postStepProgress(
+  sessionId: string,
   email: string,
   labNumber: number,
   completedSteps: number[]
@@ -108,37 +112,29 @@ export async function postStepProgress(
     await fetch(`${API_BASE}/step-progress`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, labNumber, completedSteps }),
+      body: JSON.stringify({ sessionId, email, labNumber, completedSteps }),
     });
   } catch {
     // Ignore
   }
 }
 
-/**
- * Reset only the current user's leaderboard entry (score 0, no completed labs, no lab times).
- * Other participants' data is not modified.
- */
-export async function postResetProgress(email: string): Promise<void> {
+export async function postResetProgress(sessionId: string, email: string): Promise<void> {
   const res = await fetch(`${API_BASE}/reset`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ sessionId, email }),
   });
   if (!res.ok) {
     throw new Error(`Reset progress failed: ${res.status}`);
   }
 }
 
-/**
- * Reset the full leaderboard (moderator only). Clears all entries in MongoDB.
- * Call from Workshop Settings when moderator clicks "Reset Leaderboard".
- */
-export async function postResetLeaderboardAll(): Promise<void> {
+export async function postResetLeaderboardAll(sessionId: string): Promise<void> {
   const res = await fetch(`${API_BASE}/reset-all`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({}),
+    body: JSON.stringify({ sessionId }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -146,16 +142,11 @@ export async function postResetLeaderboardAll(): Promise<void> {
   }
 }
 
-/**
- * Delete a participant from the leaderboard (moderator only).
- * Performs the same server-side reset as "Reset progress" (score 0, clear labs, steps, times)
- * then removes the user's entry from the leaderboard.
- */
-export async function postDeleteLeaderboardEntry(email: string): Promise<void> {
+export async function postDeleteLeaderboardEntry(sessionId: string, email: string): Promise<void> {
   const res = await fetch(`${API_BASE}/entry`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ sessionId, email }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));

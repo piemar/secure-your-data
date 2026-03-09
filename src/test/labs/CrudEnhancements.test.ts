@@ -29,6 +29,16 @@ describe('CRUD step enhancements', () => {
     expect(enh!.codeBlocks![0].code).toContain('$set');
   });
 
+  it('update enhancement has skeleton and inlineHints on every block for hint markers', async () => {
+    const enh = await getStepEnhancement('crud.update');
+    expect(enh?.codeBlocks).toBeDefined();
+    for (const block of enh!.codeBlocks!) {
+      expect(block.skeleton, `Block ${block.filename} must have skeleton`).toBeDefined();
+      expect(block.inlineHints, `Block ${block.filename} must have inlineHints for hint markers`).toBeDefined();
+      expect(block.inlineHints!.length, `Block ${block.filename} must have at least one hint`).toBeGreaterThan(0);
+    }
+  });
+
   it('provides code block for replace-one enhancement', async () => {
     const enh = await getStepEnhancement('crud.replace-one');
     expect(enh).toBeDefined();

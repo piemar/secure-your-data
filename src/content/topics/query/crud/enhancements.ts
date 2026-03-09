@@ -270,10 +270,10 @@ Console.WriteLine("Found (limit 2): " + docs.Count);
 var one = coll.___________(Builders<BsonDocument>.Filter.Eq("name", "Widget")).FirstOrDefault();
 Console.WriteLine("findOne: " + (one?.ToJson() ?? "null"));`,
         inlineHints: [
-          { line: 12, blankText: '______', hint: 'Method to query documents; returns a cursor', answer: 'Find' },
-          { line: 13, blankText: '________', hint: 'Cursor method to cap the number of documents returned', answer: 'Limit' },
-          { line: 14, blankText: '_______', hint: 'Cursor method to skip the first n documents', answer: 'Skip' },
-          { line: 16, blankText: '___________', hint: 'Method to return a single document or null', answer: 'Find' },
+          { line: 10, blankText: '______', hint: 'Method to query documents; returns a cursor', answer: 'Find' },
+          { line: 11, blankText: '________', hint: 'Cursor method to cap the number of documents returned', answer: 'Limit' },
+          { line: 12, blankText: '_______', hint: 'Cursor method to skip the first n documents', answer: 'Skip' },
+          { line: 14, blankText: '___________', hint: 'Method to return a single document or null', answer: 'Find' },
         ],
       },
     ],
@@ -407,9 +407,9 @@ var r2 = coll.___________(
   Builders<BsonDocument>.Update.Set("status", "updated"));
 Console.WriteLine("updateMany matched: " + r2.MatchedCount + " modified: " + r2.ModifiedCount);`,
         inlineHints: [
-          { line: 12, blankText: '__________', hint: 'Method to update one document matching the filter', answer: 'UpdateOne' },
-          { line: 14, blankText: '_____', hint: 'Update builder method to set the value of a field', answer: 'Set' },
-          { line: 16, blankText: '___________', hint: 'Method to update all documents matching the filter', answer: 'UpdateMany' },
+          { line: 10, blankText: '__________', hint: 'Method to update one document matching the filter', answer: 'UpdateOne' },
+          { line: 12, blankText: '_____', hint: 'Update builder method to set the value of a field', answer: 'Set' },
+          { line: 14, blankText: '___________', hint: 'Method to update all documents matching the filter', answer: 'UpdateMany' },
         ],
       },
     ],
@@ -675,8 +675,8 @@ var result = coll.__________(
 Console.WriteLine("matchedCount: " + result.MatchedCount + " modifiedCount: " + result.ModifiedCount);
 if (result.UpsertedId != null) Console.WriteLine("upsertedId: " + result.UpsertedId);`,
         inlineHints: [
-          { line: 12, blankText: '_____________', hint: 'Option: when true, insert a document if no document matches the filter', answer: 'IsUpsert' },
-          { line: 13, blankText: '__________', hint: 'Method to update one document; with upsert option can insert if no match', answer: 'UpdateOne' },
+          { line: 10, blankText: '_____________', hint: 'Option: when true, insert a document if no document matches the filter', answer: 'IsUpsert' },
+          { line: 11, blankText: '__________', hint: 'Method to update one document; with upsert option can insert if no match', answer: 'UpdateOne' },
         ],
       },
     ],
@@ -785,13 +785,13 @@ if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI 
 var client = new MongoClient(uri);
 var db = client.GetDatabase("crud_lab");
 var coll = db.GetCollection<BsonDocument>("items");
-var resultOne = coll.__________(Builders<BsonDocument>.Filter.Eq("name", "Gizmo"));
+var resultOne = coll._________(Builders<BsonDocument>.Filter.Eq("name", "Gizmo"));
 Console.WriteLine("deleteOne deleted: " + resultOne.DeletedCount);
 var resultMany = coll.___________(Builders<BsonDocument>.Filter.Eq("name", "Widget"));
 Console.WriteLine("deleteMany deleted: " + resultMany.DeletedCount);`,
         inlineHints: [
-          { line: 12, blankText: '__________', hint: 'Method to remove at most one document matching the filter', answer: 'DeleteOne' },
-          { line: 14, blankText: '___________', hint: 'Method to remove all documents matching the filter', answer: 'DeleteMany' },
+          { line: 10, blankText: '_________', hint: 'Method to remove at most one document matching the filter', answer: 'DeleteOne' },
+          { line: 12, blankText: '___________', hint: 'Method to remove all documents matching the filter', answer: 'DeleteMany' },
         ],
       },
     ],
@@ -924,8 +924,8 @@ var result = coll.__________(
   new BulkWriteOptions { _________: true });
 Console.WriteLine("insertedCount: " + result.InsertedCount + " modifiedCount: " + result.ModifiedCount + " deletedCount: " + result.DeletedCount);`,
         inlineHints: [
-          { line: 15, blankText: '__________', hint: 'Method to send multiple insert/update/delete operations in one round trip', answer: 'BulkWrite' },
-          { line: 17, blankText: '_________', hint: 'Option: true = stop on first error, false = continue and report all errors', answer: 'IsOrdered' },
+          { line: 16, blankText: '__________', hint: 'Method to send multiple insert/update/delete operations in one round trip', answer: 'BulkWrite' },
+          { line: 18, blankText: '_________', hint: 'Option: true = stop on first error, false = continue and report all errors', answer: 'IsOrdered' },
         ],
       },
     ],

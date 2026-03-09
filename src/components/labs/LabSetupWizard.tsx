@@ -624,7 +624,7 @@ docker compose up app --force-recreate`}
                             }}
                         >
                             <PlayCircle className="w-4 h-4" />
-                            Start Lab 1: CSFLE Fundamentals
+                            Start Lab
                         </Button>
                     </div>
 

@@ -8,7 +8,7 @@ This doc describes where workshop templates live, how custom templates work, and
 
 **Answer: in the repo, on disk.**
 
-- **Location:** `src/content/workshop-templates/*.ts` (e.g. `default-encryption-workshop.ts`, `retail-encryption-quickstart.ts`, `query-capabilities-workshop.ts`).
+- **Location:** `src/content/workshop-templates/*.ts` (e.g. `default-encryption-workshop.ts`, `retail-encryption-quickstart.ts`, `rich-query-workshop.ts`).
 - **Loading:** The app’s `ContentService` imports these modules and exposes them via `getTemplates()`. No database is required for predefined templates.
 
 **Why repo is the best option for defaults**
