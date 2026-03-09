@@ -11,7 +11,6 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:csharp:rich-query": "node scripts/test-rich-query-csharp-build.mjs",
     "diagnose:rich-query-db": "node scripts/diagnose-rich-query-db.mjs"
   },
   "dependencies": {

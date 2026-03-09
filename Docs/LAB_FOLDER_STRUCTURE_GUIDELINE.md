@@ -12,7 +12,7 @@ Labs and topics are **colocated** under `src/content/topics/`. Each topic folder
 - Lab definitions (`.ts` files), either flat or in POV subfolders
 - Optional `data/` and `scripts/` subfolders for shared resources
 
-See `Docs/TOPIC_CENTRIC_STRUCTURE_PROPOSAL.md` for the full rationale and migration details.
+See [Docs/archive/TOPIC_CENTRIC_STRUCTURE_PROPOSAL.md](./archive/TOPIC_CENTRIC_STRUCTURE_PROPOSAL.md) (archived) for the full rationale and migration details.
 
 ---
 
@@ -41,6 +41,9 @@ src/content/topics/
 │       └── lab-flexible-microservice-compat.ts
 ├── query/
 │   ├── topic.ts
+│   ├── crud/
+│   │   ├── enhancements.ts
+│   │   └── lab-mongodb-crud.ts
 │   ├── rich-query/
 │   │   ├── enhancements.ts      # Code blocks, skeletons, hints for rich-query.*
 │   │   ├── lab-rich-query-basics.ts
@@ -61,21 +64,29 @@ src/content/topics/
 │   └── workload-isolation/
 ├── operations/
 │   ├── topic.ts
+│   ├── auto-ha/
 │   ├── monitoring/
 │   ├── rolling-updates/
 │   ├── full-recovery-rpo/
-│   └── full-recovery-rto/
+│   ├── full-recovery-rto/
+│   ├── partial-recovery/
+│   └── partial-recovery-rpo/
 ├── deployment/
 │   ├── topic.ts
-│   └── migratable/
+│   ├── migratable/
+│   ├── portable/
+│   └── auto-deploy/
 ├── integration/
-│   └── topic.ts
+│   ├── topic.ts
+│   └── reporting/
 ├── security/
 │   └── topic.ts
 ├── _fixtures/
 │   └── test-lab.ts          # Test-only, not in allLabs
 └── index.ts                  # Barrel: allTopics, allLabs
 ```
+
+This tree is representative; the loader’s `moduleMap` in `src/labs/enhancements/loader.ts` is the source of truth for registered POV prefixes.
 
 **Rule:** Labs are grouped by their **topic** (via `topicId`). Topics with multiple POVs or multiple labs use subfolders (e.g. `query/rich-query/`, `encryption/csfle/`, `encryption/queryable-encryption/`, `encryption/right-to-erasure/`). Each POV subfolder contains that capability’s lab(s) and `enhancements.ts`.
 

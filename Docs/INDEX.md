@@ -2,21 +2,18 @@
 
 Quick pointers to the docs you need.
 
+**Archive:** Dated fix plans (e.g. `YYYY-MM-DD_FIX_PLAN.md`) and completed phase summaries live in **[Docs/archive/](./archive/)** and **Docs/archive/phases/**. Current validation produces new fix plans in `Docs/` when run.
+
 ---
 
-## Adding a new lab
+## Adding and validating labs
 
-- **[ADD_LAB_MASTER_PROMPT.md](./ADD_LAB_MASTER_PROMPT.md)** – Run this prompt in Cursor (or your LLM) with a description and proof number or source doc path; it generates lab file, enhancements, registration, and tests.
+- **[ADDING_AND_VALIDATING_LABS.md](./ADDING_AND_VALIDATING_LABS.md)** – **Start here:** step-by-step how to add a new lab (using ADD_LAB prompt) and how to validate existing labs (full audit or by topic/lab).
+- **[ADD_LAB_MASTER_PROMPT.md](./ADD_LAB_MASTER_PROMPT.md)** – The prompt to run for adding a lab (generates lab file, enhancements, registration, tests).
+- **[VALIDATE_LABS_MASTER_PROMPT.md](./VALIDATE_LABS_MASTER_PROMPT.md)** – The prompt to run for auditing labs (produces dated fix plan or scoped report).
 - **[ARCHITECTURE_AND_ADDING_LABS.md](./ARCHITECTURE_AND_ADDING_LABS.md)** – Checklist and flow: create lab file, enhancements, register in index and loader, validate and test.
 - **[LAB_FOLDER_STRUCTURE_GUIDELINE.md](./LAB_FOLDER_STRUCTURE_GUIDELINE.md)** – Where labs and enhancements live: `src/content/topics/<topic>/<pov>/`.
 - **[CONTENT_STANDARDS.md](./CONTENT_STANDARDS.md)** – Lab and step standards, standardized approach (Run all / Run selection, no Terminal for node, skeleton + hints).
-
----
-
-## Validating labs
-
-- **[VALIDATE_LABS_MASTER_PROMPT.md](./VALIDATE_LABS_MASTER_PROMPT.md)** – Audit all labs against ADD_LAB_MASTER_PROMPT; produces a dated fix plan.
-- **[CONTENT_STANDARDS.md](./CONTENT_STANDARDS.md)** – Quality bar and conventions.
 
 ---
 
@@ -46,7 +43,6 @@ Quick pointers to the docs you need.
 - **[LAB_SAMPLE_DATA_PLAN.md](./LAB_SAMPLE_DATA_PLAN.md)** – Pre-loaded data, Load Sample Data UX, reset behaviour.
 - **[LAB_UI_LAYOUT_TARGET.md](./LAB_UI_LAYOUT_TARGET.md)** – Target layout: Sidebar | Database Navigator | Editor | Preview.
 - **[LAB_PREREQUISITES_IMPLEMENTATION_PLAN.md](./LAB_PREREQUISITES_IMPLEMENTATION_PLAN.md)** – Lab dependencies (prerequisiteLabIds), auto-include and sort in workshop builder.
-- **[SA_MUST_KNOW_CONCEPTS.md](./SA_MUST_KNOW_CONCEPTS.md)** – CSFLE, QE, Right to Erasure concepts for SAs.
 - **Guides/** – Lab guides (e.g. Lab_1_CSFLE.md, Lab_2_QE.md, Lab_3_GDPR.md), security, migration.
 - **Enablement/** – Quick reference, patterns.
 
@@ -54,6 +50,8 @@ Quick pointers to the docs you need.
 
 ## Archive / plans (restored and historical)
 
+- **[archive/DOCS_CLEANUP_PLAN.md](./archive/DOCS_CLEANUP_PLAN.md)** – Superseded by INDEX; kept for history.
+- **[archive/2026-03-07_FIX_PLAN_CSFLE_QRY_GDPR_CRUD_RICH.md](./archive/2026-03-07_FIX_PLAN_CSFLE_QRY_GDPR_CRUD_RICH.md)** – Dated fix plan (CSFLE, QE, GDPR, CRUD, Rich Query).
 - **[archive/LAB_HOW_TO_USE_AND_WHERE_TO_RUN_PLAN.md](./archive/LAB_HOW_TO_USE_AND_WHERE_TO_RUN_PLAN.md)** – Plan for clarifying “copy code → run in your terminal/mongosh → Verify” (restored from git).
 - **[archive/WORKSHOP_FRAMEWORK_PLAN.md](./archive/WORKSHOP_FRAMEWORK_PLAN.md)** – Workshop framework and phases.
 - **[archive/COMPETITOR_SIDE_BY_SIDE_IMPLEMENTATION_PLAN.md](./archive/COMPETITOR_SIDE_BY_SIDE_IMPLEMENTATION_PLAN.md)** – Competitor comparison UX plan.

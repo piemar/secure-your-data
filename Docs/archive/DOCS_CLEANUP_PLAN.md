@@ -1,6 +1,10 @@
 # Documentation Cleanup Plan – What’s No Longer Needed
 
-This document analyzes repo docs and recommends which can be removed, archived, or consolidated. It does **not** delete anything; it’s a plan for you to approve and run.
+**Superseded by:** [Docs/INDEX.md](../INDEX.md) (current doc index). This file is archived for history.
+
+---
+
+This document analyzed repo docs and recommended which can be removed, archived, or consolidated. Phase completion summaries and dated fix plans have been moved to `Docs/archive/` and `Docs/archive/phases/`.
 
 ---
 
@@ -31,7 +35,7 @@ These are **historical or one-time** and are not imported or linked from code. T
 
 ### 2.1 Phase completion summaries (recommend: move to `Docs/archive/phases/` or delete)
 
-One-time “Phase N done” writeups. Useful only for history; COMPREHENSIVE_POV_LAB_IMPLEMENTATION_PLAN already tracks status.
+One-time "Phase N done" writeups. Useful only for history; COMPREHENSIVE_POV_LAB_IMPLEMENTATION_PLAN already tracks status.
 
 - `Docs/PHASE_0_VALIDATION_SUMMARY.md`
 - `Docs/PHASE_0A_0B_COMPLETION_SUMMARY.md`
@@ -65,7 +69,7 @@ One-time “Phase N done” writeups. Useful only for history; COMPREHENSIVE_POV
 - `Docs/2026-02-05_RUN_ALL_TIP_VALIDATION_SUMMARY.md` – one-time validation run.
 - `Docs/2026-02-23_FIX_PLAN.md` – dated fix plan. **Keep until fixes are applied**, then archive or remove. VALIDATE_LABS_MASTER_PROMPT says to produce *new* dated fix plans (e.g. `YYYY-MM-DD_FIX_PLAN.md`), so old ones are historical.
 
-### 2.3 Implementation plans that are “done” or superseded (recommend: archive)
+### 2.3 Implementation plans that are "done" or superseded (recommend: archive)
 
 - `Docs/COMPETITOR_SIDE_BY_SIDE_IMPLEMENTATION_PLAN.md` – side-by-side competitor feature; if implemented, this is historical.
 - `Docs/WORKSHOP_FRAMEWORK_PLAN.md` – referenced by WORKSHOP_FRAMEWORK_ARCHITECTURE; if the framework is built, the *plan* can live in `Docs/archive/` and keep only the architecture doc as current.
@@ -78,14 +82,14 @@ One-time “Phase N done” writeups. Useful only for history; COMPREHENSIVE_POV
 ### 3.1 START.md vs README.md
 
 - **START.md** – Quick start (dev server, Docker) with paths like `/Users/.../csfle-new/secure-your-data`.
-- **README.md** – Full “Getting Started”, prerequisites, Docker, AWS SSO, etc.
+- **README.md** – Full "Getting Started", prerequisites, Docker, AWS SSO, etc.
 
-**Recommendation:** Fold START.md’s “Quick Start” into README (or a “Quick start” subsection) and **delete START.md**, or make START.md a one-line redirect to README § Getting Started. Update WHATS_NEXT “Quick Start Tomorrow” to point at README.
+**Recommendation:** Fold START.md's "Quick Start" into README (or a "Quick start" subsection) and **delete START.md**, or make START.md a one-line redirect to README § Getting Started. Update WHATS_NEXT "Quick Start Tomorrow" to point at README.
 
 ### 3.2 WHATS_NEXT.md
 
-- Tracks “what’s next” and phase status; references COMPREHENSIVE_POV, VALIDATE_LABS_MASTER_PROMPT, etc.
-- **Keep** as the single “current status & next steps” doc; optionally add a short “Docs to keep vs archive” pointer (e.g. to this plan).
+- Tracks "what's next" and phase status; references COMPREHENSIVE_POV, VALIDATE_LABS_MASTER_PROMPT, etc.
+- **Keep** as the single "current status & next steps" doc; optionally add a short "Docs to keep vs archive" pointer (e.g. to this plan).
 
 ---
 
@@ -123,7 +127,6 @@ Do **not** remove these; they are linked from code, CONTRIBUTING, or validation/
 | **Docs/CONTENT_TEMPLATES.md** | Content creation. |
 | **Docs/MODERATOR_DYNAMIC_TEMPLATE_GUIDE.md** | Moderator workflow. |
 | **Docs/WORKSHOP_LAB_MAPPING.md** | Workshop planning. |
-| **Docs/WORKSHOP_PREPARATION_EMAIL.md** | Outreach / prep. |
 | **Docs/SA_MUST_KNOW_CONCEPTS.md** | Enablement/concepts. |
 | **content/README.md** | Content folder. |
 
@@ -133,7 +136,7 @@ Do **not** remove these; they are linked from code, CONTRIBUTING, or validation/
 
 1. **Create archive (optional)**  
    - `Docs/archive/` or `Docs/archive/phases/`  
-   - Move (don’t delete) phase completion summaries and dated fix/validation summaries there if you want to keep history.
+   - Move (don't delete) phase completion summaries and dated fix/validation summaries there if you want to keep history.
 
 2. **Remove or archive**  
    - Phase completion summaries (delete or move to archive).  
@@ -143,14 +146,14 @@ Do **not** remove these; they are linked from code, CONTRIBUTING, or validation/
 
 3. **Consolidate**  
    - Merge START.md into README (or redirect), then delete START.md.  
-   - Update WHATS_NEXT “Quick Start” to point at README.
+   - Update WHATS_NEXT "Quick Start" to point at README.
 
 4. **Update references (if you archive)**  
    - Search for links to moved files (e.g. `PHASE_17_AUTO_HA_COMPLETION_SUMMARY`) and point them to `Docs/archive/...` or remove the links if the doc is deleted.
 
 ---
 
-## 6. Quick reference – “can I delete this?”
+## 6. Quick reference – "can I delete this?"
 
 | Doc | Safe to delete? | Note |
 |-----|-----------------|------|
@@ -161,4 +164,4 @@ Do **not** remove these; they are linked from code, CONTRIBUTING, or validation/
 | `WORKSHOP_FRAMEWORK_PLAN.md` | If framework is done | Archive; keep WORKSHOP_FRAMEWORK_ARCHITECTURE. |
 | `TOPIC_CENTRIC_STRUCTURE_PROPOSAL.md` | Yes if not adopted | Archive or delete. |
 | `START.md` | After merging into README | Consolidate first. |
-| Anything in §4 “Docs to keep” | No | Referenced by code or workflows. |
+| Anything in §4 "Docs to keep" | No | Referenced by code or workflows. |

@@ -75,23 +75,33 @@ labContextOverlays: [{
 
 ## Lab Library Structure
 
-### Recommended Lab Organization
+Labs live under the **topic-centric** layout: `src/content/topics/<topic>/<pov>/lab-*.ts`, with step content in `enhancements.ts` in the same POV folder. See **[LAB_FOLDER_STRUCTURE_GUIDELINE.md](./LAB_FOLDER_STRUCTURE_GUIDELINE.md)** for the canonical structure and the loader’s `moduleMap` in `src/labs/enhancements/loader.ts` for registered POVs.
+
+### Lab organization (topic-centric)
 
 ```
-src/content/labs/
+src/content/topics/
 ├── encryption/
-│   ├── lab-csfle-fundamentals.ts          # Generic CSFLE lab
-│   ├── lab-queryable-encryption.ts        # Generic QE lab
-│   ├── lab-right-to-erasure.ts           # Generic GDPR lab
-│   └── lab-key-rotation.ts                # Generic key rotation lab
+│   ├── csfle/
+│   │   ├── lab-csfle-fundamentals.ts      # Generic CSFLE lab
+│   │   └── enhancements.ts
+│   ├── queryable-encryption/
+│   │   ├── lab-queryable-encryption.ts    # Generic QE lab
+│   │   └── enhancements.ts
+│   └── right-to-erasure/
+│       ├── lab-right-to-erasure.ts        # Generic GDPR lab
+│       └── enhancements.ts
+├── query/
+│   ├── rich-query/
+│   │   ├── lab-rich-query-basics.ts
+│   │   ├── lab-rich-query-aggregations.ts
+│   │   └── enhancements.ts
+│   ├── crud/
+│   └── ...
 ├── analytics/
-│   ├── lab-aggregation-pipelines.ts       # Generic aggregation lab
-│   ├── lab-time-series.ts                 # Generic time-series lab
-│   └── lab-vector-search.ts               # Generic vector search lab
 ├── scalability/
-│   ├── lab-sharding.ts                    # Generic sharding lab
-│   └── lab-change-streams.ts              # Generic change streams lab
-└── ...
+├── operations/
+└── index.ts                               # Barrel: allTopics, allLabs
 ```
 
 ### Quest Organization
@@ -165,7 +175,7 @@ Based on `Docs/POV.txt`, labs should cover MongoDB's **57 PoV proofs** across ca
 ### Step 1: Define Generic Lab
 
 ```typescript
-// src/content/labs/encryption/lab-csfle-fundamentals.ts
+// src/content/topics/encryption/csfle/lab-csfle-fundamentals.ts
 export const labCsfleFundamentals: WorkshopLabDefinition = {
   id: 'lab-csfle-fundamentals',
   title: 'CSFLE Fundamentals',

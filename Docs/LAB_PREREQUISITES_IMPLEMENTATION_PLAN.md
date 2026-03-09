@@ -1,5 +1,7 @@
 # Lab Prerequisites – Implementation Plan
 
+**Status:** Not yet implemented. The codebase still uses `prerequisites` (display strings) for ordering in `templateGeneratorService.orderLabsByPrerequisites`; `prerequisiteLabIds` does not exist on `WorkshopLabDefinition`.
+
 **Goal:** When a lab depends on another (e.g. Lab 2 Queryable Encryption needs KMS from Lab 1 CSFLE), the workshop/template builder should (1) know the dependency, (2) auto-include prerequisite labs when the user selects a dependent lab, and (3) order labs so prerequisites come first.
 
 **POV unchanged:** POV stays the capability label (e.g. CSFLE, Queryable Encryption). Dependencies are between **labs** via a new field `prerequisiteLabIds`. Existing `prerequisites` (display strings like "Lab 1: CSFLE Fundamentals completed") remain for the intro/checklist UI.

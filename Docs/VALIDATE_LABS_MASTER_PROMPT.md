@@ -2,6 +2,8 @@
 
 Use this prompt to **audit all existing labs and steps** against the principles and quality bar defined in **`Docs/ADD_LAB_MASTER_PROMPT.md`**, including the **standardized approach (Lab 1 Step 3)**. The output is a **fix plan** listing what each lab is missing or below the bar, and what to do to fix it.
 
+**When to use:** To ensure **existing labs follow a consistent pattern** and the latest rules (mongosh when applicable, no Terminal block for node, skeleton + inlineHints, keyConcepts 4+, prerequisites including mongosh when relevant, etc.), run this validation prompt. It applies the same criteria as ADD_LAB to every registered lab and produces an actionable **`Docs/YYYY-MM-DD_FIX_PLAN.md`**. For a single topic or lab, use the **Validate by topic and lab name** prompt (see below).
+
 **Validation must be exhaustive:** The audit is performed **from scratch** for **every lab** and **every step**. Do not sample or summarize. For each lab you must load its definition, then for **each step** in that lab load the corresponding enhancement (via `step.enhancementId`) and apply the full checklist to that step and its enhancement. Record every gap for every step/enhancement that fails a criterion.
 
 **Consistency with other docs:** This prompt assumes the same content model as `Docs/METADATA_DRIVEN_ENHANCEMENT_SYSTEM_COMPLETE.md` and `Docs/LAB_MIGRATION_GUIDE.md`: lab definitions live under `src/content/topics/<topic>/<pov>/lab-*.ts`, and step content (code blocks, skeletons, hints, tips) lives in `src/content/topics/<topic>/<pov>/enhancements.ts`, loaded by `enhancementId` via the loader’s `moduleMap`. Verification is step-level `verificationId`, not `onVerify` in enhancements.
@@ -11,6 +13,8 @@ Use this prompt to **audit all existing labs and steps** against the principles 
 ---
 
 ## What to validate (criteria from ADD_LAB_MASTER_PROMPT)
+
+**Each criterion below is derived from ADD_LAB_MASTER_PROMPT.** The fix plan must state which criterion (by name) each gap violates. Mapping: lab-level (Steps per lab, Key concepts, Prerequisites, dataRequirements, Lab metadata) → ADD_LAB "Principal quality template" and lab definition; step-level (Narrative, Instructions, Hints, Per-step metadata, enhancementId) → ADD_LAB step structure; enhancement-level (Code blocks, \*.cjs/\*.js = Lab 1 Step 3, No Terminal block, Inline hints vs skeleton, Node + Mongosh composite, Mongosh blocks, C# blocks, Tips, Metadata) → ADD_LAB "Placeholders (skeleton + inlineHints)", "Placeholder and hint authoring workflow", and standardized approach; **Hint placement verification** → ADD_LAB "Hint placement verification (mandatory)" and `src/test/labs/validate-hint-rendering.test.ts`.
 
 Use the following checklist for **each lab** and, where applicable, **each step** and **each enhancement**. Treat **Lab 1: CSFLE Fundamentals** and **Lab 2: Queryable Encryption** as the principal reference (they define the target level).
 
@@ -55,16 +59,13 @@ Use the following checklist for **each lab** and, where applicable, **each step*
 
 Applies to **all** code blocks that use skeleton + inlineHints, including **Mongosh** blocks.
 
-1. **Programmatic:** Run the hint rendering test so every hint’s line and `blankText` match the skeleton:
-   ```bash
-   npm test -- --run src/test/labs/validate-hint-rendering.test.ts
-   ```
-   Fix any reported mismatches by correcting `line` and/or `blankText` in the enhancement’s `inlineHints` so each blank exists on the given skeleton line. See `Docs/HINT_AND_SKELETON_REFACTOR_PLAN.md` (Section 7) and `src/test/labs/validate-hint-rendering.test.ts`.
+1. **Run the hint-rendering test (required):** Execute `npm test -- --run src/test/labs/validate-hint-rendering.test.ts` (or, if the AI cannot run it, read the test logic in `src/test/labs/validate-hint-rendering.test.ts` and simulate which blocks would fail). The test reports failures with: lab id, step id, enhancement id, block index/filename, hint index when applicable, `line`, `blankText`, and reason (`placeholder_has_no_matching_hint`, `blank_not_found_on_line`, `multiple_hints_on_same_line`, `multiple_placeholders_on_same_line`, `skeleton_has_no_placeholders_but_has_hints`, `line_out_of_range`). Fix any reported mismatches by correcting `line` and/or `blankText` in the enhancement's `inlineHints` so each blank exists on the given skeleton line. See `Docs/HINT_AND_SKELETON_REFACTOR_PLAN.md` and `src/test/labs/validate-hint-rendering.test.ts`.
 
-2. **One hint per line:** For each block, ensure **at most one** `inlineHint` per skeleton line (no two hints with the same `line`). No skeleton line may contain more than one placeholder. If a block has multiple hints on the same line, list as gap: "Split so at most one placeholder and one hint per line."
-3. **Visual:** In the browser, open each step that has skeleton + inline hints and confirm the "?" hint marker appears **exactly where** the placeholder (e.g. `_____________`) is rendered in the editor. If it is misaligned, fix the enhancement’s `inlineHints` (line numbers and `blankText` length) until the marker aligns.
+2. **Embed test failures in the fix plan:** In **`Docs/YYYY-MM-DD_FIX_PLAN.md`**, add a subsection **"Hint rendering test failures"** that lists **every** failure the test reports (or every failure that would be reported). For each failure include: lab id, step id, enhancement id, block index/filename, hint index if applicable, `line`, `blankText`, and reason. Each row must be **actionable**, e.g. "In enhancements.ts, enhancementId X, block index Y: set hint Z to line N and blankText '...' (or split skeleton so line M has only one placeholder)."
+3. **One hint per line:** For each block, ensure **at most one** `inlineHint` per skeleton line (no two hints with the same `line`). No skeleton line may contain more than one placeholder. If a block has multiple hints on the same line, list as gap: "Split so at most one placeholder and one hint per line."
+4. **Visual:** In the browser, open each step that has skeleton + inline hints and confirm the "?" hint marker appears **exactly where** the placeholder (e.g. `_____________`) is rendered in the editor. If it is misaligned, fix the enhancement’s `inlineHints` (line numbers and `blankText` length) until the marker aligns.
 
-Include in the fix plan: “Run hint validation test; fix any failures; ensure at most one hint per line; perform visual check for hint marker alignment.”
+The fix plan must include a **"Hint rendering test failures"** subsection listing every failure (see Output format below) with actionable fixes.
 
 ### General (from ADD_LAB_MASTER_PROMPT)
 
@@ -161,12 +162,26 @@ Add a final section:
 Then add:
 
 ```markdown
+## Hint rendering test failures
+
+List **every** failure reported by `npm test -- --run src/test/labs/validate-hint-rendering.test.ts` (or every failure that would be reported if the test were run). For each failure include: lab id, step id, enhancement id, block index/filename, hint index if applicable, `line`, `blankText`, and reason. Each row must be **actionable**, e.g. "In enhancements.ts, enhancementId X, block index Y: set hint Z to line N and blankText '...' (or split skeleton so line M has only one placeholder)."
+
+Example:
+
+- **lab-rich-query-aggregations / lab-rich-query-aggregations-step-4 / rich-query.top-n block[2] (top-n-aggregation.cs):** hint[1] line 19 blankText "_________" — blank_not_found_on_line. **Fix:** In enhancements.ts, rich-query.top-n, C# block: set the second inlineHint (sort value) to line 20 and blankText '_________'.
+
+## Structured fix list (hint rendering) [optional]
+
+One line per failure in a fixed format for machine-friendly apply-on-decide:
+
+| enhancementId | blockIndex | blockFilename | hintIndex | line | blankText | reason | suggested fix |
+|---------------|------------|---------------|-----------|------|-----------|--------|---------------|
+| rich-query.top-n | 2 | top-n-aggregation.cs | 1 | 19 | _________ | blank_not_found_on_line | Set line to 20 |
+
 ## Hint placement verification
 
 - [ ] Run: `npm test -- --run src/test/labs/validate-hint-rendering.test.ts` — all labs pass.
 - [ ] Visual check: For each lab step that has a skeleton and inline hints, open the step in the browser and confirm the "?" hint marker is positioned exactly on the placeholder (_______) in the editor.
-```
-
 ```
 
 ---
@@ -230,18 +245,19 @@ You are validating all existing workshop labs against the quality bar and princi
    - Lab: steps count (min 3; prefer 5–7 for hands-on), keyConcepts (4+), prerequisites (**when the lab has any step with a Mongosh block**, prerequisites must include mongosh so attendees avoid "mongosh missing" / Run failures), **dataRequirements** (when lab uses collections/scripts; when lab requires pre-loaded data for steps to make sense, must have at least one entry with type 'collection' + namespace or type 'script' + path—see Docs/LAB_SAMPLE_DATA_PLAN.md), lab metadata.
    - Step: narrative (2–4 sentences), instructions (concrete), hints (3–5 where step has code/verification), per-step metadata (estimatedTimeMinutes, points, sourceProof, sourceSection, verificationId when applicable, modes), enhancementId.
    - Enhancement: code blocks, **no Terminal block** that only runs node (execution via Run all / Run selection), Node + Mongosh steps have exactly two blocks **only when the step can run the same in mongosh** (otherwise one block, no mongosh tab), no Terminal, tips (2–4) that mention Run all / Run selection where appropriate; **for enhancements with a Mongosh block**, at least one tip must mention that Run requires mongosh path in Workshop Settings (to avoid "mongosh missing" / Run failures), metadata (id, povCapability, sourceProof, sourceSection).
-4. Produce a single **fix plan** markdown file.
+4. Run **`npm test -- --run src/test/labs/validate-hint-rendering.test.ts`** (or, if you cannot run it, read the test logic and simulate which blocks would fail). Embed every failure in the fix plan under a **"Hint rendering test failures"** subsection (lab id, step id, enhancement id, block, hint index, line, blankText, reason, actionable fix). Optionally add a **"Structured fix list (hint rendering)"** table (enhancementId | blockIndex | blockFilename | hintIndex | line | blankText | reason | suggested fix) for machine-friendly apply-on-decide.
+5. Produce a single **fix plan** markdown file.
 
 **Output file name and path:**  
 Name the file **YYYY-MM-DD_FIX_PLAN.md** where **YYYY-MM-DD is the current date when this prompt is invoked** (e.g. 2026-02-05). If the user provides a date, use that. Save it under **Docs/** (e.g. Docs/2026-02-05_FIX_PLAN.md).
 
 **Output content:**  
-Use the structure in Docs/VALIDATE_LABS_MASTER_PROMPT.md: title, summary (labs audited, with/without gaps), then per-lab findings in tables (criterion, status, action), step-level gaps, enhancement-level gaps, and a final “Recommended order of fixes” section. Be specific: for each gap, state the lab id, step id or enhancementId, and the exact fix (e.g. “Add 2 key concepts”, “Expand narrative to 2–4 sentences”, “Add 3 hints”).
+Use the structure in Docs/VALIDATE_LABS_MASTER_PROMPT.md: title, summary (labs audited, with/without gaps), then per-lab findings in tables (criterion, status, action), step-level gaps, enhancement-level gaps, a final “Recommended order of fixes” section, and a **“Hint rendering test failures”** subsection listing every failure from the hint-rendering test (or simulated failures) with an actionable fix per row; optionally add a **“Structured fix list (hint rendering)”** table. Be specific: for each gap, state the lab id, step id or enhancementId, and the exact fix (e.g. “Add 2 key concepts”, “Expand narrative to 2–4 sentences”, “Add 3 hints”).
 
 **Reference labs:**  
 Treat lab-csfle-fundamentals and lab-queryable-encryption as the principal template; you may mark them as “Reference – no fixes required” or note only minor gaps.
 
-Do not modify any lab or enhancement files; only produce the fix plan document.
+Do not modify any lab or enhancement files; only produce the fix plan document. The fix plan is the actionable report; applying the fixes (by editing lab or enhancement files) is a separate step, done by the user or a tool when they decide to.
 ```
 
 ---

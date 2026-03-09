@@ -1,28 +1,29 @@
-# MongoDB CSFLE & Queryable Encryption Workshop Application
+# MongoDB Workshop Application
 
 ## Purpose
 
-This interactive web application provides a comprehensive, self-paced learning experience for MongoDB's **Client-Side Field Level Encryption (CSFLE)** and **Queryable Encryption (QE)** technologies. Designed specifically for Solutions Architects, Security Engineers, and developers who need to master MongoDB's encryption capabilities.
+This interactive web application is a **multi-use-case workshop framework** for self-paced and instructor-led MongoDB learning. It started with a focus on **Client-Side Field Level Encryption (CSFLE)** and **Queryable Encryption (QE)** and has been extended to support many topics: **query & search** (CRUD, rich queries, aggregations, text search, geospatial, graph), **encryption** (CSFLE, QE, right-to-erasure), **analytics** (in-place analytics, workload isolation), **scalability** (ingest rate, scale-up, scale-out, consistency), **data management** (flexible schema, change streams), **operations** (backup/recovery, auto-HA, rolling updates, monitoring), **deployment** (portable, migratable, auto-deploy), and **integration** (reporting). Each lab is a guided, step-by-step experience with runnable code (Node, mongosh, C#, Python where supported), built-in verification, and optional leaderboard.
+
+For a **full list of labs with short descriptions**, see **[Docs/LABS.md](Docs/LABS.md)**. For the **documentation index** (adding/validating labs, architecture, guides), see **[Docs/INDEX.md](Docs/INDEX.md)**.
 
 ### What This Application Provides
 
-- **📊 Interactive Presentation Mode**: Navigate through slides covering encryption concepts, architecture, competitive positioning, and use cases
-- **🧪 Hands-On Labs**: Three guided labs with step-by-step instructions, code examples, and progress tracking
-  - **Lab 1**: CSFLE Fundamentals with AWS KMS (15 min)
-  - **Lab 2**: Queryable Encryption & Range Queries (15 min)
-  - **Lab 3**: Migration & Multi-Tenant Patterns (15 min)
-- **✅ Built-in Verification**: Check your progress with automated validation tools
+- **📊 Interactive Presentation Mode**: Navigate through slides for the selected topic (concepts, architecture, use cases)
+- **🧪 Hands-On Labs**: Guided labs with step-by-step instructions, code examples (Node, mongosh, C#, Python), and progress tracking. Labs are grouped by topic; see [Docs/LABS.md](Docs/LABS.md) for the full catalog.
+- **✅ Built-in Verification**: Check your progress with automated validation per step
 - **📈 Leaderboard**: Track progress and compete with others; optional Atlas-backed sync for multi-attendee workshops; moderators can reset the leaderboard from Settings
 - **💡 Solution Reveals**: Get hints and full solutions when you need help (with score adjustments)
-- **📝 Code Examples**: Working Node.js scripts that demonstrate real-world patterns
+- **📝 Code Examples**: Working scripts in the editor; Run all / Run selection execute against your cluster or terminal
 
-### Key Features
+### Example Topics and Use Cases
 
-- **Zero-Trust Encryption**: Learn how to encrypt data before it reaches the database
-- **AWS KMS Integration**: Hands-on experience with envelope encryption and key management
-- **GDPR Compliance**: Implement "Right to Erasure" patterns with crypto shredding
-- **Multi-Tenant Isolation**: Design SaaS architectures with per-tenant encryption keys
-- **Key Rotation**: Master CMK rotation without data re-encryption
+- **Encryption**: CSFLE with AWS KMS, Queryable Encryption, Right to Erasure & multi-tenant patterns
+- **Query & Search**: CRUD, rich queries (filtering, projections, aggregations), text search & autocomplete, geospatial, graph
+- **Analytics**: In-place analytics, workload isolation (replica tags, read preference)
+- **Scalability**: Ingest rate (bulk operations, replication), scale-up, scale-out, consistency
+- **Operations**: Full/partial recovery (RPO/RTO), auto-HA, rolling updates, monitoring
+- **Deployment**: Portable (cloud-to-cloud), migratable, auto-deploy
+- **Integration**: Reporting with BI Connector
 
 ---
 
@@ -31,13 +32,15 @@ This interactive web application provides a comprehensive, self-paced learning e
 **Prerequisites**
 
 - **MongoDB:** Atlas M10+ or local MongoDB 8.0+
-- **AWS:** Account with KMS access (see [AWS CLI and SSO setup](#aws-cli-and-sso-setup) below)
+- **AWS (only for encryption labs):** An AWS account with KMS access is required only if you plan to run labs that use AWS resources—specifically **CSFLE Fundamentals** and **Queryable Encryption** (see [Docs/LABS.md](Docs/LABS.md) under Encryption). For all other labs you can skip [AWS CLI and SSO setup](#aws-cli-and-sso-setup).
 - **If running locally:** Node.js 18+, npm, vite 7.x
 - **If using Docker:** Docker Desktop
 
 ### AWS CLI and SSO setup
 
-Do this **before** starting the stack (Docker or local) so your `.aws` folder has valid credentials when the container mounts it or when lab scripts run.
+Required **only for labs that use AWS** (e.g. **Lab 1: CSFLE Fundamentals with AWS KMS** and **Lab 2: Queryable Encryption**). If you are only doing query, analytics, operations, or other non-encryption labs, you can skip this section.
+
+Do this **before** starting the stack (Docker or local) when running those labs, so your `.aws` folder has valid credentials when the container mounts it or when lab scripts run.
 
 **── Configure SSO (one-time) ──**
 
@@ -118,7 +121,7 @@ docker compose up app --force-recreate
 
 **Alternative:** Create a file named `.env` in the same folder as `docker-compose.yml` with one line: `AWS_CONFIG_PATH=C:\Users\YourName\.aws` (replace `YourName` with your Windows username). Then run the same two-step: `docker compose build --no-cache app` and `docker compose up app --force-recreate`; the variable is read from `.env` automatically.
 
-**Workaround if env doesn't work:** If setting `AWS_CONFIG_PATH` in the environment or in `.env` does not work, edit `docker-compose.yml` at the volume line that mounts `.aws` (around line 27) and replace the expression with your Windows path, e.g. `C:\Users\YourName\.aws:/root/.aws`. Then run `docker compose build --no-cache app` and `docker compose up app --force-recreate` as above.
+**Workaround if env doesn't work:** If setting `AWS_CONFIG_PATH` in the environment or in `.env` does not work, edit `docker-compose.yml` at the volume line that mounts `.aws` (around line 26) and replace the expression with your Windows path, e.g. `C:\Users\YourName\.aws:/root/.aws`. Then run `docker compose build --no-cache app` and `docker compose up app --force-recreate` as above.
 
 ---
 
@@ -190,6 +193,7 @@ secure-your-data/
 │   ├── context/               # React context (LabContext, WorkshopConfigContext, etc.)
 │   └── utils/                 # Validators, leaderboard, workshop storage, etc.
 ├── Docs/
+│   ├── INDEX.md               # Doc index – start here for all docs
 │   ├── README_WORKSHOP.md     # Full workshop guide (presentation + labs)
 │   ├── Guides/                # Security, migration, performance, lab guides
 │   └── Enablement/            # Lab patterns and quick reference
@@ -203,11 +207,17 @@ secure-your-data/
 
 ### Adding a new lab
 
-1. Open [Docs/ADD_LAB_MASTER_PROMPT.md](./Docs/ADD_LAB_MASTER_PROMPT.md) and run the master prompt in Cursor (or your LLM) with a short description and either a proof number or a source doc path (e.g. `Docs/Guides/MyLab.md`).
-2. Apply the generated file edits (lab file, enhancements, index registration, loader if new POV, tests).
-3. Validate: run `node scripts/validate-content.js`, run the hint-rendering test (`npm test -- --run src/test/labs/validate-hint-rendering.test.ts`), and open the app to confirm the new lab and steps load.
+**Full step-by-step:** See **[Docs/ADDING_AND_VALIDATING_LABS.md](./Docs/ADDING_AND_VALIDATING_LABS.md)** for how to add a lab (and how to validate existing labs).
 
-Related docs: [Docs/VALIDATE_LABS_MASTER_PROMPT.md](./Docs/VALIDATE_LABS_MASTER_PROMPT.md) (audit existing labs), [Docs/LAB_SAMPLE_DATA_PLAN.md](./Docs/LAB_SAMPLE_DATA_PLAN.md) (pre-loaded data), [Docs/ARCHITECTURE_AND_ADDING_LABS.md](./Docs/ARCHITECTURE_AND_ADDING_LABS.md) (checklist), [Docs/COMPREHENSIVE_POV_LAB_IMPLEMENTATION_PLAN.md](./Docs/COMPREHENSIVE_POV_LAB_IMPLEMENTATION_PLAN.md) (principles).
+**Short version:**
+
+1. Create a feature branch: `git checkout -b feature/lab-<slug>` (e.g. `feature/lab-graph-traversal`).
+2. Open [Docs/ADD_LAB_MASTER_PROMPT.md](./Docs/ADD_LAB_MASTER_PROMPT.md) and run the master prompt in Cursor (or your LLM) with a short **description** and optionally a proof number or source path (e.g. `Docs/Guides/MyLab.md`). The AI generates a plan doc (`Docs/PLAN_<lab-slug>.md`), then the lab file, enhancements, index/loader registration, and tests.
+3. Apply the generated edits, then validate: `node scripts/validate-content.js`, run the new lab’s enhancement tests (`npx vitest run src/test/labs/<PovPascal>Enhancements.test.ts`), and if the lab has skeleton + hints run `npm test -- --run src/test/labs/validate-hint-rendering.test.ts`. Open the app to confirm the lab and steps load.
+
+**Validating existing labs:** Use [Docs/VALIDATE_LABS_MASTER_PROMPT.md](./Docs/VALIDATE_LABS_MASTER_PROMPT.md) for a full audit (produces a dated fix plan) or a scoped check by topic/lab. See [Docs/ADDING_AND_VALIDATING_LABS.md](./Docs/ADDING_AND_VALIDATING_LABS.md) for both flows.
+
+More: [Docs/ARCHITECTURE_AND_ADDING_LABS.md](./Docs/ARCHITECTURE_AND_ADDING_LABS.md) (checklist), [Docs/LAB_SAMPLE_DATA_PLAN.md](./Docs/LAB_SAMPLE_DATA_PLAN.md) (pre-loaded data), [Docs/INDEX.md](./Docs/INDEX.md) (full doc index).
 
 ### Available Scripts
 
@@ -215,6 +225,7 @@ Related docs: [Docs/VALIDATE_LABS_MASTER_PROMPT.md](./Docs/VALIDATE_LABS_MASTER_
 - `npm run build` - Build for production
 - `npm run preview` - Preview production build
 - `npm run lint` - Run ESLint
+- `npm run test` - Run test suite (Vitest); use `npm test -- --run src/test/labs/validate-hint-rendering.test.ts` for hint-rendering checks when adding labs
 
 ---
 
@@ -242,43 +253,18 @@ You can follow the labs using the documentation alone, or run the web applicatio
 
 ## Working Scripts
 
-When using the webapp, you create these Node.js scripts in your **project root** as you follow each lab (or use the in-browser editor and Run button). All lab code uses CommonJS (`.cjs`) and explicit AWS SSO credentials where required.
-
-**Lab 1 – CSFLE:** `keyvault-setup.cjs`, `createKey.cjs`, `keyvault-verify.cjs`, `testCSFLE.cjs`, `app.cjs`  
-**Lab 2 – Queryable Encryption:** `createQEDeks.cjs`, `createQECollection.cjs`, `insertQEData.cjs`, `queryQERange.cjs`  
-**Lab 3 – Migration & multi-tenant:** `migrateToCSFLE.cjs`, `multiTenantIsolation.cjs`, `rotateCMK.cjs`
-
-### Running scripts (project root)
-
-```bash
-# Lab 1
-node keyvault-setup.cjs
-node createKey.cjs
-node testCSFLE.cjs
-node app.cjs
-
-# Lab 2
-node createQEDeks.cjs
-node createQECollection.cjs
-node insertQEData.cjs
-node queryQERange.cjs
-
-# Lab 3
-node migrateToCSFLE.cjs
-node multiTenantIsolation.cjs
-node rotateCMK.cjs
-```
-
-**Reset and re-run:** Use **Reset step** or **Reset progress** in the app to clear lab MongoDB resources (e.g. key vault, `hr.employees`) so you can re-run scripts cleanly.
+Most labs run code **in the in-browser editor** (Run all / Run selection); you don’t need to create files on disk. For **encryption labs** (Lab 1–3: CSFLE, Queryable Encryption, Migration), you may create `.cjs` scripts in the **project root** as you follow the steps. For the full list of scripts and run order, see **[Docs/README_WORKSHOP.md](./Docs/README_WORKSHOP.md)**. Use **Reset step** or **Reset progress** in the app to clear lab resources (e.g. key vault, collections) and re-run cleanly.
 
 ---
 
 ## Technologies Used
 
-- **Frontend**: React 18, TypeScript, Vite
-- **UI Components**: shadcn/ui, Radix UI, Tailwind CSS
-- **MongoDB**: Node.js Driver 7.0.0, mongodb-client-encryption 7.0.0
-- **AWS**: @aws-sdk/credential-providers for SSO support
+- **Frontend**: React 18, TypeScript, Vite 7
+- **UI**: Radix UI, Tailwind CSS, shadcn-style components; Monaco editor (code), xterm (terminal)
+- **Routing / data**: React Router 6, TanStack Query
+- **Testing**: Vitest
+- **MongoDB**: Node.js driver 7.x, mongodb-client-encryption 7.x (for encryption labs)
+- **AWS**: @aws-sdk/credential-providers for SSO (encryption labs)
 
 ---
 
@@ -291,7 +277,7 @@ node rotateCMK.cjs
 3. **KMS Permissions**: Verify your KMS key policy allows `kms:Decrypt` and `kms:GenerateDataKey`
 4. **MongoDB Connection**: Check your Atlas connection string and network access
 
-For detailed troubleshooting, see [Docs/README_WORKSHOP.md](./Docs/README_WORKSHOP.md#14-troubleshooting-faq).
+For detailed troubleshooting, see [Docs/README_WORKSHOP.md](./Docs/README_WORKSHOP.md#15-troubleshooting-faq).
 
 ---
 

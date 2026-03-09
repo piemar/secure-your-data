@@ -111,6 +111,7 @@ flowchart TB
 
 ## Related docs
 
+- **Step-by-step (add + validate):** [ADDING_AND_VALIDATING_LABS.md](./ADDING_AND_VALIDATING_LABS.md) – How to use the ADD_LAB and VALIDATE prompts.
 - **Adding a lab with one prompt:** [ADD_LAB_MASTER_PROMPT.md](./ADD_LAB_MASTER_PROMPT.md)
 - **Validating labs (quality audit):** [VALIDATE_LABS_MASTER_PROMPT.md](./VALIDATE_LABS_MASTER_PROMPT.md)
 - **Content-driven vs legacy paths:** [LAB_IMPLEMENTATION_PATHS.md](./LAB_IMPLEMENTATION_PATHS.md)

@@ -5,6 +5,8 @@
 
 **Source criteria:** Docs/ADD_LAB_MASTER_PROMPT.md, Docs/VALIDATE_LABS_MASTER_PROMPT.md (mongosh prerequisites/tips, hint placement)
 
+**Archived:** Dated fix plan; kept for history. Current fix plans are produced by VALIDATE_LABS_MASTER_PROMPT as `Docs/YYYY-MM-DD_FIX_PLAN.md`.
+
 ---
 
 ## Summary
