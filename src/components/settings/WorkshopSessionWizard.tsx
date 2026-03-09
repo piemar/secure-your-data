@@ -318,6 +318,7 @@ export function WorkshopSessionWizard({
                   <SelectItem value="python">Python</SelectItem>
                   <SelectItem value="node">Node.js</SelectItem>
                   <SelectItem value="java">Java</SelectItem>
+                  <SelectItem value="csharp">C#</SelectItem>
                 </SelectContent>
               </Select>
             </div>

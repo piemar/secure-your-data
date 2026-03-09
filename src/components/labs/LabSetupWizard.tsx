@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { AlertCircle, CheckCircle2, ShieldCheck, Database, HelpCircle, Terminal, Cloud, Layers, Fingerprint, Loader2, AlertTriangle, ExternalLink, ChevronDown, ChevronRight, Copy, Check, PlayCircle } from 'lucide-react';
 import { validatorUtils } from '@/utils/validatorUtils';
-import { getKeyVaultNamespace } from '@/labs/stepEnhancementRegistry';
 import { toast } from 'sonner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -22,8 +21,21 @@ import { PrerequisitesChecklist } from './PrerequisitesChecklist';
 import { runResetCleanup, finishResetProgress } from '@/services/resetCleanup';
 import type { CleanupResult } from '@/services/resetCleanup';
 import { ResetCleanupStatusDialog, type ResetCleanupDialogPhase } from './ResetCleanupStatusDialog';
+import { getContentService } from '@/services/contentService';
+import type { ProgrammingLanguage } from '@/utils/workshopUtils';
 
 type SetupPhase = 'onboarding' | 'ready';
+
+/** Base tools always required for runnable labs. */
+const BASE_PREREQ_IDS = ['atlas', 'mongosh', 'node', 'npm'];
+
+/** Session programming language → prerequisite tool ID (node already in base). */
+function getSessionLanguageToolId(lang: ProgrammingLanguage | undefined): string | null {
+    if (lang === 'python') return 'python';
+    if (lang === 'java') return 'java';
+    if (lang === 'csharp') return 'dotnet';
+    return null;
+}
 
 interface Prerequisite {
     id: string;
@@ -40,7 +52,13 @@ const PREREQUISITES: Prerequisite[] = [
     { id: 'node', label: 'Node.js v18+', description: 'JavaScript runtime', installCommand: 'brew install node', downloadUrl: 'https://nodejs.org/', required: true },
     { id: 'npm', label: 'npm', description: 'Package manager (comes with Node.js)', installCommand: 'Included with Node.js', required: true },
     { id: 'mongoCryptShared', label: 'mongo_crypt_shared', description: 'Required for automatic encryption (Lab 1 CSFLE and Lab 2 QE). Not needed for explicit-only (e.g. Lab 3 migration).', installCommand: 'Download from MongoDB', downloadUrl: 'https://www.mongodb.com/try/download/enterprise', required: true },
+    { id: 'python', label: 'Python 3', description: 'Python runtime for running lab scripts', installCommand: 'brew install python@3.12', downloadUrl: 'https://www.python.org/downloads/', required: true },
+    { id: 'java', label: 'Java (JDK 17+)', description: 'Java runtime for running lab scripts', installCommand: 'brew install openjdk@17', downloadUrl: 'https://adoptium.net/', required: true },
+    { id: 'dotnet', label: '.NET SDK 10.0+', description: 'Optional: for running C# tabs in CRUD and Rich Query labs', installCommand: 'See https://dotnet.microsoft.com/download', downloadUrl: 'https://dotnet.microsoft.com/download', required: false },
 ];
+
+/** Default when no template/session: base + dotnet so non-encryption workshops show common tools. */
+const DEFAULT_VISIBLE_PREREQ_IDS = ['atlas', 'mongosh', 'node', 'npm', 'dotnet'];
 
 export const LabSetupWizard: React.FC = () => {
     const {
@@ -80,6 +98,33 @@ export const LabSetupWizard: React.FC = () => {
     const [awsProfilesList, setAwsProfilesList] = useState<string[]>([]);
     const [awsProfilesLoading, setAwsProfilesLoading] = useState(false);
     const [awsTestLoading, setAwsTestLoading] = useState(false);
+    const [visiblePrereqIds, setVisiblePrereqIds] = useState<string[]>(() => DEFAULT_VISIBLE_PREREQ_IDS);
+
+    // Compute visible prerequisites from session language + template lab requiredPrereqIds
+    useEffect(() => {
+        const session = getWorkshopSession();
+        const labIds = activeTemplate?.labIds ?? session?.labIds;
+        const programmingLanguage = session?.programmingLanguage;
+        const sessionTool = getSessionLanguageToolId(programmingLanguage);
+        const base = [...BASE_PREREQ_IDS];
+        if (!labIds || labIds.length === 0) {
+            const ids = [...base, 'dotnet'];
+            if (sessionTool) ids.push(sessionTool);
+            setVisiblePrereqIds(ids.filter((id, i, a) => a.indexOf(id) === i));
+            return;
+        }
+        const contentService = getContentService();
+        Promise.all(labIds.map((id) => contentService.getLabById(id))).then((labs) => {
+            const union = new Set<string>(base);
+            if (sessionTool) union.add(sessionTool);
+            union.add('dotnet'); // optional in checklist but often shown for CRUD/Rich Query
+            labs.forEach((lab) => {
+                const ids = lab?.requiredPrereqIds ?? base;
+                ids.forEach((id) => union.add(id));
+            });
+            setVisiblePrereqIds(Array.from(union));
+        });
+    }, [activeTemplate?.labIds, activeTemplate?.id]);
 
     // Get attendee name from localStorage (set during registration)
     const attendeeName = localStorage.getItem('workshop_attendee_name') || '';
@@ -199,6 +244,7 @@ export const LabSetupWizard: React.FC = () => {
         const results: Record<string, { verified: boolean; message: string; path?: string; detectedLocation?: string }> = {};
 
         for (const prereq of PREREQUISITES) {
+            if (!visiblePrereqIds.includes(prereq.id)) continue;
             try {
                 // mongo_crypt_shared: user path first, then auto-detect; use checkMongoCryptShared for detectedLocation
                 if (prereq.id === 'mongoCryptShared') {
@@ -219,7 +265,9 @@ export const LabSetupWizard: React.FC = () => {
                         setVerifiedTool(prereq.id, false, '');
                     }
                 } else {
-                    const result = await validatorUtils.checkToolInstalled(prereq.label.replace(' v2', '').replace(' v18+', ''));
+                    // Map prereq id to label for checkToolInstalled (dotnet uses 'dotnet' so API returns path)
+                    const toolLabel = prereq.id === 'dotnet' ? 'dotnet' : prereq.label.replace(' v2', '').replace(' v18+', '');
+                    const result = await validatorUtils.checkToolInstalled(toolLabel);
                     if (result.success) {
                         const version = result.message?.replace('System Scan: ', '') || result.path || '';
                         results[prereq.id] = { verified: true, message: version, path: result.path, detectedLocation: result.detectedLocation };
@@ -260,12 +308,12 @@ export const LabSetupWizard: React.FC = () => {
             const uriVal = validatorUtils.validateMongoUri(localUri);
             if (uriVal.success) {
                 try {
-                    const atlasResult = await validatorUtils.checkKeyVault(localUri, getKeyVaultNamespace());
-                    if (atlasResult.success) {
+                    const connectionResult = await validatorUtils.checkMongoConnection(localUri);
+                    if (connectionResult.success) {
                         results['atlas'] = { verified: true, message: 'Connected' };
-                        setVerifiedTool('atlas', true, 'M10+ Cluster Connected');
+                        setVerifiedTool('atlas', true, 'MongoDB connection verified');
                     } else {
-                        results['atlas'] = { verified: false, message: atlasResult.message || 'Connection failed' };
+                        results['atlas'] = { verified: false, message: connectionResult.message || 'Connection failed' };
                     }
                 } catch {
                     results['atlas'] = { verified: false, message: 'Connection failed' };
@@ -288,11 +336,15 @@ export const LabSetupWizard: React.FC = () => {
             setCryptSharedManualPath(cryptSharedPath);
         }
 
-        const requiredPassed = PREREQUISITES.filter(p => p.required).every(p => results[p.id]?.verified);
+        const labelById: Record<string, string> = Object.fromEntries(PREREQUISITES.map(p => [p.id, p.label]));
+        labelById['atlas'] = 'MongoDB connection';
+        const requiredPassed = visiblePrereqIds.every((id) => results[id]?.verified);
         if (requiredPassed) {
             toast.success('All required prerequisites verified!');
         } else {
-            toast.warning('Some prerequisites are missing. You can install them or continue anyway.');
+            const missing = visiblePrereqIds.filter((id) => !results[id]?.verified);
+            const missingLabels = missing.map((id) => labelById[id] || id);
+            toast.warning(`Missing prerequisites: ${missingLabels.join(', ')}. Install them below or fix the issues, then recheck.`, { duration: 6000 });
         }
     };
 
@@ -346,7 +398,9 @@ export const LabSetupWizard: React.FC = () => {
         toast.success("Environment Activated! Ready for Lab 1.");
     };
 
-    const requiredVerified = verifiedTools.awsCli.verified && verifiedTools.mongosh.verified && verifiedTools.node.verified && verifiedTools.npm.verified;
+    // All visible prerequisites are mandatory (no optional section)
+    const visibleRequiredIds = useMemo(() => [...visiblePrereqIds], [visiblePrereqIds]);
+    const requiredVerified = visiblePrereqIds.every((id) => verifiedTools[id]?.verified);
     const allVerified = requiredVerified || bypassPrereqs;
     const hasAtlasConnection = verifiedTools.atlas.verified || prereqResults['atlas']?.verified;
 
@@ -654,11 +708,25 @@ docker compose up app --force-recreate`}
                         <><ShieldCheck className="w-4 h-4" />Check Prerequisites</>
                     )}
                 </Button>
+                {localUri?.trim() && (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full gap-2 rounded-lg"
+                        disabled={isCheckingPrereqs}
+                        onClick={checkAllPrerequisites}
+                    >
+                        {isCheckingPrereqs ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
+                        Recheck prerequisites
+                    </Button>
+                )}
 
                 {/* What You'll Need: checklist with overrides + single "Show details" for installation instructions (same width as button above) */}
                 <PrerequisitesChecklist
                     prerequisites={PREREQUISITES}
                     verifiedTools={verifiedTools}
+                    visiblePrereqIds={visiblePrereqIds}
+                    visibleRequiredIds={visibleRequiredIds}
                     overrideByPrereqId={overrideByPrereqId}
                     mongodbSource={getWorkshopSession()?.mongodbSource}
                     runningInContainer={runningInContainer}
@@ -681,7 +749,7 @@ docker compose up app --force-recreate`}
 
             </CardContent>
 
-            <CardFooter className="px-6 pt-4 pb-6 border-0 bg-transparent">
+            <CardFooter className="px-6 pt-4 pb-6 border-0 bg-transparent flex flex-col gap-2">
                 <Button
                     variant="default"
                     className="w-full h-12 text-base font-semibold rounded-lg gap-2"
@@ -699,6 +767,18 @@ docker compose up app --force-recreate`}
                         <><ShieldCheck className="w-5 h-5" />Check Prerequisites</>
                     )}
                 </Button>
+                {localUri?.trim() && (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full gap-2 rounded-lg"
+                        disabled={isCheckingPrereqs}
+                        onClick={checkAllPrerequisites}
+                    >
+                        {isCheckingPrereqs ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
+                        Recheck prerequisites
+                    </Button>
+                )}
             </CardFooter>
         </Card>
         <ResetCleanupStatusDialog

@@ -279,6 +279,12 @@ export interface LabContextOverlay {
   };
 }
 
+/** Canonical prerequisite tool IDs used by Lab Setup. Use these in WorkshopLabDefinition.requiredPrereqIds. */
+export const PREREQ_TOOL_IDS = [
+  'atlas', 'mongosh', 'node', 'npm', 'dotnet', 'python', 'java', 'awsCli', 'mongoCryptShared'
+] as const;
+export type PrereqToolId = (typeof PREREQ_TOOL_IDS)[number];
+
 export interface WorkshopLabDefinition {
   id: string;
   topicId: string;
@@ -288,6 +294,8 @@ export interface WorkshopLabDefinition {
   estimatedTotalTimeMinutes?: number;
   tags?: string[];
   prerequisites?: string[];
+  /** Tool IDs from PREREQ_TOOL_IDS required to run this lab (drives Lab Setup checklist). Omit = default base set. */
+  requiredPrereqIds?: PrereqToolId[];
   steps: WorkshopLabStep[];
   modes?: WorkshopMode[]; // which modes this lab supports
   audience?: WorkshopRole | 'all';

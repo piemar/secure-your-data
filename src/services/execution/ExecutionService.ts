@@ -40,8 +40,8 @@ export const executionService = {
     return runJavaApi(params.code, options);
   },
 
-  runCSharp(params: CodeRunParams, options?: RunOptions): Promise<RunResult> {
-    return runCSharpApi(params.code, options);
+  runCSharp(params: CodeRunParams & { uri?: string; filename?: string; userSuffix?: string }, options?: RunOptions): Promise<RunResult> {
+    return runCSharpApi(params, options);
   },
 };
 

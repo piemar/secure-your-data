@@ -9,7 +9,7 @@ export interface ArchivedLeaderboard {
   entries: LeaderboardEntry[];
 }
 
-export type ProgrammingLanguage = 'python' | 'node' | 'java';
+export type ProgrammingLanguage = 'python' | 'node' | 'java' | 'csharp';
 export type WorkshopSessionMode = 'demo' | 'lab' | 'challenge';
 
 export interface WorkshopSession {

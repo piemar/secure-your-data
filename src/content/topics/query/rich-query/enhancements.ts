@@ -191,10 +191,78 @@ print("Query completed.");`,
           { line: 24, blankText: '________', hint: 'This nested field indicates whether the insured person is a smoker.', answer: 'smoking' },
         ],
       },
+      {
+        filename: 'compound-query.cs',
+        language: 'csharp',
+        code: `// Compound query: same logic as mongosh — Female, born 1990, UT, life policy with smoker
+using System.Collections.Generic;
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+coll.Drop();
+var docs = new List<BsonDocument> {
+  new BsonDocument { { "status", "active" }, { "gender", "Female" }, { "dob", new DateTime(1990, 6, 15) }, { "address", new BsonDocument { { "state", "UT" } } }, { "accountBalance", 1500.50 }, { "policies", new BsonArray { new BsonDocument { { "policyType", "life" }, { "premium", 100 }, { "insured_person", new BsonDocument { { "smoking", true } } } }, new BsonDocument { { "policyType", "auto" }, { "premium", 200 } } } } },
+  new BsonDocument { { "status", "active" }, { "gender", "Female" }, { "dob", new DateTime(1990, 3, 20) }, { "address", new BsonDocument { { "state", "UT" } } }, { "accountBalance", 2200.75 }, { "policies", new BsonArray { new BsonDocument { { "policyType", "life" }, { "premium", 150 }, { "insured_person", new BsonDocument { { "smoking", false } } } } } },
+  new BsonDocument { { "status", "active" }, { "gender", "Male" }, { "dob", new DateTime(1985, 1, 10) }, { "address", new BsonDocument { { "state", "CA" } } }, { "accountBalance", 800.25 }, { "policies", new BsonArray { new BsonDocument { { "policyType", "auto" }, { "premium", 180 } } } } },
+};
+coll.InsertMany(docs);
+Console.WriteLine("Dropped and recreated sample customers for Rich Query labs.");
+var filter = Builders<BsonDocument>.Filter.And(
+  Builders<BsonDocument>.Filter.Eq("gender", "Female"),
+  Builders<BsonDocument>.Filter.Gte("dob", new DateTime(1990, 1, 1)),
+  Builders<BsonDocument>.Filter.Lte("dob", new DateTime(1990, 12, 31)),
+  Builders<BsonDocument>.Filter.Eq("address.state", "UT"),
+  Builders<BsonDocument>.Filter.ElemMatch("policies", Builders<BsonDocument>.Filter.And(
+    Builders<BsonDocument>.Filter.Eq("policyType", "life"),
+    Builders<BsonDocument>.Filter.Eq("insured_person.smoking", true)
+  ))
+);
+var results = coll.Find(filter).ToList();
+Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(results, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+Console.WriteLine("Query completed.");`,
+        skeleton: `// Compound query: same as mongosh — Female, born 1990, UT, life policy with smoker
+using System.Collections.Generic;
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var coll = db.GetCollection<BsonDocument>("customers");
+coll.Drop();
+var docs = new List<BsonDocument> {
+  new BsonDocument { { "status", "active" }, { "gender", "Female" }, { "dob", new DateTime(1990, 6, 15) }, { "address", new BsonDocument { { "state", "UT" } } }, { "accountBalance", 1500.50 }, { "policies", new BsonArray { new BsonDocument { { "policyType", "life" }, { "insured_person", new BsonDocument { { "smoking", true } } } } } },
+  new BsonDocument { { "status", "active" }, { "gender", "Female" }, { "dob", new DateTime(1990, 3, 20) }, { "address", new BsonDocument { { "state", "UT" } } }, { "accountBalance", 2200.75 }, { "policies", new BsonArray { new BsonDocument { { "policyType", "life" }, { "insured_person", new BsonDocument { { "smoking", false } } } } } },
+  new BsonDocument { { "status", "active" }, { "gender", "Male" }, { "dob", new DateTime(1985, 1, 10) }, { "address", new BsonDocument { { "state", "CA" } } }, { "accountBalance", 800.25 }, { "policies", new BsonArray { new BsonDocument { { "policyType", "auto" }, { "premium", 180 } } } } },
+};
+coll.InsertMany(docs);
+Console.WriteLine("Dropped and recreated sample customers for Rich Query labs.");
+var filter = Builders<BsonDocument>.Filter.And(
+  Builders<BsonDocument>.Filter.Eq("gender", "_________"),
+  Builders<BsonDocument>.Filter.Gte("dob", new DateTime(1990, 1, 1)),
+  Builders<BsonDocument>.Filter.Lte("dob", new DateTime(1990, 12, 31)),
+  Builders<BsonDocument>.Filter.Eq("address.state", "UT"),
+  Builders<BsonDocument>.Filter.ElemMatch("policies", Builders<BsonDocument>.Filter.And(
+    Builders<BsonDocument>.Filter.Eq("policyType", "life"),
+    Builders<BsonDocument>.Filter.Eq("insured_person.________", true)
+  ))
+);
+var results = coll.Find(filter).ToList();
+Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(results, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));`,
+        inlineHints: [
+          { line: 22, blankText: '_________', hint: "Filter by the customer's gender using a string literal.", answer: 'Female' },
+          { line: 28, blankText: '________', hint: 'Nested field indicating whether the insured person is a smoker.', answer: 'smoking' },
+        ],
+      },
     ],
     tips: [
-      'Use the node tab to run with the MongoDB Node driver (.cjs), or the mongosh tab to run the same logic in the shell.',
-      'Run uses the mongosh path from Workshop Settings; set it if Run fails or you see "mongosh missing".',
+      'Use the mongosh, node, or C# tab to run the same logic; Run uses the mongosh path from Workshop Settings for mongosh.',
       'This query mirrors the RICH-QUERY proof exercise compound criteria.',
       'Explain to the audience that all filtering happens server-side in MongoDB.',
     ],
@@ -355,9 +423,63 @@ print("Query completed.");`,
           { line: 26, blankText: '_______', hint: 'Sort by the same date field you projected.', answer: 'dob' },
         ],
       },
+      {
+        filename: 'projection-and-sort.cs',
+        language: 'csharp',
+        code: `// Projection and sort: same as mongosh — filter, project _id:0 firstName lastName dob, sort by dob
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var filter = Builders<BsonDocument>.Filter.And(
+  Builders<BsonDocument>.Filter.Eq("gender", "Female"),
+  Builders<BsonDocument>.Filter.Gte("dob", new DateTime(1990, 1, 1)),
+  Builders<BsonDocument>.Filter.Lte("dob", new DateTime(1990, 12, 31)),
+  Builders<BsonDocument>.Filter.Eq("address.state", "UT"),
+  Builders<BsonDocument>.Filter.ElemMatch("policies", Builders<BsonDocument>.Filter.And(
+    Builders<BsonDocument>.Filter.Eq("policyType", "life"),
+    Builders<BsonDocument>.Filter.Eq("insured_person.smoking", true)
+  ))
+);
+var projection = Builders<BsonDocument>.Projection.Exclude("_id").Include("firstName").Include("lastName").Include("dob");
+var results = db.GetCollection<BsonDocument>("customers").Find(filter).Project(projection).Sort(Builders<BsonDocument>.Sort.Ascending("dob")).ToList();
+Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(results, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));`,
+        skeleton: `// Projection and sort: same as mongosh
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var filter = Builders<BsonDocument>.Filter.And(
+  Builders<BsonDocument>.Filter.Eq("gender", "Female"),
+  Builders<BsonDocument>.Filter.Gte("dob", new DateTime(1990, 1, 1)),
+  Builders<BsonDocument>.Filter.Lte("dob", new DateTime(1990, 12, 31)),
+  Builders<BsonDocument>.Filter.Eq("address.state", "UT"),
+  Builders<BsonDocument>.Filter.ElemMatch("policies", Builders<BsonDocument>.Filter.And(
+    Builders<BsonDocument>.Filter.Eq("policyType", "life"),
+    Builders<BsonDocument>.Filter.Eq("insured_person.smoking", true)
+  ))
+);
+var projection = Builders<BsonDocument>.Projection.Exclude("_id")
+  .Include("_________")
+  .Include("_________")
+  .Include("dob");
+var results = db.GetCollection<BsonDocument>("customers").Find(filter).Project(projection).Sort(Builders<BsonDocument>.Sort.___________("dob")).ToList();
+Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(results, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));`,
+        inlineHints: [
+          { line: 21, blankText: '_________', hint: 'Include the given name field in the projection.', answer: 'firstName' },
+          { line: 22, blankText: '_________', hint: 'Include the family name field in the projection.', answer: 'lastName' },
+          { line: 24, blankText: '___________', hint: 'Sort ascending by the given field.', answer: 'Ascending' },
+        ],
+      },
     ],
     tips: [
-      'Use Run all or Run selection in the editor to run the query.',
+      'Use Run all or Run selection in the editor to run the query. Use mongosh, node, or C# tab.',
       'Show how projections reduce network payload compared to returning full documents.',
       'Sorting on an indexed field will later benefit from the compound index you create.',
     ],
@@ -454,9 +576,53 @@ print("Query completed.");`,
           { line: 5, blankText: '______', hint: 'Remember that the first page is page 0 in zero-based indexing.', answer: '2' },
         ],
       },
+      {
+        filename: 'pagination.cs',
+        language: 'csharp',
+        code: `// Pagination: same as mongosh — find, sort, skip, limit
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var pageSize = 20;
+var page = 2;
+var results = db.GetCollection<BsonDocument>("customers")
+  .Find(Builders<BsonDocument>.Filter.Eq("address.state", "UT"))
+  .Sort(Builders<BsonDocument>.Sort.Ascending("lastName").Ascending("firstName"))
+  .Skip(page * pageSize)
+  .Limit(pageSize)
+  .ToList();
+Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(results, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+Console.WriteLine("Query completed.");`,
+        skeleton: `// Pagination: same as mongosh
+using MongoDB.Bson;
+using MongoDB.Driver;
+
+var uri = Environment.GetEnvironmentVariable("MONGODB_URI");
+if (string.IsNullOrEmpty(uri)) throw new InvalidOperationException("MONGODB_URI not set");
+var client = new MongoClient(uri);
+var db = client.GetDatabase("rich_query");
+var pageSize = 20;
+var page = ______;
+var results = db.GetCollection<BsonDocument>("customers")
+  .Find(Builders<BsonDocument>.Filter.Eq("address.state", "UT"))
+  .Sort(Builders<BsonDocument>.Sort.Ascending("lastName").Ascending("firstName"))
+  .______(page * pageSize)
+  .______(pageSize)
+  .ToList();
+Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(results, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));`,
+        inlineHints: [
+          { line: 11, blankText: '______', hint: 'Zero-based page index (e.g. 2 for third page).', answer: '2' },
+          { line: 16, blankText: '______', hint: 'Cursor method to skip the first n documents.', answer: 'Skip' },
+          { line: 17, blankText: '______', hint: 'Cursor method to cap the number of documents returned.', answer: 'Limit' },
+        ],
+      },
     ],
     tips: [
-      'Use Run all or Run selection in the editor to run the query.',
+      'Use Run all or Run selection in the editor to run the query. Use mongosh, node, or C# tab.',
       'Discuss trade-offs of skip/limit vs range-based pagination.',
       'Explain that skip gets slower on very high offsets, motivating alternative patterns.',
     ],

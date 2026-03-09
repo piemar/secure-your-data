@@ -27,6 +27,7 @@ export const lab1Definition: WorkshopLabDefinition = {
     'Working Terminal with AWS CLI access',
     'mongosh (MongoDB Shell) installed; path configured in Workshop Settings so Run can execute mongosh blocks',
   ],
+  requiredPrereqIds: ['atlas', 'mongosh', 'node', 'npm', 'awsCli', 'mongoCryptShared'],
   keyConcepts: [
     { term: 'Client-Side Field Level Encryption (CSFLE)', explanation: 'Encrypts sensitive fields in the application before data reaches MongoDB.' },
     { term: 'Envelope Encryption', explanation: 'CMK wraps DEKs; DEKs encrypt data. CMK never leaves KMS.' },

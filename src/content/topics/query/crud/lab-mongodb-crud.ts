@@ -21,7 +21,9 @@ export const labMongodbCrudDefinition: WorkshopLabDefinition = {
     'Node.js 18+',
     'MONGODB_URI environment variable set',
     'mongosh (MongoDB Shell) installed; path configured in Workshop Settings so Run can execute mongosh blocks',
+    'Optional: .NET SDK 10.0+ to run the C# tab (install from https://dotnet.microsoft.com/download; verify with `dotnet --version`)',
   ],
+  requiredPrereqIds: ['atlas', 'mongosh', 'node', 'npm', 'dotnet'],
   povCapabilities: ['RICH-QUERY'],
   modes: ['lab', 'demo', 'challenge'],
   whatYouWillBuild: [

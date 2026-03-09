@@ -17,6 +17,10 @@ interface Prerequisite {
 interface PrerequisitesChecklistProps {
   prerequisites: Prerequisite[];
   verifiedTools: Record<string, { verified: boolean; path: string; detectedLocation?: string }>;
+  /** When set, only these prerequisite ids are shown (e.g. from workshop template lab selection). Omit to show all. */
+  visiblePrereqIds?: string[];
+  /** When set, these ids are treated as required for this session (e.g. from session language + labs). Omit to use each prereq's static required flag. */
+  visibleRequiredIds?: string[];
   /** Override inputs/sections to show directly under each prerequisite (key = prereq id, e.g. atlas, mongoCryptShared, mongosh, awsCli). */
   overrideByPrereqId?: Record<string, React.ReactNode>;
   /** When 'local', atlas prerequisite shows "MongoDB (Local Docker)" and Docker-focused copy. When 'atlas', shows Atlas M10+ copy. */
@@ -164,12 +168,53 @@ const EXTENDED_PREREQUISITES: Prerequisite[] = [
       '4. Note the path to mongo_crypt_v1.dylib (macOS) or mongo_crypt_v1.dll (Windows)',
       '5. Set in Lab Setup above or in scripts: cryptSharedLibPath: "/path/to/mongo_crypt_v1.dylib"'
     ]
+  },
+  {
+    id: 'python',
+    label: 'Python 3',
+    description: 'Python runtime for running lab scripts',
+    required: true,
+    downloadUrl: 'https://www.python.org/downloads/',
+    setupInstructions: [
+      'macOS: brew install python@3.12',
+      'Windows: Download from python.org/downloads',
+      'Linux: sudo apt install python3 python3-pip (or equivalent)',
+      'Verify: python3 --version'
+    ]
+  },
+  {
+    id: 'java',
+    label: 'Java (JDK 17+)',
+    description: 'Java runtime for running lab scripts',
+    required: true,
+    downloadUrl: 'https://adoptium.net/',
+    setupInstructions: [
+      'macOS: brew install openjdk@17',
+      'Windows: Download from adoptium.net',
+      'Linux: sudo apt install openjdk-17-jdk (or equivalent)',
+      'Verify: java -version'
+    ]
+  },
+  {
+    id: 'dotnet',
+    label: '.NET SDK 10.0+',
+    description: 'Optional. Required only to run the C# tab in CRUD and Rich Query labs (Run button for C# blocks).',
+    required: false,
+    downloadUrl: 'https://dotnet.microsoft.com/download',
+    setupInstructions: [
+      'macOS: brew install dotnet',
+      'Windows: Download installer from dotnet.microsoft.com/download',
+      'Linux: See https://learn.microsoft.com/en-us/dotnet/core/install/linux',
+      'Verify: dotnet --version (should be 10.0 or higher)'
+    ]
   }
 ];
 
 export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
   prerequisites,
   verifiedTools,
+  visiblePrereqIds,
+  visibleRequiredIds,
   overrideByPrereqId = {},
   mongodbSource,
   runningInContainer = false
@@ -205,10 +250,15 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
     setExpandedOverrides(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // Use extended prerequisites instead of passed ones
-  const allPrereqs = EXTENDED_PREREQUISITES;
-  const requiredPrereqs = allPrereqs.filter(p => p.required);
-  const optionalPrereqs = allPrereqs.filter(p => !p.required);
+  // Use extended prerequisites; when visiblePrereqIds is set, show only those (e.g. filtered by workshop template)
+  const allPrereqs = visiblePrereqIds && visiblePrereqIds.length > 0
+    ? EXTENDED_PREREQUISITES.filter((p) => visiblePrereqIds.includes(p.id))
+    : EXTENDED_PREREQUISITES;
+  // When visibleRequiredIds is set, all visible items are mandatory (no optional section)
+  const requiredPrereqs = visibleRequiredIds && visibleRequiredIds.length > 0
+    ? allPrereqs.filter(p => visibleRequiredIds.includes(p.id))
+    : allPrereqs.filter(p => p.required);
+  const optionalPrereqs = visibleRequiredIds && visibleRequiredIds.length > 0 ? [] : allPrereqs.filter(p => !p.required);
 
   const renderPrereq = (prereq: Prerequisite) => {
     const isVerified = verifiedTools[prereq.id]?.verified;
@@ -239,7 +289,9 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
                 htmlFor={prereq.id}
                 className={cn(
                   "font-medium text-sm cursor-pointer",
-                  isChecked && "text-green-600 line-through opacity-70"
+                  isVerified && "text-green-600",
+                  !isVerified && "text-destructive",
+                  isChecked && !isVerified && "line-through opacity-70"
                 )}
               >
                 {displayLabel}
@@ -407,7 +459,7 @@ export const PrerequisitesChecklist: React.FC<PrerequisitesChecklistProps> = ({
         {optionalPrereqs.length > 0 && (
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-              Optional (for Lab 2)
+              Optional
             </h4>
             <div className="divide-y divide-border/50">
               {optionalPrereqs.map(renderPrereq)}

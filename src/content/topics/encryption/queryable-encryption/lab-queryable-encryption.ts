@@ -51,6 +51,7 @@ export const lab2Definition: WorkshopLabDefinition = {
     'AWS KMS CMK created (from Lab 1)',
     'Node.js and npm installed'
   ],
+  requiredPrereqIds: ['atlas', 'mongosh', 'node', 'npm', 'awsCli', 'mongoCryptShared'],
   steps: [
     {
       id: 'lab-queryable-encryption-step-create-encrypted-collection',

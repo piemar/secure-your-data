@@ -3,13 +3,15 @@
 # To publish: docker build -f Dockerfile.full -t pierrepetersson/mongodb-workshop-sandbox:latest .
 FROM node:20-bookworm-slim
 
-# Install tools for AWS CLI, mongosh, and a minimal editor (mongosh .edit() uses EDITOR; vi is not in slim)
+# Install tools for AWS CLI, mongosh, .NET runtime deps, and a minimal editor (mongosh .edit() uses EDITOR; vi is not in slim)
+# libicu72 required by .NET SDK at runtime (globalization); without it dotnet --version fails
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     unzip \
     gnupg \
     ca-certificates \
     nano \
+    libicu72 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install AWS CLI v2 (multi-arch: amd64 or aarch64)
@@ -30,6 +32,20 @@ RUN curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | gpg -o /usr/s
     && apt-get update \
     && apt-get install -y --no-install-recommends mongodb-mongosh \
     && rm -rf /var/lib/apt/lists/*
+
+# Install .NET SDK 10.0.x for C# lab tabs (Run button for C# blocks via /api/run-csharp)
+# SDK version 10.0.103 = 10.0.3 release; use --channel 10.0 so latest 10.0.x is used (arm64/x64 both available)
+ARG TARGETARCH
+RUN case "$TARGETARCH" in \
+    "amd64") DOTNET_ARCH="x64" ;; \
+    "arm64") DOTNET_ARCH="arm64" ;; \
+    *) DOTNET_ARCH="x64" ;; \
+    esac \
+    && curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh \
+    && chmod +x /tmp/dotnet-install.sh \
+    && /tmp/dotnet-install.sh --channel 10.0 --architecture "$DOTNET_ARCH" --install-dir /usr/share/dotnet --no-path \
+    && rm /tmp/dotnet-install.sh
+ENV PATH="/usr/share/dotnet:${PATH}"
 
 # Install mongo_crypt_shared (required for Lab 1 CSFLE and Lab 2 Queryable Encryption)
 # Replaces mongocryptd; enables automatic encryption without a separate process.

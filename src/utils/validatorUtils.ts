@@ -41,6 +41,24 @@ export const validatorUtils = {
     },
 
     /**
+     * Tests that the MongoDB URI is reachable (ping). Use this for the Lab Setup
+     * "MongoDB connection" prerequisite. Does not require a key vault.
+     */
+    checkMongoConnection: async (uri: string): Promise<ValidationResult> => {
+        if (!uri || uri.trim() === '') {
+            return { success: false, message: 'MongoDB URI is required. Enter it in Lab Setup.' };
+        }
+        try {
+            const params = new URLSearchParams({ uri: uri.trim() });
+            const response = await fetch(`/api/check-mongo-connection?${params.toString()}`);
+            const data = await response.json();
+            return { success: data.success === true, message: data.message || (data.success ? 'Connected' : 'Connection failed') };
+        } catch (error) {
+            return { success: false, message: 'Connection to validation bridge failed. Ensure npm run dev is active.' };
+        }
+    },
+
+    /**
      * Checks for the existence and configuration of the Key Vault collection.
      * Uses the real /api/verify-index endpoint to check via mongosh.
      */
@@ -422,6 +440,12 @@ export const validatorUtils = {
             queryLabel = 'node';
         } else if (toolLower.includes('npm')) {
             queryLabel = 'npm';
+        } else if (toolLower.includes('dotnet') || toolLower.includes('.net sdk')) {
+            queryLabel = 'dotnet';
+        } else if (toolLower.includes('python')) {
+            queryLabel = 'python';
+        } else if (toolLower.includes('java')) {
+            queryLabel = 'java';
         } else if (toolLower.includes('mongo_crypt') || toolLower.includes('crypt_shared')) {
             queryLabel = 'mongo_crypt_shared';
         } else {

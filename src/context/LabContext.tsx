@@ -109,7 +109,10 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         mongodbClientEncryption: { verified: false, path: '' },
         awsSdkCredentialProviders: { verified: false, path: '' },
         libmongocrypt: { verified: false, path: '' },
-        mongoCryptShared: { verified: false, path: '' }
+        mongoCryptShared: { verified: false, path: '' },
+        dotnet: { verified: false, path: '' },
+        python: { verified: false, path: '' },
+        java: { verified: false, path: '' },
     });
     const [userSuffix, setUserSuffixState] = useState('');
     const [userEmail, setUserEmailState] = useState('');

@@ -6,7 +6,7 @@ import { createRequire } from "module";
 import { componentTagger } from "lovable-tagger";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 import { exec, execFile, execSync } from "child_process";
-import { writeFileSync, readFileSync, existsSync, statSync, unlinkSync, mkdirSync } from "fs";
+import { writeFileSync, readFileSync, existsSync, statSync, unlinkSync, mkdirSync, readdirSync, rmSync } from "fs";
 import { MongoClient } from "mongodb";
 
 const requireFromModule = createRequire(import.meta.url);
@@ -111,6 +111,26 @@ function getMongoshPath(): string {
     if (existsSync(c)) return c;
   }
   return "mongosh";
+}
+
+/** Resolve dotnet executable path. Dev server may have limited PATH; same idea as getMongoshPath(). */
+function getDotnetPath(): string {
+  try {
+    const out = execSync("which dotnet", { encoding: "utf8", env: process.env }).trim();
+    if (out && existsSync(out)) return out;
+  } catch {
+    /* which failed */
+  }
+  const home = process.env.HOME || process.env.USERPROFILE || "";
+  const candidates = [
+    "/usr/share/dotnet/dotnet",
+    "/usr/local/share/dotnet/dotnet",
+    home ? path.join(home, ".dotnet", "dotnet") : "",
+  ].filter(Boolean);
+  for (const c of candidates) {
+    if (existsSync(c)) return c;
+  }
+  return "dotnet";
 }
 
 /** Result of mongo_crypt_shared detection: path and human-readable location. */
@@ -549,6 +569,9 @@ export default defineConfig(({ mode }) => ({
               'mongosh': 'mongosh --version',
               'node': 'node --version',
               'npm': 'npm --version',
+              'dotnet': 'dotnet --version',
+              'python': 'python3 --version',
+              'java': 'java -version 2>&1',
               'atlas': 'echo "Atlas Cluster: Provisioned (Cloud Check)"' // Atlas is verified via URI logic
             };
 
@@ -561,9 +584,10 @@ export default defineConfig(({ mode }) => ({
 
             // Use resolved path for mongosh so check works when server has limited PATH (e.g. IDE)
             const resolvedBinary = tool === 'mongosh' ? getMongoshPath() : null;
+            const whichCmd = tool === 'python' ? 'which python3' : tool === 'java' ? 'which java' : `which ${tool}`;
             const runCommand = resolvedBinary
               ? `${resolvedBinary} --version`
-              : (tool === 'atlas' ? 'echo "Cloud"' : `${command} && which ${tool}`);
+              : (tool === 'atlas' ? 'echo "Cloud"' : `${command} && ${whichCmd}`);
             const explicitPath = resolvedBinary || null;
 
             exec(runCommand, (error: any, stdout: any, stderr: any) => {
@@ -585,15 +609,20 @@ export default defineConfig(({ mode }) => ({
                 version = (stdout || '').trim();
                 binaryPath = 'Cloud';
               } else {
-                const lines = (stdout || '').trim().split('\n');
-                version = lines[0];
-                binaryPath = lines[lines.length - 1] || '';
+                const lines = (stdout || '').trim().split('\n').map(l => l.trim()).filter(Boolean);
+                version = lines[0] || '';
+                // Path is typically the last line (from which); use last line that looks like a path (e.g. /usr/bin/dotnet or C:\...)
+                const pathLine = lines.length > 1
+                  ? (lines.find(l => /^\/|^[A-Za-z]:[\\/]/.test(l)) || lines[lines.length - 1])
+                  : '';
+                binaryPath = pathLine || '';
               }
 
               const payload: Record<string, unknown> = {
                 success: true,
                 version: version,
-                path: binaryPath
+                path: binaryPath || version,
+                ...((tool === 'dotnet' || tool === 'python' || tool === 'java') && binaryPath ? { detectedLocation: binaryPath } : {})
               };
 
               if (tool === 'aws') {
@@ -693,6 +722,36 @@ export default defineConfig(({ mode }) => ({
                 success: found,
                 message: found ? `Verified CMK Alias: ${safeAlias}` : `Alias ${safeAlias} not found in account.`
               }));
+            });
+            return;
+          }
+
+          if (req.url && req.url.startsWith('/api/check-mongo-connection')) {
+            const url = new URL(req.url, `http://${req.headers.host}`);
+            let uri = url.searchParams.get('uri') || process.env.MONGODB_URI || '';
+            uri = (uri || '').trim();
+            const isLocalNoAuth = /^mongodb:\/\/(localhost|127\.0\.0\.1|mongo)(:\d+)?(\/|$)/i.test(uri);
+            const effectiveUri = isLocalNoAuth && process.env.MONGODB_URI ? process.env.MONGODB_URI : uri;
+            if (!effectiveUri) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, message: 'MongoDB URI is required.' }));
+              return;
+            }
+            const pingScript = 'db.runCommand({ping:1}).ok';
+            const escapedUri = effectiveUri.replace(/"/g, '\\"');
+            const mongoshBin = getMongoshPath();
+            const cmd = `${mongoshBin} "${escapedUri}" --quiet --eval "${pingScript}"`;
+            exec(cmd, (error: any, stdout: any, stderr: any) => {
+              res.setHeader('Content-Type', 'application/json');
+              if (error) {
+                const detail = [stderr, error?.message].filter(Boolean).join('\n').trim();
+                res.statusCode = 500;
+                res.end(JSON.stringify({ success: false, message: detail || 'Connection failed. Check the URI and that MongoDB is reachable.' }));
+                return;
+              }
+              const ok = stdout.trim() === '1';
+              res.end(JSON.stringify({ success: ok, message: ok ? 'MongoDB connection verified.' : 'Ping failed.' }));
             });
             return;
           }
@@ -2069,10 +2128,170 @@ export default defineConfig(({ mode }) => ({
                 const nodeCmd = `${process.execPath} ${tmpFile}`;
                 const envLine = `[lab] Command: ${nodeCmd}\n[lab] Env: MONGODB_URI=${redactMongoUri(effectiveNodeUri)} AWS_PROFILE=${awsProfile || 'default'}${awsRegion ? ` AWS_REGION=${awsRegion}` : ''} cwd=${cwd}\n`;
                 logLabCommand('run-node', nodeCmd, { MONGODB_URI: redactMongoUri(effectiveNodeUri), AWS_PROFILE: awsProfile || 'default', cwd, ...(awsRegion ? { AWS_REGION: awsRegion } : {}) });
+
+                if (nodePty) {
+                  const NODE_RUN_TIMEOUT_MS = 30000;
+                  let output = '';
+                  let sent = false;
+                  const finish = (out: string, code: number) => {
+                    if (sent) return;
+                    sent = true;
+                    try { require('fs').unlinkSync(tmpFile); } catch { /* ignore */ }
+                    const clean = out.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\r\n/g, '\n').trim();
+                    sendNodeResult(clean, '', code, envLine);
+                  };
+                  try {
+                    const pty = nodePty.spawn(process.execPath, [tmpFile], {
+                      name: 'xterm-256color',
+                      cols: 80,
+                      rows: 24,
+                      cwd,
+                      env,
+                    });
+                    pty.onData((data: string) => { output += data; });
+                    const timeout = setTimeout(() => {
+                      try { pty.kill(); } catch (_) { /* ignore */ }
+                      finish(output, 143);
+                    }, NODE_RUN_TIMEOUT_MS);
+                    pty.onExit(({ exitCode }) => {
+                      clearTimeout(timeout);
+                      finish(output, exitCode ?? 0);
+                    });
+                  } catch (spawnErr: any) {
+                    try { require('fs').unlinkSync(tmpFile); } catch { /* ignore */ }
+                    sendNodeResult('', spawnErr?.message || 'Failed to run node', 1, envLine);
+                  }
+                  return;
+                }
+
                 execFile(process.execPath, [tmpFile], { timeout: 30000, maxBuffer: 1024 * 1024, env, cwd }, (error: any, stdout: string, stderr: string) => {
                   try { require('fs').unlinkSync(tmpFile); } catch { /* ignore */ }
                   const exitCode = error?.code ?? (error ? 1 : 0);
                   sendNodeResult(stdout || '', stderr || '', exitCode, envLine);
+                });
+              } catch (e: any) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ success: false, stdout: '', stderr: (e as Error).message || 'Invalid request', error: true, message: (e as Error).message }));
+              }
+            });
+            return;
+          }
+
+          // Run C# code: temp dir with Program.cs + .csproj (MongoDB.Driver), dotnet run. PTY when nodePty available (same pattern as mongosh).
+          if (req.url && req.url.startsWith('/api/run-csharp') && req.method === 'POST') {
+            let body = '';
+            req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+            req.on('end', () => {
+              try {
+                const { code, uri, filename, userSuffix, prepareOnly } = JSON.parse(body || '{}');
+                if (typeof code !== 'string' || !code.trim()) {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: false, stdout: '', stderr: 'No code provided', message: 'No code provided' }));
+                  return;
+                }
+                const { runDir } = getLabRunTempPath(userSuffix, filename, '.cs');
+                if (existsSync(runDir)) {
+                  try {
+                    for (const name of readdirSync(runDir)) {
+                      if (name.startsWith('csharp-')) {
+                        try { rmSync(path.join(runDir, name), { recursive: true }); } catch { /* ignore */ }
+                      }
+                    }
+                  } catch { /* ignore */ }
+                }
+                const csharpDir = path.join(runDir, `csharp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
+                mkdirSync(csharpDir, { recursive: true });
+                writeFileSync(path.join(csharpDir, 'Program.cs'), code, 'utf-8');
+                const csproj = `<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>LabRun</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MongoDB.Driver" Version="2.28.0" />
+  </ItemGroup>
+</Project>
+`;
+                writeFileSync(path.join(csharpDir, 'LabRun.csproj'), csproj, 'utf-8');
+
+                if (prepareOnly === true) {
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: true, projectPath: csharpDir }));
+                  return;
+                }
+
+                const effectiveUri = (uri && typeof uri === 'string' && uri.trim()) ? uri.trim() : (process.env.MONGODB_URI || '');
+                const env = { ...process.env, MONGODB_URI: effectiveUri };
+                const dotnetPath = getDotnetPath();
+                logLabCommand('run-csharp', `dotnet run (${path.basename(csharpDir)})`, { MONGODB_URI: redactMongoUri(effectiveUri) });
+
+                const dotnetNotFoundMessage = 'dotnet not found. Install .NET SDK 10.0+ (dotnet --version) or set path in Lab Setup.';
+                const sendCSharpResult = (stdout: string, stderr: string, exitCode: number, err?: any) => {
+                  try { rmSync(csharpDir, { recursive: true }); } catch { /* ignore */ }
+                  const out = (stdout || '').trim();
+                  const errStr = (stderr || '').trim();
+                  const isNotFound = err && (err.code === 'ENOENT' || /not found|ENOENT/i.test(String(err.message || '')));
+                  const failureOutput = errStr || out;
+                  const message = isNotFound
+                    ? dotnetNotFoundMessage
+                    : exitCode === 0
+                      ? (out || 'OK')
+                      : (failureOutput || err?.message || 'Build or run failed. Ensure .NET SDK 10.0+ is installed (dotnet --version).');
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({
+                    success: exitCode === 0 && !isNotFound,
+                    stdout: stdout ?? '',
+                    stderr: isNotFound ? dotnetNotFoundMessage : errStr,
+                    exitCode: isNotFound ? 1 : exitCode,
+                    error: exitCode !== 0 || isNotFound,
+                    message,
+                  }));
+                };
+
+                if (nodePty) {
+                  const RUN_TIMEOUT_MS = 60000;
+                  let output = '';
+                  let sent = false;
+                  const finish = (out: string, code: number) => {
+                    if (sent) return;
+                    sent = true;
+                    const clean = out.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\r\n/g, '\n').trim();
+                    // PTY merges stdout/stderr; pass as stderr on failure so message shows the real error (e.g. ICU, compiler)
+                    sendCSharpResult(clean, code !== 0 ? clean : '', code);
+                  };
+                  try {
+                    const pty = nodePty.spawn(dotnetPath, ['run'], {
+                      name: 'xterm-256color',
+                      cols: 80,
+                      rows: 24,
+                      cwd: csharpDir,
+                      env,
+                    });
+                    pty.onData((data: string) => { output += data; });
+                    const timeout = setTimeout(() => {
+                      try { pty.kill(); } catch (_) { /* ignore */ }
+                      finish(output, 143);
+                    }, RUN_TIMEOUT_MS);
+                    pty.onExit(({ exitCode }) => {
+                      clearTimeout(timeout);
+                      finish(output, exitCode ?? 0);
+                    });
+                  } catch (spawnErr: any) {
+                    const isNotFound = spawnErr?.code === 'ENOENT' || /posix_spawnp|not found|ENOENT/i.test(spawnErr?.message || '');
+                    sendCSharpResult(isNotFound ? dotnetNotFoundMessage : (spawnErr?.message || 'Failed to run dotnet'), '', 1, spawnErr);
+                  }
+                  return;
+                }
+
+                execFile(dotnetPath, ['run'], { timeout: 60000, maxBuffer: 1024 * 1024, env, cwd: csharpDir }, (error: any, stdout: string, stderr: string) => {
+                  const exitCode = error?.code ?? (error ? 1 : 0);
+                  sendCSharpResult(stdout || '', stderr || '', exitCode, error);
                 });
               } catch (e: any) {
                 res.statusCode = 400;
