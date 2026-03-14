@@ -77,6 +77,7 @@ export function InlineHintEditor({
   // Allow editing so users can fill in blanks; skeleton is initial content only
   const isReadOnly = false;
   const containerRef = useRef<HTMLDivElement>(null);
+  const highlightRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [editorInstance, setEditorInstance] = useState<any>(null);
   const [monacoInstance, setMonacoInstance] = useState<Monaco | null>(null);
   const [blankPositions, setBlankPositions] = useState<BlankPosition[]>([]);
@@ -220,10 +221,11 @@ export function InlineHintEditor({
       setScrollLeft(e.scrollLeft || 0);
     });
 
-    // Force syntax highlighting on first paint: set language and re-set value so Monaco tokenizes immediately (avoids "1 edit to see colors")
+    // Force syntax highlighting on first paint: set language and re-set value so Monaco tokenizes immediately
     const model = editor.getModel?.();
+    const langId = normalizeLabLanguage(language);
+    const theme = getLabEditorTheme(resolvedTheme);
     if (model) {
-      const langId = normalizeLabLanguage(language);
       if (model.getLanguageId?.() !== langId) model.setLanguageId?.(langId);
       const val = model.getValue();
       if (val) {
@@ -231,13 +233,35 @@ export function InlineHintEditor({
           model.setValue(val);
         });
       }
+      // Delayed refresh: Monaco (and any worker) may not have tokenized correctly on first paint.
+      // Re-apply theme, re-set value to force retokenization, and layout so colors fix without user scroll.
+      if (highlightRefreshTimeoutRef.current) clearTimeout(highlightRefreshTimeoutRef.current);
+      highlightRefreshTimeoutRef.current = window.setTimeout(() => {
+        highlightRefreshTimeoutRef.current = null;
+        try {
+          monaco.editor.setTheme(theme);
+          const currentVal = model.getValue();
+          if (currentVal) model.setValue(currentVal);
+          if (typeof editor.layout === 'function') editor.layout();
+        } catch {
+          // Editor/model may be disposed if user navigated away
+        }
+      }, 120);
     }
 
     // Mark editor as ready after a short delay to ensure layout is complete
     requestAnimationFrame(() => {
       setIsEditorReady(true);
     });
-  }, [setLineHeight, onEditorSession, language]);
+  }, [setLineHeight, onEditorSession, language, resolvedTheme]);
+
+  // Clear highlight refresh timeout on unmount
+  useEffect(() => () => {
+    if (highlightRefreshTimeoutRef.current) {
+      clearTimeout(highlightRefreshTimeoutRef.current);
+      highlightRefreshTimeoutRef.current = null;
+    }
+  }, []);
 
   // Apply decorations for revealed answers (green highlight)
   useEffect(() => {

@@ -363,10 +363,46 @@ export function registerCSharpLanguage(monaco: typeof import('monaco-editor')) {
 }
 
 /**
+ * Register shell (bash/sh) language with Monarch so tokenization runs synchronously at mount.
+ * Avoids relying on Monaco's built-in shell (which can tokenize in a worker and paint wrong colors until scroll).
+ */
+export function registerShellLanguage(monaco: typeof import('monaco-editor')) {
+  try {
+    monaco.languages.register({ id: 'shell' });
+    monaco.languages.setMonarchTokensProvider('shell', {
+      defaultToken: '',
+      tokenPostfix: '.sh',
+      keywords: [
+        'if', 'then', 'else', 'elif', 'fi', 'for', 'in', 'while', 'do', 'done', 'case', 'esac',
+        'echo', 'exit', 'return', 'export', 'readonly', 'local', 'function', 'true', 'false',
+        'alias', 'unalias', 'cd', 'pwd', 'set', 'unset', 'read', 'exec', 'eval', 'shift',
+        'break', 'continue', 'test', '[', ']', 'source', '.',
+      ],
+      tokenizer: {
+        root: [
+          [/#.*$/, 'comment'],
+          [/\$[\w]+/, 'variable'],
+          [/\$\{[^}]+\}/, 'variable'],
+          [/"(?:[^"\\]|\\.)*"/, 'string'],
+          [/'[^']*'/, 'string'],
+          [/[a-zA-Z_][\w]*/, { cases: { '@keywords': 'keyword', '@default': 'identifier' } }],
+          [/\d+/, 'number'],
+          [/[=<>!&|;\\]+/, 'operator'],
+          [/\s+/, 'white'],
+        ],
+      },
+    });
+  } catch (_) {
+    // Fall back to Monaco built-in shell if any
+  }
+}
+
+/**
  * Register all lab languages (call from Editor beforeMount). Phase 3 optional.
  */
 export function registerLabLanguages(monaco: typeof import('monaco-editor')) {
   registerMongoshLanguage(monaco);
+  registerShellLanguage(monaco);
   registerPythonLanguage(monaco);
   registerJavaLanguage(monaco);
   registerCSharpLanguage(monaco);
