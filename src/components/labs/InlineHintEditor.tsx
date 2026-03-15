@@ -45,7 +45,7 @@ interface BlankPosition {
   hint: InlineHint;
 }
 
-/** Monaco uses "csharp" as language id; normalize "C#" / "c#" from content so highlighting works. */
+/** Normalize content language to Monaco language id; C# uses built-in "csharp". */
 function normalizeLabLanguage(lang: string): string {
   const l = (lang || '').toLowerCase();
   if (l === 'c#' || l === 'csharp') return 'csharp';
@@ -316,8 +316,33 @@ export function InlineHintEditor({
     };
   }, [editorInstance, monacoInstance, documentPath]);
 
-  // Sync model when controlled value changes from parent (e.g. step reset). Ensures displayed content
-  // and tokenization match state so color coding refreshes and Run uses the current code.
+  // Force Monaco to re-tokenize so syntax highlighting repaints. Safe to call with undefined resolvedTheme (uses lab-dark).
+  const forceHighlightRefresh = useCallback(() => {
+    if (!editorInstance || !monacoInstance) return;
+    const model = editorInstance.getModel?.();
+    if (!model) return;
+    if (highlightRefreshTimeoutRef.current) clearTimeout(highlightRefreshTimeoutRef.current);
+    const theme = getLabEditorTheme(resolvedTheme);
+    const doRefresh = () => {
+      try {
+        monacoInstance.editor.setTheme(theme);
+        const val = model.getValue();
+        if (val) model.setValue(val);
+        if (typeof editorInstance.layout === 'function') editorInstance.layout();
+      } catch {
+        // Editor/model may be disposed
+      }
+    };
+    highlightRefreshTimeoutRef.current = window.setTimeout(() => {
+      highlightRefreshTimeoutRef.current = null;
+      doRefresh();
+      // Second pass for slow tokenization (e.g. incognito, cold load)
+      window.setTimeout(doRefresh, 220);
+    }, 120);
+  }, [editorInstance, monacoInstance, resolvedTheme]);
+
+  // Sync model when controlled value changes from parent (e.g. step reset, or user revealed an answer).
+  // Ensures displayed content and tokenization match state so color coding refreshes and Run uses the current code.
   useEffect(() => {
     if (!editorInstance) return;
     const model = editorInstance.getModel?.();
@@ -327,7 +352,23 @@ export function InlineHintEditor({
     model.setValue(editorValue);
     const langId = normalizeLabLanguage(language);
     if (model.getLanguageId?.() !== langId) model.setLanguageId?.(langId);
-  }, [editorInstance, editorValue, language]);
+
+    // Force re-tokenization after content update. Works even when resolvedTheme is undefined (incognito/hydration).
+    if (monacoInstance) forceHighlightRefresh();
+  }, [editorInstance, editorValue, language, monacoInstance, forceHighlightRefresh]);
+
+  // When user reveals an answer, parent updates controlled value; sometimes Monaco still loses highlighting.
+  // Explicitly force refresh when revealedAnswers changes so color coding is restored (incognito, all languages).
+  const prevRevealedCountRef = useRef(0);
+  useEffect(() => {
+    const count = revealedAnswers.length;
+    if (count > prevRevealedCountRef.current && editorInstance && monacoInstance) {
+      prevRevealedCountRef.current = count;
+      forceHighlightRefresh();
+    } else {
+      prevRevealedCountRef.current = count;
+    }
+  }, [revealedAnswers.length, revealedAnswers, editorInstance, monacoInstance, forceHighlightRefresh]);
 
   // Calculate pixel position for a line/column in the editor.
   // The "?" marker must appear exactly where the blank (___________) is rendered.
