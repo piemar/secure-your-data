@@ -30,6 +30,7 @@ Quick pointers to the docs you need.
 - **[BROWSER_IDE_TERMINAL_REFACTOR_ARCHITECTURE.md](./BROWSER_IDE_TERMINAL_REFACTOR_ARCHITECTURE.md)** – Incremental plan to evolve the app toward a VS Code–like browser IDE with real terminal (xterm.js), Monaco, multi-language execution (Python, Node, Java, C#), placeholders/hints, command palette, and Warp-style hybrid UX.
 - **[BROWSER_IDE_REFACTOR_IMPLEMENTATION_STATUS.md](./BROWSER_IDE_REFACTOR_IMPLEMENTATION_STATUS.md)** – Implementation status vs the architecture doc: what’s done (Phases 0–2, execution/hints/palette/types), partial (Phase 3–6), and recommended next steps.
 - **[CURRENT_EXECUTION_AND_EDITOR_MAP.md](./CURRENT_EXECUTION_AND_EDITOR_MAP.md)** – Phase 0 map: where run-node/run-mongosh/run-bash are called, Monaco mounts, output surface, and validation.
+- **[ARCHITECTURE_OVERVIEW.md](./ARCHITECTURE_OVERVIEW.md)** – Short, contributor-focused overview of the workshop framework architecture (content-driven labs, registry, content service, lab runtime, enhancement loader).
 
 ---
 

@@ -345,6 +345,8 @@ Use your own Docker Hub username instead of `pierrepetersson` if you're publishi
 
 This is an internal MongoDB Solutions Architect enablement tool. For questions or improvements, please contact the maintainers.
 
+For collaboration principles (branching, workflow, mindset, and where to find docs), see **[Docs/COLLABORATION_PRINCIPLES.md](Docs/COLLABORATION_PRINCIPLES.md)**. For a short, contributor-focused architecture overview, see **[Docs/ARCHITECTURE_OVERVIEW.md](Docs/ARCHITECTURE_OVERVIEW.md)**.
+
 ---
 
 ## License

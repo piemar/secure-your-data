@@ -19,7 +19,6 @@ export { operationsTopic } from './operations/topic';
 export { deploymentTopic } from './deployment/topic';
 export { integrationTopic } from './integration/topic';
 export { securityTopic } from './security/topic';
-
 import { queryTopic } from './query/topic';
 import { encryptionTopic } from './encryption/topic';
 import { analyticsTopic } from './analytics/topic';
@@ -29,7 +28,6 @@ import { operationsTopic } from './operations/topic';
 import { deploymentTopic } from './deployment/topic';
 import { integrationTopic } from './integration/topic';
 import { securityTopic } from './security/topic';
-
 // Lab definitions
 import { lab1Definition } from './encryption/csfle/lab-csfle-fundamentals';
 import { lab2Definition } from './encryption/queryable-encryption/lab-queryable-encryption';
@@ -99,7 +97,6 @@ import { labReportingExecuteDefinition } from './integration/reporting/lab-repor
 import { labAutoHaOverviewDefinition } from './operations/auto-ha/lab-auto-ha-overview';
 import { labAutoHaSetupDefinition } from './operations/auto-ha/lab-auto-ha-setup';
 import { labAutoHaExecuteDefinition } from './operations/auto-ha/lab-auto-ha-execute';
-
 /** All workshop topics */
 export const allTopics: WorkshopTopic[] = [
   queryTopic,
