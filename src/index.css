@@ -333,4 +333,21 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+
+  /* "More code below" cue: pulsating glow from green to current theme until user scrolls (or terminal no longer covers) */
+  @keyframes scroll-cue-glow {
+    0%, 100% {
+      color: hsl(var(--primary));
+      border-color: hsl(var(--primary));
+      box-shadow: 0 0 12px hsl(var(--primary) / 0.5), 0 0 24px hsl(var(--primary) / 0.25);
+    }
+    50% {
+      color: hsl(var(--muted-foreground));
+      border-color: hsl(var(--border));
+      box-shadow: 0 0 4px hsl(var(--border) / 0.3);
+    }
+  }
+  .scroll-cue-pulse {
+    animation: scroll-cue-glow 1.8s ease-in-out infinite;
+  }
 }

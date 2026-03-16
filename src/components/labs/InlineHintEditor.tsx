@@ -84,6 +84,8 @@ export function InlineHintEditor({
   const [scrollTop, setScrollTop] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [isEditorReady, setIsEditorReady] = useState(false);
+  /** When editor fills container (resizable with terminal): true if content below is hidden (scroll or terminal covering). */
+  const [hasMoreBelow, setHasMoreBelow] = useState(true);
 
   // Find all blank positions by matching each hint's blankText; supports multiple blanks per line.
   // When multiple hints share a line, search for each blankText after the previous match so we don't
@@ -215,11 +217,28 @@ export function InlineHintEditor({
       // ignore
     }
 
-    // Track scroll position
+    // Track scroll position and whether content below is visible (for "More code below" cue when fill/terminal resized)
+    const useFill = fillContainer || equalHeightSplit;
+    const updateHasMoreBelow = () => {
+      if (!useFill) return;
+      try {
+        const scrollHeight = editor.getScrollHeight();
+        const scrollTopCurrent = editor.getScrollTop();
+        const layout = editor.getLayoutInfo();
+        const visibleHeight = layout?.height ?? 0;
+        const threshold = 24;
+        setHasMoreBelow(scrollHeight - scrollTopCurrent - visibleHeight > threshold);
+      } catch {
+        setHasMoreBelow(false);
+      }
+    };
     editor.onDidScrollChange((e: any) => {
       setScrollTop(e.scrollTop || 0);
       setScrollLeft(e.scrollLeft || 0);
+      updateHasMoreBelow();
     });
+    editor.onDidLayoutChange(updateHasMoreBelow);
+    requestAnimationFrame(() => updateHasMoreBelow());
 
     // Force syntax highlighting on first paint: set language and re-set value so Monaco tokenizes immediately
     const model = editor.getModel?.();
@@ -253,7 +272,7 @@ export function InlineHintEditor({
     requestAnimationFrame(() => {
       setIsEditorReady(true);
     });
-  }, [setLineHeight, onEditorSession, language, resolvedTheme]);
+  }, [setLineHeight, onEditorSession, language, resolvedTheme, fillContainer, equalHeightSplit]);
 
   // Clear highlight refresh timeout on unmount
   useEffect(() => () => {
@@ -444,7 +463,9 @@ export function InlineHintEditor({
 
   const useFillHeight = fillContainer || equalHeightSplit;
   const visibleLinesApprox = useFillHeight ? 0 : Math.floor((calculatedHeight - paddingVertical) / lineHeight);
-  const showScrollCue = !useFillHeight && lineCount > visibleLinesApprox && visibleLinesApprox > 0;
+  const showScrollCue = useFillHeight
+    ? hasMoreBelow
+    : lineCount > visibleLinesApprox && visibleLinesApprox > 0;
 
   return (
     <div 
@@ -481,7 +502,7 @@ export function InlineHintEditor({
       />
       {showScrollCue && (
         <div className="absolute bottom-2 left-0 right-0 flex justify-center pointer-events-none">
-          <span className="text-[10px] text-muted-foreground bg-background/90 px-2 py-0.5 rounded border border-border">
+          <span className="scroll-cue-pulse text-[10px] text-muted-foreground bg-background/90 px-2 py-0.5 rounded border border-border">
             More code below – scroll to view
           </span>
         </div>
