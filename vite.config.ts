@@ -20,6 +20,23 @@ try {
 /** PATH suffix so which/spawn can find mongosh when server has limited env (e.g. started from IDE). */
 const MONGOSH_PATH_SUFFIX = ":/opt/homebrew/bin:/usr/local/bin";
 
+/** Resolve shell to an absolute path that exists, so node-pty posix_spawnp does not fail (e.g. when SHELL is unset or invalid). */
+function getPtyShellPath(): string {
+  const candidates: string[] = [];
+  const envShell = process.env.SHELL;
+  if (envShell && path.isAbsolute(envShell)) candidates.push(envShell);
+  else if (envShell) candidates.push(path.resolve(process.cwd(), envShell));
+  if (process.platform === 'win32') {
+    candidates.push('powershell.exe', 'cmd.exe');
+  } else {
+    candidates.push('/bin/zsh', '/bin/bash', '/usr/bin/zsh', '/usr/bin/bash');
+  }
+  for (const p of candidates) {
+    if (existsSync(p) && statSync(p).isFile()) return p;
+  }
+  return process.platform === 'win32' ? 'powershell.exe' : '/bin/sh';
+}
+
 /** Resolve AWS profile: use request param if non-empty, else AWS_PROFILE env, else "default". */
 function getEffectiveAwsProfile(profileParam: string | null): string {
   const p = (profileParam ?? "").trim();
@@ -408,13 +425,23 @@ export default defineConfig(({ mode }) => ({
               const url = request.url || '';
               if (url.startsWith('/api/pty')) {
                 wss.handleUpgrade(request, socket, head, (ws: any) => {
-                  const shell = process.env.SHELL || (process.platform === 'win32' ? 'powershell.exe' : '/bin/bash');
+                  const shell = getPtyShellPath();
                   const ptyEnv = { ...process.env } as any;
                   if (process.platform !== 'win32') {
                     ptyEnv.EDITOR = ptyEnv.EDITOR || process.env.LAB_EDITOR || (useLabEditor ? `node ${labEditorWrapperPath}` : 'nano');
                     ptyEnv.LAB_EDITOR_SERVER_URL = labEditorServerUrl;
                   }
-                  const pty = nodePty!.spawn(shell, [], { name: 'xterm-256color', cols: 80, rows: 24, cwd: process.cwd(), env: ptyEnv });
+                  let pty: import("node-pty").IPty;
+                  try {
+                    pty = nodePty!.spawn(shell, [], { name: 'xterm-256color', cols: 80, rows: 24, cwd: process.cwd(), env: ptyEnv });
+                  } catch (err) {
+                    const msg = `Terminal could not start (posix_spawnp failed). Shell: ${shell}. Try setting SHELL to an absolute path (e.g. /bin/zsh).`;
+                    try {
+                      if (ws.readyState === 1) ws.send(`\r\n${msg}\r\n`);
+                      ws.close();
+                    } catch { /* ignore */ }
+                    return;
+                  }
                   pty.onData((data: string) => {
                     try { if (ws.readyState === 1) ws.send(data); } catch { /* ignore */ }
                   });
