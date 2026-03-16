@@ -13,6 +13,11 @@
  * available so the marker aligns with the actual text.
  *
  * Run: npm test -- validate-hint-rendering
+ *
+ * Optional scope (validate only a subset of labs):
+ * - LAB_ID=<lab-id>         Only run validation for the lab with this id (e.g. lab-timeseries-fundamentals).
+ * - ENHANCEMENT_PREFIX=<id> Only run validation for steps whose enhancementId starts with this prefix (e.g. timeseries).
+ * Example: LAB_ID=lab-timeseries-fundamentals npm test -- --run src/test/labs/validate-hint-rendering.test.ts
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -188,11 +193,16 @@ describe('Hint rendering validation (all labs)', () => {
 
   beforeAll(async () => {
     const failures: ValidationFailure[] = [];
+    const labIdFilter = process.env.LAB_ID;
+    const enhancementPrefix = process.env.ENHANCEMENT_PREFIX;
 
-    for (const lab of allLabs) {
+    const labsToRun = labIdFilter ? allLabs.filter((lab) => lab.id === labIdFilter) : allLabs;
+
+    for (const lab of labsToRun) {
       for (const step of lab.steps) {
         const enhancementId = step.enhancementId;
         if (!enhancementId) continue;
+        if (enhancementPrefix && !enhancementId.startsWith(enhancementPrefix)) continue;
 
         const metadata = await loadEnhancementMetadata(enhancementId);
         if (!metadata?.codeBlocks) continue;
