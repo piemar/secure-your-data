@@ -87,6 +87,7 @@ async function loadEnhancementModule(
     'partial-recovery': () => import('@/content/topics/operations/partial-recovery/enhancements'),
     'reporting': () => import('@/content/topics/integration/reporting/enhancements'),
     'auto-ha': () => import('@/content/topics/operations/auto-ha/enhancements'),
+    'timeseries': () => import('@/content/topics/timeseries/timeseries/enhancements'),
   };
 
   const loader = moduleMap[prefix];
@@ -111,7 +112,7 @@ async function loadEnhancementModule(
  * Useful for initializing the cache
  */
 export async function preloadAllEnhancements(): Promise<void> {
-  const prefixes = ['rich-query', 'crud', 'text-search', 'flexible', 'ingest-rate', 'in-place-analytics', 'workload-isolation', 'consistency', 'scale-out', 'scale-up', 'right-to-erasure', 'csfle', 'queryable-encryption', 'migratable', 'portable', 'auto-deploy', 'rolling-updates', 'full-recovery-rpo', 'full-recovery-rto', 'partial-recovery-rpo', 'partial-recovery', 'reporting', 'auto-ha'];
+  const prefixes = ['rich-query', 'crud', 'text-search', 'flexible', 'ingest-rate', 'in-place-analytics', 'workload-isolation', 'consistency', 'scale-out', 'scale-up', 'right-to-erasure', 'csfle', 'queryable-encryption', 'migratable', 'portable', 'auto-deploy', 'rolling-updates', 'full-recovery-rpo', 'full-recovery-rto', 'partial-recovery-rpo', 'partial-recovery', 'reporting', 'auto-ha', 'timeseries'];
   
   for (const prefix of prefixes) {
     try {
