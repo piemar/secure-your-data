@@ -147,6 +147,28 @@ class SoundEngine {
           });
           break;
         }
+        case 'datatype': {
+          // Robotic terminal blip — short, clicky, sci-fi feel
+          const osc = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'square';
+          osc2.type = 'sine';
+          const freq = 600 + Math.random() * 600;
+          osc.frequency.setValueAtTime(freq, now);
+          osc.frequency.exponentialRampToValueAtTime(freq * 0.5, now + 0.025);
+          osc2.frequency.setValueAtTime(freq * 1.5, now);
+          gain.gain.setValueAtTime(this._volume * 0.04, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
+          osc.connect(gain);
+          osc2.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc2.start(now);
+          osc.stop(now + 0.025);
+          osc2.stop(now + 0.025);
+          break;
+        }
       }
     } catch {
       // Audio context not available

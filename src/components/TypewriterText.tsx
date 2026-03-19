@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { soundEngine } from '@/lib/sound-engine';
 
 interface TypewriterTextProps {
   text: string;
@@ -6,9 +7,10 @@ interface TypewriterTextProps {
   delay?: number;
   onComplete?: () => void;
   className?: string;
+  sound?: boolean;
 }
 
-export function TypewriterText({ text, speed = 40, delay = 0, onComplete, className = '' }: TypewriterTextProps) {
+export function TypewriterText({ text, speed = 40, delay = 0, onComplete, className = '', sound = true }: TypewriterTextProps) {
   const [displayed, setDisplayed] = useState('');
   const [started, setStarted] = useState(false);
 
@@ -22,12 +24,15 @@ export function TypewriterText({ text, speed = 40, delay = 0, onComplete, classN
     if (displayed.length < text.length) {
       const timeout = setTimeout(() => {
         setDisplayed(text.slice(0, displayed.length + 1));
+        if (sound && text[displayed.length] !== ' ') {
+          soundEngine.play('datatype');
+        }
       }, speed);
       return () => clearTimeout(timeout);
     } else {
       onComplete?.();
     }
-  }, [displayed, started, text, speed, onComplete]);
+  }, [displayed, started, text, speed, onComplete, sound]);
 
   return (
     <span className={`font-mono ${className}`}>
