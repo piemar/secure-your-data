@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useEffect, useState } from 'react';
 import { Mission, MissionTier } from '@/lib/types';
 import { MISSION_PREREQUISITES, isMissionUnlocked } from '@/lib/mission-prerequisites';
+import { getMissionIcon } from '@/lib/mission-icons';
 import { soundEngine } from '@/lib/sound-engine';
 
 interface MissionNodeGraphProps {
@@ -9,121 +10,247 @@ interface MissionNodeGraphProps {
   onMissionClick: (missionId: string) => void;
 }
 
-interface NodePosition {
+const TIER_META: Record<MissionTier, { label: string; color: string }> = {
+  recon: { label: 'RECON', color: 'hsl(var(--primary))' },
+  infiltration: { label: 'INFILTRATION', color: 'hsl(var(--warning))' },
+  exfiltration: { label: 'EXFILTRATION', color: 'hsl(var(--destructive))' },
+};
+
+interface NodeData {
+  mission: Mission;
   x: number;
   y: number;
+  tier: MissionTier;
 }
 
-const TIER_COLORS: Record<MissionTier, string> = {
-  recon: 'hsl(var(--primary))',
-  infiltration: 'hsl(var(--warning))',
-  exfiltration: 'hsl(var(--destructive))',
-};
+// Matrix rain particles for background
+function MatrixParticles() {
+  const chars = '01アイウエオカキクケコ';
+  const particles = useMemo(() =>
+    Array.from({ length: 30 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      delay: Math.random() * 8,
+      duration: 4 + Math.random() * 6,
+      char: chars[Math.floor(Math.random() * chars.length)],
+      size: 8 + Math.random() * 6,
+      opacity: 0.05 + Math.random() * 0.1,
+    })), []);
 
-const TIER_Y_BASE: Record<MissionTier, number> = {
-  recon: 80,
-  infiltration: 240,
-  exfiltration: 400,
-};
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {particles.map(p => (
+        <span
+          key={p.id}
+          className="absolute font-mono text-primary animate-[matrix-fall_linear_infinite]"
+          style={{
+            left: `${p.x}%`,
+            fontSize: `${p.size}px`,
+            opacity: p.opacity,
+            animationDuration: `${p.duration}s`,
+            animationDelay: `${p.delay}s`,
+          }}
+        >
+          {p.char}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export function MissionNodeGraph({ missions, completedMissions, onMissionClick }: MissionNodeGraphProps) {
-  const { positions, connections } = useMemo(() => {
-    const pos: Record<string, NodePosition> = {};
-    const conns: { from: string; to: string }[] = [];
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
-    // Position missions by tier with horizontal spread
+  // Layout: vertical winding path, missions snake left-right
+  const { nodes, connections, totalHeight, tierSections } = useMemo(() => {
+    const tierOrder: MissionTier[] = ['recon', 'infiltration', 'exfiltration'];
     const byTier: Record<MissionTier, Mission[]> = { recon: [], infiltration: [], exfiltration: [] };
     for (const m of missions) byTier[m.tier].push(m);
 
-    for (const tier of ['recon', 'infiltration', 'exfiltration'] as MissionTier[]) {
+    const allNodes: NodeData[] = [];
+    const conns: { from: NodeData; to: NodeData }[] = [];
+    const sections: { tier: MissionTier; yStart: number }[] = [];
+
+    const nodeW = 700; // usable width
+    const nodeSpacingY = 120;
+    const tierGap = 60;
+    const paddingTop = 60;
+    const nodesPerRow = 3;
+    let currentY = paddingTop;
+
+    for (const tier of tierOrder) {
+      sections.push({ tier, yStart: currentY });
+      currentY += 40; // space for tier label
       const tierMissions = byTier[tier];
-      const spacing = 900 / (tierMissions.length + 1);
+
       tierMissions.forEach((m, i) => {
-        // Add slight vertical jitter for organic feel
-        const jitter = (i % 2 === 0 ? -15 : 15);
-        pos[m.id] = {
-          x: spacing * (i + 1),
-          y: TIER_Y_BASE[tier] + jitter,
-        };
+        const row = Math.floor(i / nodesPerRow);
+        const col = i % nodesPerRow;
+        // Snake: even rows left-to-right, odd rows right-to-left
+        const actualCol = row % 2 === 0 ? col : (nodesPerRow - 1 - col);
+        const xSpacing = nodeW / (nodesPerRow + 1);
+        const x = 50 + xSpacing * (actualCol + 1);
+        const y = currentY + row * nodeSpacingY;
+
+        allNodes.push({ mission: m, x, y, tier });
       });
+
+      const rows = Math.ceil(tierMissions.length / nodesPerRow);
+      currentY += rows * nodeSpacingY + tierGap;
     }
 
-    // Build connections from prerequisites
+    // Build map for connections
+    const nodeMap = new Map(allNodes.map(n => [n.mission.id, n]));
     for (const [missionId, prereqs] of Object.entries(MISSION_PREREQUISITES)) {
+      const toNode = nodeMap.get(missionId);
+      if (!toNode) continue;
       for (const prereq of prereqs) {
-        if (pos[prereq] && pos[missionId]) {
-          conns.push({ from: prereq, to: missionId });
-        }
+        const fromNode = nodeMap.get(prereq);
+        if (fromNode) conns.push({ from: fromNode, to: toNode });
       }
     }
 
-    return { positions: pos, connections: conns };
+    // Also connect sequential nodes within the same tier for the trail
+    for (const tier of tierOrder) {
+      const tierNodes = allNodes.filter(n => n.tier === tier);
+      for (let i = 1; i < tierNodes.length; i++) {
+        const from = tierNodes[i - 1];
+        const to = tierNodes[i];
+        // Only add if not already a prerequisite connection
+        const exists = conns.some(c =>
+          c.from.mission.id === from.mission.id && c.to.mission.id === to.mission.id
+        );
+        if (!exists) conns.push({ from, to });
+      }
+    }
+
+    return { nodes: allNodes, connections: conns, totalHeight: currentY + 40, tierSections: sections };
   }, [missions]);
 
+  const svgWidth = 800;
+
   return (
-    <div className="relative w-full overflow-x-auto">
-      <svg width="900" height="520" className="w-full" viewBox="0 0 900 520">
+    <div ref={containerRef} className="relative w-full rounded-lg border border-border overflow-hidden bg-gradient-to-b from-background via-card to-background">
+      <MatrixParticles />
+
+      {/* Subtle grid background */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.03]"
+        style={{
+          backgroundImage: `
+            linear-gradient(hsl(var(--primary)) 1px, transparent 1px),
+            linear-gradient(90deg, hsl(var(--primary)) 1px, transparent 1px)
+          `,
+          backgroundSize: '40px 40px',
+        }}
+      />
+
+      <svg
+        width="100%"
+        height={totalHeight}
+        viewBox={`0 0 ${svgWidth} ${totalHeight}`}
+        className="relative z-10"
+        style={{ minHeight: 500 }}
+      >
         <defs>
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="3" result="blur" />
+          <filter id="node-glow">
+            <feGaussianBlur stdDeviation="4" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-          <filter id="glow-strong">
-            <feGaussianBlur stdDeviation="6" result="blur" />
+          <filter id="node-glow-strong">
+            <feGaussianBlur stdDeviation="8" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
+          {/* Animated dash for trail */}
+          <linearGradient id="trail-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.6" />
+            <stop offset="50%" stopColor="hsl(var(--primary))" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.6" />
+          </linearGradient>
         </defs>
 
-        {/* Tier labels */}
-        {(['recon', 'infiltration', 'exfiltration'] as MissionTier[]).map(tier => (
-          <text
-            key={tier}
-            x={12}
-            y={TIER_Y_BASE[tier] - 30}
-            className="fill-muted-foreground font-mono"
-            fontSize="10"
-            opacity="0.5"
-          >
-            {tier.toUpperCase()}
-          </text>
+        {/* Tier section labels */}
+        {tierSections.map(({ tier, yStart }) => (
+          <g key={tier}>
+            <text
+              x={50}
+              y={yStart + 14}
+              className="font-mono"
+              fontSize="11"
+              fill={TIER_META[tier].color}
+              opacity="0.6"
+              letterSpacing="3"
+            >
+              {'▸ ' + TIER_META[tier].label}
+            </text>
+            <line
+              x1={50}
+              y1={yStart + 22}
+              x2={svgWidth - 50}
+              y2={yStart + 22}
+              stroke={TIER_META[tier].color}
+              strokeWidth="0.5"
+              opacity="0.15"
+            />
+          </g>
         ))}
 
-        {/* Connection lines */}
+        {/* Connection trails */}
         {connections.map(({ from, to }, i) => {
-          const fromPos = positions[from];
-          const toPos = positions[to];
-          if (!fromPos || !toPos) return null;
-          const isCompleted = completedMissions.includes(from) && completedMissions.includes(to);
-          const isPartial = completedMissions.includes(from);
+          const fromCompleted = completedMissions.includes(from.mission.id);
+          const toCompleted = completedMissions.includes(to.mission.id);
+          const bothComplete = fromCompleted && toCompleted;
+          const oneComplete = fromCompleted || toCompleted;
+
+          // Bezier curve for organic path
+          const midY = (from.y + to.y) / 2;
+          const d = `M${from.x},${from.y} C${from.x},${midY} ${to.x},${midY} ${to.x},${to.y}`;
 
           return (
-            <line
-              key={i}
-              x1={fromPos.x}
-              y1={fromPos.y}
-              x2={toPos.x}
-              y2={toPos.y}
-              stroke={isCompleted ? 'hsl(var(--primary))' : isPartial ? 'hsl(var(--primary) / 0.3)' : 'hsl(var(--border))'}
-              strokeWidth={isCompleted ? 2 : 1}
-              strokeDasharray={isCompleted ? undefined : '4 4'}
-              opacity={isCompleted ? 0.8 : 0.4}
-            />
+            <g key={i}>
+              {/* Shadow trail */}
+              <path
+                d={d}
+                fill="none"
+                stroke={bothComplete ? 'hsl(var(--primary))' : oneComplete ? 'hsl(var(--primary))' : 'hsl(var(--border))'}
+                strokeWidth={bothComplete ? 3 : 1.5}
+                opacity={bothComplete ? 0.4 : oneComplete ? 0.15 : 0.08}
+                strokeLinecap="round"
+              />
+              {/* Animated dashed overlay for active paths */}
+              {oneComplete && !bothComplete && (
+                <path
+                  d={d}
+                  fill="none"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={1.5}
+                  strokeDasharray="6 8"
+                  opacity={0.3}
+                  strokeLinecap="round"
+                >
+                  <animate attributeName="stroke-dashoffset" from="28" to="0" dur="2s" repeatCount="indefinite" />
+                </path>
+              )}
+            </g>
           );
         })}
 
         {/* Mission nodes */}
-        {missions.map(m => {
-          const pos = positions[m.id];
-          if (!pos) return null;
+        {nodes.map(node => {
+          const { mission: m, x, y } = node;
           const isCompleted = completedMissions.includes(m.id);
           const unlocked = isMissionUnlocked(m.id, completedMissions);
-          const nodeColor = TIER_COLORS[m.tier];
+          const isHovered = hoveredId === m.id;
+          const tierColor = TIER_META[m.tier].color;
+          const icon = getMissionIcon(m.codename);
+          const nodeRadius = 26;
 
           return (
             <g
@@ -134,64 +261,132 @@ export function MissionNodeGraph({ missions, completedMissions, onMissionClick }
                   onMissionClick(m.id);
                 }
               }}
+              onMouseEnter={() => setHoveredId(m.id)}
+              onMouseLeave={() => setHoveredId(null)}
               className={unlocked ? 'cursor-pointer' : 'cursor-not-allowed'}
-              opacity={unlocked ? 1 : 0.35}
+              opacity={unlocked ? 1 : 0.3}
+              style={{ transition: 'opacity 0.3s' }}
             >
-              {/* Pulse ring for available missions */}
+              {/* Pulse ring for available (unlocked, not completed) */}
               {unlocked && !isCompleted && (
-                <circle
-                  cx={pos.x}
-                  cy={pos.y}
-                  r={28}
-                  fill="none"
-                  stroke={nodeColor}
-                  strokeWidth={1}
-                  opacity={0.4}
-                >
-                  <animate attributeName="r" from="24" to="32" dur="2s" repeatCount="indefinite" />
-                  <animate attributeName="opacity" from="0.4" to="0" dur="2s" repeatCount="indefinite" />
+                <circle cx={x} cy={y} r={nodeRadius + 6} fill="none" stroke={tierColor} strokeWidth={1} opacity={0.3}>
+                  <animate attributeName="r" from={nodeRadius + 2} to={nodeRadius + 12} dur="2.5s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" from="0.3" to="0" dur="2.5s" repeatCount="indefinite" />
                 </circle>
               )}
 
-              {/* Node circle */}
-              <circle
-                cx={pos.x}
-                cy={pos.y}
-                r={22}
-                fill={isCompleted ? nodeColor : 'hsl(var(--card))'}
-                stroke={nodeColor}
-                strokeWidth={isCompleted ? 2.5 : 1.5}
-                filter={isCompleted ? 'url(#glow)' : undefined}
+              {/* Glow bg for completed */}
+              {isCompleted && (
+                <circle cx={x} cy={y} r={nodeRadius + 4} fill={tierColor} opacity={0.1} filter="url(#node-glow-strong)" />
+              )}
+
+              {/* Hexagonal-ish node (rounded rect) */}
+              <rect
+                x={x - nodeRadius}
+                y={y - nodeRadius}
+                width={nodeRadius * 2}
+                height={nodeRadius * 2}
+                rx={isCompleted ? nodeRadius : 8}
+                fill={isCompleted ? tierColor : 'hsl(var(--card))'}
+                stroke={isCompleted ? tierColor : isHovered ? tierColor : 'hsl(var(--border))'}
+                strokeWidth={isCompleted ? 2 : isHovered ? 1.5 : 1}
+                filter={isCompleted || isHovered ? 'url(#node-glow)' : undefined}
+                style={{ transition: 'all 0.2s' }}
               />
 
-              {/* Completion checkmark */}
-              {isCompleted && (
-                <text x={pos.x} y={pos.y + 4} textAnchor="middle" fontSize="14" fill="hsl(var(--card))">✓</text>
-              )}
-
-              {/* Lock icon */}
-              {!unlocked && (
-                <text x={pos.x} y={pos.y + 4} textAnchor="middle" fontSize="12" fill="hsl(var(--muted-foreground))">🔒</text>
-              )}
-
-              {/* Difficulty stars for unlocked incomplete */}
-              {unlocked && !isCompleted && (
-                <text x={pos.x} y={pos.y + 4} textAnchor="middle" fontSize="10" fill={nodeColor}>
-                  {'★'.repeat(Math.min(m.difficulty, 5))}
+              {/* Inner icon */}
+              {unlocked ? (
+                <g transform={`translate(${x - 10}, ${y - 10}) scale(0.83)`}>
+                  <path
+                    d={icon.path}
+                    fill="none"
+                    stroke={isCompleted ? 'hsl(var(--primary-foreground))' : tierColor}
+                    strokeWidth={1.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity={isCompleted ? 1 : 0.8}
+                  />
+                </g>
+              ) : (
+                <text x={x} y={y + 4} textAnchor="middle" fontSize="14" fill="hsl(var(--muted-foreground))">
+                  🔒
                 </text>
               )}
 
-              {/* Mission name label */}
+              {/* Completion check badge */}
+              {isCompleted && (
+                <g>
+                  <circle cx={x + nodeRadius - 4} cy={y - nodeRadius + 4} r={7} fill="hsl(var(--primary))" stroke="hsl(var(--background))" strokeWidth={2} />
+                  <text x={x + nodeRadius - 4} y={y - nodeRadius + 7.5} textAnchor="middle" fontSize="9" fill="hsl(var(--primary-foreground))" fontWeight="bold">✓</text>
+                </g>
+              )}
+
+              {/* Difficulty dots */}
+              {unlocked && !isCompleted && (
+                <g>
+                  {Array.from({ length: Math.min(m.difficulty, 5) }, (_, di) => (
+                    <circle
+                      key={di}
+                      cx={x - ((Math.min(m.difficulty, 5) - 1) * 4) / 2 + di * 4}
+                      cy={y + nodeRadius + 10}
+                      r={1.5}
+                      fill={tierColor}
+                      opacity={0.7}
+                    />
+                  ))}
+                </g>
+              )}
+
+              {/* Codename label */}
               <text
-                x={pos.x}
-                y={pos.y + 38}
+                x={x}
+                y={y + nodeRadius + (unlocked && !isCompleted ? 22 : 14)}
                 textAnchor="middle"
-                className="font-mono fill-foreground"
+                className="font-mono"
                 fontSize="8"
-                opacity={unlocked ? 0.9 : 0.4}
+                fill="hsl(var(--foreground))"
+                opacity={unlocked ? 0.8 : 0.3}
+                letterSpacing="1"
               >
                 {m.codename}
               </text>
+
+              {/* Hover tooltip */}
+              {isHovered && unlocked && (
+                <g>
+                  <rect
+                    x={x - 80}
+                    y={y - nodeRadius - 36}
+                    width={160}
+                    height={26}
+                    rx={4}
+                    fill="hsl(var(--popover))"
+                    stroke="hsl(var(--border))"
+                    strokeWidth={0.5}
+                    opacity={0.95}
+                  />
+                  <text
+                    x={x}
+                    y={y - nodeRadius - 20}
+                    textAnchor="middle"
+                    className="font-mono"
+                    fontSize="9"
+                    fill="hsl(var(--foreground))"
+                  >
+                    {m.title}
+                  </text>
+                  <text
+                    x={x}
+                    y={y - nodeRadius - 11}
+                    textAnchor="middle"
+                    className="font-mono"
+                    fontSize="7"
+                    fill="hsl(var(--primary))"
+                  >
+                    {isCompleted ? '✓ COMPLETED' : `+${m.xpReward} XP`}
+                  </text>
+                </g>
+              )}
             </g>
           );
         })}
