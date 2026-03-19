@@ -1,14 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { HUDBar } from '@/components/HUDBar';
 import { MissionCard } from '@/components/MissionCard';
 import { TiltCard } from '@/components/TiltCard';
 import { ActivityTicker } from '@/components/ActivityTicker';
 import { MatrixRain } from '@/components/MatrixRain';
+import { MissionNodeGraph } from '@/components/MissionNodeGraph';
+import { MissionSearch } from '@/components/MissionSearch';
 import { Player, MissionTier } from '@/lib/types';
 import { getPlayer } from '@/lib/game-store';
-import { MISSIONS, ACHIEVEMENTS, MOCK_LEADERBOARD_PLAYERS } from '@/lib/game-data';
+import { MISSIONS, ACHIEVEMENTS, MOCK_LEADERBOARD_PLAYERS, QUESTS } from '@/lib/game-data';
+import { isMissionUnlocked, POV_LABELS } from '@/lib/mission-prerequisites';
 import { Badge } from '@/components/ui/badge';
+import { Lock, Map, LayoutGrid } from 'lucide-react';
 
 const TIER_ORDER: MissionTier[] = ['recon', 'infiltration', 'exfiltration'];
 const TIER_NAMES: Record<MissionTier, string> = {
@@ -20,6 +24,8 @@ const TIER_NAMES: Record<MissionTier, string> = {
 export default function Dashboard() {
   const navigate = useNavigate();
   const [player, setPlayer] = useState<Player | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'graph'>('grid');
+  const [filteredMissionIds, setFilteredMissionIds] = useState<string[] | null>(null);
 
   useEffect(() => {
     const p = getPlayer();
@@ -27,15 +33,29 @@ export default function Dashboard() {
     setPlayer(p);
   }, [navigate]);
 
+  const handleFilterChange = useCallback((ids: string[] | null) => {
+    setFilteredMissionIds(ids);
+  }, []);
+
   if (!player) return null;
+
+  const displayMissions = filteredMissionIds
+    ? MISSIONS.filter(m => filteredMissionIds.includes(m.id))
+    : MISSIONS;
 
   const missionsByTier = TIER_ORDER.map(tier => ({
     tier,
-    missions: MISSIONS.filter(m => m.tier === tier),
-  }));
+    missions: displayMissions.filter(m => m.tier === tier),
+  })).filter(t => t.missions.length > 0);
 
   const unlockedAchievements = ACHIEVEMENTS.filter(a => player.achievements.includes(a.id));
   const topPlayers = MOCK_LEADERBOARD_PLAYERS.slice(0, 5);
+
+  // Quest progress
+  const activeQuests = QUESTS.filter(q => {
+    const done = q.missionIds.filter(id => player.completedMissions.includes(id)).length;
+    return done > 0 && done < q.requiredMissions;
+  });
 
   return (
     <div className="min-h-screen bg-background relative">
@@ -44,42 +64,146 @@ export default function Dashboard() {
 
       <div className="relative z-10 pt-16 pb-20 px-4 max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8 mt-4">
-          <h1 className="font-mono text-2xl font-bold text-primary text-glow">
-            MISSION CONTROL
-          </h1>
-          <p className="font-mono text-xs text-muted-foreground mt-1">
-            {player.completedMissions.length}/{MISSIONS.length} MISSIONS COMPLETED •{' '}
-            {ACHIEVEMENTS.length - unlockedAchievements.length} ACHIEVEMENTS REMAINING
-          </p>
+        <div className="mb-6 mt-4 flex items-center justify-between">
+          <div>
+            <h1 className="font-mono text-2xl font-bold text-primary text-glow">
+              MISSION CONTROL
+            </h1>
+            <p className="font-mono text-xs text-muted-foreground mt-1">
+              {player.completedMissions.length}/{MISSIONS.length} MISSIONS COMPLETED •{' '}
+              {ACHIEVEMENTS.length - unlockedAchievements.length} ACHIEVEMENTS REMAINING
+            </p>
+          </div>
+          <div className="flex gap-1">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 rounded transition-colors ${viewMode === 'grid' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              title="Grid view"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('graph')}
+              className={`p-2 rounded transition-colors ${viewMode === 'graph' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              title="Node graph"
+            >
+              <Map className="w-4 h-4" />
+            </button>
+          </div>
         </div>
+
+        {/* Search & Filter */}
+        <div className="mb-6">
+          <MissionSearch missions={MISSIONS} onFilterChange={handleFilterChange} />
+        </div>
+
+        {/* Node Graph View */}
+        {viewMode === 'graph' && (
+          <div className="mb-8 border border-border rounded-lg bg-card/80 backdrop-blur-sm p-4 overflow-hidden">
+            <MissionNodeGraph
+              missions={displayMissions}
+              completedMissions={player.completedMissions}
+              onMissionClick={(id) => navigate(`/mission/${id}`)}
+            />
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Mission List - Left/Center */}
           <div className="lg:col-span-3 space-y-8">
-            {missionsByTier.map(({ tier, missions }) => (
+            {viewMode === 'grid' && missionsByTier.map(({ tier, missions }) => (
               <div key={tier}>
                 <h2 className="font-mono text-sm font-bold text-foreground mb-3 flex items-center gap-2">
                   {TIER_NAMES[tier]}
                   <span className="h-px flex-1 bg-border" />
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                  {missions.map(mission => (
-                    <TiltCard key={mission.id}>
-                      <MissionCard
-                        mission={mission}
-                        isCompleted={player.completedMissions.includes(mission.id)}
-                        onClick={() => navigate(`/mission/${mission.id}`)}
-                      />
-                    </TiltCard>
-                  ))}
+                  {missions.map(mission => {
+                    const unlocked = isMissionUnlocked(mission.id, player.completedMissions);
+                    const isCompleted = player.completedMissions.includes(mission.id);
+                    return (
+                      <TiltCard key={mission.id}>
+                        <div className="relative">
+                          {!unlocked && !isCompleted && (
+                            <div className="absolute inset-0 z-10 bg-background/70 backdrop-blur-[2px] rounded-lg flex items-center justify-center">
+                              <div className="text-center">
+                                <Lock className="w-5 h-5 text-muted-foreground mx-auto mb-1" />
+                                <span className="font-mono text-[10px] text-muted-foreground">LOCKED</span>
+                              </div>
+                            </div>
+                          )}
+                          <MissionCard
+                            mission={mission}
+                            isCompleted={isCompleted}
+                            onClick={() => unlocked ? navigate(`/mission/${mission.id}`) : undefined}
+                          />
+                          {/* POV tags */}
+                          {mission.povCapabilities && mission.povCapabilities.length > 0 && (
+                            <div className="flex flex-wrap gap-1 px-3 pb-2">
+                              {mission.povCapabilities.map(pov => (
+                                <span key={pov} className="text-[8px] font-mono text-primary/60 bg-primary/5 px-1.5 py-0.5 rounded">
+                                  {POV_LABELS[pov] || pov}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </TiltCard>
+                    );
+                  })}
                 </div>
               </div>
             ))}
+
+            {viewMode === 'graph' && (
+              <p className="font-mono text-xs text-muted-foreground text-center py-4">
+                Click a node in the graph above to start a mission
+              </p>
+            )}
           </div>
 
           {/* Sidebar - Right */}
           <div className="space-y-6">
+            {/* Active Quests */}
+            {activeQuests.length > 0 && (
+              <div className="border border-border rounded-lg p-4 bg-card/80 backdrop-blur-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-mono text-xs font-bold text-foreground">ACTIVE QUESTS</h3>
+                  <button
+                    onClick={() => navigate('/quests')}
+                    className="text-[10px] text-primary font-mono hover:underline"
+                  >
+                    VIEW ALL →
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {activeQuests.slice(0, 3).map(quest => {
+                    const done = quest.missionIds.filter(id => player.completedMissions.includes(id)).length;
+                    return (
+                      <button key={quest.id} onClick={() => navigate('/quests')} className="block w-full text-left">
+                        <div className="flex items-center gap-2 text-xs">
+                          <span>{quest.icon}</span>
+                          <span className="font-mono text-foreground flex-1 truncate">{quest.title}</span>
+                          <span className="font-mono text-primary text-[10px]">{done}/{quest.requiredMissions}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* All Quests link */}
+            <button
+              onClick={() => navigate('/quests')}
+              className="w-full border border-border rounded-lg p-3 bg-card/80 backdrop-blur-sm hover:border-primary/30 transition-colors text-left"
+            >
+              <h3 className="font-mono text-xs font-bold text-foreground mb-1">📜 QUEST CHAINS</h3>
+              <p className="font-mono text-[10px] text-muted-foreground">
+                {QUESTS.length} story arcs with bonus XP rewards
+              </p>
+            </button>
+
             {/* Mini Leaderboard */}
             <div className="border border-border rounded-lg p-4 bg-card/80 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-3">

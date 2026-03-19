@@ -122,6 +122,7 @@ export function HUDBar({ player, timeRemaining, systemStability = 100, showTimer
         <div className="flex gap-1">
           {[
             { path: '/dashboard', label: '⌘' },
+            { path: '/quests', label: '📜' },
             { path: '/leaderboard', label: '🏆' },
           ].map(nav => (
             <button
