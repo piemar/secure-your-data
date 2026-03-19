@@ -106,6 +106,12 @@ export default function Landing() {
           >
             {ASCII_LOGO}
           </pre>
+          <pre
+            className="font-mono text-primary/30 text-[3px] sm:text-[5px] md:text-[7px] leading-tight whitespace-pre select-none mt-1"
+            style={{ animationName: 'fade-in-slow', animationDuration: '3s', animationDelay: '0.5s', animationFillMode: 'both' }}
+          >
+            {ASCII_SUBTITLE}
+          </pre>
         </div>
 
         {/* Connection text */}
