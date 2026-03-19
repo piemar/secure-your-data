@@ -80,6 +80,28 @@ router.patch('/:id/status', authenticateToken, requireModerator, async (req: Req
   }
 });
 
+/** PATCH /api/workshops/:id/config — update workshop execution config */
+router.patch('/:id/config', authenticateToken, requireModerator, async (req: Request, res: Response) => {
+  try {
+    const { executionMode } = req.body;
+    if (!['sandbox_only', 'atlas_connected', 'hybrid'].includes(executionMode)) {
+      res.status(400).json({ error: 'Invalid execution mode' });
+      return;
+    }
+
+    const db = getDb();
+    await db.collection(COLLECTIONS.WORKSHOP_SESSIONS).updateOne(
+      { _id: new ObjectId(req.params.id), moderatorId: req.user!.userId },
+      { $set: { executionMode, updatedAt: new Date() } }
+    );
+
+    res.json({ executionMode });
+  } catch (err) {
+    console.error('Update workshop config error:', err);
+    res.status(500).json({ error: 'Failed to update workshop config' });
+  }
+});
+
 /** GET /api/workshops/:id/metrics — live session metrics */
 router.get('/:id/metrics', authenticateToken, requireModerator, async (req: Request, res: Response) => {
   try {

@@ -98,6 +98,11 @@ export const api = {
         body: JSON.stringify({ status }),
       }),
     metrics: (id: string) => request<Record<string, unknown>>(`/api/workshops/${id}/metrics`),
+    updateConfig: (id: string, config: { executionMode: string }) =>
+      request<{ executionMode: string }>(`/api/workshops/${id}/config`, {
+        method: 'PATCH',
+        body: JSON.stringify(config),
+      }),
   },
 
   metrics: {
