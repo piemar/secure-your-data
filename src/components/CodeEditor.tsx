@@ -5,11 +5,9 @@ import { InlineHint } from '@/lib/types';
 import { InlineHintMarker } from './InlineHintMarker';
 
 interface BlankPosition {
-  line: number;       // 1-based
-  column: number;     // 1-based start of ___BLANK___
-  hintIndex: number;  // index into hints array
-  pixelX: number;
-  pixelY: number;
+  lineNumber: number;  // 1-based line where ___BLANK___ currently lives
+  hintIndex: number;   // sequential index into hints array
+  pixelY: number;      // vertical pixel offset (scroll-aware)
 }
 
 type HintState = 'unrevealed' | 'hint-shown' | 'answer-shown';
@@ -40,8 +38,9 @@ export function CodeEditor({
   const decorationsRef = useRef<string[]>([]);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [blankPositions, setBlankPositions] = useState<BlankPosition[]>([]);
+  const [gutterWidth, setGutterWidth] = useState(0);
 
-  // Scan for ___BLANK___ markers and compute pixel positions
+  // Scan content for ___BLANK___ markers and compute gutter-aligned Y positions
   const updateBlankPositions = useCallback(() => {
     const ed = editorRef.current;
     if (!ed || hints.length === 0) {
@@ -52,50 +51,52 @@ export function CodeEditor({
     const model = ed.getModel();
     if (!model) return;
 
+    // Get gutter width from layout info
+    const layoutInfo = ed.getLayoutInfo();
+    const glyphMarginWidth = layoutInfo.glyphMarginWidth || 0;
+    const lineNumbersWidth = layoutInfo.lineNumbersWidth || 0;
+    setGutterWidth(glyphMarginWidth + lineNumbersWidth);
+
     const content = model.getValue();
     const lines = content.split('\n');
     const positions: BlankPosition[] = [];
     let blankCount = 0;
 
-    lines.forEach((lineContent, lineIdx) => {
+    for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+      const lineContent = lines[lineIdx];
+      if (!lineContent.includes('___BLANK___')) continue;
+
+      // Count all blanks on this line
       const blankRegex = /___BLANK___/g;
       let match;
       while ((match = blankRegex.exec(lineContent)) !== null) {
-        // Match blank to hint by sequential order
         const hintIndex = blankCount;
         blankCount++;
 
-        if (hintIndex >= hints.length) return;
+        if (hintIndex >= hints.length) break;
 
-        // Get state - skip if answer already shown
+        // Skip if answer already shown (blank was replaced)
         const state = hintStates.get(hintIndex) || 'unrevealed';
-        if (state === 'answer-shown') return;
+        if (state === 'answer-shown') continue;
 
-        // Get pixel position via Monaco API
+        // Get the Y pixel position for this line (scroll-aware)
         const lineNumber = lineIdx + 1;
-        const column = match.index + 6; // center of ___BLANK___ (11 chars / 2)
-        const pos = ed.getScrolledVisiblePosition({ lineNumber, column });
+        const pos = ed.getScrolledVisiblePosition({ lineNumber, column: 1 });
 
         if (pos) {
-          // Get the editor's layout to account for content left offset (gutter + line numbers)
-          const layoutInfo = ed.getLayoutInfo();
-          const contentLeft = layoutInfo.contentLeft || 0;
-
           positions.push({
-            line: lineNumber,
-            column,
+            lineNumber,
             hintIndex,
-            pixelX: pos.left + contentLeft,
-            pixelY: pos.top + 10, // vertically center on line (~18px line height / 2)
+            pixelY: pos.top + 9, // center vertically (~18px line height)
           });
         }
       }
-    });
+    }
 
     setBlankPositions(positions);
   }, [hints, hintStates]);
 
-  // Update positions on value/scroll changes
+  // Re-scan positions on every content change, scroll, or layout change
   useEffect(() => {
     const ed = editorRef.current;
     if (!ed) return;
@@ -104,10 +105,12 @@ export function CodeEditor({
 
     const scrollDisposable = ed.onDidScrollChange(() => updateBlankPositions());
     const layoutDisposable = ed.onDidLayoutChange(() => updateBlankPositions());
+    const contentDisposable = ed.onDidChangeModelContent(() => updateBlankPositions());
 
     return () => {
       scrollDisposable.dispose();
       layoutDisposable.dispose();
+      contentDisposable.dispose();
     };
   }, [value, updateBlankPositions]);
 
@@ -132,7 +135,7 @@ export function CodeEditor({
           range: new monaco.Range(lineIdx + 1, match.index + 1, lineIdx + 1, match.index + 12),
           options: {
             inlineClassName: 'blank-marker-highlight',
-            hoverMessage: { value: '**💡 Click the ? marker to get a hint**' },
+            hoverMessage: { value: '**💡 Click the ? in the gutter to get a hint**' },
           },
         });
       }
@@ -145,7 +148,6 @@ export function CodeEditor({
     editorRef.current = editor;
     monacoRef.current = monaco;
 
-    // Define MongoDB/mongosh theme
     monaco.editor.defineTheme('heist-terminal', {
       base: 'vs-dark',
       inherit: true,
@@ -183,7 +185,6 @@ export function CodeEditor({
 
     monaco.editor.setTheme('heist-terminal');
 
-    // Add MongoDB/mongosh completions
     monaco.languages.registerCompletionItemProvider('javascript', {
       provideCompletionItems: (model: any, position: any) => {
         const word = model.getWordUntilPosition(position);
@@ -217,8 +218,8 @@ export function CodeEditor({
       },
     });
 
-    // Trigger initial position calculation after mount
-    setTimeout(() => updateBlankPositions(), 100);
+    // Initial position calculation after mount
+    setTimeout(() => updateBlankPositions(), 150);
   }, [updateBlankPositions]);
 
   return (
@@ -255,18 +256,18 @@ export function CodeEditor({
         }
       />
 
-      {/* Floating hint markers overlay */}
+      {/* Gutter-aligned hint markers */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         {blankPositions.map((pos) => (
           <InlineHintMarker
-            key={`hint-${pos.hintIndex}-${pos.line}`}
+            key={`hint-${pos.hintIndex}`}
             hint={hints[pos.hintIndex]}
             index={pos.hintIndex}
             state={hintStates.get(pos.hintIndex) || 'unrevealed'}
             onRevealHint={onRevealHint || (() => {})}
             onRevealAnswer={onRevealAnswer || (() => {})}
             style={{
-              left: `${pos.pixelX}px`,
+              left: `${Math.max(4, gutterWidth - 22)}px`,
               top: `${pos.pixelY}px`,
             }}
           />
