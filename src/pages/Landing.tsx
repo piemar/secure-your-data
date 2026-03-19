@@ -78,10 +78,10 @@ export default function Landing() {
           <div className="relative h-16 sm:h-20 overflow-visible mb-1">
             <img
               src={heistMascot}
-              alt="Agent Raccoon"
+              alt="MDB Turtle Mascot"
               className="absolute w-12 h-12 sm:w-16 sm:h-16 bottom-0 drop-shadow-[0_0_12px_hsl(var(--primary)/0.6)] pointer-events-none"
               style={{
-                animation: 'mascot-patrol 8s ease-in-out infinite, mascot-hop 0.6s ease-in-out infinite',
+                animation: 'mascot-patrol 8s ease-in-out infinite, mascot-waddle 0.5s ease-in-out infinite',
               }}
             />
           </div>
