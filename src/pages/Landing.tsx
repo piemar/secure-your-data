@@ -86,18 +86,27 @@ export default function Landing() {
             />
           </div>
 
-          {/* MongoDB as styled text — perfectly readable */}
-          <h1
-            className="font-mono font-bold text-primary select-none cursor-pointer transition-all duration-300 hover:animate-glitch text-5xl sm:text-6xl md:text-7xl tracking-tight"
-            style={{
-              animationName: 'fade-in-slow',
-              animationDuration: '2s',
-              animationFillMode: 'both',
-              textShadow: '0 0 20px hsl(145 95% 46% / 0.6), 0 0 60px hsl(145 95% 46% / 0.3), 0 0 100px hsl(145 95% 46% / 0.1)',
-            }}
-          >
-            MongoDB
-          </h1>
+          {/* MongoDB styled text with CRT scanline overlay */}
+          <div className="relative inline-block">
+            <h1
+              className="font-mono font-bold text-primary select-none cursor-pointer transition-all duration-300 hover:animate-glitch text-5xl sm:text-6xl md:text-7xl tracking-tight"
+              style={{
+                animationName: 'fade-in-slow',
+                animationDuration: '2s',
+                animationFillMode: 'both',
+                textShadow: '0 0 20px hsl(145 95% 46% / 0.6), 0 0 60px hsl(145 95% 46% / 0.3), 0 0 100px hsl(145 95% 46% / 0.1)',
+              }}
+            >
+              MongoDB
+            </h1>
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px)',
+                mixBlendMode: 'multiply',
+              }}
+            />
+          </div>
 
           {/* GAME DAY in ASCII art */}
           <pre
