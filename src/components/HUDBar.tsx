@@ -82,6 +82,14 @@ export function HUDBar({ player, timeRemaining, systemStability = 100, showTimer
           </div>
         )}
 
+        {/* Hints Used */}
+        {showTimer && hintsUsed > 0 && (
+          <div className="hidden md:flex items-center gap-1.5">
+            <span className="text-xs text-warning font-mono">💡{hintsUsed}</span>
+            <span className="text-[10px] text-destructive font-mono">−{hintPenalty}</span>
+          </div>
+        )}
+
         {/* Player Info */}
         <button
           onClick={() => navigate('/profile')}
