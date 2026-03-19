@@ -3,11 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { HUDBar } from '@/components/HUDBar';
 import { ChaosEventOverlay } from '@/components/ChaosEventOverlay';
 import { TypewriterText } from '@/components/TypewriterText';
+import { CodeEditor } from '@/components/CodeEditor';
+import { ValidationFeedback } from '@/components/ValidationFeedback';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Player, MissionObjective, ChaosEvent } from '@/lib/types';
 import { getPlayer, completeMission, unlockAchievement, updatePlayer } from '@/lib/game-store';
 import { MISSIONS } from '@/lib/game-data';
+import { MISSION_SKELETONS } from '@/lib/mission-skeletons';
+import { MISSION_VALIDATIONS } from '@/lib/mission-validations';
+import { validateAllObjectives, ValidationResult } from '@/lib/validation';
+import { CheckCircle2, AlertTriangle, Play, RotateCcw } from 'lucide-react';
 
 export default function MissionPage() {
   const { missionId } = useParams<{ missionId: string }>();
@@ -21,6 +26,9 @@ export default function MissionPage() {
   const [triggeredChaos, setTriggeredChaos] = useState<Set<string>>(new Set());
   const [briefingDone, setBriefingDone] = useState(false);
   const [xpEarned, setXpEarned] = useState(0);
+  const [code, setCode] = useState('');
+  const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
+  const [hasValidated, setHasValidated] = useState(false);
 
   const mission = MISSIONS.find(m => m.id === missionId);
 
@@ -31,6 +39,7 @@ export default function MissionPage() {
     if (mission) {
       setTimeRemaining(mission.timeLimit);
       setObjectives(mission.objectives.map(o => ({ ...o, completed: false })));
+      setCode(MISSION_SKELETONS[mission.id] || `// Mission: ${mission.title}\n// Write your MongoDB commands here\n\n`);
     }
   }, [navigate, mission]);
 
@@ -39,10 +48,7 @@ export default function MissionPage() {
     if (phase !== 'active') return;
     const interval = setInterval(() => {
       setTimeRemaining(prev => {
-        if (prev <= 1) {
-          setPhase('failed');
-          return 0;
-        }
+        if (prev <= 1) { setPhase('failed'); return 0; }
         return prev - 1;
       });
     }, 1000);
@@ -71,9 +77,28 @@ export default function MissionPage() {
     setSystemStability(prev => Math.min(100, prev + 10));
   }, [player]);
 
-  const toggleObjective = (objId: string) => {
-    setObjectives(prev => prev.map(o => o.id === objId ? { ...o, completed: !o.completed } : o));
-  };
+  const handleValidate = useCallback(() => {
+    if (!mission) return;
+    const validations = MISSION_VALIDATIONS[mission.id] || [];
+    const results = validateAllObjectives(code, validations);
+    setValidationResults(results);
+    setHasValidated(true);
+
+    // Auto-complete objectives that pass validation
+    setObjectives(prev => prev.map(obj => {
+      const result = results.find(r => r.objectiveId === obj.id);
+      return result?.passed ? { ...obj, completed: true } : obj;
+    }));
+  }, [code, mission]);
+
+  const handleResetCode = useCallback(() => {
+    if (mission) {
+      setCode(MISSION_SKELETONS[mission.id] || '');
+      setValidationResults([]);
+      setHasValidated(false);
+      setObjectives(prev => prev.map(o => ({ ...o, completed: false })));
+    }
+  }, [mission]);
 
   const handleComplete = () => {
     if (!mission || !player) return;
@@ -85,7 +110,6 @@ export default function MissionPage() {
 
     let updated = completeMission(mission.id, earned);
 
-    // Check achievements
     if (updated.completedMissions.length === 1) updated = unlockAchievement('first-blood');
     if (timeRemaining > mission.timeLimit - 120) updated = unlockAchievement('speed-demon');
     if (triggeredChaos.size > 0) updated = unlockAchievement('chaos-survivor');
@@ -100,6 +124,7 @@ export default function MissionPage() {
   if (!mission || !player) return null;
 
   const allComplete = objectives.every(o => o.completed);
+  const objectiveTexts = Object.fromEntries(objectives.map(o => [o.id, o.text]));
 
   return (
     <div className="min-h-screen bg-background">
@@ -107,10 +132,10 @@ export default function MissionPage() {
 
       {activeChaos && <ChaosEventOverlay event={activeChaos} onDismiss={handleDismissChaos} />}
 
-      <div className="pt-16 pb-8 px-4 max-w-4xl mx-auto">
+      <div className="pt-16 pb-8 px-4 max-w-7xl mx-auto">
         {/* Briefing Phase */}
         {phase === 'briefing' && (
-          <div className="mt-8 space-y-6">
+          <div className="mt-8 space-y-6 max-w-4xl mx-auto">
             <div className="border border-primary/20 rounded-lg p-6 bg-card border-glow">
               <div className="space-y-4">
                 <div className="flex items-center gap-2 mb-4">
@@ -119,11 +144,7 @@ export default function MissionPage() {
                 </div>
                 <h2 className="font-mono text-xl font-bold text-foreground">{mission.title}</h2>
                 <div className="font-mono text-xs text-muted-foreground whitespace-pre-line leading-relaxed">
-                  <TypewriterText
-                    text={mission.briefing}
-                    speed={15}
-                    onComplete={() => setBriefingDone(true)}
-                  />
+                  <TypewriterText text={mission.briefing} speed={15} onComplete={() => setBriefingDone(true)} />
                 </div>
               </div>
             </div>
@@ -143,11 +164,7 @@ export default function MissionPage() {
                     <div className="text-destructive">{mission.chaosEvents.length} threats</div>
                   </div>
                 </div>
-
-                <Button
-                  onClick={() => setPhase('active')}
-                  className="w-full font-mono font-bold tracking-wider animate-pulse-glow"
-                >
+                <Button onClick={() => setPhase('active')} className="w-full font-mono font-bold tracking-wider animate-pulse-glow">
                   [ BEGIN MISSION ]
                 </Button>
               </div>
@@ -155,75 +172,86 @@ export default function MissionPage() {
           </div>
         )}
 
-        {/* Active Phase */}
+        {/* Active Phase — Split Layout */}
         {phase === 'active' && (
-          <div className="mt-8 space-y-6">
-            <div className="border border-border rounded-lg p-4 bg-card">
-              <h3 className="font-mono text-xs font-bold text-foreground mb-4">OBJECTIVES</h3>
-              <div className="space-y-3">
-                {objectives.map((obj, i) => (
-                  <div
-                    key={obj.id}
-                    className={`flex items-start gap-3 p-3 rounded border transition-all ${
-                      obj.completed ? 'border-primary/30 bg-primary/5' : 'border-border'
-                    }`}
-                  >
-                    <Checkbox
-                      checked={obj.completed}
-                      onCheckedChange={() => toggleObjective(obj.id)}
-                      className="mt-0.5"
-                    />
-                    <div className="flex-1">
-                      <p className={`font-mono text-sm ${obj.completed ? 'text-primary line-through' : 'text-foreground'}`}>
-                        <span className="text-muted-foreground mr-2">[{String(i + 1).padStart(2, '0')}]</span>
+          <div className="mt-4 grid grid-cols-1 lg:grid-cols-5 gap-4">
+            {/* Left Panel: Objectives */}
+            <div className="lg:col-span-2 space-y-4">
+              <div className="border border-border rounded-lg p-4 bg-card">
+                <h3 className="font-mono text-xs font-bold text-foreground mb-3">OBJECTIVES</h3>
+                <div className="space-y-2">
+                  {objectives.map((obj, i) => (
+                    <div
+                      key={obj.id}
+                      className={`flex items-start gap-2 p-2 rounded border transition-all text-xs ${
+                        obj.completed ? 'border-primary/30 bg-primary/5' : 'border-border'
+                      }`}
+                    >
+                      {obj.completed ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+                      ) : (
+                        <AlertTriangle className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                      )}
+                      <p className={`font-mono ${obj.completed ? 'text-primary line-through' : 'text-foreground'}`}>
+                        <span className="text-muted-foreground mr-1">[{String(i + 1).padStart(2, '0')}]</span>
                         {obj.text}
                       </p>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
+
+              {/* Validation Actions */}
+              <div className="flex gap-2">
+                <Button onClick={handleValidate} className="flex-1 font-mono text-xs gap-1.5" size="sm">
+                  <Play className="w-3 h-3" /> VALIDATE CODE
+                </Button>
+                <Button onClick={handleResetCode} variant="outline" className="font-mono text-xs gap-1.5" size="sm">
+                  <RotateCcw className="w-3 h-3" /> RESET
+                </Button>
+              </div>
+
+              {/* Validation Results */}
+              {hasValidated && (
+                <ValidationFeedback results={validationResults} objectiveTexts={objectiveTexts} />
+              )}
+
+              {/* Extract Button */}
+              <Button
+                onClick={handleComplete}
+                disabled={!allComplete}
+                className="w-full font-mono font-bold tracking-wider text-xs"
+                variant={allComplete ? 'default' : 'secondary'}
+              >
+                {allComplete ? '[ EXTRACT — COMPLETE MISSION ]' : `[ ${objectives.filter(o => o.completed).length}/${objectives.length} OBJECTIVES REMAINING ]`}
+              </Button>
             </div>
 
-            {/* Simulated Terminal */}
-            <div className="border border-border rounded-lg bg-card overflow-hidden">
-              <div className="flex items-center gap-2 px-4 py-2 bg-secondary/50 border-b border-border">
+            {/* Right Panel: Code Editor */}
+            <div className="lg:col-span-3 border border-border rounded-lg bg-card overflow-hidden flex flex-col" style={{ minHeight: '70vh' }}>
+              <div className="flex items-center gap-2 px-4 py-2 bg-secondary/50 border-b border-border shrink-0">
                 <div className="w-2 h-2 rounded-full bg-destructive" />
                 <div className="w-2 h-2 rounded-full bg-warning" />
                 <div className="w-2 h-2 rounded-full bg-primary" />
                 <span className="font-mono text-[10px] text-muted-foreground ml-2">mongosh — {mission.codename}</span>
+                <span className="ml-auto font-mono text-[10px] text-primary/50">
+                  {objectives.filter(o => o.completed).length}/{objectives.length} objectives
+                </span>
               </div>
-              <div className="p-4 font-mono text-xs text-foreground min-h-[200px]">
-                <p className="text-muted-foreground">{'>'} // Mission workspace</p>
-                <p className="text-muted-foreground">{'>'} // Complete objectives to progress</p>
-                <p className="text-primary mt-2">{'>'} db.mission.status()</p>
-                <p className="text-foreground">
-                  {`{ objectives: ${objectives.filter(o => o.completed).length}/${objectives.length}, status: "${allComplete ? 'READY' : 'IN_PROGRESS'}" }`}
-                </p>
-                {allComplete && (
-                  <p className="text-primary mt-2 animate-pulse">{'>'} MISSION READY FOR EXTRACTION_</p>
-                )}
+              <div className="flex-1">
+                <CodeEditor value={code} onChange={setCode} language="javascript" />
               </div>
             </div>
-
-            <Button
-              onClick={handleComplete}
-              disabled={!allComplete}
-              className="w-full font-mono font-bold tracking-wider"
-              variant={allComplete ? 'default' : 'secondary'}
-            >
-              {allComplete ? '[ EXTRACT — COMPLETE MISSION ]' : `[ ${objectives.filter(o => o.completed).length}/${objectives.length} OBJECTIVES REMAINING ]`}
-            </Button>
           </div>
         )}
 
         {/* Complete Phase */}
         {phase === 'complete' && (
-          <div className="mt-8 space-y-6 text-center">
+          <div className="mt-8 space-y-6 text-center max-w-2xl mx-auto">
             <div className="border border-primary/30 rounded-lg p-8 bg-card border-glow animate-slide-up">
               <div className="text-4xl mb-4">✅</div>
               <h2 className="font-mono text-xl font-bold text-primary text-glow mb-2">MISSION COMPLETE</h2>
               <p className="font-mono text-sm text-muted-foreground">{mission.title}</p>
-
               <div className="mt-6 space-y-2 text-sm font-mono">
                 <div className="flex justify-between max-w-xs mx-auto">
                   <span className="text-muted-foreground">XP Earned</span>
@@ -239,33 +267,24 @@ export default function MissionPage() {
                 </div>
               </div>
             </div>
-
             <div className="flex gap-3 justify-center">
-              <Button onClick={() => navigate('/dashboard')} variant="outline" className="font-mono">
-                ← MISSION CONTROL
-              </Button>
-              <Button onClick={() => navigate('/leaderboard')} className="font-mono">
-                VIEW LEADERBOARD →
-              </Button>
+              <Button onClick={() => navigate('/dashboard')} variant="outline" className="font-mono">← MISSION CONTROL</Button>
+              <Button onClick={() => navigate('/leaderboard')} className="font-mono">VIEW LEADERBOARD →</Button>
             </div>
           </div>
         )}
 
         {/* Failed Phase */}
         {phase === 'failed' && (
-          <div className="mt-8 space-y-6 text-center">
+          <div className="mt-8 space-y-6 text-center max-w-2xl mx-auto">
             <div className="border border-destructive/30 rounded-lg p-8 bg-card animate-slide-up">
               <div className="text-4xl mb-4">💀</div>
               <h2 className="font-mono text-xl font-bold text-destructive mb-2">MISSION FAILED</h2>
               <p className="font-mono text-sm text-muted-foreground">Time expired. The data was lost.</p>
             </div>
             <div className="flex gap-3 justify-center">
-              <Button onClick={() => navigate('/dashboard')} variant="outline" className="font-mono">
-                ← RETREAT
-              </Button>
-              <Button onClick={() => window.location.reload()} className="font-mono">
-                RETRY MISSION
-              </Button>
+              <Button onClick={() => navigate('/dashboard')} variant="outline" className="font-mono">← RETREAT</Button>
+              <Button onClick={() => window.location.reload()} className="font-mono">RETRY MISSION</Button>
             </div>
           </div>
         )}
