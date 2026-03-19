@@ -197,3 +197,14 @@
   opacity: 0.7;
   font-size: 11px;
 }
+
+.revealed-answer-green {
+  background: rgba(0, 237, 100, 0.12) !important;
+  border-bottom: 2px solid rgba(0, 237, 100, 0.4) !important;
+  color: #00ED64 !important;
+}
+
+@keyframes hint-marker-enter {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}

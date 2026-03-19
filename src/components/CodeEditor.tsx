@@ -1,7 +1,18 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { InlineHint } from '@/lib/types';
+import { InlineHintMarker } from './InlineHintMarker';
+
+interface BlankPosition {
+  line: number;       // 1-based
+  column: number;     // 1-based start of ___BLANK___
+  hintIndex: number;  // index into hints array
+  pixelX: number;
+  pixelY: number;
+}
+
+type HintState = 'unrevealed' | 'hint-shown' | 'answer-shown';
 
 interface CodeEditorProps {
   value: string;
@@ -9,20 +20,98 @@ interface CodeEditorProps {
   language?: string;
   readOnly?: boolean;
   hints?: InlineHint[];
-  revealedHints?: Set<number>;
+  hintStates?: Map<number, HintState>;
   onRevealHint?: (index: number) => void;
+  onRevealAnswer?: (index: number) => void;
 }
 
-export function CodeEditor({ value, onChange, language = 'javascript', readOnly = false, hints = [], revealedHints = new Set(), onRevealHint }: CodeEditorProps) {
+export function CodeEditor({
+  value,
+  onChange,
+  language = 'javascript',
+  readOnly = false,
+  hints = [],
+  hintStates = new Map(),
+  onRevealHint,
+  onRevealAnswer,
+}: CodeEditorProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [blankPositions, setBlankPositions] = useState<BlankPosition[]>([]);
 
-  // Update inline hint decorations whenever value, hints, or revealedHints change
+  // Scan for ___BLANK___ markers and compute pixel positions
+  const updateBlankPositions = useCallback(() => {
+    const ed = editorRef.current;
+    if (!ed || hints.length === 0) {
+      setBlankPositions([]);
+      return;
+    }
+
+    const model = ed.getModel();
+    if (!model) return;
+
+    const content = model.getValue();
+    const lines = content.split('\n');
+    const positions: BlankPosition[] = [];
+    let blankCount = 0;
+
+    lines.forEach((lineContent, lineIdx) => {
+      const blankRegex = /___BLANK___/g;
+      let match;
+      while ((match = blankRegex.exec(lineContent)) !== null) {
+        // Match blank to hint by sequential order
+        const hintIndex = blankCount;
+        blankCount++;
+
+        if (hintIndex >= hints.length) return;
+
+        // Get state - skip if answer already shown
+        const state = hintStates.get(hintIndex) || 'unrevealed';
+        if (state === 'answer-shown') return;
+
+        // Get pixel position via Monaco API
+        const lineNumber = lineIdx + 1;
+        const column = match.index + 1;
+        const pos = ed.getScrolledVisiblePosition({ lineNumber, column });
+
+        if (pos) {
+          positions.push({
+            line: lineNumber,
+            column,
+            hintIndex,
+            pixelX: pos.left + 44, // offset for line gutter ~44px
+            pixelY: pos.top + 8,   // center vertically on line
+          });
+        }
+      }
+    });
+
+    setBlankPositions(positions);
+  }, [hints, hintStates]);
+
+  // Update positions on value/scroll changes
+  useEffect(() => {
+    const ed = editorRef.current;
+    if (!ed) return;
+
+    updateBlankPositions();
+
+    const scrollDisposable = ed.onDidScrollChange(() => updateBlankPositions());
+    const layoutDisposable = ed.onDidLayoutChange(() => updateBlankPositions());
+
+    return () => {
+      scrollDisposable.dispose();
+      layoutDisposable.dispose();
+    };
+  }, [value, updateBlankPositions]);
+
+  // Update blank highlight decorations
   useEffect(() => {
     const ed = editorRef.current;
     const monaco = monacoRef.current;
-    if (!ed || !monaco || hints.length === 0) return;
+    if (!ed || !monaco) return;
 
     const model = ed.getModel();
     if (!model) return;
@@ -31,51 +120,22 @@ export function CodeEditor({ value, onChange, language = 'javascript', readOnly 
     const content = model.getValue();
     const lines = content.split('\n');
 
-    // Find all ___BLANK___ markers in the code
     lines.forEach((lineContent, lineIdx) => {
       const blankRegex = /___BLANK___/g;
       let match;
       while ((match = blankRegex.exec(lineContent)) !== null) {
-        // Find corresponding hint
-        const hintIndex = hints.findIndex((h, i) => {
-          // Match by line proximity and blank marker
-          const hintLine = h.line - 1; // Convert to 0-based
-          return Math.abs(hintLine - lineIdx) <= 2 && h.blankText === '___BLANK___' && !newDecorations.some(d => d.range.startLineNumber === lineIdx + 1 && d.range.startColumn === match!.index + 1);
-        });
-
-        // Highlight the blank marker
         newDecorations.push({
           range: new monaco.Range(lineIdx + 1, match.index + 1, lineIdx + 1, match.index + 12),
           options: {
             inlineClassName: 'blank-marker-highlight',
-            hoverMessage: { value: '**💡 Click a hint in the panel to fill this in**' },
+            hoverMessage: { value: '**💡 Click the ? marker to get a hint**' },
           },
         });
       }
     });
 
-    // Add revealed hint annotations as inline after-content
-    hints.forEach((hint, i) => {
-      if (revealedHints.has(i) && hint.answer) {
-        // Find the line with ___BLANK___ near this hint's line
-        const targetLine = Math.min(hint.line, lines.length);
-        if (targetLine > 0 && targetLine <= lines.length) {
-          newDecorations.push({
-            range: new monaco.Range(targetLine, 1, targetLine, 1),
-            options: {
-              after: {
-                content: ` 💡 ${hint.answer}`,
-                inlineClassName: 'hint-answer-inline',
-              },
-              isWholeLine: false,
-            },
-          });
-        }
-      }
-    });
-
     decorationsRef.current = ed.deltaDecorations(decorationsRef.current, newDecorations);
-  }, [value, hints, revealedHints]);
+  }, [value]);
 
   const handleMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
@@ -152,10 +212,13 @@ export function CodeEditor({ value, onChange, language = 'javascript', readOnly 
         return { suggestions };
       },
     });
-  }, []);
+
+    // Trigger initial position calculation after mount
+    setTimeout(() => updateBlankPositions(), 100);
+  }, [updateBlankPositions]);
 
   return (
-    <div className="h-full w-full rounded-b-lg overflow-hidden">
+    <div ref={containerRef} className="h-full w-full rounded-b-lg overflow-hidden relative">
       <Editor
         height="100%"
         language={language}
@@ -187,6 +250,24 @@ export function CodeEditor({ value, onChange, language = 'javascript', readOnly 
           </div>
         }
       />
+
+      {/* Floating hint markers overlay */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        {blankPositions.map((pos) => (
+          <InlineHintMarker
+            key={`hint-${pos.hintIndex}-${pos.line}`}
+            hint={hints[pos.hintIndex]}
+            index={pos.hintIndex}
+            state={hintStates.get(pos.hintIndex) || 'unrevealed'}
+            onRevealHint={onRevealHint || (() => {})}
+            onRevealAnswer={onRevealAnswer || (() => {})}
+            style={{
+              left: `${pos.pixelX}px`,
+              top: `${pos.pixelY}px`,
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
