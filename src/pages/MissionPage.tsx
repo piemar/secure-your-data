@@ -6,15 +6,16 @@ import { TypewriterText } from '@/components/TypewriterText';
 import { CodeEditor } from '@/components/CodeEditor';
 import { ValidationFeedback } from '@/components/ValidationFeedback';
 import { MissionCelebration } from '@/components/MissionCelebration';
+import { DifficultySelector } from '@/components/DifficultySelector';
 import { Button } from '@/components/ui/button';
-import { Player, MissionObjective, ChaosEvent } from '@/lib/types';
+import { Player, MissionObjective, ChaosEvent, MissionDifficulty, InlineHint } from '@/lib/types';
 import { getPlayer, completeMission, unlockAchievement, updatePlayer } from '@/lib/game-store';
 import { MISSIONS } from '@/lib/game-data';
-import { MISSION_SKELETONS } from '@/lib/mission-skeletons';
+import { getSkeletonForDifficulty, getHintsForDifficulty } from '@/lib/mission-skeletons';
 import { MISSION_VALIDATIONS } from '@/lib/mission-validations';
 import { validateAllObjectives, ValidationResult } from '@/lib/validation';
 import { soundEngine } from '@/lib/sound-engine';
-import { CheckCircle2, AlertTriangle, Play, RotateCcw } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Play, RotateCcw, Lightbulb } from 'lucide-react';
 
 export default function MissionPage() {
   const { missionId } = useParams<{ missionId: string }>();
@@ -31,6 +32,11 @@ export default function MissionPage() {
   const [code, setCode] = useState('');
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
   const [hasValidated, setHasValidated] = useState(false);
+  const [difficulty, setDifficulty] = useState<MissionDifficulty>('guided');
+  const [hints, setHints] = useState<InlineHint[]>([]);
+  const [revealedHints, setRevealedHints] = useState<Set<number>>(new Set());
+  const [hintsUsedCount, setHintsUsedCount] = useState(0);
+  const [hintXpPenalty, setHintXpPenalty] = useState(0);
 
   const mission = MISSIONS.find(m => m.id === missionId);
 
@@ -38,14 +44,22 @@ export default function MissionPage() {
     const p = getPlayer();
     if (!p) { navigate('/'); return; }
     setPlayer(p);
+    if (p.preferredDifficulty) setDifficulty(p.preferredDifficulty);
     if (mission) {
       setTimeRemaining(mission.timeLimit);
       setObjectives(mission.objectives.map(o => ({ ...o, completed: false })));
-      setCode(MISSION_SKELETONS[mission.id] || `// Mission: ${mission.title}\n// Write your MongoDB commands here\n\n`);
     }
   }, [navigate, mission]);
 
-  // Timer with heartbeat sound
+  // Load skeleton when difficulty changes (before mission starts)
+  useEffect(() => {
+    if (mission && phase === 'briefing') {
+      setCode(getSkeletonForDifficulty(mission.id, difficulty));
+      setHints(getHintsForDifficulty(mission.id, difficulty));
+    }
+  }, [mission, difficulty, phase]);
+
+  // Timer with heartbeat
   useEffect(() => {
     if (phase !== 'active') return;
     const interval = setInterval(() => {
@@ -62,7 +76,7 @@ export default function MissionPage() {
     return () => clearInterval(interval);
   }, [phase]);
 
-  // Chaos event triggers with sound
+  // Chaos event triggers
   useEffect(() => {
     if (phase !== 'active' || !mission) return;
     const elapsed = mission.timeLimit - timeRemaining;
@@ -85,6 +99,30 @@ export default function MissionPage() {
     setSystemStability(prev => Math.min(100, prev + 10));
   }, [player]);
 
+  const handleRevealHint = useCallback((hintIndex: number) => {
+    if (revealedHints.has(hintIndex)) return;
+    const hint = hints[hintIndex];
+    if (!hint) return;
+    soundEngine.play('click');
+    setRevealedHints(prev => new Set(prev).add(hintIndex));
+    setHintsUsedCount(prev => prev + 1);
+    const penalty = hint.xpPenalty || 25;
+    setHintXpPenalty(prev => prev + penalty);
+  }, [hints, revealedHints]);
+
+  const handleBeginMission = () => {
+    // Save preferred difficulty
+    if (player) {
+      updatePlayer({ preferredDifficulty: difficulty });
+    }
+    setCode(getSkeletonForDifficulty(mission!.id, difficulty));
+    setHints(getHintsForDifficulty(mission!.id, difficulty));
+    setRevealedHints(new Set());
+    setHintsUsedCount(0);
+    setHintXpPenalty(0);
+    setPhase('active');
+  };
+
   const handleValidate = useCallback(() => {
     if (!mission) return;
     soundEngine.play('validate');
@@ -99,29 +137,31 @@ export default function MissionPage() {
     });
     setObjectives(newObjectives);
 
-    // Play success/error based on results
     const allPassed = newObjectives.every(o => o.completed);
     if (allPassed) soundEngine.play('success');
   }, [code, mission, objectives]);
 
   const handleResetCode = useCallback(() => {
     if (mission) {
-      setCode(MISSION_SKELETONS[mission.id] || '');
+      setCode(getSkeletonForDifficulty(mission.id, difficulty));
       setValidationResults([]);
       setHasValidated(false);
       setObjectives(prev => prev.map(o => ({ ...o, completed: false })));
     }
-  }, [mission]);
+  }, [mission, difficulty]);
 
   const handleComplete = () => {
     if (!mission || !player) return;
     const completedCount = objectives.filter(o => o.completed).length;
     const completionBonus = completedCount === objectives.length ? 1.5 : completedCount / objectives.length;
     const timeBonus = timeRemaining > mission.timeLimit * 0.5 ? 1.3 : 1;
-    const earned = Math.round(mission.xpReward * completionBonus * timeBonus);
+    const difficultyMultiplier = difficulty === 'expert' ? 1.5 : difficulty === 'challenge' ? 1.2 : 1;
+    const baseXp = Math.round(mission.xpReward * completionBonus * timeBonus * difficultyMultiplier);
+    const earned = Math.max(0, baseXp - hintXpPenalty);
     setXpEarned(earned);
 
     let updated = completeMission(mission.id, earned);
+    updated = updatePlayer({ hintsUsed: updated.hintsUsed + hintsUsedCount, hintXpPenalty: updated.hintXpPenalty + hintXpPenalty });
 
     if (updated.completedMissions.length === 1) updated = unlockAchievement('first-blood');
     if (timeRemaining > mission.timeLimit - 120) updated = unlockAchievement('speed-demon');
@@ -129,6 +169,9 @@ export default function MissionPage() {
     if (completedCount === objectives.length && triggeredChaos.size === 0) updated = unlockAchievement('perfect-run');
     if (updated.completedMissions.length === MISSIONS.length) updated = unlockAchievement('full-collection');
     if (updated.chaosEventsSurvived >= 5) updated = unlockAchievement('cluster-whisperer');
+    if (difficulty === 'expert' && hintsUsedCount === 0) {
+      // Track expert completions for 'no-hints' achievement
+    }
 
     setPlayer(updated);
     setPhase('complete');
@@ -139,9 +182,21 @@ export default function MissionPage() {
   const allComplete = objectives.every(o => o.completed);
   const objectiveTexts = Object.fromEntries(objectives.map(o => [o.id, o.text]));
 
+  const hintCounts = {
+    guided: getHintsForDifficulty(mission.id, 'guided').length,
+    challenge: getHintsForDifficulty(mission.id, 'challenge').length,
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      <HUDBar player={player} timeRemaining={timeRemaining} systemStability={systemStability} showTimer={phase === 'active'} />
+      <HUDBar
+        player={player}
+        timeRemaining={timeRemaining}
+        systemStability={systemStability}
+        showTimer={phase === 'active'}
+        hintsUsed={hintsUsedCount}
+        hintPenalty={hintXpPenalty}
+      />
 
       {activeChaos && <ChaosEventOverlay event={activeChaos} onDismiss={handleDismissChaos} />}
 
@@ -177,8 +232,19 @@ export default function MissionPage() {
                     <div className="text-destructive">{mission.chaosEvents.length} threats</div>
                   </div>
                 </div>
-                <Button onClick={() => setPhase('active')} className="w-full font-mono font-bold tracking-wider animate-pulse-glow">
-                  [ BEGIN MISSION ]
+
+                {/* Difficulty Selector */}
+                <div className="border border-border rounded-lg p-4 bg-card">
+                  <h3 className="font-mono text-xs font-bold text-foreground mb-3">SELECT DIFFICULTY</h3>
+                  <DifficultySelector
+                    selected={difficulty}
+                    onChange={setDifficulty}
+                    hintCounts={hintCounts}
+                  />
+                </div>
+
+                <Button onClick={handleBeginMission} className="w-full font-mono font-bold tracking-wider animate-pulse-glow">
+                  [ BEGIN MISSION — {difficulty.toUpperCase()} ]
                 </Button>
               </div>
             )}
@@ -188,10 +254,13 @@ export default function MissionPage() {
         {/* Active Phase — Split Layout */}
         {phase === 'active' && (
           <div className="mt-4 grid grid-cols-1 lg:grid-cols-5 gap-4">
-            {/* Left Panel: Objectives */}
+            {/* Left Panel: Objectives + Hints */}
             <div className="lg:col-span-2 space-y-4">
               <div className="border border-border rounded-lg p-4 bg-card">
-                <h3 className="font-mono text-xs font-bold text-foreground mb-3">OBJECTIVES</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-mono text-xs font-bold text-foreground">OBJECTIVES</h3>
+                  <span className="font-mono text-[10px] text-muted-foreground uppercase">{difficulty}</span>
+                </div>
                 <div className="space-y-2">
                   {objectives.map((obj, i) => (
                     <div
@@ -214,6 +283,39 @@ export default function MissionPage() {
                 </div>
               </div>
 
+              {/* Inline Hints Panel */}
+              {hints.length > 0 && (
+                <div className="border border-border rounded-lg p-4 bg-card">
+                  <h3 className="font-mono text-xs font-bold text-foreground mb-3 flex items-center gap-2">
+                    <Lightbulb className="w-3.5 h-3.5 text-warning" />
+                    HINTS ({hintsUsedCount}/{hints.length} revealed)
+                  </h3>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {hints.map((hint, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        {revealedHints.has(i) ? (
+                          <div className="text-xs font-mono p-2 rounded bg-warning/10 border border-warning/20 w-full">
+                            <span className="text-warning text-[10px]">HINT (−{hint.xpPenalty || 25} XP):</span>
+                            <p className="text-foreground mt-0.5">{hint.hint}</p>
+                            {hint.answer && (
+                              <p className="text-primary mt-1 font-bold">→ {hint.answer}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleRevealHint(i)}
+                            className="text-xs font-mono p-2 rounded border border-dashed border-muted-foreground/30 w-full text-left hover:border-warning/50 hover:bg-warning/5 transition-colors"
+                          >
+                            <span className="text-muted-foreground">💡 Hint #{i + 1}</span>
+                            <span className="text-destructive/60 ml-2">(−{hint.xpPenalty || 25} XP)</span>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Validation Actions */}
               <div className="flex gap-2">
                 <Button onClick={handleValidate} className="flex-1 font-mono text-xs gap-1.5" size="sm">
@@ -224,12 +326,10 @@ export default function MissionPage() {
                 </Button>
               </div>
 
-              {/* Validation Results */}
               {hasValidated && (
                 <ValidationFeedback results={validationResults} objectiveTexts={objectiveTexts} />
               )}
 
-              {/* Extract Button */}
               <Button
                 onClick={handleComplete}
                 disabled={!allComplete}
@@ -250,6 +350,9 @@ export default function MissionPage() {
                 <span className="ml-auto font-mono text-[10px] text-primary/50">
                   {objectives.filter(o => o.completed).length}/{objectives.length} objectives
                 </span>
+                {hintXpPenalty > 0 && (
+                  <span className="font-mono text-[10px] text-destructive/70">−{hintXpPenalty} XP</span>
+                )}
               </div>
               <div className="flex-1">
                 <CodeEditor value={code} onChange={setCode} language="javascript" />
@@ -258,7 +361,7 @@ export default function MissionPage() {
           </div>
         )}
 
-        {/* Complete Phase — Celebration! */}
+        {/* Complete Phase */}
         {phase === 'complete' && (
           <MissionCelebration
             missionTitle={mission.title}

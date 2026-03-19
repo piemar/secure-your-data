@@ -77,6 +77,10 @@ export function unlockAchievement(achievementId: string): Player {
   return updatePlayer({ achievements });
 }
 
+export function setPreferredDifficulty(difficulty: 'guided' | 'challenge' | 'expert'): Player {
+  return updatePlayer({ preferredDifficulty: difficulty });
+}
+
 export function clearPlayer(): void {
   localStorage.removeItem(STORAGE_KEY);
 }

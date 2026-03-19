@@ -12,9 +12,11 @@ interface HUDBarProps {
   timeRemaining?: number;
   systemStability?: number;
   showTimer?: boolean;
+  hintsUsed?: number;
+  hintPenalty?: number;
 }
 
-export function HUDBar({ player, timeRemaining, systemStability = 100, showTimer = false }: HUDBarProps) {
+export function HUDBar({ player, timeRemaining, systemStability = 100, showTimer = false, hintsUsed = 0, hintPenalty = 0 }: HUDBarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [scoreAnim, setScoreAnim] = useState(false);
@@ -77,6 +79,14 @@ export function HUDBar({ player, timeRemaining, systemStability = 100, showTimer
             <span className={`font-mono text-xs ${systemStability < 30 ? 'text-destructive' : 'text-primary'}`}>
               {systemStability}%
             </span>
+          </div>
+        )}
+
+        {/* Hints Used */}
+        {showTimer && hintsUsed > 0 && (
+          <div className="hidden md:flex items-center gap-1.5">
+            <span className="text-xs text-warning font-mono">💡{hintsUsed}</span>
+            <span className="text-[10px] text-destructive font-mono">−{hintPenalty}</span>
           </div>
         )}
 
