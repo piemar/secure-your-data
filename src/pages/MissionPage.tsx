@@ -4,6 +4,7 @@ import { HUDBar } from '@/components/HUDBar';
 import { ChaosEventOverlay } from '@/components/ChaosEventOverlay';
 import { TypewriterText } from '@/components/TypewriterText';
 import { CodeEditor } from '@/components/CodeEditor';
+import { ComboStreak } from '@/components/ComboStreak';
 import { ValidationFeedback } from '@/components/ValidationFeedback';
 import { MissionCelebration } from '@/components/MissionCelebration';
 import { DifficultySelector } from '@/components/DifficultySelector';
