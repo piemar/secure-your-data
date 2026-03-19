@@ -150,44 +150,44 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-background relative">
+    <div className="min-h-screen bg-background relative flex flex-col">
       <MatrixRain />
       <HUDBar player={player} />
 
-      <div className="relative z-10 pt-16 pb-20 px-4 max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6 mt-4 flex items-center justify-between">
-          <div>
-            <h1 className="font-mono text-2xl font-bold text-primary text-glow">MISSION CONTROL</h1>
-            <p className="font-mono text-xs text-muted-foreground mt-1">
-              {player.completedMissions.length}/{MISSIONS.length} MISSIONS COMPLETED •{' '}
-              {ACHIEVEMENTS.length - unlockedAchievements.length} ACHIEVEMENTS REMAINING
-            </p>
+      {/* Sticky header + search */}
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border/50 pt-16 pb-4 px-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-4 mt-4 flex items-center justify-between">
+            <div>
+              <h1 className="font-mono text-2xl font-bold text-primary text-glow">MISSION CONTROL</h1>
+              <p className="font-mono text-xs text-muted-foreground mt-1">
+                {player.completedMissions.length}/{MISSIONS.length} MISSIONS COMPLETED •{' '}
+                {ACHIEVEMENTS.length - unlockedAchievements.length} ACHIEVEMENTS REMAINING
+              </p>
+            </div>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 rounded transition-colors ${viewMode === 'grid' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                title="Grid view"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('graph')}
+                className={`p-2 rounded transition-colors ${viewMode === 'graph' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                title="Node graph"
+              >
+                <Map className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-          <div className="flex gap-1">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded transition-colors ${viewMode === 'grid' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-              title="Grid view"
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('graph')}
-              className={`p-2 rounded transition-colors ${viewMode === 'graph' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-              title="Node graph"
-            >
-              <Map className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Search */}
-        <div className="mb-6">
           <MissionSearch missions={MISSIONS} onFilterChange={handleFilterChange} onMissionClick={viewMode === 'graph' ? handleSearchMissionClick : undefined} />
         </div>
+      </div>
 
-        {/* Main content: always sidebar on right */}
+      {/* Main content */}
+      <div className="relative z-10 flex-1 px-4 pt-6 pb-20 max-w-7xl mx-auto w-full">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-3 space-y-8">
             {viewMode === 'graph' ? (
@@ -244,9 +244,11 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Sidebar always visible */}
+          {/* Sticky sidebar */}
           <div className="lg:col-span-1">
-            <Sidebar />
+            <div className="lg:sticky lg:top-[200px] space-y-6 max-h-[calc(100vh-220px)] overflow-y-auto scrollbar-thin">
+              <Sidebar />
+            </div>
           </div>
         </div>
       </div>
