@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import heistMascot from '@/assets/heist-mascot.png';
 
 const BOOT_LINES = [
   { text: '> INITIALIZING SECURE CONNECTION...', delay: 0 },
@@ -29,12 +30,8 @@ export function BootSequence({ onComplete }: BootSequenceProps) {
     return () => timers.forEach(clearTimeout);
   }, []);
 
-  const handleKey = useCallback(() => {
-    if (ready) onComplete();
-  }, [ready, onComplete]);
-
   useEffect(() => {
-    const handler = (e: KeyboardEvent | MouseEvent) => {
+    const handler = () => {
       if (ready) onComplete();
     };
     window.addEventListener('keydown', handler);
@@ -45,8 +42,28 @@ export function BootSequence({ onComplete }: BootSequenceProps) {
     };
   }, [ready, onComplete]);
 
+  const isBooting = visibleLines > 0 && visibleLines < BOOT_LINES.length;
+
   return (
-    <div className="fixed inset-0 z-[100] bg-background flex items-center justify-center">
+    <div className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-center">
+      {/* Mascot walking across screen while booting */}
+      <div className="relative w-full max-w-lg mb-6 h-20 overflow-hidden">
+        <img
+          src={heistMascot}
+          alt="Agent Raccoon hacking in"
+          className="absolute w-14 h-14 sm:w-16 sm:h-16 bottom-0 drop-shadow-[0_0_10px_hsl(var(--primary)/0.6)]"
+          style={{
+            animation: isBooting
+              ? 'raccoon-walk 3.6s linear forwards, raccoon-bob 0.4s ease-in-out infinite'
+              : ready
+              ? 'raccoon-idle 1.5s ease-in-out infinite'
+              : undefined,
+            left: ready ? '50%' : '0%',
+            transform: ready ? 'translateX(-50%)' : undefined,
+          }}
+        />
+      </div>
+
       <div className="max-w-lg w-full p-8 space-y-1">
         {BOOT_LINES.slice(0, visibleLines).map((line, i) => (
           <p
@@ -62,7 +79,7 @@ export function BootSequence({ onComplete }: BootSequenceProps) {
             {line.text}
           </p>
         ))}
-        {visibleLines > 0 && visibleLines < BOOT_LINES.length && (
+        {isBooting && (
           <span className="inline-block w-2 h-4 bg-primary animate-pulse" />
         )}
       </div>
