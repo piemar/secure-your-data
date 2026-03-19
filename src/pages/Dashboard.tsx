@@ -13,6 +13,7 @@ import { MISSIONS, ACHIEVEMENTS, MOCK_LEADERBOARD_PLAYERS, QUESTS } from '@/lib/
 import { isMissionUnlocked, POV_LABELS } from '@/lib/mission-prerequisites';
 import { Badge } from '@/components/ui/badge';
 import { Lock, Map, LayoutGrid } from 'lucide-react';
+import heistMascot from '@/assets/heist-mascot.png';
 
 const TIER_ORDER: MissionTier[] = ['recon', 'infiltration', 'exfiltration'];
 const TIER_NAMES: Record<MissionTier, string> = {
