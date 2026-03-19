@@ -10,16 +10,6 @@ import { generateHandle } from '@/lib/game-data';
 import { soundEngine } from '@/lib/sound-engine';
 import heistMascot from '@/assets/heist-mascot.png';
 
-const ASCII_LOGO = `
- ███╗   ███╗                       ██████╗          ██████╗  ██████╗
- ████╗ ████║                      ██╔═══██╗         ██╔══██╗ ██╔══██╗
- ██╔████╔██║  █████╗  ██████╗     ██║   ██║ █████╗  ██║  ██║ ██████╔╝
- ██║╚██╔╝██║ ██╔══██╗ ██╔═██║     ██║   ██║██╔══██╗ ██║  ██║ ██╔══██╗
- ██║ ╚═╝ ██║ ╚█████╔╝ ██║ ██║     ╚██████╔╝╚█████╔╝ ██████╔╝ ██████╔╝
- ╚═╝     ╚═╝  ╚════╝  ╚═╝ ╚═╝      ╚═══██║  ╚════╝  ╚═════╝  ╚═════╝
-                                      ████║
-                                      ╚═══╝`;
-
 const ASCII_SUBTITLE = `
   ██████╗  █████╗ ███╗   ███╗███████╗  ██████╗  █████╗ ██╗   ██╗
  ██╔════╝ ██╔══██╗████╗ ████║██╔════╝  ██╔══██╗██╔══██╗╚██╗ ██╔╝
@@ -42,7 +32,6 @@ export default function Landing() {
     }
   }, [navigate]);
 
-  // Skip boot if already seen this session
   useEffect(() => {
     if (sessionStorage.getItem('heist-booted')) {
       setBooted(true);
@@ -76,19 +65,16 @@ export default function Landing() {
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 relative overflow-hidden">
       <MatrixRain />
 
-      {/* Background effects */}
       <div className="absolute inset-0 circuit-pattern" />
       <div className="absolute inset-0 scanline pointer-events-none" />
 
-      {/* Floating particles */}
       <div className="absolute top-20 left-10 w-1 h-1 bg-primary rounded-full animate-float opacity-40" />
       <div className="absolute top-40 right-20 w-1 h-1 bg-primary rounded-full animate-float opacity-30" style={{ animationDelay: '1s' }} />
       <div className="absolute bottom-32 left-1/4 w-1 h-1 bg-accent rounded-full animate-float opacity-20" style={{ animationDelay: '2s' }} />
 
       <div className="relative z-10 max-w-xl w-full space-y-8 text-center">
-        {/* ASCII Logo with mascot walking on top */}
         <div className="relative">
-          {/* Mascot walking across the logo */}
+          {/* Mascot walking across */}
           <div className="relative h-16 sm:h-20 overflow-visible mb-1">
             <img
               src={heistMascot}
@@ -100,14 +86,22 @@ export default function Landing() {
             />
           </div>
 
-          <pre
-            className="font-mono text-primary text-[5px] sm:text-[8px] md:text-[12px] leading-tight text-glow whitespace-pre select-none cursor-pointer transition-all duration-300 hover:animate-glitch"
-            style={{ animationName: 'fade-in-slow', animationDuration: '2s', animationFillMode: 'both' }}
+          {/* MongoDB as styled text — perfectly readable */}
+          <h1
+            className="font-mono font-bold text-primary select-none cursor-pointer transition-all duration-300 hover:animate-glitch text-5xl sm:text-6xl md:text-7xl tracking-tight"
+            style={{
+              animationName: 'fade-in-slow',
+              animationDuration: '2s',
+              animationFillMode: 'both',
+              textShadow: '0 0 20px hsl(145 95% 46% / 0.6), 0 0 60px hsl(145 95% 46% / 0.3), 0 0 100px hsl(145 95% 46% / 0.1)',
+            }}
           >
-            {ASCII_LOGO}
-          </pre>
+            MongoDB
+          </h1>
+
+          {/* GAME DAY in ASCII art */}
           <pre
-            className="font-mono text-primary/50 text-[3px] sm:text-[5px] md:text-[7px] leading-tight whitespace-pre select-none mt-1 animate-pulse-glow"
+            className="font-mono text-primary/50 text-[3px] sm:text-[5px] md:text-[7px] leading-tight whitespace-pre select-none mt-2 animate-pulse-glow"
             style={{ animationName: 'fade-in-slow', animationDuration: '3s', animationDelay: '0.5s', animationFillMode: 'both' }}
           >
             {ASCII_SUBTITLE}
