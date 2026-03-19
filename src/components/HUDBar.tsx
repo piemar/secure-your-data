@@ -96,6 +96,7 @@ export function HUDBar({ player, timeRemaining, systemStability = 100, showTimer
           onClick={() => navigate('/profile')}
           className="flex items-center gap-2 hover:opacity-80 transition-opacity"
         >
+          <AvatarDisplay avatarId={player.avatarId} size="sm" />
           <Badge variant="outline" className="font-mono text-xs border-primary/30 text-primary">
             {player.rank}
           </Badge>
