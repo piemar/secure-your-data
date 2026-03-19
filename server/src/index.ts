@@ -31,6 +31,7 @@ app.use('/api/missions', missionRoutes);
 app.use('/api/workshops', workshopRoutes);
 app.use('/api/metrics', metricsRoutes);
 app.use('/api/verify', verifyRoutes);
+app.use('/api/execute', executeRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
