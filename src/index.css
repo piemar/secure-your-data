@@ -167,6 +167,23 @@
   50% { transform: translateY(-10px) rotate(2deg); }
 }
 
+@keyframes raccoon-walk {
+  0% { left: -15%; }
+  100% { left: 50%; transform: translateX(-50%); }
+}
+
+@keyframes raccoon-bob {
+  0%, 100% { transform: translateY(0) scaleX(1); }
+  25% { transform: translateY(-4px) scaleX(0.97); }
+  50% { transform: translateY(0) scaleX(1); }
+  75% { transform: translateY(-3px) scaleX(1.03); }
+}
+
+@keyframes raccoon-idle {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-5px); }
+}
+
 @keyframes counter-tick {
   0% { transform: scale(1); }
   50% { transform: scale(1.2); }
