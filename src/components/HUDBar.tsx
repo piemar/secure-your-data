@@ -12,6 +12,8 @@ interface HUDBarProps {
   timeRemaining?: number;
   systemStability?: number;
   showTimer?: boolean;
+  hintsUsed?: number;
+  hintPenalty?: number;
 }
 
 export function HUDBar({ player, timeRemaining, systemStability = 100, showTimer = false }: HUDBarProps) {
