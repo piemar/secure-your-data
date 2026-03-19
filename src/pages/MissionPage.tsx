@@ -10,6 +10,8 @@ import { MissionCelebration } from '@/components/MissionCelebration';
 import { DifficultySelector } from '@/components/DifficultySelector';
 import { Button } from '@/components/ui/button';
 import { Player, MissionObjective, ChaosEvent, MissionDifficulty, InlineHint } from '@/lib/types';
+
+type HintState = 'unrevealed' | 'hint-shown' | 'answer-shown';
 import { getPlayer, completeMission, unlockAchievement, updatePlayer } from '@/lib/game-store';
 import { MISSIONS } from '@/lib/game-data';
 import { getSkeletonForDifficulty, getHintsForDifficulty } from '@/lib/mission-skeletons';
