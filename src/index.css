@@ -187,22 +187,28 @@
 @keyframes mascot-patrol {
   0%   { left: 5%;  transform: scaleX(1); }
   20%  { left: 40%; transform: scaleX(1); }
-  25%  { left: 45%; transform: scaleX(1) translateY(-14px); } /* jump! */
+  25%  { left: 45%; transform: scaleX(1) translateY(-14px); }
   30%  { left: 50%; transform: scaleX(1); }
   45%  { left: 85%; transform: scaleX(1); }
-  50%  { left: 85%; transform: scaleX(-1); } /* turn around */
-  55%  { left: 75%; transform: scaleX(-1) translateY(-10px); } /* hop */
+  50%  { left: 85%; transform: scaleX(-1); }
+  55%  { left: 75%; transform: scaleX(-1) translateY(-10px); }
   60%  { left: 65%; transform: scaleX(-1); }
   75%  { left: 30%; transform: scaleX(-1); }
-  80%  { left: 20%; transform: scaleX(-1) translateY(-14px); } /* jump! */
+  80%  { left: 20%; transform: scaleX(-1) translateY(-14px); }
   85%  { left: 12%; transform: scaleX(-1); }
   95%  { left: 5%;  transform: scaleX(-1); }
-  100% { left: 5%;  transform: scaleX(1); } /* turn back */
+  100% { left: 5%;  transform: scaleX(1); }
 }
 
-@keyframes mascot-hop {
-  0%, 100% { margin-top: 0; }
-  50%      { margin-top: -3px; }
+/* Walk cycle: alternating tilt + bounce to simulate footsteps */
+@keyframes mascot-waddle {
+  0%   { transform: translateY(0)  rotate(0deg); }
+  15%  { transform: translateY(-6px) rotate(-5deg); }
+  30%  { transform: translateY(0)  rotate(0deg); }
+  45%  { transform: translateY(-6px) rotate(5deg); }
+  60%  { transform: translateY(0)  rotate(0deg); }
+  75%  { transform: translateY(-6px) rotate(-5deg); }
+  100% { transform: translateY(0)  rotate(0deg); }
 }
 
 @keyframes counter-tick {
