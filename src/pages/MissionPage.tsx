@@ -148,7 +148,7 @@ export default function MissionPage() {
     }
     setCode(getSkeletonForDifficulty(mission!.id, difficulty));
     setHints(getHintsForDifficulty(mission!.id, difficulty));
-    setRevealedHints(new Set());
+    setHintStates(new Map());
     setHintsUsedCount(0);
     setHintXpPenalty(0);
     setPhase('active');
