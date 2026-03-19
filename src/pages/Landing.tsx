@@ -8,15 +8,16 @@ import { BootSequence } from '@/components/BootSequence';
 import { getPlayer, createPlayer } from '@/lib/game-store';
 import { generateHandle } from '@/lib/game-data';
 import { soundEngine } from '@/lib/sound-engine';
+import heistMascot from '@/assets/heist-mascot.png';
 
 const ASCII_LOGO = `
- ███╗   ███╗ ██████╗ ███╗   ██╗ ██████╗  ██████╗ 
- ████╗ ████║██╔═══██╗████╗  ██║██╔════╝ ██╔═══██╗
- ██╔████╔██║██║   ██║██╔██╗ ██║██║  ███╗██║   ██║
- ██║╚██╔╝██║██║   ██║██║╚██╗██║██║   ██║██║   ██║
- ██║ ╚═╝ ██║╚██████╔╝██║ ╚████║╚██████╔╝╚██████╔╝
- ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝  ╚═════╝ 
-        D A T A   H E I S T
+ ███╗   ███╗ ██████╗ ███╗   ██╗ ██████╗  ██████╗ ██████╗ ██████╗ 
+ ████╗ ████║██╔═══██╗████╗  ██║██╔════╝ ██╔═══██╗██╔══██╗██╔══██╗
+ ██╔████╔██║██║   ██║██╔██╗ ██║██║  ███╗██║   ██║██║  ██║██████╔╝
+ ██║╚██╔╝██║██║   ██║██║╚██╗██║██║   ██║██║   ██║██║  ██║██╔══██╗
+ ██║ ╚═╝ ██║╚██████╔╝██║ ╚████║╚██████╔╝╚██████╔╝██████╔╝██████╔╝
+ ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝  ╚═════╝ ╚═════╝ ╚═════╝ 
+         D A T A   H E I S T
 `;
 
 export default function Landing() {
@@ -77,8 +78,20 @@ export default function Landing() {
       <div className="absolute bottom-32 left-1/4 w-1 h-1 bg-accent rounded-full animate-float opacity-20" style={{ animationDelay: '2s' }} />
 
       <div className="relative z-10 max-w-xl w-full space-y-8 text-center">
+        {/* Mascot */}
+        <div className="flex justify-center mb--4">
+          <img
+            src={heistMascot}
+            alt="Data Heist Mascot"
+            className="w-20 h-20 sm:w-24 sm:h-24 drop-shadow-[0_0_12px_hsl(var(--primary)/0.6)]"
+            style={{
+              animation: 'mascot-float 3s ease-in-out infinite, fade-in 1s ease-out both',
+            }}
+          />
+        </div>
+
         {/* ASCII Logo */}
-        <pre className="font-mono text-primary text-[6px] sm:text-[8px] md:text-[10px] leading-tight text-glow whitespace-pre select-none" style={{ animationName: 'fade-in-slow', animationDuration: '2s', animationFillMode: 'both' }}>
+        <pre className="font-mono text-primary text-[5px] sm:text-[7px] md:text-[9px] leading-tight text-glow whitespace-pre select-none" style={{ animationName: 'fade-in-slow', animationDuration: '2s', animationFillMode: 'both' }}>
           {ASCII_LOGO}
         </pre>
 
