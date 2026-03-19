@@ -5,6 +5,7 @@ import { ChaosEventOverlay } from '@/components/ChaosEventOverlay';
 import { TypewriterText } from '@/components/TypewriterText';
 import { CodeEditor } from '@/components/CodeEditor';
 import { ValidationFeedback } from '@/components/ValidationFeedback';
+import { MissionCelebration } from '@/components/MissionCelebration';
 import { Button } from '@/components/ui/button';
 import { Player, MissionObjective, ChaosEvent } from '@/lib/types';
 import { getPlayer, completeMission, unlockAchievement, updatePlayer } from '@/lib/game-store';
@@ -12,6 +13,7 @@ import { MISSIONS } from '@/lib/game-data';
 import { MISSION_SKELETONS } from '@/lib/mission-skeletons';
 import { MISSION_VALIDATIONS } from '@/lib/mission-validations';
 import { validateAllObjectives, ValidationResult } from '@/lib/validation';
+import { soundEngine } from '@/lib/sound-engine';
 import { CheckCircle2, AlertTriangle, Play, RotateCcw } from 'lucide-react';
 
 export default function MissionPage() {
@@ -43,24 +45,30 @@ export default function MissionPage() {
     }
   }, [navigate, mission]);
 
-  // Timer
+  // Timer with heartbeat sound
   useEffect(() => {
     if (phase !== 'active') return;
     const interval = setInterval(() => {
       setTimeRemaining(prev => {
-        if (prev <= 1) { setPhase('failed'); return 0; }
+        if (prev <= 1) {
+          soundEngine.play('error');
+          setPhase('failed');
+          return 0;
+        }
+        if (prev <= 60 && prev % 2 === 0) soundEngine.play('tick');
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(interval);
   }, [phase]);
 
-  // Chaos event triggers
+  // Chaos event triggers with sound
   useEffect(() => {
     if (phase !== 'active' || !mission) return;
     const elapsed = mission.timeLimit - timeRemaining;
     for (const event of mission.chaosEvents) {
       if (elapsed >= event.triggerAt && !triggeredChaos.has(event.id) && !activeChaos) {
+        soundEngine.play('chaos');
         setActiveChaos(event);
         setTriggeredChaos(prev => new Set(prev).add(event.id));
         setSystemStability(prev => Math.max(10, prev - 15));
@@ -79,17 +87,22 @@ export default function MissionPage() {
 
   const handleValidate = useCallback(() => {
     if (!mission) return;
+    soundEngine.play('validate');
     const validations = MISSION_VALIDATIONS[mission.id] || [];
     const results = validateAllObjectives(code, validations);
     setValidationResults(results);
     setHasValidated(true);
 
-    // Auto-complete objectives that pass validation
-    setObjectives(prev => prev.map(obj => {
+    const newObjectives = objectives.map(obj => {
       const result = results.find(r => r.objectiveId === obj.id);
       return result?.passed ? { ...obj, completed: true } : obj;
-    }));
-  }, [code, mission]);
+    });
+    setObjectives(newObjectives);
+
+    // Play success/error based on results
+    const allPassed = newObjectives.every(o => o.completed);
+    if (allPassed) soundEngine.play('success');
+  }, [code, mission, objectives]);
 
   const handleResetCode = useCallback(() => {
     if (mission) {
@@ -245,33 +258,16 @@ export default function MissionPage() {
           </div>
         )}
 
-        {/* Complete Phase */}
+        {/* Complete Phase — Celebration! */}
         {phase === 'complete' && (
-          <div className="mt-8 space-y-6 text-center max-w-2xl mx-auto">
-            <div className="border border-primary/30 rounded-lg p-8 bg-card border-glow animate-slide-up">
-              <div className="text-4xl mb-4">✅</div>
-              <h2 className="font-mono text-xl font-bold text-primary text-glow mb-2">MISSION COMPLETE</h2>
-              <p className="font-mono text-sm text-muted-foreground">{mission.title}</p>
-              <div className="mt-6 space-y-2 text-sm font-mono">
-                <div className="flex justify-between max-w-xs mx-auto">
-                  <span className="text-muted-foreground">XP Earned</span>
-                  <span className="text-primary font-bold">+{xpEarned}</span>
-                </div>
-                <div className="flex justify-between max-w-xs mx-auto">
-                  <span className="text-muted-foreground">Time Remaining</span>
-                  <span className="text-foreground">{Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}</span>
-                </div>
-                <div className="flex justify-between max-w-xs mx-auto">
-                  <span className="text-muted-foreground">Chaos Survived</span>
-                  <span className="text-foreground">{triggeredChaos.size}</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-3 justify-center">
-              <Button onClick={() => navigate('/dashboard')} variant="outline" className="font-mono">← MISSION CONTROL</Button>
-              <Button onClick={() => navigate('/leaderboard')} className="font-mono">VIEW LEADERBOARD →</Button>
-            </div>
-          </div>
+          <MissionCelebration
+            missionTitle={mission.title}
+            xpEarned={xpEarned}
+            timeRemaining={timeRemaining}
+            chaosSurvived={triggeredChaos.size}
+            onDashboard={() => navigate('/dashboard')}
+            onLeaderboard={() => navigate('/leaderboard')}
+          />
         )}
 
         {/* Failed Phase */}

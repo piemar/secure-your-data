@@ -3,8 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TypewriterText } from '@/components/TypewriterText';
+import { MatrixRain } from '@/components/MatrixRain';
+import { BootSequence } from '@/components/BootSequence';
 import { getPlayer, createPlayer } from '@/lib/game-store';
 import { generateHandle } from '@/lib/game-data';
+import { soundEngine } from '@/lib/sound-engine';
 
 const ASCII_LOGO = `
  ███╗   ███╗ ██████╗ ███╗   ██╗ ██████╗  ██████╗ 
@@ -19,8 +22,9 @@ const ASCII_LOGO = `
 export default function Landing() {
   const navigate = useNavigate();
   const [handle, setHandle] = useState('');
-  const [phase, setPhase] = useState<'intro' | 'ready'>('intro');
+  const [phase, setPhase] = useState<'boot' | 'intro' | 'ready'>('boot');
   const [showInput, setShowInput] = useState(false);
+  const [booted, setBooted] = useState(false);
 
   useEffect(() => {
     const player = getPlayer();
@@ -29,18 +33,40 @@ export default function Landing() {
     }
   }, [navigate]);
 
+  // Skip boot if already seen this session
+  useEffect(() => {
+    if (sessionStorage.getItem('heist-booted')) {
+      setBooted(true);
+      setPhase('intro');
+    }
+  }, []);
+
+  const handleBootComplete = useCallback(() => {
+    sessionStorage.setItem('heist-booted', '1');
+    setBooted(true);
+    setPhase('intro');
+  }, []);
+
   const handleGenerate = useCallback(() => {
+    soundEngine.play('validate');
     setHandle(generateHandle());
   }, []);
 
   const handleConnect = () => {
     if (!handle.trim()) return;
+    soundEngine.play('success');
     createPlayer(handle.trim());
     navigate('/dashboard');
   };
 
+  if (!booted) {
+    return <BootSequence onComplete={handleBootComplete} />;
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      <MatrixRain />
+
       {/* Background effects */}
       <div className="absolute inset-0 circuit-pattern" />
       <div className="absolute inset-0 scanline pointer-events-none" />
