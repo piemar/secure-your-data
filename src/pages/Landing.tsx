@@ -80,25 +80,27 @@ export default function Landing() {
       <div className="absolute bottom-32 left-1/4 w-1 h-1 bg-accent rounded-full animate-float opacity-20" style={{ animationDelay: '2s' }} />
 
       <div className="relative z-10 max-w-xl w-full space-y-8 text-center">
-        {/* Mascot */}
-        <div className="flex justify-center mb--4">
-          <img
-            src={heistMascot}
-            alt="Data Heist Mascot"
-            className="w-20 h-20 sm:w-24 sm:h-24 drop-shadow-[0_0_12px_hsl(var(--primary)/0.6)]"
-            style={{
-              animation: 'mascot-float 3s ease-in-out infinite, fade-in 1s ease-out both',
-            }}
-          />
-        </div>
+        {/* ASCII Logo with mascot walking on top */}
+        <div className="relative">
+          {/* Mascot walking across the logo */}
+          <div className="relative h-16 sm:h-20 overflow-visible mb-1">
+            <img
+              src={heistMascot}
+              alt="Agent Raccoon"
+              className="absolute w-12 h-12 sm:w-16 sm:h-16 bottom-0 drop-shadow-[0_0_12px_hsl(var(--primary)/0.6)] pointer-events-none"
+              style={{
+                animation: 'mascot-patrol 8s ease-in-out infinite, mascot-hop 0.6s ease-in-out infinite',
+              }}
+            />
+          </div>
 
-        {/* ASCII Logo */}
-        <pre
-          className="font-mono text-primary text-[3.5px] sm:text-[6px] md:text-[9px] leading-tight text-glow whitespace-pre select-none group cursor-pointer transition-all duration-300 hover:animate-glitch"
-          style={{ animationName: 'fade-in-slow', animationDuration: '2s', animationFillMode: 'both' }}
-        >
-          {ASCII_LOGO}
-        </pre>
+          <pre
+            className="font-mono text-primary text-[3.5px] sm:text-[6px] md:text-[9px] leading-tight text-glow whitespace-pre select-none cursor-pointer transition-all duration-300 hover:animate-glitch"
+            style={{ animationName: 'fade-in-slow', animationDuration: '2s', animationFillMode: 'both' }}
+          >
+            {ASCII_LOGO}
+          </pre>
+        </div>
 
         {/* Connection text */}
         <div className="space-y-2">
