@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { Button } from '@/components/ui/button';
 import { soundEngine } from '@/lib/sound-engine';
+import heistMascotCelebrate from '@/assets/heist-mascot-celebrate.png';
 
 interface MissionCelebrationProps {
   missionTitle: string;
