@@ -124,26 +124,22 @@ export default function MissionPage() {
     const current = hintStates.get(hintIndex);
     soundEngine.play('click');
     setHintStates(prev => new Map(prev).set(hintIndex, 'answer-shown'));
-    // Only charge answer penalty (hint penalty may already have been charged)
     if (current !== 'hint-shown') {
       setHintsUsedCount(prev => prev + 1);
     }
     const answerPenalty = Math.round((hint.xpPenalty || 25) * 0.4);
     setHintXpPenalty(prev => prev + answerPenalty);
 
-    // Auto-fill: replace the nth ___BLANK___ with the answer
-    setCode(prev => {
-      let count = 0;
-      return prev.replace(/___BLANK___/g, (match) => {
-        if (count === hintIndex) {
-          count++;
-          return hint.answer;
-        }
-        count++;
-        return match;
-      });
+    // Rebuild code from original skeleton with all answered blanks applied
+    const newAnswered = new Map(answeredBlanks).set(hintIndex, hint.answer);
+    setAnsweredBlanks(newAnswered);
+    let blankCount = 0;
+    const rebuilt = originalSkeleton.replace(/___BLANK___/g, (match) => {
+      const idx = blankCount++;
+      return newAnswered.has(idx) ? newAnswered.get(idx)! : match;
     });
-  }, [hints, hintStates]);
+    setCode(rebuilt);
+  }, [hints, hintStates, answeredBlanks, originalSkeleton]);
 
   const handleBeginMission = () => {
     // Save preferred difficulty
