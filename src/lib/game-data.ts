@@ -1,6 +1,7 @@
 import { Mission, Achievement } from './types';
 
 export const MISSIONS: Mission[] = [
+  // === ORIGINAL 5 MISSIONS ===
   {
     id: 'mission-1',
     title: 'The Phantom Index',
@@ -18,14 +19,7 @@ export const MISSIONS: Mission[] = [
     xpReward: 500,
     difficulty: 2,
     chaosEvents: [
-      {
-        id: 'chaos-1-1',
-        title: '⚠ WRITE LOCK DETECTED',
-        description: 'A background index build is blocking writes. Queries are queueing up!',
-        triggerAt: 180,
-        penalty: 100,
-        duration: 60,
-      },
+      { id: 'chaos-1-1', title: '⚠ WRITE LOCK DETECTED', description: 'A background index build is blocking writes. Queries are queueing up!', triggerAt: 180, penalty: 100, duration: 60 },
     ],
   },
   {
@@ -46,22 +40,8 @@ export const MISSIONS: Mission[] = [
     xpReward: 1000,
     difficulty: 4,
     chaosEvents: [
-      {
-        id: 'chaos-2-1',
-        title: '🔥 REPLICA SET MEMBER DOWN',
-        description: 'Secondary member rs2-b has crashed! Failover in progress...',
-        triggerAt: 240,
-        penalty: 200,
-        duration: 90,
-      },
-      {
-        id: 'chaos-2-2',
-        title: '⚡ NETWORK PARTITION',
-        description: 'Network split detected between rs1 and rs2. Reads are failing!',
-        triggerAt: 500,
-        penalty: 150,
-        duration: 60,
-      },
+      { id: 'chaos-2-1', title: '🔥 REPLICA SET MEMBER DOWN', description: 'Secondary member rs2-b has crashed! Failover in progress...', triggerAt: 240, penalty: 200, duration: 90 },
+      { id: 'chaos-2-2', title: '⚡ NETWORK PARTITION', description: 'Network split detected between rs1 and rs2. Reads are failing!', triggerAt: 500, penalty: 150, duration: 60 },
     ],
   },
   {
@@ -82,14 +62,7 @@ export const MISSIONS: Mission[] = [
     xpReward: 750,
     difficulty: 3,
     chaosEvents: [
-      {
-        id: 'chaos-3-1',
-        title: '💾 MEMORY LIMIT HIT',
-        description: 'Aggregation exceeding 100MB memory limit! Enable allowDiskUse or optimize.',
-        triggerAt: 200,
-        penalty: 100,
-        duration: 45,
-      },
+      { id: 'chaos-3-1', title: '💾 MEMORY LIMIT HIT', description: 'Aggregation exceeding 100MB memory limit! Enable allowDiskUse or optimize.', triggerAt: 200, penalty: 100, duration: 45 },
     ],
   },
   {
@@ -109,14 +82,7 @@ export const MISSIONS: Mission[] = [
     xpReward: 850,
     difficulty: 3,
     chaosEvents: [
-      {
-        id: 'chaos-4-1',
-        title: '🌊 SECOND WAVE INCOMING',
-        description: 'Connection count doubled! Another 10K connections hitting the cluster!',
-        triggerAt: 300,
-        penalty: 200,
-        duration: 120,
-      },
+      { id: 'chaos-4-1', title: '🌊 SECOND WAVE INCOMING', description: 'Connection count doubled! Another 10K connections hitting the cluster!', triggerAt: 300, penalty: 200, duration: 120 },
     ],
   },
   {
@@ -138,22 +104,142 @@ export const MISSIONS: Mission[] = [
     xpReward: 1500,
     difficulty: 5,
     chaosEvents: [
-      {
-        id: 'chaos-5-1',
-        title: '🕵️ INSIDER STILL ACTIVE',
-        description: 'The saboteur just changed another validator! Check the orders collection!',
-        triggerAt: 400,
-        penalty: 300,
-        duration: 120,
-      },
-      {
-        id: 'chaos-5-2',
-        title: '📊 DATA CORRUPTION SPREADING',
-        description: 'Invalid documents detected in analytics pipeline. Corruption rate: 23%',
-        triggerAt: 700,
-        penalty: 250,
-        duration: 90,
-      },
+      { id: 'chaos-5-1', title: '🕵️ INSIDER STILL ACTIVE', description: 'The saboteur just changed another validator! Check the orders collection!', triggerAt: 400, penalty: 300, duration: 120 },
+      { id: 'chaos-5-2', title: '📊 DATA CORRUPTION SPREADING', description: 'Invalid documents detected in analytics pipeline. Corruption rate: 23%', triggerAt: 700, penalty: 250, duration: 90 },
+    ],
+  },
+
+  // === NEW MISSIONS FROM SECURE-YOUR-DATA POV PROOFS ===
+
+  // QUERY: Rich Query (from RICH-QUERY proof #1)
+  {
+    id: 'mission-6',
+    title: 'Rich Query Recon',
+    codename: 'RICHQUERY',
+    tier: 'recon',
+    description: 'Master compound queries with nested fields, array operators, projections, and compound indexes on 1M customer records.',
+    briefing: `INTEL BRIEFING\n\nA customer database with 1 million insurance records needs to be queried efficiently. Your targets: female customers born in 1990, living in Utah, with life insurance policies where the insured person is a smoker.\n\nBuild compound queries with $elemMatch on nested arrays, add projections to reduce payload, sort and paginate results, then create the perfect compound index to prove IXSCAN.\n\nSpeed is everything. The data analysts are waiting.`,
+    objectives: [
+      { id: 'obj-6-1', text: 'Build compound find() with $elemMatch on nested arrays', completed: false },
+      { id: 'obj-6-2', text: 'Add projections to return only needed fields', completed: false },
+      { id: 'obj-6-3', text: 'Sort and paginate results with sort/limit/skip', completed: false },
+      { id: 'obj-6-4', text: 'Create compound index and verify IXSCAN with explain()', completed: false },
+    ],
+    timeLimit: 480,
+    xpReward: 600,
+    difficulty: 2,
+    chaosEvents: [
+      { id: 'chaos-6-1', title: '📈 QUERY SPIKE', description: 'Another team just fired 10,000 concurrent queries! Collection scans are killing the cluster.', triggerAt: 150, penalty: 100, duration: 45 },
+    ],
+  },
+
+  // ENCRYPTION: CSFLE (from ENCRYPT-FIELDS proof #46)
+  {
+    id: 'mission-7',
+    title: 'Encryption Lockdown',
+    codename: 'CIPHER',
+    tier: 'exfiltration',
+    description: 'Implement Client-Side Field Level Encryption to protect PII data from database-level access.',
+    briefing: `CLASSIFIED — EYES ONLY\n\nOur medical records database has been flagged by compliance. Patient SSNs and health data are stored in plaintext — visible to any DBA with cluster access. Your mission: implement CSFLE using envelope encryption.\n\nCreate a Customer Master Key in KMS, generate Data Encryption Keys, define the encryption schema, and prove that even with direct database access, the encrypted fields show only Binary ciphertext.\n\nNo plaintext. No exceptions.`,
+    objectives: [
+      { id: 'obj-7-1', text: 'Create Customer Master Key (CMK) in KMS', completed: false },
+      { id: 'obj-7-2', text: 'Generate Data Encryption Key (DEK) with ClientEncryption', completed: false },
+      { id: 'obj-7-3', text: 'Define encryption schema map with algorithms', completed: false },
+      { id: 'obj-7-4', text: 'Create encrypted MongoClient with autoEncryption', completed: false },
+      { id: 'obj-7-5', text: 'Insert and query — verify encryption/decryption works', completed: false },
+    ],
+    timeLimit: 900,
+    xpReward: 1200,
+    difficulty: 4,
+    chaosEvents: [
+      { id: 'chaos-7-1', title: '🔓 AUDIT ALERT', description: 'Compliance team running spot check! Encrypted fields must show Binary, not plaintext.', triggerAt: 300, penalty: 250, duration: 90 },
+      { id: 'chaos-7-2', title: '🔑 KEY ROTATION REQUIRED', description: 'Security policy mandates key rotation. New DEK must be generated!', triggerAt: 600, penalty: 150, duration: 60 },
+    ],
+  },
+
+  // ANALYTICS: In-Place Analytics + Workload Isolation (proofs #4, #5)
+  {
+    id: 'mission-8',
+    title: 'Analytics Extraction',
+    codename: 'ANALYTICS',
+    tier: 'recon',
+    description: 'Run in-place analytics with aggregation pipelines while isolating workloads to protect production reads.',
+    briefing: `DATA EXTRACTION REQUEST\n\nThe business team needs real-time revenue analytics — total, average, min, max by category and time period. But the CRUD workload on the primary is already at 80% capacity.\n\nYour mission: build aggregation pipelines for in-place analytics, group by time dimensions, and route analytics queries to secondary replicas using read preferences to achieve workload isolation.\n\nDon't let analytics kill production.`,
+    objectives: [
+      { id: 'obj-8-1', text: 'Build aggregation pipeline with $group and accumulators', completed: false },
+      { id: 'obj-8-2', text: 'Add time-based grouping with $year/$month', completed: false },
+      { id: 'obj-8-3', text: 'Configure read preference for workload isolation', completed: false },
+    ],
+    timeLimit: 420,
+    xpReward: 550,
+    difficulty: 2,
+    chaosEvents: [
+      { id: 'chaos-8-1', title: '📊 PIPELINE OVERFLOW', description: 'Aggregation is consuming too much memory! Consider allowDiskUse.', triggerAt: 180, penalty: 100, duration: 45 },
+    ],
+  },
+
+  // SCALABILITY: Scale-Out (from SCALE-OUT proof #7)
+  {
+    id: 'mission-9',
+    title: 'Scale-Out Siege',
+    codename: 'SCALEOUT',
+    tier: 'infiltration',
+    description: 'Shard a collection, sustain massive load, add shards dynamically, and verify data distributes evenly.',
+    briefing: `CAPACITY CRITICAL\n\nThe events collection is growing at 10GB per hour. The single replica set is running out of disk and CPU. You must enable horizontal scaling: shard the collection with the right key, sustain load under pressure, add new shards to the cluster, and prove that the balancer distributes data evenly.\n\nScale or fail.`,
+    objectives: [
+      { id: 'obj-9-1', text: 'Enable sharding and choose shard key strategy', completed: false },
+      { id: 'obj-9-2', text: 'Generate sustained write load', completed: false },
+      { id: 'obj-9-3', text: 'Verify shard distribution is balanced', completed: false },
+      { id: 'obj-9-4', text: 'Add a new shard to the cluster', completed: false },
+    ],
+    timeLimit: 720,
+    xpReward: 900,
+    difficulty: 3,
+    chaosEvents: [
+      { id: 'chaos-9-1', title: '💥 JUMBO CHUNKS', description: 'Chunk too large to migrate! Your shard key may have low cardinality.', triggerAt: 250, penalty: 200, duration: 90 },
+    ],
+  },
+
+  // OPERATIONS: Auto-HA (from AUTO-HA proof #17)
+  {
+    id: 'mission-10',
+    title: 'Auto-HA Failover',
+    codename: 'FAILOVER',
+    tier: 'infiltration',
+    description: 'Test automatic high availability: trigger failover and prove retryable writes make it transparent.',
+    briefing: `HIGH AVAILABILITY DRILL\n\nCommand wants proof that our database survives primary failure. Your mission: connect without retryable writes and measure the downtime during failover. Then reconnect WITH retryable writes and prove zero visible disruption.\n\nTrigger the failover. Measure. Prove resilience.`,
+    objectives: [
+      { id: 'obj-10-1', text: 'Check replica set status and identify PRIMARY', completed: false },
+      { id: 'obj-10-2', text: 'Connect without retryable writes (baseline)', completed: false },
+      { id: 'obj-10-3', text: 'Enable retryable writes and reads', completed: false },
+      { id: 'obj-10-4', text: 'Verify failover recovery is transparent', completed: false },
+    ],
+    timeLimit: 600,
+    xpReward: 800,
+    difficulty: 3,
+    chaosEvents: [
+      { id: 'chaos-10-1', title: '🔄 UNEXPECTED FAILOVER', description: 'The primary just stepped down! Was your app prepared?', triggerAt: 200, penalty: 150, duration: 60 },
+    ],
+  },
+
+  // DEPLOYMENT: Terraform/Auto-Deploy (from proofs #11, #48)
+  {
+    id: 'mission-11',
+    title: 'Deployment Automation',
+    codename: 'TERRAFORM',
+    tier: 'exfiltration',
+    description: 'Automate Atlas cluster provisioning with Terraform — define, plan, and apply infrastructure as code.',
+    briefing: `DEPLOYMENT ORDER\n\nManual cluster provisioning is over. Command wants infrastructure as code. Define a production-ready Atlas cluster in Terraform: specify the provider, region, instance size, and replication specs. Plan the deployment. Apply it. Verify the cluster is live.\n\nNo more clicking. Code the infrastructure.`,
+    objectives: [
+      { id: 'obj-11-1', text: 'Define Terraform resource for Atlas cluster', completed: false },
+      { id: 'obj-11-2', text: 'Configure cluster specs (region, instance, replication)', completed: false },
+      { id: 'obj-11-3', text: 'Run Terraform init/plan/apply commands', completed: false },
+    ],
+    timeLimit: 600,
+    xpReward: 700,
+    difficulty: 3,
+    chaosEvents: [
+      { id: 'chaos-11-1', title: '🏗️ DRIFT DETECTED', description: 'Someone changed the cluster config manually! Your Terraform state is out of sync.', triggerAt: 250, penalty: 150, duration: 60 },
     ],
   },
 ];
@@ -171,6 +257,10 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'index-everything', name: 'Index Everything', description: 'Complete The Phantom Index in under 3 minutes', icon: '📑', rarity: 'rare', unlocked: false },
   { id: 'cluster-whisperer', name: 'Cluster Whisperer', description: 'Survive 5 chaos events', icon: '🌀', rarity: 'epic', unlocked: false },
   { id: 'atlas-overlord', name: 'Atlas Overlord', description: 'Reach the highest rank', icon: '👑', rarity: 'legendary', unlocked: false },
+  { id: 'query-ninja', name: 'Query Ninja', description: 'Complete Rich Query Recon without any hints', icon: '🥷', rarity: 'rare', unlocked: false },
+  { id: 'crypto-agent', name: 'Crypto Agent', description: 'Complete Encryption Lockdown', icon: '🔐', rarity: 'epic', unlocked: false },
+  { id: 'scale-master', name: 'Scale Master', description: 'Complete Scale-Out Siege', icon: '📐', rarity: 'rare', unlocked: false },
+  { id: 'infra-coder', name: 'Infra as Code', description: 'Complete Deployment Automation', icon: '🏗️', rarity: 'epic', unlocked: false },
 ];
 
 export const RANK_THRESHOLDS: { rank: string; minXP: number }[] = [
