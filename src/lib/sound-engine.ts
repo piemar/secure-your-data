@@ -40,6 +40,18 @@ class SoundEngine {
           osc.stop(now + 0.03);
           break;
         }
+        case 'click': {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(1000, now);
+          gain.gain.setValueAtTime(this._volume * 0.1, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.05);
+          break;
+        }
         case 'hover': {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
