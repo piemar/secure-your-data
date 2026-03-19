@@ -1,104 +1,129 @@
 
 
-# MongoDB GameDay Trailer — 2 Minutes with Fresh Audio & Callout Annotations
+# MongoDB GameDay — Promotional Trailer Video (Final Plan)
 
-## Key Clarification: Fresh Audio Extraction
-Extract audio **fresh** from the original YouTube source `https://youtu.be/0vPt7GI-2kc?si=Gix_TwmckK0m3SZJ` starting at exactly **00:25**, pulling **120 seconds** of audio. Do NOT reuse any previously extracted file.
+## Summary
 
-```text
-yt-dlp → full audio → ffmpeg -ss 25 -t 120 → fade in/out → heist-bg-120s.mp3
-```
-
-## Overview
-- **Duration**: 120s (3600 frames at 30fps)
-- **Output**: `/mnt/documents/heist-trailer-v3.mp4` (1920x1080, H.264 + AAC)
-- **Audio**: 120s background music from YouTube source, freshly extracted
-- **Visual**: Real app screenshots in Chrome browser frames with animated callout annotations
+A 120-second Remotion-rendered MP4 trailer with **background music extracted from the YouTube video** (audio only, starting at 0:25) and **real app interaction captures** via browser automation. No YouTube video footage is used — only its audio track.
 
 ---
 
-## Step 1 — Extract Audio (Fresh from YouTube)
+## Audio Strategy
 
-Download audio from `https://youtu.be/0vPt7GI-2kc?si=Gix_TwmckK0m3SZJ` using `yt-dlp`. Then use `ffmpeg` to trim starting at 00:25 for exactly 120 seconds, with 2s fade-in and 5s fade-out. Copy result to the Remotion project's `public/audio/` directory.
+The sandbox renders video muted (missing `libfdk_aac`), but we can work around this:
 
-## Step 2 — Capture 9 Screenshots via Browser Tool
+1. **Download** the YouTube video using `yt-dlp`
+2. **Extract audio only** starting at 0:25, trimmed to 120 seconds → `/tmp/bg-music.mp3`
+3. **Render** the Remotion video muted → `/tmp/gameday-silent.mp4`
+4. **Mux** audio + video using `ffmpeg -c:v copy` (no re-encoding needed) → `/mnt/documents/gameday-trailer.mp4`
 
-Navigate the live preview app and capture these pages at 1920x1080. Save each as base64, then write to the Remotion project's `public/images/`:
+```text
+yt-dlp → extract audio from 0:25 → bg-music.mp3
+Remotion render → gameday-silent.mp4 (muted)
+ffmpeg -i silent.mp4 -i bg-music.mp3 -c:v copy -c:a aac → final.mp4
+```
 
-1. **Boot Sequence** (`/`) — terminal boot animation
-2. **Landing Page** (`/`) — ASCII art, mascot, handle input
-3. **Dashboard Grid** (`/dashboard`) — mission cards, HUD bar, tiers
-4. **Dashboard Graph** (`/dashboard`) — toggle to graph view, node graph
-5. **Mission Briefing** (`/mission/crud-boot-camp`) — briefing text, difficulty selector
-6. **Mission Active** (`/mission/crud-boot-camp`) — code editor, objectives, combo streak
-7. **Leaderboard** (`/leaderboard`) — podium, rankings
-8. **Profile** (`/profile`) — achievements, XP, avatar
-9. **Quests** (`/quests`) — quest chains, progress bars
+If `aac` encoding fails due to the sandbox ffmpeg build, we fall back to keeping the MP3 stream as-is (`-c:a copy` with an MKV container, or deliver the MP3 separately for manual muxing).
 
-## Step 3 — Scaffold Remotion Project
+---
 
-Set up `/tmp/heist-video-v3` with Remotion, React, TailwindCSS. Install deps via `bun`. Patch compositor (musl→gnu), symlink ffmpeg/ffprobe. Load fonts: Space Grotesk (display) + JetBrains Mono (code).
+## Visual Capture Strategy
 
-## Step 4 — Build Components
+Use browser automation to capture **rapid sequential screenshots** (~80 frames) across 4 user flows from the live preview app. These play as image sequences in Remotion with crossfades and an animated cursor overlay to simulate screen recordings.
 
-### ChromeFrame Component
-Reusable wrapper rendering a dark Chrome browser UI:
-- Title bar with red/yellow/green traffic light dots
-- Address bar with URL text
-- Screenshot as page content
-- Subtle rounded corners and drop shadow
+### Flows to Capture
 
-### CalloutAnnotation Component
-Animated annotation arrows/labels that fly in and point to specific UI features:
-- Takes `label`, `x`, `y`, `angle`, `delay` props
-- Uses `spring()` for entrance (scale + opacity)
-- Renders a colored line/arrow + rounded label badge
-- Glow effect on the label in MongoDB green
+| Flow | Screens | ~Frames |
+|------|---------|---------|
+| A: Onboarding | Boot sequence → handle input → "Jack In" → Dashboard | 15 |
+| B: Dashboard | Mission grid → tier browsing → graph view → mission select | 20 |
+| C: Mission | Briefing → difficulty select → code editor → validate → celebrate | 30 |
+| D: Social | Leaderboard → Profile → achievements | 15 |
 
-### Per-Screenshot Callout Map
+---
 
-| Screenshot | Callouts |
-|---|---|
-| Dashboard Grid | "HUD Bar" → top bar, "Mission Cards" → card grid, "Tier Sections" → tier headers |
-| Dashboard Graph | "Node Graph" → center, "Prerequisites" → connecting lines |
-| Mission Briefing | "Difficulty Selector" → selector area, "Mission Intel" → briefing text |
-| Mission Active | "Monaco Editor" → code panel, "Objectives Panel" → right side, "Chaos Events" → overlay area |
-| Leaderboard | "XP Rankings" → table, "Podium" → top 3 |
-| Profile | "Achievements" → badges area, "XP Progress" → progress bar |
-| Quests | "Quest Chains" → quest list, "Progress Tracking" → progress bars |
+## Render Strategy (Timeout Mitigation)
 
-## Step 5 — Build 14 Scene Components
+The sandbox has a 600-second render limit. A 120-second video at 30fps = 3600 frames, which will exceed this. Solution:
 
-### Act 1 — The Hook (0-15s)
-- **Scene 1 (0-4s)**: Terminal cursor types "What if MongoDB training... felt like a heist?" Glitch cut.
-- **Scene 2 (4-10s)**: Problem statement. "Slides don't build muscle memory." Stats fly in.
-- **Scene 3 (10-15s)**: Logo reveal. "MongoDB HEIST" with spring slam + glow. Mascot slides in.
+- Render **4 segments** (~30s / 900 frames each)
+- Concatenate with `ffmpeg -f concat`
+- Mux the background audio onto the joined video
 
-### Act 2 — The Platform (15-55s)
-- **Scene 4 (15-22s)**: Boot screenshot in ChromeFrame. Slow zoom. Caption below.
-- **Scene 5 (22-30s)**: Landing page in ChromeFrame. Zoom into ASCII art.
-- **Scene 6 (30-40s)**: Dashboard grid in ChromeFrame. Slow pan. **Callouts animate in**: "HUD Bar", "Mission Cards", "Tier Sections".
-- **Scene 7 (40-48s)**: Dashboard graph in ChromeFrame. **Callouts**: "Node Graph", "Prerequisites".
-- **Scene 8 (48-58s)**: Mission briefing → active editor transition in ChromeFrame. **Callouts**: "Monaco Editor", "Objectives Panel", "Difficulty Selector".
+---
 
-### Act 3 — Why It Works (58-85s)
-- **Scene 9 (58-66s)**: Kinetic typography feature cards: "3 Difficulty Tiers", "Inline Hints", "Chaos Events", "Sandbox Execution".
-- **Scene 10 (66-74s)**: Leaderboard in ChromeFrame. **Callouts**: "XP Rankings", "Podium".
-- **Scene 11 (74-82s)**: Profile + Quests in ChromeFrame. **Callouts**: "Achievements", "Quest Chains".
-- **Scene 12 (82-90s)**: Strategic pitch typography. Mission names → POV capability tags.
+## Scene Breakdown (120 seconds)
 
-### Act 4 — Close (90-120s)
-- **Scene 13 (90-105s)**: Rapid montage of all screenshots (1-2s each). Stats overlay.
-- **Scene 14 (105-120s)**: Final logo lockup. "MongoDB HEIST — GameDay v2.0". "Level Up Your Team." Fade.
+### Segment 1 — Hook + Problem + Reveal (0–30s)
 
-## Step 6 — Wire Together & Render
+**Scene 1 (0–8s):** Terminal cursor types: *"Your team knows MongoDB. But can they prove it under pressure?"* Matrix rain texture background. Glitch transition.
 
-- Use `TransitionSeries` with wipe/slide transitions between scenes
-- Persistent scanline overlay across all frames
-- Audio track via `<Audio src={staticFile('audio/bg-music.mp3')} />`
-- Render with programmatic script (`scripts/render.mjs`) — patch audio codec to `aac`, use `chromeMode: "chrome-for-testing"`, `concurrency: 1`
-- Output to `/mnt/documents/heist-trailer-v3.mp4`
+**Scene 2 (8–18s):** *"Slides don't build muscle memory. Demos don't test resilience."* Animated stat cards spring in: "25 Missions", "Real MongoDB Queries", "Timed Challenges"
 
-## Rendering Note: Audio
-Since Nix ffmpeg lacks `libfdk_aac`, patch Remotion's audio codec config to use built-in `aac` encoder. Set `muted: false` in render script but patch the codec mapping.
+**Scene 3 (18–30s):** Kinetic typography — "MongoDB" glows in `#00ED64`, "GameDay" slams in with spring bounce. Subtitle: "A gamified hands-on training platform". Turtle mascot slides in. Crossfade into **Flow A** footage (boot sequence, handle entry, Jack In).
+
+### Segment 2 — Dashboard Tour + Mission Start (30–60s)
+
+**Scene 4 (30–45s):** **Flow B** footage plays inside a green-bordered browser frame with scanline overlay. Caption cards: "25 Missions Across 3 Tiers", "Visual Node Graph", "Search and Filter"
+
+**Scene 5 (45–60s):** First half of **Flow C** — mission briefing, difficulty selector, code editor appears. Caption: "Guided, Challenge, and Expert Modes"
+
+### Segment 3 — Mission Completion + Chaos (60–90s)
+
+**Scene 6 (60–80s):** Second half of **Flow C** — code validation, green checkmarks, celebration with XP. Caption: "Real-Time Validation Against Live MongoDB"
+
+**Scene 7 (80–90s):** Kinetic typography: *"Chaos Events test resilience under pressure."* Recreated chaos overlay UI mockup in Remotion.
+
+### Segment 4 — Engagement + Why + CTA (90–120s)
+
+**Scene 8 (90–100s):** **Flow D** footage — Leaderboard and Profile with feature cards: "XP and Achievements", "Global Leaderboard", "Quest Chains"
+
+**Scene 9 (100–112s):** Mission-to-POV mapping layout. Mission names on left, capability tags on right (CRUD → RICH-QUERY, Aggregation → ANALYTICS, Sharding → SCALABILITY, Encryption → SECURITY, Vector Search → AI). Animated connecting lines.
+
+**Scene 10 (112–120s):** Final lockup — "MongoDB GameDay" + turtle mascot + "Level Up Your Team". Green glow pulses, hard cut to black.
+
+---
+
+## Creative Direction
+
+- **Palette**: MongoDB Green `#00ED64`, Terminal Dark `#061a14`, Off-white `#E8EDDF`, Muted Green `#1a3d2e`
+- **Fonts**: Space Grotesk (headers) + JetBrains Mono (code/terminal)
+- **Motion**: Snappy springs for text, wipe/fade transitions between scenes, Ken Burns zoom on app footage
+- **Motifs**: Green-glowing browser frame around all captured footage, scanline overlay, terminal cursor on typography scenes
+- **Video treatment**: All app captures shown inside styled "browser chrome" with rounded corners and green glow — never raw fullscreen
+
+---
+
+## Music Timing Guide
+
+Since the audio is extracted from a single source track, these cues help align visual beats with the music:
+
+| Timecode | Scene | Visual Energy |
+|----------|-------|---------------|
+| 0:00–0:08 | Hook | Low — tension building |
+| 0:08–0:18 | Problem | Rising — stats fly in |
+| 0:18–0:30 | Reveal | Peak — brand slam, mascot entry |
+| 0:30–0:60 | Product tour | Driving — continuous footage |
+| 0:60–0:90 | Mission + Chaos | High energy — validation, chaos |
+| 0:90–1:12 | Features + Mapping | Resolving — confident |
+| 1:12–2:00 | CTA | Clean ending — logo hit |
+
+If the extracted audio doesn't naturally align, we can trim or fade sections with ffmpeg filters.
+
+---
+
+## Build Steps
+
+1. Download YouTube audio via `yt-dlp`, extract from 0:25, trim to 120s
+2. Capture ~80 sequential screenshots from the live app via browser automation
+3. Scaffold Remotion project at `/tmp/gameday-trailer/`
+4. Build 10 scene components with kinetic typography + image sequence playback
+5. Render 4 segments (~900 frames each)
+6. Concatenate segments with `ffmpeg -f concat`
+7. Mux background audio onto the silent video
+8. Output: `/mnt/documents/gameday-trailer.mp4` — 120s, 1920x1080, 30fps, with audio
+
+## Deliverable
+
+`/mnt/documents/gameday-trailer.mp4` — 120 seconds, 1920x1080, 30fps, **with background music**
 
