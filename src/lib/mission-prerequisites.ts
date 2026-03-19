@@ -58,6 +58,9 @@ export const POV_LABELS: Record<string, string> = {
   'ENCRYPTION': 'Encryption',
   'AUTO-DEPLOY': 'Auto Deploy',
   'TERRAFORM': 'Terraform IaC',
+  'TIME-SERIES': 'Time Series',
+  'RETRIEVAL-AUGMENTED-GENERATION': 'Vector Search / RAG',
+  'FLEXIBLE': 'Flexible Schema',
 };
 
 // Check if a mission is unlocked for a player
