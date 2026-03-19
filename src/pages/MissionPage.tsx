@@ -18,7 +18,7 @@ import { getSkeletonForDifficulty, getHintsForDifficulty } from '@/lib/mission-s
 import { MISSION_VALIDATIONS } from '@/lib/mission-validations';
 import { validateAllObjectives, ValidationResult } from '@/lib/validation';
 import { soundEngine } from '@/lib/sound-engine';
-import { CheckCircle2, AlertTriangle, Play, RotateCcw, Lightbulb } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Play, RotateCcw } from 'lucide-react';
 
 export default function MissionPage() {
   const { missionId } = useParams<{ missionId: string }>();
