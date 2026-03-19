@@ -39,7 +39,7 @@ export function InlineHintMarker({ hint, index, state, onRevealHint, onRevealAns
               w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold
               border shadow-lg transition-all duration-200 hover:scale-125
               ${state === 'unrevealed'
-                ? 'bg-blue-500/90 border-blue-400/50 text-white shadow-blue-500/30 animate-pulse'
+                ? 'bg-blue-500/90 border-blue-400/50 text-white shadow-blue-500/30 animate-[hint-glow_3s_ease-in-out_infinite]'
                 : 'bg-amber-500/90 border-amber-400/50 text-white shadow-amber-500/30'
               }
             `}

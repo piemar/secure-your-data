@@ -73,16 +73,20 @@ export function CodeEditor({
 
         // Get pixel position via Monaco API
         const lineNumber = lineIdx + 1;
-        const column = match.index + 1;
+        const column = match.index + 6; // center of ___BLANK___ (11 chars / 2)
         const pos = ed.getScrolledVisiblePosition({ lineNumber, column });
 
         if (pos) {
+          // Get the editor's layout to account for content left offset (gutter + line numbers)
+          const layoutInfo = ed.getLayoutInfo();
+          const contentLeft = layoutInfo.contentLeft || 0;
+
           positions.push({
             line: lineNumber,
             column,
             hintIndex,
-            pixelX: pos.left + 44, // offset for line gutter ~44px
-            pixelY: pos.top + 8,   // center vertically on line
+            pixelX: pos.left + contentLeft,
+            pixelY: pos.top + 10, // vertically center on line (~18px line height / 2)
           });
         }
       }
