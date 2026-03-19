@@ -176,7 +176,13 @@ export default function MissionPage() {
 
   const handleResetCode = useCallback(() => {
     if (mission) {
-      setCode(getSkeletonForDifficulty(mission.id, difficulty));
+      const skeleton = getSkeletonForDifficulty(mission.id, difficulty);
+      setCode(skeleton);
+      setOriginalSkeleton(skeleton);
+      setAnsweredBlanks(new Map());
+      setHintStates(new Map());
+      setHintsUsedCount(0);
+      setHintXpPenalty(0);
       setValidationResults([]);
       setHasValidated(false);
       setObjectives(prev => prev.map(o => ({ ...o, completed: false })));
