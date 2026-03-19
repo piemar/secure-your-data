@@ -162,6 +162,11 @@
   50% { transform: translateY(-5px); }
 }
 
+@keyframes mascot-float {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-10px) rotate(2deg); }
+}
+
 @keyframes counter-tick {
   0% { transform: scale(1); }
   50% { transform: scale(1.2); }
