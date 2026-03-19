@@ -116,5 +116,47 @@ export const api = {
       }),
   },
 
+  execute: {
+    createSandbox: (missionId: string, sessionId?: string) =>
+      request<{ created: boolean; tier: string; dbName?: string; seeded?: boolean; message?: string }>(
+        '/api/execute/sandbox',
+        { method: 'POST', body: JSON.stringify({ missionId, sessionId }) }
+      ),
+
+    run: (code: string, missionId: string, sessionId?: string) =>
+      request<{
+        tier: string;
+        success: boolean;
+        output: Array<{ command: string; result: unknown; error?: string; timeMs?: number; simulated?: boolean; message?: string }>;
+        error?: string;
+        executionTimeMs?: number;
+        message?: string;
+      }>('/api/execute/run', {
+        method: 'POST',
+        body: JSON.stringify({ code, missionId, sessionId }),
+      }),
+
+    verify: (missionId: string, sessionId?: string) =>
+      request<{
+        tier: string;
+        results: Array<{ objectiveId: string; passed: boolean; message: string }>;
+        message?: string;
+      }>('/api/execute/verify', {
+        method: 'POST',
+        body: JSON.stringify({ missionId, sessionId }),
+      }),
+
+    destroySandbox: (sessionId?: string) =>
+      request<{ destroyed: boolean }>('/api/execute/sandbox', {
+        method: 'DELETE',
+        body: JSON.stringify({ sessionId }),
+      }),
+
+    status: (sessionId?: string) =>
+      request<{ active: boolean; dbName?: string; missionId?: string; ageMs?: number }>(
+        `/api/execute/status?sessionId=${sessionId || 'solo'}`
+      ),
+  },
+
   health: () => request<{ status: string; db: string }>('/api/health'),
 };

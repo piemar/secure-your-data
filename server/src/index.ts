@@ -50,6 +50,9 @@ const PORT = parseInt(process.env.PORT || '3001', 10);
 async function start() {
   try {
     await connectDB();
+    await initSandboxClient().catch(err => {
+      console.warn('⚠️ Sandbox service unavailable (Tier 2 execution disabled):', err.message);
+    });
     httpServer.listen(PORT, () => {
       console.log(`🚀 MongoDB Mayhem server running on port ${PORT}`);
       console.log(`📦 Database: ${process.env.MONGODB_DB_NAME}`);
