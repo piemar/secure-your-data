@@ -5,6 +5,7 @@ import { Player } from '@/lib/types';
 import { RANK_THRESHOLDS } from '@/lib/game-data';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { soundEngine } from '@/lib/sound-engine';
+import { AvatarDisplay } from '@/components/AvatarPicker';
 import { Volume2, VolumeX } from 'lucide-react';
 
 interface HUDBarProps {
