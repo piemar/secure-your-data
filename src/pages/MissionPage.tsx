@@ -4,6 +4,7 @@ import { HUDBar } from '@/components/HUDBar';
 import { ChaosEventOverlay } from '@/components/ChaosEventOverlay';
 import { TypewriterText } from '@/components/TypewriterText';
 import { CodeEditor } from '@/components/CodeEditor';
+import { ComboStreak } from '@/components/ComboStreak';
 import { ValidationFeedback } from '@/components/ValidationFeedback';
 import { MissionCelebration } from '@/components/MissionCelebration';
 import { DifficultySelector } from '@/components/DifficultySelector';
@@ -354,7 +355,8 @@ export default function MissionPage() {
                   <span className="font-mono text-[10px] text-destructive/70">−{hintXpPenalty} XP</span>
                 )}
               </div>
-              <div className="flex-1">
+              <div className="flex-1 relative">
+                <ComboStreak code={code} isActive={phase === 'active'} />
                 <CodeEditor value={code} onChange={setCode} language="javascript" />
               </div>
             </div>

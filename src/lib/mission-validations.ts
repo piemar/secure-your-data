@@ -5,6 +5,41 @@
 import { ObjectiveValidation } from './validation';
 
 export const MISSION_VALIDATIONS: Record<string, ObjectiveValidation[]> = {
+  // Mission 12: CRUD Boot Camp
+  'mission-12': [
+    {
+      objectiveId: 'obj-12-1',
+      rules: [
+        { pattern: /\.insertOne\s*\(/, description: 'Use insertOne() to insert a document', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-12-2',
+      rules: [
+        { pattern: /\.insertMany\s*\(/, description: 'Use insertMany() to bulk insert', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-12-3',
+      rules: [
+        { pattern: /(\.find\s*\(|\.findOne\s*\()/, description: 'Use find() or findOne() to query', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-12-4',
+      rules: [
+        { pattern: /\.updateOne\s*\(/, description: 'Use updateOne()', required: true },
+        { pattern: /\$set/, description: 'Use $set operator', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-12-5',
+      rules: [
+        { pattern: /\.deleteOne\s*\(/, description: 'Use deleteOne()', required: true },
+      ],
+    },
+  ],
+
   // Mission 1: The Phantom Index — Query & Index optimization
   'mission-1': [
     {
@@ -345,6 +380,153 @@ export const MISSION_VALIDATIONS: Record<string, ObjectiveValidation[]> = {
       objectiveId: 'obj-11-3',
       rules: [
         { pattern: /(terraform\s+(apply|plan|init))/, description: 'Run Terraform commands', required: true },
+      ],
+    },
+  ],
+
+  // Mission 13: Geospatial Pursuit
+  'mission-13': [
+    {
+      objectiveId: 'obj-13-1',
+      rules: [
+        { pattern: /createIndex.*2dsphere/, description: 'Create 2dsphere index', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-13-2',
+      rules: [
+        { pattern: /\$geoNear/, description: 'Use $geoNear aggregation stage', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-13-3',
+      rules: [
+        { pattern: /\$geoWithin/, description: 'Use $geoWithin query', required: true },
+        { pattern: /(Polygon|\$geometry)/, description: 'Use Polygon geometry', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-13-4',
+      rules: [
+        { pattern: /\$geoWithin|\$geoNear/, description: 'Use geo query', required: true },
+        { pattern: /(status|type|active|category)/, description: 'Combine with non-geo filter', required: true },
+      ],
+    },
+  ],
+
+  // Mission 14: Graph Infiltration
+  'mission-14': [
+    {
+      objectiveId: 'obj-14-1',
+      rules: [
+        { pattern: /\$graphLookup/, description: 'Use $graphLookup', required: true },
+        { pattern: /connectFromField/, description: 'Define connectFromField', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-14-2',
+      rules: [
+        { pattern: /maxDepth/, description: 'Set maxDepth limit', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-14-3',
+      rules: [
+        { pattern: /restrictSearchWithMatch/, description: 'Filter traversal with restrictSearchWithMatch', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-14-4',
+      rules: [
+        { pattern: /(\$project|\$size|network)/, description: 'Analyze graph output', required: true },
+      ],
+    },
+  ],
+
+  // Mission 15: Change Stream Stakeout
+  'mission-15': [
+    {
+      objectiveId: 'obj-15-1',
+      rules: [
+        { pattern: /\.watch\s*\(/, description: 'Open change stream with watch()', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-15-2',
+      rules: [
+        { pattern: /\$match.*operationType/, description: 'Filter changes with $match', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-15-3',
+      rules: [
+        { pattern: /(resumeAfter|resume|_id)/, description: 'Handle resume token', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-15-4',
+      rules: [
+        { pattern: /(operationType|fullDocument)/, description: 'Handle change events', required: true },
+      ],
+    },
+  ],
+
+  // Mission 16: Transaction Lockout
+  'mission-16': [
+    {
+      objectiveId: 'obj-16-1',
+      rules: [
+        { pattern: /(startSession|session)/, description: 'Start a client session', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-16-2',
+      rules: [
+        { pattern: /startTransaction/, description: 'Begin transaction', required: true },
+        { pattern: /(readConcern|writeConcern)/, description: 'Configure read/write concern', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-16-3',
+      rules: [
+        { pattern: /(updateOne|insertOne|updateMany)/, description: 'Execute writes in transaction', required: true },
+        { pattern: /session/, description: 'Pass session to operations', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-16-4',
+      rules: [
+        { pattern: /(commitTransaction|abortTransaction)/, description: 'Commit or abort', required: true },
+      ],
+    },
+  ],
+
+  // Mission 17: Text Search Infiltration
+  'mission-17': [
+    {
+      objectiveId: 'obj-17-1',
+      rules: [
+        { pattern: /(mappings|fields|analyzer|type)/, description: 'Define search index mappings', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-17-2',
+      rules: [
+        { pattern: /\$search/, description: 'Use $search stage', required: true },
+        { pattern: /fuzzy/, description: 'Include fuzzy matching', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-17-3',
+      rules: [
+        { pattern: /autocomplete/, description: 'Implement autocomplete', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-17-4',
+      rules: [
+        { pattern: /\$searchMeta/, description: 'Use $searchMeta for facets', required: true },
+        { pattern: /facet/, description: 'Define faceted search', required: true },
       ],
     },
   ],

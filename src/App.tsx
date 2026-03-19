@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import MissionPage from "./pages/MissionPage";
 import Profile from "./pages/Profile";
 import Leaderboard from "./pages/Leaderboard";
+import Quests from "./pages/Quests";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/mission/:missionId" element={<MissionPage />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/quests" element={<Quests />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
