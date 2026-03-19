@@ -6,12 +6,14 @@ import { createServer } from 'http';
 import { connectDB } from './config/db.js';
 import { apiLimiter } from './middleware/rateLimit.js';
 import { initSocketIO } from './socket/metrics.js';
+import { initSandboxClient } from './services/sandbox.js';
 import authRoutes from './routes/auth.js';
 import playerRoutes from './routes/players.js';
 import missionRoutes from './routes/missions.js';
 import workshopRoutes from './routes/workshops.js';
 import metricsRoutes from './routes/metrics.js';
 import verifyRoutes from './routes/verify.js';
+import executeRoutes from './routes/execute.js';
 
 const app = express();
 const httpServer = createServer(app);
