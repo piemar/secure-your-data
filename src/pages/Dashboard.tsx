@@ -13,6 +13,7 @@ import { MISSIONS, ACHIEVEMENTS, MOCK_LEADERBOARD_PLAYERS, QUESTS } from '@/lib/
 import { isMissionUnlocked, POV_LABELS } from '@/lib/mission-prerequisites';
 import { Badge } from '@/components/ui/badge';
 import { Lock, Map, LayoutGrid } from 'lucide-react';
+import heistMascot from '@/assets/heist-mascot.png';
 
 const TIER_ORDER: MissionTier[] = ['recon', 'infiltration', 'exfiltration'];
 const TIER_NAMES: Record<MissionTier, string> = {
@@ -68,8 +69,34 @@ export default function Dashboard() {
     return done > 0 && done < q.requiredMissions;
   });
 
+  const getMascotMessage = () => {
+    const completed = player.completedMissions.length;
+    const total = MISSIONS.length;
+    const pct = completed / total;
+    if (pct === 0) return "Ready for your first heist, agent?";
+    if (pct < 0.25) return "Nice start! Keep cracking those databases!";
+    if (pct < 0.5) return "You're getting dangerous, agent...";
+    if (pct < 0.75) return "Over halfway! The data fears you now.";
+    if (pct < 1) return "Almost legend status. Finish strong!";
+    return "ALL MISSIONS COMPLETE. You are the heist.";
+  };
+
   const Sidebar = () => (
     <div className="space-y-6">
+      {/* Mascot helper */}
+      <div className="border border-primary/20 rounded-lg p-4 bg-card/80 backdrop-blur-sm flex items-center gap-3">
+        <img
+          src={heistMascot}
+          alt="Heist mascot"
+          className="w-12 h-12 flex-shrink-0 drop-shadow-[0_0_8px_hsl(var(--primary)/0.4)]"
+          style={{ animation: 'mascot-float 3s ease-in-out infinite' }}
+        />
+        <div>
+          <p className="font-mono text-[10px] text-primary font-bold">AGENT RACCOON</p>
+          <p className="font-mono text-[10px] text-muted-foreground leading-relaxed">{getMascotMessage()}</p>
+        </div>
+      </div>
+
       {activeQuests.length > 0 && (
         <div className="border border-border rounded-lg p-4 bg-card/80 backdrop-blur-sm">
           <div className="flex items-center justify-between mb-3">

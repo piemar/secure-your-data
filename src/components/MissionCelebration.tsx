@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { Button } from '@/components/ui/button';
 import { soundEngine } from '@/lib/sound-engine';
+import heistMascotCelebrate from '@/assets/heist-mascot-celebrate.png';
 
 interface MissionCelebrationProps {
   missionTitle: string;
@@ -75,7 +76,12 @@ export function MissionCelebration({
       <div className="relative">
         <div className="absolute inset-0 bg-primary/10 blur-3xl rounded-full" />
         <div className="relative border border-primary/30 rounded-lg p-8 bg-card border-glow">
-          <div className="text-6xl mb-4 animate-float">🏆</div>
+          <img
+            src={heistMascotCelebrate}
+            alt="Celebration mascot"
+            className="w-20 h-20 mx-auto mb-2 drop-shadow-[0_0_12px_hsl(var(--primary)/0.6)]"
+            style={{ animation: 'mascot-float 2s ease-in-out infinite' }}
+          />
           <h2 className="font-mono text-2xl font-bold text-primary text-glow mb-2 tracking-wider">
             MISSION COMPLETE
           </h2>
