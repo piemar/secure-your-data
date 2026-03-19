@@ -377,6 +377,9 @@ export default function MissionPage() {
             xpEarned={xpEarned}
             timeRemaining={timeRemaining}
             chaosSurvived={triggeredChaos.size}
+            hintsUsed={Array.from(hintStates.values()).filter(s => s === 'hint-shown').length}
+            answersRevealed={Array.from(hintStates.values()).filter(s => s === 'answer-shown').length}
+            hintXpPenalty={hintXpPenalty}
             onDashboard={() => navigate('/dashboard')}
             onLeaderboard={() => navigate('/leaderboard')}
           />
