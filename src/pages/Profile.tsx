@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { HUDBar } from '@/components/HUDBar';
+import { AvatarPicker, AvatarDisplay } from '@/components/AvatarPicker';
 import { Player } from '@/lib/types';
-import { getPlayer } from '@/lib/game-store';
+import { getPlayer, updatePlayer } from '@/lib/game-store';
 import { ACHIEVEMENTS, MISSIONS, RANK_THRESHOLDS } from '@/lib/game-data';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -39,6 +40,11 @@ export default function Profile() {
     navigate('/');
   };
 
+  const handleAvatarChange = (avatarId: string) => {
+    const updated = updatePlayer({ avatarId });
+    setPlayer(updated);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <HUDBar player={player} />
@@ -47,8 +53,8 @@ export default function Profile() {
         <div className="mt-8 space-y-6">
           {/* Agent Card */}
           <div className="border border-primary/20 rounded-lg p-6 bg-card border-glow text-center">
-            <div className="w-20 h-20 rounded-full bg-secondary border-2 border-primary/30 flex items-center justify-center mx-auto mb-4">
-              <span className="font-mono text-2xl text-primary">{player.handle[0]?.toUpperCase()}</span>
+            <div className="mx-auto mb-4">
+              <AvatarDisplay avatarId={player.avatarId} size="lg" className="mx-auto" />
             </div>
             <h1 className="font-mono text-xl font-bold text-foreground">{player.handle}</h1>
             <Badge variant="outline" className="font-mono text-xs border-primary/30 text-primary mt-2">
@@ -67,6 +73,19 @@ export default function Profile() {
                 </p>
               )}
             </div>
+          </div>
+
+          {/* Avatar Picker */}
+          <div className="border border-border rounded-lg p-6 bg-card">
+            <h2 className="font-mono text-sm font-bold text-foreground mb-4">CHOOSE AVATAR</h2>
+            <AvatarPicker
+              selectedId={player.avatarId || 'ghost'}
+              achievements={player.achievements}
+              onChange={handleAvatarChange}
+            />
+            <p className="font-mono text-[10px] text-muted-foreground mt-3">
+              🔒 Locked avatars are unlocked by earning specific achievements
+            </p>
           </div>
 
           {/* Stats Grid */}
@@ -118,7 +137,7 @@ export default function Profile() {
           <div className="border border-border rounded-lg p-6 bg-card">
             <h2 className="font-mono text-sm font-bold text-foreground mb-4">RANK PROGRESSION</h2>
             <div className="space-y-3">
-              {RANK_THRESHOLDS.map((t, i) => {
+              {RANK_THRESHOLDS.map((t) => {
                 const isCurrentOrPast = player.xp >= t.minXP;
                 return (
                   <div key={t.rank} className="flex items-center gap-3">
