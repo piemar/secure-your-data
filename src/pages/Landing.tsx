@@ -11,16 +11,22 @@ import { soundEngine } from '@/lib/sound-engine';
 import heistMascot from '@/assets/heist-mascot.png';
 
 const ASCII_LOGO = `
- ███╗   ███╗                                    ██████╗  ██████╗
- ████╗ ████║                                    ██╔══██╗ ██╔══██╗
- ██╔████╔██║  █████╗ ██████╗  █████╗  █████╗   ██║  ██║ ██████╔╝
- ██║╚██╔╝██║ ██╔══██╗██╔═██║ ██╔══██╗██╔══██╗  ██║  ██║ ██╔══██╗
- ██║ ╚═╝ ██║ ╚█████╔╝██║ ██║ ╚█████║╚█████╔╝  ██████╔╝ ██████╔╝
- ╚═╝     ╚═╝  ╚════╝ ╚═╝ ╚═╝  ╚══██║ ╚════╝   ╚═════╝  ╚═════╝
-                                █████║
-                                ╚════╝
-          D A T A   H E I S T
-`;
+ ███╗   ███╗                                       ██████╗  ██████╗
+ ████╗ ████║                                       ██╔══██╗ ██╔══██╗
+ ██╔████╔██║  █████╗  ██████╗  ██████╗  █████╗    ██║  ██║ ██████╔╝
+ ██║╚██╔╝██║ ██╔══██╗ ██╔═██║ ██╔═══██╗██╔══██╗   ██║  ██║ ██╔══██╗
+ ██║ ╚═╝ ██║ ╚█████╔╝ ██║ ██║ ╚██████║╚█████╔╝   ██████╔╝ ██████╔╝
+ ╚═╝     ╚═╝  ╚════╝  ╚═╝ ╚═╝  ╚═══██║ ╚════╝    ╚═════╝  ╚═════╝
+                                 ██████║
+                                 ╚═════╝`;
+
+const ASCII_SUBTITLE = `
+  ██████╗  █████╗ ███╗   ███╗███████╗  ██████╗  █████╗ ██╗   ██╗
+ ██╔════╝ ██╔══██╗████╗ ████║██╔════╝  ██╔══██╗██╔══██╗╚██╗ ██╔╝
+ ██║  ███╗███████║██╔████╔██║█████╗    ██║  ██║███████║ ╚████╔╝
+ ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝    ██║  ██║██╔══██║  ╚██╔╝
+ ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗  ██████╔╝██║  ██║   ██║
+  ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝  ╚═════╝ ╚═╝  ╚═╝   ╚═╝`;
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -99,6 +105,12 @@ export default function Landing() {
             style={{ animationName: 'fade-in-slow', animationDuration: '2s', animationFillMode: 'both' }}
           >
             {ASCII_LOGO}
+          </pre>
+          <pre
+            className="font-mono text-primary/30 text-[3px] sm:text-[5px] md:text-[7px] leading-tight whitespace-pre select-none mt-1"
+            style={{ animationName: 'fade-in-slow', animationDuration: '3s', animationDelay: '0.5s', animationFillMode: 'both' }}
+          >
+            {ASCII_SUBTITLE}
           </pre>
         </div>
 
