@@ -213,3 +213,10 @@
   0%, 100% { opacity: 0.8; box-shadow: 0 0 4px hsl(var(--primary) / 0.2); }
   50% { opacity: 1; box-shadow: 0 0 12px hsl(var(--primary) / 0.4); }
 }
+
+@keyframes matrix-fall {
+  0% { transform: translateY(-20px); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(calc(100vh + 20px)); opacity: 0; }
+}
