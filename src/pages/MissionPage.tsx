@@ -59,7 +59,9 @@ export default function MissionPage() {
   // Load skeleton when difficulty changes (before mission starts)
   useEffect(() => {
     if (mission && phase === 'briefing') {
-      setCode(getSkeletonForDifficulty(mission.id, difficulty));
+      const skeleton = getSkeletonForDifficulty(mission.id, difficulty);
+      setCode(skeleton);
+      setOriginalSkeleton(skeleton);
       setHints(getHintsForDifficulty(mission.id, difficulty));
     }
   }, [mission, difficulty, phase]);
