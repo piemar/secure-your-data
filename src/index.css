@@ -203,6 +203,7 @@
 @keyframes mascot-hop {
   0%, 100% { margin-top: 0; }
   50%      { margin-top: -3px; }
+}
 
 @keyframes counter-tick {
   0% { transform: scale(1); }
