@@ -11,13 +11,13 @@ import { soundEngine } from '@/lib/sound-engine';
 import heistMascot from '@/assets/heist-mascot.png';
 
 const ASCII_LOGO = `
- ███╗   ███╗                         ██████╗ ██████╗ 
- ████╗ ████║  ___  _ __   __ _  ___  ██╔══██╗██╔══██╗
- ██╔████╔██║ / _ \\| '_ \\ / _\` |/ _ \\ ██║  ██║██████╔╝
- ██║╚██╔╝██║| (_) | | | | (_| | (_) |██║  ██║██╔══██╗
- ██║ ╚═╝ ██║ \\___/|_| |_|\\__, |\\___/ ██████╔╝██████╔╝
- ╚═╝     ╚═╝             |___/       ╚═════╝ ╚═════╝ 
-         D A T A   H E I S T
+ ███╗   ███╗                          ████████╗ ████████╗
+ ████╗ ████║  ██████╗  █████╗   ██████╗ ██╔═══██║██╔═══██║
+ ██╔████╔██║ ██╔═══██╗██╔══██╗██╔════╝ ██║   ██║██████╔═╝
+ ██║╚██╔╝██║ ██║   ██║██║  ██║██║ ████╗██║   ██║██╔═══██╗
+ ██║ ╚═╝ ██║ ╚██████╔╝██║  ██║╚██████╔╝████████║████████║
+ ╚═╝     ╚═╝  ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚═══════╝╚═══════╝
+           D A T A   H E I S T
 `;
 
 export default function Landing() {
@@ -91,7 +91,7 @@ export default function Landing() {
         </div>
 
         {/* ASCII Logo */}
-        <pre className="font-mono text-primary text-[5px] sm:text-[7px] md:text-[9px] leading-tight text-glow whitespace-pre select-none" style={{ animationName: 'fade-in-slow', animationDuration: '2s', animationFillMode: 'both' }}>
+        <pre className="font-mono text-primary text-[4px] sm:text-[6px] md:text-[8px] leading-tight text-glow whitespace-pre select-none" style={{ animationName: 'fade-in-slow', animationDuration: '2s', animationFillMode: 'both' }}>
           {ASCII_LOGO}
         </pre>
 
