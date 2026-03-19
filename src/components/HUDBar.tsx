@@ -4,6 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Player } from '@/lib/types';
 import { RANK_THRESHOLDS } from '@/lib/game-data';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { soundEngine } from '@/lib/sound-engine';
+import { Volume2, VolumeX } from 'lucide-react';
 
 interface HUDBarProps {
   player: Player;
@@ -16,6 +18,7 @@ export function HUDBar({ player, timeRemaining, systemStability = 100, showTimer
   const navigate = useNavigate();
   const location = useLocation();
   const [scoreAnim, setScoreAnim] = useState(false);
+  const [muted, setMuted] = useState(soundEngine.muted);
 
   const currentThreshold = RANK_THRESHOLDS.find(t => t.rank === player.rank);
   const nextThreshold = RANK_THRESHOLDS[RANK_THRESHOLDS.indexOf(currentThreshold!) + 1];
@@ -36,6 +39,11 @@ export function HUDBar({ player, timeRemaining, systemStability = 100, showTimer
   };
 
   const isUrgent = showTimer && timeRemaining !== undefined && timeRemaining < 60;
+
+  const handleToggleMute = () => {
+    const newMuted = soundEngine.toggleMute();
+    setMuted(newMuted);
+  };
 
   return (
     <div className={`fixed top-0 left-0 right-0 z-50 border-b bg-background/95 backdrop-blur-sm px-4 py-2 ${isUrgent ? 'border-destructive animate-pulse' : 'border-border'}`}>
@@ -89,6 +97,15 @@ export function HUDBar({ player, timeRemaining, systemStability = 100, showTimer
               </div>
             </div>
           </div>
+        </button>
+
+        {/* Sound Toggle */}
+        <button
+          onClick={handleToggleMute}
+          className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors"
+          title={muted ? 'Unmute' : 'Mute'}
+        >
+          {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
         </button>
 
         {/* Nav */}

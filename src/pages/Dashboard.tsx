@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { HUDBar } from '@/components/HUDBar';
 import { MissionCard } from '@/components/MissionCard';
+import { TiltCard } from '@/components/TiltCard';
+import { ActivityTicker } from '@/components/ActivityTicker';
+import { MatrixRain } from '@/components/MatrixRain';
 import { Player, MissionTier } from '@/lib/types';
 import { getPlayer } from '@/lib/game-store';
 import { MISSIONS, ACHIEVEMENTS, MOCK_LEADERBOARD_PLAYERS } from '@/lib/game-data';
@@ -35,10 +38,11 @@ export default function Dashboard() {
   const topPlayers = MOCK_LEADERBOARD_PLAYERS.slice(0, 5);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative">
+      <MatrixRain />
       <HUDBar player={player} />
 
-      <div className="pt-16 pb-8 px-4 max-w-7xl mx-auto">
+      <div className="relative z-10 pt-16 pb-20 px-4 max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8 mt-4">
           <h1 className="font-mono text-2xl font-bold text-primary text-glow">
@@ -61,12 +65,13 @@ export default function Dashboard() {
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                   {missions.map(mission => (
-                    <MissionCard
-                      key={mission.id}
-                      mission={mission}
-                      isCompleted={player.completedMissions.includes(mission.id)}
-                      onClick={() => navigate(`/mission/${mission.id}`)}
-                    />
+                    <TiltCard key={mission.id}>
+                      <MissionCard
+                        mission={mission}
+                        isCompleted={player.completedMissions.includes(mission.id)}
+                        onClick={() => navigate(`/mission/${mission.id}`)}
+                      />
+                    </TiltCard>
                   ))}
                 </div>
               </div>
@@ -76,7 +81,7 @@ export default function Dashboard() {
           {/* Sidebar - Right */}
           <div className="space-y-6">
             {/* Mini Leaderboard */}
-            <div className="border border-border rounded-lg p-4 bg-card">
+            <div className="border border-border rounded-lg p-4 bg-card/80 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-mono text-xs font-bold text-foreground">THE GRID</h3>
                 <button
@@ -100,7 +105,7 @@ export default function Dashboard() {
             </div>
 
             {/* Recent Achievements */}
-            <div className="border border-border rounded-lg p-4 bg-card">
+            <div className="border border-border rounded-lg p-4 bg-card/80 backdrop-blur-sm">
               <h3 className="font-mono text-xs font-bold text-foreground mb-3">ACHIEVEMENTS</h3>
               {unlockedAchievements.length === 0 ? (
                 <p className="text-[10px] text-muted-foreground font-mono">No achievements yet. Complete missions to unlock.</p>
@@ -116,7 +121,7 @@ export default function Dashboard() {
             </div>
 
             {/* Player Stats */}
-            <div className="border border-border rounded-lg p-4 bg-card space-y-2">
+            <div className="border border-border rounded-lg p-4 bg-card/80 backdrop-blur-sm space-y-2">
               <h3 className="font-mono text-xs font-bold text-foreground mb-3">AGENT STATS</h3>
               {[
                 ['Handle', player.handle],
@@ -134,6 +139,11 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Live Activity Ticker */}
+      <div className="fixed bottom-0 left-0 right-0 z-40">
+        <ActivityTicker />
       </div>
     </div>
   );
