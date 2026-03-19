@@ -1,7 +1,7 @@
 // Web Audio API sound engine — no external audio files needed
 // All sounds are synthesized programmatically
 
-type SoundName = 'keyclick' | 'validate' | 'success' | 'error' | 'chaos' | 'tick' | 'levelup' | 'hover';
+type SoundName = 'keyclick' | 'click' | 'validate' | 'success' | 'error' | 'chaos' | 'tick' | 'levelup' | 'hover';
 
 class SoundEngine {
   private ctx: AudioContext | null = null;
