@@ -33,6 +33,8 @@ export default function MissionPage() {
   const [briefingDone, setBriefingDone] = useState(false);
   const [xpEarned, setXpEarned] = useState(0);
   const [code, setCode] = useState('');
+  const [originalSkeleton, setOriginalSkeleton] = useState('');
+  const [answeredBlanks, setAnsweredBlanks] = useState<Map<number, string>>(new Map());
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
   const [hasValidated, setHasValidated] = useState(false);
   const [difficulty, setDifficulty] = useState<MissionDifficulty>('guided');
