@@ -142,11 +142,13 @@ export default function MissionPage() {
   }, [hints, hintStates, answeredBlanks, originalSkeleton]);
 
   const handleBeginMission = () => {
-    // Save preferred difficulty
     if (player) {
       updatePlayer({ preferredDifficulty: difficulty });
     }
-    setCode(getSkeletonForDifficulty(mission!.id, difficulty));
+    const skeleton = getSkeletonForDifficulty(mission!.id, difficulty);
+    setCode(skeleton);
+    setOriginalSkeleton(skeleton);
+    setAnsweredBlanks(new Map());
     setHints(getHintsForDifficulty(mission!.id, difficulty));
     setHintStates(new Map());
     setHintsUsedCount(0);
