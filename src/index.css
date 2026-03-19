@@ -184,6 +184,26 @@
   50% { transform: translateX(-50%) translateY(-5px); }
 }
 
+@keyframes mascot-patrol {
+  0%   { left: 5%;  transform: scaleX(1); }
+  20%  { left: 40%; transform: scaleX(1); }
+  25%  { left: 45%; transform: scaleX(1) translateY(-14px); } /* jump! */
+  30%  { left: 50%; transform: scaleX(1); }
+  45%  { left: 85%; transform: scaleX(1); }
+  50%  { left: 85%; transform: scaleX(-1); } /* turn around */
+  55%  { left: 75%; transform: scaleX(-1) translateY(-10px); } /* hop */
+  60%  { left: 65%; transform: scaleX(-1); }
+  75%  { left: 30%; transform: scaleX(-1); }
+  80%  { left: 20%; transform: scaleX(-1) translateY(-14px); } /* jump! */
+  85%  { left: 12%; transform: scaleX(-1); }
+  95%  { left: 5%;  transform: scaleX(-1); }
+  100% { left: 5%;  transform: scaleX(1); } /* turn back */
+}
+
+@keyframes mascot-hop {
+  0%, 100% { margin-top: 0; }
+  50%      { margin-top: -3px; }
+
 @keyframes counter-tick {
   0% { transform: scale(1); }
   50% { transform: scale(1.2); }
