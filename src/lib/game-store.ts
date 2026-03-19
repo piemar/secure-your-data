@@ -36,6 +36,8 @@ export function createPlayer(handle: string): Player {
     completedMissions: [],
     totalScore: 0,
     chaosEventsSurvived: 0,
+    hintsUsed: 0,
+    hintXpPenalty: 0,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(player));
   return player;
