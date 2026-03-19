@@ -91,7 +91,7 @@ export default function Landing() {
         </div>
 
         {/* ASCII Logo */}
-        <pre className="font-mono text-primary text-[4px] sm:text-[6px] md:text-[8px] leading-tight text-glow whitespace-pre select-none" style={{ animationName: 'fade-in-slow', animationDuration: '2s', animationFillMode: 'both' }}>
+        <pre className="font-mono text-primary text-[7px] sm:text-[10px] md:text-[13px] leading-tight text-glow whitespace-pre select-none" style={{ animationName: 'fade-in-slow', animationDuration: '2s', animationFillMode: 'both' }}>
           {ASCII_LOGO}
         </pre>
 
