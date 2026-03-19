@@ -95,7 +95,7 @@ export default function Landing() {
           </div>
 
           <pre
-            className="font-mono text-primary text-[3.5px] sm:text-[6px] md:text-[9px] leading-tight text-glow whitespace-pre select-none cursor-pointer transition-all duration-300 hover:animate-glitch"
+            className="font-mono text-primary text-[5px] sm:text-[8px] md:text-[12px] leading-tight text-glow whitespace-pre select-none cursor-pointer transition-all duration-300 hover:animate-glitch"
             style={{ animationName: 'fade-in-slow', animationDuration: '2s', animationFillMode: 'both' }}
           >
             {ASCII_LOGO}
