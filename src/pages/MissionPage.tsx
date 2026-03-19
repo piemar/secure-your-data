@@ -10,13 +10,15 @@ import { MissionCelebration } from '@/components/MissionCelebration';
 import { DifficultySelector } from '@/components/DifficultySelector';
 import { Button } from '@/components/ui/button';
 import { Player, MissionObjective, ChaosEvent, MissionDifficulty, InlineHint } from '@/lib/types';
+
+type HintState = 'unrevealed' | 'hint-shown' | 'answer-shown';
 import { getPlayer, completeMission, unlockAchievement, updatePlayer } from '@/lib/game-store';
 import { MISSIONS } from '@/lib/game-data';
 import { getSkeletonForDifficulty, getHintsForDifficulty } from '@/lib/mission-skeletons';
 import { MISSION_VALIDATIONS } from '@/lib/mission-validations';
 import { validateAllObjectives, ValidationResult } from '@/lib/validation';
 import { soundEngine } from '@/lib/sound-engine';
-import { CheckCircle2, AlertTriangle, Play, RotateCcw, Lightbulb } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Play, RotateCcw } from 'lucide-react';
 
 export default function MissionPage() {
   const { missionId } = useParams<{ missionId: string }>();
@@ -35,7 +37,7 @@ export default function MissionPage() {
   const [hasValidated, setHasValidated] = useState(false);
   const [difficulty, setDifficulty] = useState<MissionDifficulty>('guided');
   const [hints, setHints] = useState<InlineHint[]>([]);
-  const [revealedHints, setRevealedHints] = useState<Set<number>>(new Set());
+  const [hintStates, setHintStates] = useState<Map<number, HintState>>(new Map());
   const [hintsUsedCount, setHintsUsedCount] = useState(0);
   const [hintXpPenalty, setHintXpPenalty] = useState(0);
 
@@ -101,15 +103,43 @@ export default function MissionPage() {
   }, [player]);
 
   const handleRevealHint = useCallback((hintIndex: number) => {
-    if (revealedHints.has(hintIndex)) return;
+    const current = hintStates.get(hintIndex);
+    if (current && current !== 'unrevealed') return;
     const hint = hints[hintIndex];
     if (!hint) return;
     soundEngine.play('click');
-    setRevealedHints(prev => new Set(prev).add(hintIndex));
+    setHintStates(prev => new Map(prev).set(hintIndex, 'hint-shown'));
     setHintsUsedCount(prev => prev + 1);
-    const penalty = hint.xpPenalty || 25;
+    const penalty = Math.round((hint.xpPenalty || 25) * 0.6);
     setHintXpPenalty(prev => prev + penalty);
-  }, [hints, revealedHints]);
+  }, [hints, hintStates]);
+
+  const handleRevealAnswer = useCallback((hintIndex: number) => {
+    const hint = hints[hintIndex];
+    if (!hint) return;
+    const current = hintStates.get(hintIndex);
+    soundEngine.play('click');
+    setHintStates(prev => new Map(prev).set(hintIndex, 'answer-shown'));
+    // Only charge answer penalty (hint penalty may already have been charged)
+    if (current !== 'hint-shown') {
+      setHintsUsedCount(prev => prev + 1);
+    }
+    const answerPenalty = Math.round((hint.xpPenalty || 25) * 0.4);
+    setHintXpPenalty(prev => prev + answerPenalty);
+
+    // Auto-fill: replace the nth ___BLANK___ with the answer
+    setCode(prev => {
+      let count = 0;
+      return prev.replace(/___BLANK___/g, (match) => {
+        if (count === hintIndex) {
+          count++;
+          return hint.answer;
+        }
+        count++;
+        return match;
+      });
+    });
+  }, [hints, hintStates]);
 
   const handleBeginMission = () => {
     // Save preferred difficulty
@@ -118,7 +148,7 @@ export default function MissionPage() {
     }
     setCode(getSkeletonForDifficulty(mission!.id, difficulty));
     setHints(getHintsForDifficulty(mission!.id, difficulty));
-    setRevealedHints(new Set());
+    setHintStates(new Map());
     setHintsUsedCount(0);
     setHintXpPenalty(0);
     setPhase('active');
@@ -284,38 +314,7 @@ export default function MissionPage() {
                 </div>
               </div>
 
-              {/* Inline Hints Panel */}
-              {hints.length > 0 && (
-                <div className="border border-border rounded-lg p-4 bg-card">
-                  <h3 className="font-mono text-xs font-bold text-foreground mb-3 flex items-center gap-2">
-                    <Lightbulb className="w-3.5 h-3.5 text-warning" />
-                    HINTS ({hintsUsedCount}/{hints.length} revealed)
-                  </h3>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {hints.map((hint, i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        {revealedHints.has(i) ? (
-                          <div className="text-xs font-mono p-2 rounded bg-warning/10 border border-warning/20 w-full">
-                            <span className="text-warning text-[10px]">HINT (−{hint.xpPenalty || 25} XP):</span>
-                            <p className="text-foreground mt-0.5">{hint.hint}</p>
-                            {hint.answer && (
-                              <p className="text-primary mt-1 font-bold">→ {hint.answer}</p>
-                            )}
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleRevealHint(i)}
-                            className="text-xs font-mono p-2 rounded border border-dashed border-muted-foreground/30 w-full text-left hover:border-warning/50 hover:bg-warning/5 transition-colors"
-                          >
-                            <span className="text-muted-foreground">💡 Hint #{i + 1}</span>
-                            <span className="text-destructive/60 ml-2">(−{hint.xpPenalty || 25} XP)</span>
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+
 
               {/* Validation Actions */}
               <div className="flex gap-2">
@@ -362,8 +361,9 @@ export default function MissionPage() {
                   onChange={setCode}
                   language="javascript"
                   hints={hints}
-                  revealedHints={revealedHints}
+                  hintStates={hintStates}
                   onRevealHint={handleRevealHint}
+                  onRevealAnswer={handleRevealAnswer}
                 />
               </div>
             </div>
