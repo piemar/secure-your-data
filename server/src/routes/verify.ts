@@ -1,12 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth.js';
+import { verify, VerificationId } from '../services/verification.js';
 
 const router = Router();
 
 /**
- * POST /api/verify — real MongoDB verification endpoint
- * Phase 3: Will port VerificationService from Secure Your Data here.
- * For now, returns a stub that uses regex validation (same as frontend).
+ * POST /api/verify — real MongoDB verification endpoint.
+ * Phase 3: Uses VerificationService ported from Secure Your Data.
  */
 router.post('/', authenticateToken, async (req: Request, res: Response) => {
   try {
@@ -17,13 +17,16 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
       return;
     }
 
-    // TODO Phase 3: Replace with real MongoDB verification
-    // This will execute the user's code against a sandboxed MongoDB instance
-    // and verify the results match expected outcomes.
+    if (verificationId) {
+      const result = await verify(verificationId as VerificationId, {});
+      res.json(result);
+      return;
+    }
+
+    // No verificationId — fallback to client-side validation
     res.json({
       verified: false,
-      message: 'Server-side verification not yet implemented. Using client-side validation.',
-      verificationId: verificationId || null,
+      message: 'No verificationId provided. Using client-side validation.',
     });
   } catch (err) {
     console.error('Verify error:', err);
