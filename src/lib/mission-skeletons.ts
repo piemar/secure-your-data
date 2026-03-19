@@ -1280,6 +1280,245 @@ resource "mongodbatlas_cluster" "heist_cluster" {
       challenge: [],
     },
   },
+
+  // ─── Mission 18: Time Series Infiltration ───
+  'mission-18': {
+    guided: `// MISSION: Time Series Infiltration
+// Create and query time series collections for IoT sensor data
+
+// Step 1: Create a time series collection
+db.createCollection("sensor_readings", {
+  timeseries: {
+    timeField: "___BLANK___",
+    metaField: "___BLANK___",
+    granularity: "___BLANK___"
+  }
+});
+
+// Step 2: Insert sensor readings
+db.sensor_readings.insertMany([
+  { timestamp: new Date(), metadata: { deviceId: "___BLANK___", type: "temperature" }, value: 22.5 },
+  { timestamp: new Date(), metadata: { deviceId: "sensor-001", type: "___BLANK___" }, value: 1013.25 },
+  { timestamp: new Date(), metadata: { deviceId: "sensor-002", type: "temperature" }, value: ___BLANK___ }
+]);
+
+// Step 3: Windowed aggregation with $dateTrunc
+db.sensor_readings.aggregate([
+  { $group: {
+    _id: {
+      device: "$metadata.deviceId",
+      bucket: { $dateTrunc: { date: "$___BLANK___", unit: "___BLANK___" } }
+    },
+    avgValue: { $___BLANK___: "$value" },
+    count: { $sum: 1 }
+  }},
+  { $sort: { "_id.bucket": 1 } }
+]);
+
+// Step 4: Anomaly detection — find readings above threshold
+db.sensor_readings.aggregate([
+  { $match: { value: { $___BLANK___: ___BLANK___ } } },
+  { $project: { timestamp: 1, "metadata.deviceId": 1, value: 1, _id: 0 } }
+]);
+`,
+    challenge: `// MISSION: Time Series Infiltration
+// Work with time series collections for IoT data
+
+// Create a time series collection with timeField, metaField, and granularity
+// YOUR CODE HERE
+
+// Insert at least 3 timestamped sensor readings with metadata
+// YOUR CODE HERE
+
+// Build a windowed aggregation grouping by device and time bucket
+// YOUR CODE HERE
+
+// Find anomalous readings above a threshold
+// YOUR CODE HERE
+`,
+    expert: `// MISSION: Time Series Infiltration
+// Create time series collections, insert IoT sensor data,
+// run windowed aggregations with $dateTrunc, and detect anomalies.
+`,
+    hints: {
+      guided: [
+        { line: 7, blankText: '___BLANK___', hint: 'The field containing timestamps', answer: 'timestamp', xpPenalty: 20 },
+        { line: 8, blankText: '___BLANK___', hint: 'The field containing device metadata', answer: 'metadata', xpPenalty: 20 },
+        { line: 9, blankText: '___BLANK___', hint: 'Granularity: "seconds", "minutes", or "hours"', answer: 'minutes', xpPenalty: 20 },
+        { line: 14, blankText: '___BLANK___', hint: 'Device identifier, e.g. "sensor-001"', answer: 'sensor-001', xpPenalty: 15 },
+        { line: 15, blankText: '___BLANK___', hint: 'Sensor type: "pressure", "humidity", etc.', answer: 'pressure', xpPenalty: 15 },
+        { line: 16, blankText: '___BLANK___', hint: 'A temperature value as a number', answer: '25.1', xpPenalty: 15 },
+        { line: 24, blankText: '___BLANK___', hint: 'Date field name for $dateTrunc', answer: 'timestamp', xpPenalty: 20 },
+        { line: 24, blankText: '___BLANK___', hint: 'Time bucket unit: "hour", "minute", "day"', answer: 'hour', xpPenalty: 20 },
+        { line: 26, blankText: '___BLANK___', hint: 'Accumulator for average', answer: 'avg', xpPenalty: 20 },
+        { line: 33, blankText: '___BLANK___', hint: 'Comparison operator for "greater than"', answer: 'gt', xpPenalty: 20 },
+        { line: 33, blankText: '___BLANK___', hint: 'Threshold value, e.g. 30', answer: '30', xpPenalty: 15 },
+      ],
+      challenge: [
+        { line: 4, blankText: '', hint: 'db.createCollection("name", { timeseries: { timeField: "...", metaField: "...", granularity: "..." } })', answer: '', xpPenalty: 30 },
+        { line: 10, blankText: '', hint: 'Use $dateTrunc: { date: "$field", unit: "hour" } inside $group._id', answer: '', xpPenalty: 35 },
+      ],
+    },
+  },
+
+  // ─── Mission 19: Vector Heist ───
+  'mission-19': {
+    guided: `// MISSION: Vector Heist
+// Build Atlas Vector Search for semantic document retrieval
+
+// Step 1: Define vector search index (Atlas UI/API)
+/*
+{
+  "fields": [{
+    "type": "vector",
+    "path": "___BLANK___",
+    "numDimensions": ___BLANK___,
+    "similarity": "___BLANK___"
+  }]
+}
+*/
+
+// Step 2: Generate and store embeddings
+// (Assume getEmbedding() returns a vector array)
+const docs = [
+  { title: "MongoDB Sharding", content: "...", embedding: await getEmbedding("MongoDB Sharding") },
+  { title: "___BLANK___", content: "...", embedding: await getEmbedding("___BLANK___") }
+];
+db.documents.insertMany(docs);
+
+// Step 3: Perform $vectorSearch
+db.documents.aggregate([
+  { $vectorSearch: {
+    index: "___BLANK___",
+    path: "___BLANK___",
+    queryVector: await getEmbedding("how to scale a database"),
+    numCandidates: ___BLANK___,
+    limit: ___BLANK___
+  }},
+  { $project: { title: 1, score: { $meta: "___BLANK___" } } }
+]);
+
+// Step 4: Vector search with pre-filter
+db.documents.aggregate([
+  { $vectorSearch: {
+    index: "vector_index",
+    path: "embedding",
+    queryVector: await getEmbedding("encryption best practices"),
+    numCandidates: 100,
+    limit: 5,
+    filter: { "category": "___BLANK___" }
+  }}
+]);
+`,
+    challenge: `// MISSION: Vector Heist
+// Implement semantic search with Atlas Vector Search
+
+// Define a vector search index definition (as JSON comment)
+// YOUR CODE HERE
+
+// Insert documents with embedding vectors
+// YOUR CODE HERE
+
+// Perform a $vectorSearch query with numCandidates and limit
+// YOUR CODE HERE
+
+// Add a pre-filter to vector search to narrow results by category
+// YOUR CODE HERE
+`,
+    expert: `// MISSION: Vector Heist
+// Implement Atlas Vector Search: define index, store embeddings,
+// run $vectorSearch queries, and combine with pre-filters.
+`,
+    hints: {
+      guided: [
+        { line: 9, blankText: '___BLANK___', hint: 'Path to the vector field in documents', answer: 'embedding', xpPenalty: 20 },
+        { line: 10, blankText: '___BLANK___', hint: 'Number of dimensions (common: 768, 1536)', answer: '1536', xpPenalty: 25 },
+        { line: 11, blankText: '___BLANK___', hint: 'Similarity function: "cosine", "euclidean", or "dotProduct"', answer: 'cosine', xpPenalty: 25 },
+        { line: 18, blankText: '___BLANK___', hint: 'A document title — any topic', answer: 'ACID Transactions', xpPenalty: 15 },
+        { line: 25, blankText: '___BLANK___', hint: 'Name of your search index', answer: 'vector_index', xpPenalty: 20 },
+        { line: 26, blankText: '___BLANK___', hint: 'Path to embedding field', answer: 'embedding', xpPenalty: 15 },
+        { line: 28, blankText: '___BLANK___', hint: 'How many candidates to consider (50-200)', answer: '100', xpPenalty: 20 },
+        { line: 29, blankText: '___BLANK___', hint: 'Max results to return (5-10)', answer: '5', xpPenalty: 15 },
+        { line: 31, blankText: '___BLANK___', hint: 'Score metadata field name', answer: 'vectorSearchScore', xpPenalty: 25 },
+        { line: 41, blankText: '___BLANK___', hint: 'Category to filter on — e.g. "security"', answer: 'security', xpPenalty: 15 },
+      ],
+      challenge: [
+        { line: 4, blankText: '', hint: 'Index needs: type "vector", path to embedding field, numDimensions, similarity', answer: '', xpPenalty: 35 },
+        { line: 10, blankText: '', hint: '$vectorSearch: { index, path, queryVector, numCandidates, limit }', answer: '', xpPenalty: 35 },
+      ],
+    },
+  },
+
+  // ─── Mission 20: Schema Evolution ───
+  'mission-20': {
+    guided: `// MISSION: Schema Evolution
+// In-place schema changes without downtime
+
+// Step 1: Rename fields
+db.users.updateMany(
+  {},
+  { $rename: { "___BLANK___": "___BLANK___" } }
+);
+
+// Step 2: Remove deprecated fields
+db.users.updateMany(
+  {},
+  { $unset: { "___BLANK___": "", "___BLANK___": "" } }
+);
+
+// Step 3: Add default values to existing documents
+db.users.updateMany(
+  { ___BLANK___: { $exists: false } },
+  { $set: { ___BLANK___: "___BLANK___" } }
+);
+
+// Step 4: Query polymorphic documents
+// Find documents that have the new field format
+db.users.find({
+  email: { $exists: true },
+  profileVersion: { $___BLANK___: "___BLANK___" }
+});
+
+// Find documents with specific field types
+db.users.find({
+  age: { $type: "___BLANK___" }
+});
+`,
+    challenge: `// MISSION: Schema Evolution
+// Perform in-place schema changes on the users collection
+
+// Rename a field (e.g. "userName" -> "handle")
+// YOUR CODE HERE
+
+// Remove deprecated fields
+// YOUR CODE HERE
+
+// Add default values to documents missing a field
+// YOUR CODE HERE
+
+// Query documents by field existence ($exists) and type ($type)
+// YOUR CODE HERE
+`,
+    expert: `// MISSION: Schema Evolution
+// Demonstrate in-place schema changes: $rename, $unset, $set defaults,
+// and handle polymorphic schemas with $exists and $type queries.
+`,
+    hints: {
+      guided: [
+        { line: 6, blankText: '___BLANK___', hint: 'Old field name to rename, e.g. "userName"', answer: 'userName', xpPenalty: 15 },
+        { line: 6, blankText: '___BLANK___', hint: 'New field name, e.g. "handle"', answer: 'handle', xpPenalty: 15 },
+        { line: 12, blankText: '___BLANK___', hint: 'First deprecated field to remove', answer: 'legacyId', xpPenalty: 15 },
+        { line: 12, blankText: '___BLANK___', hint: 'Second deprecated field to remove', answer: 'oldEmail', xpPenalty: 15 },
+        { line: 18, blankText: '___BLANK___', hint: 'Field name to check for existence', answer: 'profileVersion', xpPenalty: 20 },
+        { line: 19, blankText: '___BLANK___', hint: 'Same field name to set', answer: 'profileVersion', xpPenalty: 15 },
+        { line: 19, blankText: '___BLANK___', hint: 'Default value, e.g. "v2"', answer: 'v2', xpPenalty: 15 },
+        { line: 25, blankText: '___BLANK___', hint: 'Comparison operator, e.g. "gte"', answer: 'gte', xpPenalty: 20 },
+        { line: 25, blankText: '___BLANK___', hint: 'Version to compare, e.g. "v2"', answer: 'v2', xpPenalty: 15 },
+        { line: 30, blankText: '___BLANK___', hint: 'BSON type name: "number", "string", "int", "double"', answer: 'number', xpPenalty: 20 },
+      ],
+      challenge: [],
+    },
+  },
 };
 
 /**

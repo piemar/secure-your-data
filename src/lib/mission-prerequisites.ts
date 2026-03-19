@@ -3,29 +3,28 @@
  */
 
 // Which missions must be completed before unlocking each mission
+// Currently all missions are unlocked by default (empty prerequisites)
 export const MISSION_PREREQUISITES: Record<string, string[]> = {
-  // Recon tier — mission-12 is always unlocked (entry point)
   'mission-12': [],
-  'mission-1': ['mission-12'],          // Need CRUD basics first
-  'mission-6': ['mission-12'],          // Need CRUD basics first
-  'mission-3': ['mission-1'],           // Need indexing before aggregation
-  'mission-8': ['mission-3'],           // Need aggregation before analytics
-
-  // Infiltration tier — need at least some recon
-  'mission-13': ['mission-6'],          // Need rich queries before geospatial
-  'mission-14': ['mission-3'],          // Need aggregation before graph
-  'mission-15': ['mission-12'],         // Need CRUD before change streams
-  'mission-16': ['mission-12'],         // Need CRUD before transactions
-  'mission-2': ['mission-1', 'mission-9'], // Need indexing + scale-out concepts
-  'mission-4': ['mission-12'],          // Need CRUD before connection mgmt
-  'mission-9': ['mission-1'],           // Need indexing before sharding
-  'mission-10': ['mission-4'],          // Need connection mgmt before HA
-
-  // Exfiltration tier — need infiltration experience
-  'mission-17': ['mission-6'],          // Need rich queries before text search
-  'mission-5': ['mission-12'],          // Need CRUD before schema validation
-  'mission-7': ['mission-5'],           // Need schema before encryption
-  'mission-11': ['mission-10'],         // Need HA concepts before Terraform
+  'mission-1': [],
+  'mission-6': [],
+  'mission-3': [],
+  'mission-8': [],
+  'mission-13': [],
+  'mission-14': [],
+  'mission-15': [],
+  'mission-16': [],
+  'mission-2': [],
+  'mission-4': [],
+  'mission-9': [],
+  'mission-10': [],
+  'mission-17': [],
+  'mission-5': [],
+  'mission-7': [],
+  'mission-11': [],
+  'mission-18': [],
+  'mission-19': [],
+  'mission-20': [],
 };
 
 // Human-readable topic labels for search
@@ -59,6 +58,9 @@ export const POV_LABELS: Record<string, string> = {
   'ENCRYPTION': 'Encryption',
   'AUTO-DEPLOY': 'Auto Deploy',
   'TERRAFORM': 'Terraform IaC',
+  'TIME-SERIES': 'Time Series',
+  'RETRIEVAL-AUGMENTED-GENERATION': 'Vector Search / RAG',
+  'FLEXIBLE': 'Flexible Schema',
 };
 
 // Check if a mission is unlocked for a player

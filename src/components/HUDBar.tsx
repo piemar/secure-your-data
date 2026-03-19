@@ -5,6 +5,7 @@ import { Player } from '@/lib/types';
 import { RANK_THRESHOLDS } from '@/lib/game-data';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { soundEngine } from '@/lib/sound-engine';
+import { AvatarDisplay } from '@/components/AvatarPicker';
 import { Volume2, VolumeX } from 'lucide-react';
 
 interface HUDBarProps {
@@ -95,6 +96,7 @@ export function HUDBar({ player, timeRemaining, systemStability = 100, showTimer
           onClick={() => navigate('/profile')}
           className="flex items-center gap-2 hover:opacity-80 transition-opacity"
         >
+          <AvatarDisplay avatarId={player.avatarId} size="sm" />
           <Badge variant="outline" className="font-mono text-xs border-primary/30 text-primary">
             {player.rank}
           </Badge>

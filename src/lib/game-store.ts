@@ -38,6 +38,7 @@ export function createPlayer(handle: string): Player {
     chaosEventsSurvived: 0,
     hintsUsed: 0,
     hintXpPenalty: 0,
+    avatarId: 'ghost',
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(player));
   return player;

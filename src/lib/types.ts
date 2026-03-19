@@ -84,6 +84,7 @@ export interface Player {
   hintXpPenalty: number;
   preferredDifficulty?: MissionDifficulty;
   activeQuestId?: string;
+  avatarId?: string;
 }
 
 export interface LeaderboardEntry {

@@ -357,7 +357,14 @@ export default function MissionPage() {
               </div>
               <div className="flex-1 relative">
                 <ComboStreak code={code} isActive={phase === 'active'} />
-                <CodeEditor value={code} onChange={setCode} language="javascript" />
+                <CodeEditor
+                  value={code}
+                  onChange={setCode}
+                  language="javascript"
+                  hints={hints}
+                  revealedHints={revealedHints}
+                  onRevealHint={handleRevealHint}
+                />
               </div>
             </div>
           </div>

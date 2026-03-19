@@ -530,4 +530,98 @@ export const MISSION_VALIDATIONS: Record<string, ObjectiveValidation[]> = {
       ],
     },
   ],
+
+  // Mission 18: Time Series Infiltration
+  'mission-18': [
+    {
+      objectiveId: 'obj-18-1',
+      rules: [
+        { pattern: /createCollection/, description: 'Use createCollection()', required: true },
+        { pattern: /timeseries/, description: 'Define timeseries options', required: true },
+        { pattern: /timeField/, description: 'Specify timeField', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-18-2',
+      rules: [
+        { pattern: /(insertMany|insertOne)/, description: 'Insert sensor readings', required: true },
+        { pattern: /timestamp|Date/, description: 'Include timestamps', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-18-3',
+      rules: [
+        { pattern: /\$dateTrunc/, description: 'Use $dateTrunc for windowed aggregation', required: true },
+        { pattern: /\$group/, description: 'Use $group stage', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-18-4',
+      rules: [
+        { pattern: /\$match/, description: 'Use $match to filter', required: true },
+        { pattern: /(\$gt|\$gte|\$lt|\$lte)/, description: 'Use comparison operator for threshold', required: true },
+      ],
+    },
+  ],
+
+  // Mission 19: Vector Heist
+  'mission-19': [
+    {
+      objectiveId: 'obj-19-1',
+      rules: [
+        { pattern: /(vector|numDimensions|similarity)/, description: 'Define vector search index', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-19-2',
+      rules: [
+        { pattern: /(embedding|insertMany|insertOne)/, description: 'Store document embeddings', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-19-3',
+      rules: [
+        { pattern: /\$vectorSearch/, description: 'Use $vectorSearch', required: true },
+        { pattern: /numCandidates/, description: 'Specify numCandidates', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-19-4',
+      rules: [
+        { pattern: /\$vectorSearch/, description: 'Use $vectorSearch', required: true },
+        { pattern: /filter/, description: 'Add pre-filter', required: true },
+      ],
+    },
+  ],
+
+  // Mission 20: Schema Evolution
+  'mission-20': [
+    {
+      objectiveId: 'obj-20-1',
+      rules: [
+        { pattern: /\$rename/, description: 'Use $rename operator', required: true },
+        { pattern: /updateMany/, description: 'Apply to multiple documents', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-20-2',
+      rules: [
+        { pattern: /\$unset/, description: 'Use $unset to remove fields', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-20-3',
+      rules: [
+        { pattern: /\$set/, description: 'Use $set to add defaults', required: true },
+        { pattern: /\$exists/, description: 'Check field existence', required: true },
+      ],
+    },
+    {
+      objectiveId: 'obj-20-4',
+      rules: [
+        { pattern: /\$exists/, description: 'Query with $exists', required: true },
+        { pattern: /\$type/, description: 'Query with $type', required: true },
+      ],
+    },
+  ],
 };
