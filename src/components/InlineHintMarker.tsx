@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { InlineHint } from '@/lib/types';
-import { Lightbulb, Eye, CheckCircle2 } from 'lucide-react';
+import { Lightbulb, Eye } from 'lucide-react';
 
 type MarkerState = 'unrevealed' | 'hint-shown' | 'answer-shown';
 
@@ -36,11 +36,11 @@ export function InlineHintMarker({ hint, index, state, onRevealHint, onRevealAns
         <PopoverTrigger asChild>
           <button
             className={`
-              w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold
-              border shadow-lg transition-all duration-200 hover:scale-125
+              w-5 h-5 rounded font-mono flex items-center justify-center text-[10px] font-bold
+              border transition-all duration-200 hover:scale-125
               ${state === 'unrevealed'
-                ? 'bg-blue-500/90 border-blue-400/50 text-white shadow-blue-500/30 animate-[hint-glow_3s_ease-in-out_infinite]'
-                : 'bg-amber-500/90 border-amber-400/50 text-white shadow-amber-500/30'
+                ? 'bg-primary/20 border-primary/50 text-primary shadow-[0_0_8px_hsl(var(--primary)/0.3)] animate-[hint-glow_3s_ease-in-out_infinite]'
+                : 'bg-accent/20 border-accent/50 text-accent shadow-[0_0_8px_hsl(var(--accent)/0.3)]'
               }
             `}
             title={`Hint #${index + 1}`}
@@ -52,16 +52,16 @@ export function InlineHintMarker({ hint, index, state, onRevealHint, onRevealAns
           side="top"
           align="center"
           sideOffset={8}
-          className="w-64 p-0 border-border bg-card"
+          className="w-64 p-0 border-primary/20 bg-card/95 backdrop-blur-sm"
         >
           <div className="p-3 space-y-2">
-            <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground">
-              <Lightbulb className="w-3 h-3 text-amber-400" />
-              HINT #{index + 1}
+            <div className="flex items-center gap-1.5 font-mono text-[10px] text-primary tracking-widest">
+              <span className="text-primary animate-pulse">▸</span>
+              HINT_{String(index + 1).padStart(2, '0')}
             </div>
 
             {state === 'hint-shown' && (
-              <div className="text-xs font-mono p-2 rounded bg-amber-500/10 border border-amber-500/20 text-foreground">
+              <div className="font-mono text-xs p-2 rounded border border-primary/20 bg-primary/5 text-foreground leading-relaxed">
                 {hint.hint}
               </div>
             )}
@@ -71,13 +71,11 @@ export function InlineHintMarker({ hint, index, state, onRevealHint, onRevealAns
                 <Button
                   size="sm"
                   variant="outline"
-                  className="w-full text-xs font-mono gap-1.5 h-7 border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
-                  onClick={() => {
-                    onRevealHint(index);
-                  }}
+                  className="w-full font-mono text-[10px] gap-1.5 h-7 border-primary/30 text-primary hover:bg-primary/10"
+                  onClick={() => onRevealHint(index)}
                 >
                   <Lightbulb className="w-3 h-3" />
-                  Show Hint
+                  SHOW_HINT
                   <span className="text-destructive/70 ml-auto">−{hintPenalty} XP</span>
                 </Button>
               )}
@@ -85,14 +83,14 @@ export function InlineHintMarker({ hint, index, state, onRevealHint, onRevealAns
               <Button
                 size="sm"
                 variant="outline"
-                className="w-full text-xs font-mono gap-1.5 h-7 border-primary/30 text-primary hover:bg-primary/10"
+                className="w-full font-mono text-[10px] gap-1.5 h-7 border-accent/30 text-accent hover:bg-accent/10"
                 onClick={() => {
                   onRevealAnswer(index);
                   setOpen(false);
                 }}
               >
                 <Eye className="w-3 h-3" />
-                Show Answer
+                SHOW_ANSWER
                 <span className="text-destructive/70 ml-auto">−{answerPenalty} XP</span>
               </Button>
             </div>

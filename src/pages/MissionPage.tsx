@@ -33,6 +33,8 @@ export default function MissionPage() {
   const [briefingDone, setBriefingDone] = useState(false);
   const [xpEarned, setXpEarned] = useState(0);
   const [code, setCode] = useState('');
+  const [originalSkeleton, setOriginalSkeleton] = useState('');
+  const [answeredBlanks, setAnsweredBlanks] = useState<Map<number, string>>(new Map());
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
   const [hasValidated, setHasValidated] = useState(false);
   const [difficulty, setDifficulty] = useState<MissionDifficulty>('guided');
@@ -57,7 +59,9 @@ export default function MissionPage() {
   // Load skeleton when difficulty changes (before mission starts)
   useEffect(() => {
     if (mission && phase === 'briefing') {
-      setCode(getSkeletonForDifficulty(mission.id, difficulty));
+      const skeleton = getSkeletonForDifficulty(mission.id, difficulty);
+      setCode(skeleton);
+      setOriginalSkeleton(skeleton);
       setHints(getHintsForDifficulty(mission.id, difficulty));
     }
   }, [mission, difficulty, phase]);
@@ -120,33 +124,31 @@ export default function MissionPage() {
     const current = hintStates.get(hintIndex);
     soundEngine.play('click');
     setHintStates(prev => new Map(prev).set(hintIndex, 'answer-shown'));
-    // Only charge answer penalty (hint penalty may already have been charged)
     if (current !== 'hint-shown') {
       setHintsUsedCount(prev => prev + 1);
     }
     const answerPenalty = Math.round((hint.xpPenalty || 25) * 0.4);
     setHintXpPenalty(prev => prev + answerPenalty);
 
-    // Auto-fill: replace the nth ___BLANK___ with the answer
-    setCode(prev => {
-      let count = 0;
-      return prev.replace(/___BLANK___/g, (match) => {
-        if (count === hintIndex) {
-          count++;
-          return hint.answer;
-        }
-        count++;
-        return match;
-      });
+    // Rebuild code from original skeleton with all answered blanks applied
+    const newAnswered = new Map(answeredBlanks).set(hintIndex, hint.answer);
+    setAnsweredBlanks(newAnswered);
+    let blankCount = 0;
+    const rebuilt = originalSkeleton.replace(/___BLANK___/g, (match) => {
+      const idx = blankCount++;
+      return newAnswered.has(idx) ? newAnswered.get(idx)! : match;
     });
-  }, [hints, hintStates]);
+    setCode(rebuilt);
+  }, [hints, hintStates, answeredBlanks, originalSkeleton]);
 
   const handleBeginMission = () => {
-    // Save preferred difficulty
     if (player) {
       updatePlayer({ preferredDifficulty: difficulty });
     }
-    setCode(getSkeletonForDifficulty(mission!.id, difficulty));
+    const skeleton = getSkeletonForDifficulty(mission!.id, difficulty);
+    setCode(skeleton);
+    setOriginalSkeleton(skeleton);
+    setAnsweredBlanks(new Map());
     setHints(getHintsForDifficulty(mission!.id, difficulty));
     setHintStates(new Map());
     setHintsUsedCount(0);
@@ -174,7 +176,13 @@ export default function MissionPage() {
 
   const handleResetCode = useCallback(() => {
     if (mission) {
-      setCode(getSkeletonForDifficulty(mission.id, difficulty));
+      const skeleton = getSkeletonForDifficulty(mission.id, difficulty);
+      setCode(skeleton);
+      setOriginalSkeleton(skeleton);
+      setAnsweredBlanks(new Map());
+      setHintStates(new Map());
+      setHintsUsedCount(0);
+      setHintXpPenalty(0);
       setValidationResults([]);
       setHasValidated(false);
       setObjectives(prev => prev.map(o => ({ ...o, completed: false })));
