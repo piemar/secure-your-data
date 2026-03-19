@@ -8,6 +8,7 @@ import { ComboStreak } from '@/components/ComboStreak';
 import { ValidationFeedback } from '@/components/ValidationFeedback';
 import { MissionCelebration } from '@/components/MissionCelebration';
 import { DifficultySelector } from '@/components/DifficultySelector';
+import { ExecutionOutputPanel } from '@/components/ExecutionOutputPanel';
 import { Button } from '@/components/ui/button';
 import { Player, MissionObjective, ChaosEvent, MissionDifficulty, InlineHint } from '@/lib/types';
 
@@ -17,6 +18,7 @@ import { MISSIONS } from '@/lib/game-data';
 import { getSkeletonForDifficulty, getHintsForDifficulty } from '@/lib/mission-skeletons';
 import { MISSION_VALIDATIONS } from '@/lib/mission-validations';
 import { validateAllObjectives, ValidationResult } from '@/lib/validation';
+import { useSandboxExecution } from '@/hooks/useSandboxExecution';
 import { soundEngine } from '@/lib/sound-engine';
 import { CheckCircle2, AlertTriangle, Play, RotateCcw } from 'lucide-react';
 
@@ -44,6 +46,9 @@ export default function MissionPage() {
   const [hintXpPenalty, setHintXpPenalty] = useState(0);
 
   const mission = MISSIONS.find(m => m.id === missionId);
+
+  // Sandbox execution hook
+  const sandbox = useSandboxExecution(missionId);
 
   useEffect(() => {
     const p = getPlayer();
@@ -130,18 +135,17 @@ export default function MissionPage() {
     const answerPenalty = Math.round((hint.xpPenalty || 25) * 0.4);
     setHintXpPenalty(prev => prev + answerPenalty);
 
-    // Rebuild code from original skeleton with all answered blanks applied
     const newAnswered = new Map(answeredBlanks).set(hintIndex, hint.answer);
     setAnsweredBlanks(newAnswered);
     let blankCount = 0;
-    const rebuilt = originalSkeleton.replace(/___BLANK___/g, (match) => {
+    const rebuilt = originalSkeleton.replace(/___BLANK___/g, () => {
       const idx = blankCount++;
-      return newAnswered.has(idx) ? newAnswered.get(idx)! : match;
+      return newAnswered.has(idx) ? newAnswered.get(idx)! : '___BLANK___';
     });
     setCode(rebuilt);
   }, [hints, hintStates, answeredBlanks, originalSkeleton]);
 
-  const handleBeginMission = () => {
+  const handleBeginMission = useCallback(async () => {
     if (player) {
       updatePlayer({ preferredDifficulty: difficulty });
     }
@@ -153,26 +157,36 @@ export default function MissionPage() {
     setHintStates(new Map());
     setHintsUsedCount(0);
     setHintXpPenalty(0);
-    setPhase('active');
-  };
 
-  const handleValidate = useCallback(() => {
+    // Create sandbox for Tier 2 missions
+    await sandbox.createSandbox();
+
+    setPhase('active');
+  }, [player, difficulty, mission, sandbox]);
+
+  const handleValidate = useCallback(async () => {
     if (!mission) return;
     soundEngine.play('validate');
+
+    // Step 1: Client-side pattern validation (instant)
     const validations = MISSION_VALIDATIONS[mission.id] || [];
-    const results = validateAllObjectives(code, validations);
-    setValidationResults(results);
+    const patternResults = validateAllObjectives(code, validations);
+
+    // Step 2: Server-side execution + verification (async for Tier 2/3)
+    const mergedResults = await sandbox.runFullValidation(code, patternResults);
+
+    setValidationResults(mergedResults);
     setHasValidated(true);
 
     const newObjectives = objectives.map(obj => {
-      const result = results.find(r => r.objectiveId === obj.id);
+      const result = mergedResults.find(r => r.objectiveId === obj.id);
       return result?.passed ? { ...obj, completed: true } : obj;
     });
     setObjectives(newObjectives);
 
     const allPassed = newObjectives.every(o => o.completed);
     if (allPassed) soundEngine.play('success');
-  }, [code, mission, objectives]);
+  }, [code, mission, objectives, sandbox]);
 
   const handleResetCode = useCallback(() => {
     if (mission) {
@@ -186,10 +200,11 @@ export default function MissionPage() {
       setValidationResults([]);
       setHasValidated(false);
       setObjectives(prev => prev.map(o => ({ ...o, completed: false })));
+      sandbox.clearOutput();
     }
-  }, [mission, difficulty]);
+  }, [mission, difficulty, sandbox]);
 
-  const handleComplete = () => {
+  const handleComplete = useCallback(async () => {
     if (!mission || !player) return;
     const completedCount = objectives.filter(o => o.completed).length;
     const completionBonus = completedCount === objectives.length ? 1.5 : completedCount / objectives.length;
@@ -208,18 +223,20 @@ export default function MissionPage() {
     if (completedCount === objectives.length && triggeredChaos.size === 0) updated = unlockAchievement('perfect-run');
     if (updated.completedMissions.length === MISSIONS.length) updated = unlockAchievement('full-collection');
     if (updated.chaosEventsSurvived >= 5) updated = unlockAchievement('cluster-whisperer');
-    if (difficulty === 'expert' && hintsUsedCount === 0) {
-      // Track expert completions for 'no-hints' achievement
-    }
 
     setPlayer(updated);
+
+    // Destroy sandbox on completion
+    await sandbox.destroySandbox();
+
     setPhase('complete');
-  };
+  }, [mission, player, objectives, timeRemaining, difficulty, hintXpPenalty, hintsUsedCount, triggeredChaos, sandbox]);
 
   if (!mission || !player) return null;
 
   const allComplete = objectives.every(o => o.completed);
   const objectiveTexts = Object.fromEntries(objectives.map(o => [o.id, o.text]));
+  const isValidating = sandbox.isExecuting || sandbox.isVerifying;
 
   const hintCounts = {
     guided: getHintsForDifficulty(mission.id, 'guided').length,
@@ -269,10 +286,11 @@ export default function MissionPage() {
                     <div className="text-foreground">{mission.objectives.length}</div>
                     <div className="text-muted-foreground">Chaos Events</div>
                     <div className="text-destructive">{mission.chaosEvents.length} threats</div>
+                    <div className="text-muted-foreground">Validation</div>
+                    <div className="text-accent font-bold">{sandbox.tier.toUpperCase()}</div>
                   </div>
                 </div>
 
-                {/* Difficulty Selector */}
                 <div className="border border-border rounded-lg p-4 bg-card">
                   <h3 className="font-mono text-xs font-bold text-foreground mb-3">SELECT DIFFICULTY</h3>
                   <DifficultySelector
@@ -282,8 +300,15 @@ export default function MissionPage() {
                   />
                 </div>
 
-                <Button onClick={handleBeginMission} className="w-full font-mono font-bold tracking-wider animate-pulse-glow">
-                  [ BEGIN MISSION — {difficulty.toUpperCase()} ]
+                <Button
+                  onClick={handleBeginMission}
+                  disabled={sandbox.isCreating}
+                  className="w-full font-mono font-bold tracking-wider animate-pulse-glow"
+                >
+                  {sandbox.isCreating
+                    ? '[ INITIALIZING SANDBOX... ]'
+                    : `[ BEGIN MISSION — ${difficulty.toUpperCase()} ]`
+                  }
                 </Button>
               </div>
             )}
@@ -322,12 +347,16 @@ export default function MissionPage() {
                 </div>
               </div>
 
-
-
               {/* Validation Actions */}
               <div className="flex gap-2">
-                <Button onClick={handleValidate} className="flex-1 font-mono text-xs gap-1.5" size="sm">
-                  <Play className="w-3 h-3" /> VALIDATE CODE
+                <Button
+                  onClick={handleValidate}
+                  disabled={isValidating}
+                  className="flex-1 font-mono text-xs gap-1.5"
+                  size="sm"
+                >
+                  <Play className="w-3 h-3" />
+                  {isValidating ? 'VALIDATING...' : 'VALIDATE CODE'}
                 </Button>
                 <Button onClick={handleResetCode} variant="outline" className="font-mono text-xs gap-1.5" size="sm">
                   <RotateCcw className="w-3 h-3" /> RESET
@@ -337,6 +366,18 @@ export default function MissionPage() {
               {hasValidated && (
                 <ValidationFeedback results={validationResults} objectiveTexts={objectiveTexts} />
               )}
+
+              {/* Execution Output Panel */}
+              <ExecutionOutputPanel
+                tier={sandbox.tier}
+                output={sandbox.executionOutput}
+                serverResults={sandbox.serverResults}
+                isExecuting={sandbox.isExecuting}
+                isVerifying={sandbox.isVerifying}
+                executionError={sandbox.executionError}
+                totalExecutionTimeMs={sandbox.totalExecutionTimeMs}
+                objectiveTexts={objectiveTexts}
+              />
 
               <Button
                 onClick={handleComplete}
@@ -358,6 +399,9 @@ export default function MissionPage() {
                 <span className="ml-auto font-mono text-[10px] text-primary/50">
                   {objectives.filter(o => o.completed).length}/{objectives.length} objectives
                 </span>
+                {sandbox.sandboxActive && (
+                  <span className="font-mono text-[10px] text-accent/70">● SANDBOX</span>
+                )}
                 {hintXpPenalty > 0 && (
                   <span className="font-mono text-[10px] text-destructive/70">−{hintXpPenalty} XP</span>
                 )}
