@@ -37,7 +37,7 @@ export default function MissionPage() {
   const [hasValidated, setHasValidated] = useState(false);
   const [difficulty, setDifficulty] = useState<MissionDifficulty>('guided');
   const [hints, setHints] = useState<InlineHint[]>([]);
-  const [revealedHints, setRevealedHints] = useState<Set<number>>(new Set());
+  const [hintStates, setHintStates] = useState<Map<number, HintState>>(new Map());
   const [hintsUsedCount, setHintsUsedCount] = useState(0);
   const [hintXpPenalty, setHintXpPenalty] = useState(0);
 
