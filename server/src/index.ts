@@ -6,12 +6,14 @@ import { createServer } from 'http';
 import { connectDB } from './config/db.js';
 import { apiLimiter } from './middleware/rateLimit.js';
 import { initSocketIO } from './socket/metrics.js';
+import { initSandboxClient } from './services/sandbox.js';
 import authRoutes from './routes/auth.js';
 import playerRoutes from './routes/players.js';
 import missionRoutes from './routes/missions.js';
 import workshopRoutes from './routes/workshops.js';
 import metricsRoutes from './routes/metrics.js';
 import verifyRoutes from './routes/verify.js';
+import executeRoutes from './routes/execute.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -29,6 +31,7 @@ app.use('/api/missions', missionRoutes);
 app.use('/api/workshops', workshopRoutes);
 app.use('/api/metrics', metricsRoutes);
 app.use('/api/verify', verifyRoutes);
+app.use('/api/execute', executeRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
@@ -47,6 +50,9 @@ const PORT = parseInt(process.env.PORT || '3001', 10);
 async function start() {
   try {
     await connectDB();
+    await initSandboxClient().catch(err => {
+      console.warn('⚠️ Sandbox service unavailable (Tier 2 execution disabled):', err.message);
+    });
     httpServer.listen(PORT, () => {
       console.log(`🚀 MongoDB Mayhem server running on port ${PORT}`);
       console.log(`📦 Database: ${process.env.MONGODB_DB_NAME}`);
