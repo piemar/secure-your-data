@@ -361,8 +361,9 @@ export default function MissionPage() {
                   onChange={setCode}
                   language="javascript"
                   hints={hints}
-                  revealedHints={revealedHints}
+                  hintStates={hintStates}
                   onRevealHint={handleRevealHint}
+                  onRevealAnswer={handleRevealAnswer}
                 />
               </div>
             </div>
