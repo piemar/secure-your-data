@@ -103,15 +103,43 @@ export default function MissionPage() {
   }, [player]);
 
   const handleRevealHint = useCallback((hintIndex: number) => {
-    if (revealedHints.has(hintIndex)) return;
+    const current = hintStates.get(hintIndex);
+    if (current && current !== 'unrevealed') return;
     const hint = hints[hintIndex];
     if (!hint) return;
     soundEngine.play('click');
-    setRevealedHints(prev => new Set(prev).add(hintIndex));
+    setHintStates(prev => new Map(prev).set(hintIndex, 'hint-shown'));
     setHintsUsedCount(prev => prev + 1);
-    const penalty = hint.xpPenalty || 25;
+    const penalty = Math.round((hint.xpPenalty || 25) * 0.6);
     setHintXpPenalty(prev => prev + penalty);
-  }, [hints, revealedHints]);
+  }, [hints, hintStates]);
+
+  const handleRevealAnswer = useCallback((hintIndex: number) => {
+    const hint = hints[hintIndex];
+    if (!hint) return;
+    const current = hintStates.get(hintIndex);
+    soundEngine.play('click');
+    setHintStates(prev => new Map(prev).set(hintIndex, 'answer-shown'));
+    // Only charge answer penalty (hint penalty may already have been charged)
+    if (current !== 'hint-shown') {
+      setHintsUsedCount(prev => prev + 1);
+    }
+    const answerPenalty = Math.round((hint.xpPenalty || 25) * 0.4);
+    setHintXpPenalty(prev => prev + answerPenalty);
+
+    // Auto-fill: replace the nth ___BLANK___ with the answer
+    setCode(prev => {
+      let count = 0;
+      return prev.replace(/___BLANK___/g, (match) => {
+        if (count === hintIndex) {
+          count++;
+          return hint.answer;
+        }
+        count++;
+        return match;
+      });
+    });
+  }, [hints, hintStates]);
 
   const handleBeginMission = () => {
     // Save preferred difficulty
