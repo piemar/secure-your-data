@@ -314,38 +314,7 @@ export default function MissionPage() {
                 </div>
               </div>
 
-              {/* Inline Hints Panel */}
-              {hints.length > 0 && (
-                <div className="border border-border rounded-lg p-4 bg-card">
-                  <h3 className="font-mono text-xs font-bold text-foreground mb-3 flex items-center gap-2">
-                    <Lightbulb className="w-3.5 h-3.5 text-warning" />
-                    HINTS ({hintsUsedCount}/{hints.length} revealed)
-                  </h3>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {hints.map((hint, i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        {revealedHints.has(i) ? (
-                          <div className="text-xs font-mono p-2 rounded bg-warning/10 border border-warning/20 w-full">
-                            <span className="text-warning text-[10px]">HINT (−{hint.xpPenalty || 25} XP):</span>
-                            <p className="text-foreground mt-0.5">{hint.hint}</p>
-                            {hint.answer && (
-                              <p className="text-primary mt-1 font-bold">→ {hint.answer}</p>
-                            )}
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleRevealHint(i)}
-                            className="text-xs font-mono p-2 rounded border border-dashed border-muted-foreground/30 w-full text-left hover:border-warning/50 hover:bg-warning/5 transition-colors"
-                          >
-                            <span className="text-muted-foreground">💡 Hint #{i + 1}</span>
-                            <span className="text-destructive/60 ml-2">(−{hint.xpPenalty || 25} XP)</span>
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+
 
               {/* Validation Actions */}
               <div className="flex gap-2">
