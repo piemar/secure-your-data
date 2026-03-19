@@ -16,7 +16,7 @@ interface HUDBarProps {
   hintPenalty?: number;
 }
 
-export function HUDBar({ player, timeRemaining, systemStability = 100, showTimer = false }: HUDBarProps) {
+export function HUDBar({ player, timeRemaining, systemStability = 100, showTimer = false, hintsUsed = 0, hintPenalty = 0 }: HUDBarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [scoreAnim, setScoreAnim] = useState(false);
