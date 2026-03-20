@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="MongoDB Gameday mascot">
+  <!-- Celebrating turtle, simplified for favicon legibility -->
+  <rect width="32" height="32" rx="6" fill="#0a1419"/>
+  <!-- confetti -->
+  <circle cx="6" cy="7" r="1.2" fill="#f9ed32"/>
+  <circle cx="26" cy="6" r="1" fill="#00ed64"/>
+  <circle cx="24" cy="11" r="0.9" fill="#f97316"/>
+  <circle cx="5" cy="14" r="0.85" fill="#a78bfa"/>
+  <!-- raised arms -->
+  <path d="M9 18 L7 12 M23 18 L25 12" stroke="#7dd87a" stroke-width="2" stroke-linecap="round"/>
+  <!-- shell -->
+  <ellipse cx="16" cy="19" rx="10" ry="7" fill="#6b4a2e"/>
+  <ellipse cx="16" cy="18.5" rx="7" ry="4.5" fill="#8b6342"/>
+  <!-- head -->
+  <circle cx="16" cy="11" r="6.5" fill="#13aa52"/>
+  <circle cx="16" cy="11" r="5.8" fill="#00ed64"/>
+  <!-- hoodie hint -->
+  <path d="M11 14 Q16 17 21 14" stroke="#0d3d26" stroke-width="1.2" fill="none" opacity="0.35"/>
+  <!-- eyes -->
+  <circle cx="13.3" cy="10" r="1.35" fill="#0a1419"/>
+  <circle cx="18.7" cy="10" r="1.35" fill="#0a1419"/>
+  <circle cx="13.6" cy="9.6" r="0.45" fill="#fff"/>
+  <circle cx="19" cy="9.6" r="0.45" fill="#fff"/>
+  <!-- cheeks -->
+  <circle cx="11.2" cy="12" r="1" fill="#ff8fab" opacity="0.65"/>
+  <circle cx="20.8" cy="12" r="1" fill="#ff8fab" opacity="0.65"/>
+  <!-- smile -->
+  <path d="M13.5 13.5 Q16 15.5 18.5 13.5" stroke="#0a1419" stroke-width="0.9" fill="none" stroke-linecap="round"/>
+</svg>
