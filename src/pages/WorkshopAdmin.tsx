@@ -77,10 +77,6 @@ export default function WorkshopAdmin() {
     setPlayer(currentPlayer);
   }, [navigate]);
 
-  useEffect(() => {
-    void loadSessions();
-  }, [loadSessions]);
-
   const loadSessions = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -92,6 +88,10 @@ export default function WorkshopAdmin() {
       setIsLoading(false);
     }
   }, [includeArchived]);
+
+  useEffect(() => {
+    void loadSessions();
+  }, [loadSessions]);
 
   const resetForm = useCallback(() => {
     setSelectedSessionId(null);

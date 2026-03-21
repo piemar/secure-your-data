@@ -2,6 +2,42 @@
 
 Hands-on **missions** and **quest chains** for learning MongoDB in a game-style UI: Monaco editor, tiered validation (pattern, sandbox execution, simulation), and workshop modes.
 
+## Fastest local start (nocontainer)
+
+If you want the quickest path with minimal setup, use this exact 2-step flow.
+
+### 1) Update env
+
+```bash
+cp server/.env.example server/.env
+```
+
+Open `server/.env` and set these minimum values:
+
+```env
+MONGODB_URI=mongodb://127.0.0.1:27017
+MONGODB_DB_NAME=mongodb_mayhem
+JWT_SECRET=change-me
+PORT=3001
+CORS_ORIGIN=http://localhost:8080
+```
+
+Notes:
+- `nocontainer` mode expects **local MongoDB** and **mongosh** to already be installed and available on your machine.
+- If your local MongoDB is not on `127.0.0.1:27017`, update `MONGODB_URI` accordingly.
+
+### 2) Start application (nocontainer)
+
+From repo root:
+
+```bash
+npm run local:start:nocontainer
+```
+
+That starts:
+- Web app: `http://localhost:8080`
+- API: `http://localhost:3001`
+
 ## Documentation
 
 | Doc | What it covers |
@@ -20,6 +56,8 @@ Hands-on **missions** and **quest chains** for learning MongoDB in a game-style 
 - **Container runtime required** for `npm run local:start:ide`, `npm run local:start:nocontainer:ide`, and `bash scripts/local/start-local.sh --with-ide`: those flows start the **code-server** service from Compose (`--profile ide`). Pure `local:start:nocontainer` without IDE does not need containers.
 
 ## Quick start (local)
+
+Use the section above for the fastest setup. This section contains alternative runtime modes and advanced options.
 
 ### 0. One-command local stack (recommended)
 
