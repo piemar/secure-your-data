@@ -20,6 +20,9 @@ import { mission as deployment_automationMission } from './deployment_automation
 import { mission as time_series_infiltrationMission } from './time_series_infiltration/mission';
 import { mission as vector_heistMission } from './vector_heist/mission';
 import { mission as schema_evolutionMission } from './schema_evolution/mission';
+import { mission as csfle_key_vault_bootstrapMission } from './csfle_key_vault_bootstrap/mission';
+import { mission as orthogonal_obfuscation_pipelineMission } from './orthogonal_obfuscation_pipeline/mission';
+import { mission as semantic_retrieval_audit_runMission } from './semantic_retrieval_audit_run/mission';
 import { skeleton as crud_boot_campSkeleton } from './crud_boot_camp/skeleton';
 import { skeleton as the_phantom_indexSkeleton } from './the_phantom_index/skeleton';
 import { skeleton as the_aggregation_heistSkeleton } from './the_aggregation_heist/skeleton';
@@ -40,6 +43,9 @@ import { skeleton as deployment_automationSkeleton } from './deployment_automati
 import { skeleton as time_series_infiltrationSkeleton } from './time_series_infiltration/skeleton';
 import { skeleton as vector_heistSkeleton } from './vector_heist/skeleton';
 import { skeleton as schema_evolutionSkeleton } from './schema_evolution/skeleton';
+import { skeleton as csfle_key_vault_bootstrapSkeleton } from './csfle_key_vault_bootstrap/skeleton';
+import { skeleton as orthogonal_obfuscation_pipelineSkeleton } from './orthogonal_obfuscation_pipeline/skeleton';
+import { skeleton as semantic_retrieval_audit_runSkeleton } from './semantic_retrieval_audit_run/skeleton';
 import { validations as crud_boot_campValidations } from './crud_boot_camp/validation';
 import { validations as the_phantom_indexValidations } from './the_phantom_index/validation';
 import { validations as the_aggregation_heistValidations } from './the_aggregation_heist/validation';
@@ -60,6 +66,9 @@ import { validations as deployment_automationValidations } from './deployment_au
 import { validations as time_series_infiltrationValidations } from './time_series_infiltration/validation';
 import { validations as vector_heistValidations } from './vector_heist/validation';
 import { validations as schema_evolutionValidations } from './schema_evolution/validation';
+import { validations as csfle_key_vault_bootstrapValidations } from './csfle_key_vault_bootstrap/validation';
+import { validations as orthogonal_obfuscation_pipelineValidations } from './orthogonal_obfuscation_pipeline/validation';
+import { validations as semantic_retrieval_audit_runValidations } from './semantic_retrieval_audit_run/validation';
 
 export const MISSIONS = [
   crud_boot_campMission,
@@ -82,6 +91,9 @@ export const MISSIONS = [
   time_series_infiltrationMission,
   vector_heistMission,
   schema_evolutionMission,
+  csfle_key_vault_bootstrapMission,
+  orthogonal_obfuscation_pipelineMission,
+  semantic_retrieval_audit_runMission,
 ];
 
 export const MISSION_SKELETONS: Record<string, MissionSkeleton> = {
@@ -105,6 +117,9 @@ export const MISSION_SKELETONS: Record<string, MissionSkeleton> = {
   'mission-18': time_series_infiltrationSkeleton,
   'mission-19': vector_heistSkeleton,
   'mission-20': schema_evolutionSkeleton,
+  'mission-21': csfle_key_vault_bootstrapSkeleton,
+  'mission-22': orthogonal_obfuscation_pipelineSkeleton,
+  'mission-23': semantic_retrieval_audit_runSkeleton,
 };
 
 export const MISSION_VALIDATIONS: Record<string, ObjectiveValidation[]> = {
@@ -128,6 +143,9 @@ export const MISSION_VALIDATIONS: Record<string, ObjectiveValidation[]> = {
   'mission-18': time_series_infiltrationValidations,
   'mission-19': vector_heistValidations,
   'mission-20': schema_evolutionValidations,
+  'mission-21': csfle_key_vault_bootstrapValidations,
+  'mission-22': orthogonal_obfuscation_pipelineValidations,
+  'mission-23': semantic_retrieval_audit_runValidations,
 };
 
 export function getSkeletonForDifficulty(missionId: string, difficulty: 'guided' | 'challenge' | 'expert'): string {

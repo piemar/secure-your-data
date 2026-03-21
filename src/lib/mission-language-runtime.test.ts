@@ -34,7 +34,7 @@ describe('mission language runtime code generation', () => {
 
   it('generates csharp wrapper with quoted mongosh args', () => {
     const generated = buildGeneratedLanguageCode('csharp', MONGOSH_SAMPLE, 'sandbox_acme');
-    expect(generated).toContain('p.StartInfo.Arguments = $"\\\"{uri}\\\" --file \\\"{scriptPath}\\\"";');
+    expect(generated).toContain('p.StartInfo.Arguments = $"{uri} --file {scriptPath}";');
   });
 });
 
@@ -49,13 +49,13 @@ describe('mission language runtime shell command generation', () => {
     const cases: Array<[MissionCodeLanguage, string]> = [
       ['nodejs', 'node "/tmp/mayhem-runner-node.js"'],
       ['go', 'go run "/tmp/mayhem-runner-go.go"'],
-      ['java', 'javac "/tmp/MayhemRunner.java" && java -cp "/tmp" MayhemRunner'],
+      ['java', 'javac -d "/tmp" "/tmp/MayhemRunner.java" && java -cp "/tmp" MayhemRunner'],
       ['csharp', 'mcs "/tmp/MayhemRunner.cs" -out:/tmp/MayhemRunner.exe && mono /tmp/MayhemRunner.exe'],
     ];
     for (const [language, expectedRunner] of cases) {
       const cmd = buildGeneratedLanguageRunCommand(language, MONGOSH_SAMPLE, 'sandbox_acme');
       expect(cmd).toContain(expectedRunner);
-      expect(cmd).toContain('__MAYHEM_LANG_RUNNER_EOF__');
+      expect(cmd).toMatch(/__MAYHEM_LANG_RUNNER_EOF__/);
       expect(cmd).toContain('exit $EXIT_CODE');
     }
   });
@@ -86,7 +86,7 @@ describe('mission language runtime shell command generation', () => {
         language: 'java',
         runtimeCheckSnippet: "command -v javac",
         cleanupSnippet: 'rm -f "/tmp/MayhemRunner.class" "/tmp/MayhemRunner.java"',
-        runnerSnippet: 'javac "/tmp/MayhemRunner.java" && java -cp "/tmp" MayhemRunner',
+        runnerSnippet: 'javac -d "/tmp" "/tmp/MayhemRunner.java" && java -cp "/tmp" MayhemRunner',
         generatedCodeSnippet: 'new ProcessBuilder("mongosh", uri, "--file", scriptPath.toString())',
       },
       {
@@ -108,7 +108,7 @@ describe('mission language runtime shell command generation', () => {
 
       // 2) generated source is embedded as heredoc payload
       expect(cmd).toContain(`cat > "/tmp/`);
-      expect(cmd).toContain('__MAYHEM_LANG_RUNNER_EOF__');
+      expect(cmd).toMatch(/__MAYHEM_LANG_RUNNER_EOF__/);
       expect(cmd).toContain(generated);
 
       // 3) script executes and propagates status
@@ -123,5 +123,20 @@ describe('mission language runtime shell command generation', () => {
       expect(generated).toContain(c.generatedCodeSnippet);
       expect(generated).toContain("db = db.getSiblingDB('sandbox_acme');");
     }
+  });
+
+  it('uses collision-resistant heredoc markers for embedded code', () => {
+    const command = buildGeneratedLanguageRunCommand(
+      'nodejs',
+      [
+        'db.agents.insertOne({ name: "A" });',
+        '__MAYHEM_LANG_RUNNER_EOF__',
+        'db.agents.find({});',
+      ].join('\n'),
+      'sandbox_acme'
+    );
+
+    expect(command).toMatch(/__MAYHEM_LANG_RUNNER_EOF__/);
+    expect(command).not.toContain("<<'__MAYHEM_LANG_RUNNER_EOF__'");
   });
 });

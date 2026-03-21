@@ -20,6 +20,30 @@ function escapeSingleQuotedJs(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function lineContainsMarker(payload: string, marker: string): boolean {
+  const re = new RegExp(`(^|\\n)${escapeRegex(marker)}(\\n|$)`);
+  return re.test(payload);
+}
+
+function buildHeredocMarker(prefix: string, payload: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < payload.length; i += 1) {
+    hash ^= payload.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  let marker = `${prefix}_${(hash >>> 0).toString(16).toUpperCase()}`;
+  let suffix = 0;
+  while (lineContainsMarker(payload, marker)) {
+    suffix += 1;
+    marker = `${prefix}_${(hash >>> 0).toString(16).toUpperCase()}_${suffix}`;
+  }
+  return marker;
+}
+
 export function normalizeCodeForTerminalPaste(code: string): string {
   return code.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 }
@@ -138,7 +162,7 @@ export function buildGeneratedLanguageCode(
     `    File.WriteAllText(scriptPath, ${JSON.stringify(scriptWithDb)});`,
     '    var p = new Process();',
     '    p.StartInfo.FileName = "mongosh";',
-    '    p.StartInfo.Arguments = $"\\\"{uri}\\\" --file \\\"{scriptPath}\\\"";',
+    '    p.StartInfo.Arguments = $"{uri} --file {scriptPath}";',
     '    p.StartInfo.UseShellExecute = false;',
     '    p.Start();',
     '    p.WaitForExit();',
@@ -158,10 +182,10 @@ export function buildMongoshRunCommandExecMode(
     '${MONGOSH_CONNECTION_STRING:-${MDB_CONNECTION_STRING:-${MONGODB_CONNECTION_STRING:-${MONGODB_URI:-mongodb://127.0.0.1:27017}}}}';
   const normalizedDb = (dbName || '').trim();
   const tmpPath = '/tmp/mayhem-run.js';
-  const eofMarker = '__MAYHEM_MONGOSH_EOF__';
   const scriptWithDb = normalizedDb
     ? `db = db.getSiblingDB('${escapeSingleQuotedJs(normalizedDb)}');\n${code}`
     : code;
+  const eofMarker = buildHeredocMarker('__MAYHEM_MONGOSH_EOF__', scriptWithDb);
 
   return [
     'if ! command -v mongosh >/dev/null 2>&1; then',
@@ -202,11 +226,12 @@ export function buildGeneratedLanguageRunCommand(
     return `${tmpDir}/MayhemRunner.cs`;
   })();
   const generatedCode = buildGeneratedLanguageCode(language, mongoshCode, dbName);
+  const eofMarker = buildHeredocMarker('__MAYHEM_LANG_RUNNER_EOF__', generatedCode);
   const runner = (() => {
     if (language === 'nodejs') return `node "${sourcePath}"`;
     if (language === 'go') return `go run "${sourcePath}"`;
     if (language === 'java') {
-      return `javac "${sourcePath}" && java -cp "${tmpDir}" MayhemRunner`;
+      return `javac -d "${tmpDir}" "${sourcePath}" && java -cp "${tmpDir}" MayhemRunner`;
     }
     return `mcs "${sourcePath}" -out:${tmpDir}/MayhemRunner.exe && mono ${tmpDir}/MayhemRunner.exe`;
   })();
@@ -224,9 +249,9 @@ export function buildGeneratedLanguageRunCommand(
 
   return [
     runtimeCheck,
-    `cat > "${sourcePath}" <<'__MAYHEM_LANG_RUNNER_EOF__'`,
+    `cat > "${sourcePath}" <<'${eofMarker}'`,
     generatedCode,
-    '__MAYHEM_LANG_RUNNER_EOF__',
+    eofMarker,
     `cat "${sourcePath}"`,
     runner,
     'EXIT_CODE=$?',

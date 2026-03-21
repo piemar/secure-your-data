@@ -25,6 +25,9 @@ export const MISSION_PREREQUISITES: Record<string, string[]> = {
   'mission-18': [],
   'mission-19': [],
   'mission-20': [],
+  'mission-21': [],
+  'mission-22': [],
+  'mission-23': [],
 };
 
 // Human-readable topic labels for search

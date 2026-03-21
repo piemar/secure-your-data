@@ -32,109 +32,16 @@ import {
   LANGUAGE_LABELS,
   type MissionCodeLanguage,
 } from '@/lib/mission-language-runtime';
+import {
+  isSafeMongoshDbName,
+  looksLikeMongoshPrompt,
+  sleep,
+  splitMongoshStatements,
+} from '@/lib/mongosh-utils';
 
 function tokenizeSkeletonBlanks(skeleton: string): string {
   let idx = 0;
   return skeleton.replace(/___BLANK___/g, () => `___BLANK_${idx++}___`);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function looksLikeMongoshPrompt(text: string): boolean {
-  if (!text) return false;
-  const tail = text.trimEnd();
-  return (
-    /\[[^\]]+\]\s+\S+>\s*$/.test(tail) ||
-    /\b\w+>\s*$/.test(tail)
-  );
-}
-
-function splitMongoshStatements(code: string): string[] {
-  const source = code.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-  if (!source) return [];
-  const parts: string[] = [];
-  let start = 0;
-  let inSingle = false;
-  let inDouble = false;
-  let inTemplate = false;
-  let inLineComment = false;
-  let inBlockComment = false;
-  let escape = false;
-  let depthParen = 0;
-  let depthBrace = 0;
-  let depthBracket = 0;
-
-  for (let i = 0; i < source.length; i += 1) {
-    const c = source[i];
-    const n = i + 1 < source.length ? source[i + 1] : '';
-
-    if (inLineComment) {
-      if (c === '\n') inLineComment = false;
-      continue;
-    }
-    if (inBlockComment) {
-      if (c === '*' && n === '/') {
-        inBlockComment = false;
-        i += 1;
-      }
-      continue;
-    }
-    if (inSingle || inDouble || inTemplate) {
-      if (escape) {
-        escape = false;
-        continue;
-      }
-      if (c === '\\') {
-        escape = true;
-        continue;
-      }
-      if (inSingle && c === "'") inSingle = false;
-      else if (inDouble && c === '"') inDouble = false;
-      else if (inTemplate && c === '`') inTemplate = false;
-      continue;
-    }
-
-    if (c === '/' && n === '/') {
-      inLineComment = true;
-      i += 1;
-      continue;
-    }
-    if (c === '/' && n === '*') {
-      inBlockComment = true;
-      i += 1;
-      continue;
-    }
-    if (c === "'") {
-      inSingle = true;
-      continue;
-    }
-    if (c === '"') {
-      inDouble = true;
-      continue;
-    }
-    if (c === '`') {
-      inTemplate = true;
-      continue;
-    }
-    if (c === '(') depthParen += 1;
-    else if (c === ')') depthParen = Math.max(0, depthParen - 1);
-    else if (c === '{') depthBrace += 1;
-    else if (c === '}') depthBrace = Math.max(0, depthBrace - 1);
-    else if (c === '[') depthBracket += 1;
-    else if (c === ']') depthBracket = Math.max(0, depthBracket - 1);
-
-    if (c === ';' && depthParen === 0 && depthBrace === 0 && depthBracket === 0) {
-      const statement = source.slice(start, i + 1).trim();
-      if (statement) parts.push(statement);
-      start = i + 1;
-    }
-  }
-
-  const rest = source.slice(start).trim();
-  if (rest) parts.push(rest);
-  return parts;
 }
 
 export default function MissionPage() {
@@ -305,6 +212,7 @@ export default function MissionPage() {
     const validations = MISSION_VALIDATIONS[mission.id] || [];
     const patternResults = validateAllObjectives(code, validations);
 
+    let skipServerExecute = false;
     if (sandbox.tier === 'execute') {
       try {
         const status = await api.execute.status();
@@ -344,8 +252,14 @@ export default function MissionPage() {
             shellTerminal.sendInputData('mongosh "$MONGOSH_URI"\n');
             await waitForPrompt(3200);
             if (dbName) {
-              shellTerminal.sendInputData(`use ${dbName}\n`);
-              await waitForPrompt(900);
+              if (isSafeMongoshDbName(dbName)) {
+                shellTerminal.sendInputData(`use ${dbName}\n`);
+                await waitForPrompt(900);
+              } else {
+                shellTerminal.appendTranscriptMessage(
+                  `Skipping explicit "use" for unsafe db name: ${dbName}`
+                );
+              }
             }
             for (let idx = 0; idx < statements.length; idx += 1) {
               const statement = statements[idx];
@@ -358,6 +272,7 @@ export default function MissionPage() {
             }
             // Refresh shell prompt/cursor position after automated editor playback.
             shellTerminal.sendInputData('\n');
+            skipServerExecute = true;
             } finally {
               setIsTerminalPlaybackRunning(false);
             }
@@ -370,18 +285,28 @@ export default function MissionPage() {
               shellTerminal.appendTranscriptMessage(
                 'Shell session not ready; continuing with backend validation runner.'
               );
+            } else {
+              skipServerExecute = true;
             }
           }
         } else {
-          shellTerminal.appendTranscriptMessage(
-            `Executing mission baseline via ${LANGUAGE_LABELS[selectedCodeLanguage]} runtime...`
-          );
-          const runtimeCmd = buildGeneratedLanguageRunCommand(selectedCodeLanguage, code, dbName);
-          const runtimeResult = await shellTerminal.submit(runtimeCmd);
-          if (!runtimeResult && shellTerminal.mode !== 'pty') {
+          if (shellTerminal.mode === 'pty') {
             shellTerminal.appendTranscriptMessage(
-              'Runtime session not ready; continuing with backend validation runner.'
+              `${LANGUAGE_LABELS[selectedCodeLanguage]} runtime is validated server-side while PTY is active.`
             );
+          } else {
+            shellTerminal.appendTranscriptMessage(
+              `Executing mission baseline via ${LANGUAGE_LABELS[selectedCodeLanguage]} runtime...`
+            );
+            const runtimeCmd = buildGeneratedLanguageRunCommand(selectedCodeLanguage, code, dbName);
+            const runtimeResult = await shellTerminal.submit(runtimeCmd);
+            if (!runtimeResult) {
+              shellTerminal.appendTranscriptMessage(
+                'Runtime session not ready; continuing with backend validation runner.'
+              );
+            } else {
+              skipServerExecute = true;
+            }
           }
         }
         if (selectedCodeLanguage !== 'mongosh' && shellTerminal.mode === 'pty') {
@@ -397,7 +322,7 @@ export default function MissionPage() {
 
     // Step 2: Server-side execution + verification (async for Tier 2/3)
     const mergedResults = await sandbox.runFullValidation(code, patternResults, {
-      skipExecute: shellTerminal.mode === 'pty' && selectedCodeLanguage === 'mongosh',
+      skipExecute: skipServerExecute,
     });
 
     setValidationResults(mergedResults);

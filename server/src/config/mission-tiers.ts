@@ -30,4 +30,7 @@ export const MISSION_TIERS: Record<string, ValidationTier> = {
   'mission-11': 'pattern',   // Deployment Automation (Terraform)
   'mission-17': 'pattern',   // Text Search (Atlas Search only)
   'mission-19': 'pattern',   // Vector Heist (Atlas Vector Search only)
+  'mission-21': 'pattern',   // CSFLE Key Vault Bootstrap
+  'mission-22': 'pattern',   // Orthogonal Obfuscation Pipeline
+  'mission-23': 'pattern',   // Semantic Retrieval & Audit Run
 };
