@@ -1,7 +1,7 @@
 /**
  * Frontend mirror of server MISSION_TIERS — determines validation strategy per mission.
  */
-export type ValidationTier = 'pattern' | 'execute' | 'simulate';
+export type ValidationTier = 'pattern' | 'execute' | 'simulate' | 'hold';
 
 export const MISSION_TIERS: Record<string, ValidationTier> = {
   // Tier 2: Sandboxed Execution
@@ -18,10 +18,10 @@ export const MISSION_TIERS: Record<string, ValidationTier> = {
   'mission-18': 'execute',
   'mission-20': 'execute',
 
-  // Tier 3: Simulated / Cloud-Proxy
-  'mission-2': 'simulate',
-  'mission-9': 'simulate',
-  'mission-10': 'simulate',
+  // Tier 3: On hold for now (previously simulated/cloud-proxy)
+  'mission-2': 'hold',
+  'mission-9': 'hold',
+  'mission-10': 'hold',
 
   // Tier 1: Pattern Only
   'mission-4': 'pattern',
@@ -38,4 +38,8 @@ export const MISSION_TIERS: Record<string, ValidationTier> = {
 
 export function getMissionTier(missionId: string): ValidationTier {
   return MISSION_TIERS[missionId] || 'pattern';
+}
+
+export function isMissionTierOnHold(missionId: string): boolean {
+  return getMissionTier(missionId) === 'hold';
 }

@@ -21,13 +21,17 @@ export interface CommandOutput {
   timeMs: number;
 }
 
+export interface ExecuteCodeOptions {
+  collectionPrefix?: string;
+}
+
 const COMMAND_TIMEOUT_MS = 5000;
 const TOTAL_TIMEOUT_MS = 15000;
 
 /**
  * Execute user code against a sandbox database.
  */
-export async function executeCode(db: Db, code: string): Promise<ExecutionResult> {
+export async function executeCode(db: Db, code: string, options: ExecuteCodeOptions = {}): Promise<ExecutionResult> {
   const start = Date.now();
   const parseResult = parseCode(code);
 
@@ -61,7 +65,7 @@ export async function executeCode(db: Db, code: string): Promise<ExecutionResult
       };
     }
 
-    const cmdOutput = await executeCommand(db, cmd);
+    const cmdOutput = await executeCommand(db, cmd, options);
     outputs.push(cmdOutput);
 
     if (cmdOutput.error) {
@@ -84,12 +88,12 @@ export async function executeCode(db: Db, code: string): Promise<ExecutionResult
 /**
  * Execute a single parsed command against the database.
  */
-async function executeCommand(db: Db, cmd: ParsedCommand): Promise<CommandOutput> {
+async function executeCommand(db: Db, cmd: ParsedCommand, options: ExecuteCodeOptions): Promise<CommandOutput> {
   const cmdStart = Date.now();
 
   try {
     const result = await withTimeout(
-      runCommand(db, cmd),
+      runCommand(db, cmd, options),
       COMMAND_TIMEOUT_MS,
       `Command timed out after ${COMMAND_TIMEOUT_MS}ms: ${cmd.raw}`
     );
@@ -113,13 +117,16 @@ async function executeCommand(db: Db, cmd: ParsedCommand): Promise<CommandOutput
 /**
  * Map a parsed command to an actual MongoDB driver call.
  */
-async function runCommand(db: Db, cmd: ParsedCommand): Promise<unknown> {
+async function runCommand(db: Db, cmd: ParsedCommand, options: ExecuteCodeOptions): Promise<unknown> {
+  const collectionPrefix = options.collectionPrefix || '';
+
   // Handle db-level operations
   if (cmd.collection === '__db__') {
-    return runDbCommand(db, cmd);
+    return runDbCommand(db, cmd, collectionPrefix);
   }
 
-  const collection = db.collection(cmd.collection);
+  const mappedCollection = `${collectionPrefix}${cmd.collection}`;
+  const collection = db.collection(mappedCollection);
   const args = parseArgs(cmd.args[0] as string);
   const chainOps = cmd.args[1] ? JSON.parse(cmd.args[1] as string) : [];
 
@@ -249,14 +256,14 @@ async function runCommand(db: Db, cmd: ParsedCommand): Promise<unknown> {
 /**
  * Handle db-level commands (createCollection, etc.)
  */
-async function runDbCommand(db: Db, cmd: ParsedCommand): Promise<unknown> {
+async function runDbCommand(db: Db, cmd: ParsedCommand, collectionPrefix = ''): Promise<unknown> {
   const args = parseArgs(cmd.args[0] as string);
 
   switch (cmd.operation) {
     case 'createCollection': {
       const name = args[0] as string;
       const options = (args[1] as Document) || {};
-      return db.createCollection(name, options);
+      return db.createCollection(`${collectionPrefix}${name}`, options);
     }
     default:
       throw new Error(`Unsupported db-level operation: ${cmd.operation}`);

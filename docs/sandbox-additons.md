@@ -44,7 +44,7 @@ For more complex code blocks (multi-statement), each line is parsed and executed
 | Deployment | Sandbox MongoDB | Notes |
 |---|---|---|
 | **Atlas (recommended)** | Same cluster, ephemeral databases | Atlas M10+ allows thousands of databases. User sandboxes are just databases that get dropped. Cost: minimal — sandbox data is tiny and short-lived |
-| **Railway/Render/Fly** | Sidecar MongoDB container OR Atlas connection string | Docker Compose deploys the API + a local `mongo:7` container for sandboxes |
+| **Railway/Render/Fly** | Sidecar MongoDB container OR Atlas connection string | Docker Compose deploys the API + a local `mongo:8` container for sandboxes |
 | **Air-gapped** | Local MongoDB in Docker | Everything self-contained |
 
 ### Atlas-specific consideration

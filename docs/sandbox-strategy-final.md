@@ -106,7 +106,7 @@ See: `src/components/WorkshopConfigPanel.tsx`, `server/src/routes/workshops.ts`.
 
 ### Lifecycle
 
-1. **Create** database `sandbox_{sessionId}_{userId}` (shortened IDs for MongoDB name limits) — created lazily on first write.
+1. **Create** database `sandbox_{sessionId}_{userId}_{learnerNameSuffix}` (IDs shortened for MongoDB name limits; learner suffix derived from first/last name when available) — created lazily on first write.
 2. **Seed** mission-specific collections/documents from `server/src/config/seed-data.ts`.
 3. **Execute** parsed user code via `code-executor` against that DB.
 4. **Verify** using `server/src/config/verification-checks.ts` (counts, indexes, `explain`, etc.).
@@ -131,7 +131,7 @@ MongoDB instance
 |------------|--------------|-------|
 | Atlas (M10+) | Many ephemeral DBs | Preferred for workshops; small, short-lived data |
 | Atlas M0/M2/M5 | ~**100 database** limit | Use **single DB + collection prefix** (`user123_agents`); executor remaps `db.agents` → prefixed collections |
-| Railway/Render/Fly | Sidecar `mongo:7` **or** Atlas URI | Compose: API + Mongo |
+| Railway/Render/Fly | Sidecar `mongo:8` **or** Atlas URI | Compose: API + Mongo |
 | Air-gapped | Local Mongo in Docker | Self-contained |
 
 ### Seed / verification examples (illustrative)
@@ -239,7 +239,7 @@ Tracks run in parallel where possible; **integration points** keep one execution
 | `src/hooks/useTerminal.ts` | UX | **New** | History + submit to `/api/execute/repl` |
 | `server/src/services/container-manager.ts` | Infra | **New** | Docker lifecycle (Option B) |
 | `server/src/socket/terminal.ts` | Infra | **New** | WebSocket I/O for shell |
-| `server/sandbox/Dockerfile` | Infra | **New** | mongosh + bash image |
+| `server/sandbox/Dockerfile` | Infra | **New** | single sandbox image with mongosh + bash + Node.js + Go + Java + C# runtime |
 | `server/sandbox/Dockerfile.ide` | Infra | **New** | code-server + tools (Option E) |
 | `extensions/mongodb-mayhem/` | Infra | **New** | Mission extension |
 | `server/src/routes/ide.ts` | Infra | **New** | Launch/status for IDE containers |

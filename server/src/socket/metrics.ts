@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import { Server as HttpServer } from 'http';
+import { attachTerminalShellNamespace } from './terminal.js';
 
 export function initSocketIO(httpServer: HttpServer): Server {
   const io = new Server(httpServer, {
@@ -8,6 +9,8 @@ export function initSocketIO(httpServer: HttpServer): Server {
       methods: ['GET', 'POST'],
     },
   });
+
+  attachTerminalShellNamespace(io);
 
   io.on('connection', (socket) => {
     console.log(`🔌 Socket connected: ${socket.id}`);

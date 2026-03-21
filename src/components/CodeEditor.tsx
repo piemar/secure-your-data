@@ -60,22 +60,20 @@ export function CodeEditor({
     const content = model.getValue();
     const lines = content.split('\n');
     const positions: BlankPosition[] = [];
-    let blankCount = 0;
+    const seenIndexes = new Set<number>();
 
     for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
       const lineContent = lines[lineIdx];
-      if (!lineContent.includes('___BLANK___')) continue;
+      if (!lineContent.includes('___BLANK_') && !lineContent.includes('___BLANK___')) continue;
 
-      // Count all blanks on this line
-      const blankRegex = /___BLANK___/g;
+      // New stable token format: ___BLANK_<idx>___
+      const tokenRegex = /___BLANK_(\d+)___/g;
       let match;
-      while ((match = blankRegex.exec(lineContent)) !== null) {
-        const hintIndex = blankCount;
-        blankCount++;
-
-        if (hintIndex >= hints.length) break;
-
-        // Skip if answer already shown (blank was replaced)
+      while ((match = tokenRegex.exec(lineContent)) !== null) {
+        const hintIndex = Number(match[1]);
+        if (!Number.isInteger(hintIndex) || hintIndex < 0 || hintIndex >= hints.length) continue;
+        if (seenIndexes.has(hintIndex)) continue;
+        seenIndexes.add(hintIndex);
         const state = hintStates.get(hintIndex) || 'unrevealed';
         if (state === 'answer-shown') continue;
 
@@ -88,6 +86,28 @@ export function CodeEditor({
             lineNumber,
             hintIndex,
             pixelY: pos.top + 9, // center vertically (~18px line height)
+          });
+        }
+      }
+
+      // Backward compatibility for any raw ___BLANK___ content.
+      if (!lineContent.includes('___BLANK___')) continue;
+      const fallbackRegex = /___BLANK___/g;
+      let fallbackMatch;
+      while ((fallbackMatch = fallbackRegex.exec(lineContent)) !== null) {
+        let fallbackHintIndex = 0;
+        while (seenIndexes.has(fallbackHintIndex)) fallbackHintIndex++;
+        if (fallbackHintIndex >= hints.length) break;
+        seenIndexes.add(fallbackHintIndex);
+        const state = hintStates.get(fallbackHintIndex) || 'unrevealed';
+        if (state === 'answer-shown') continue;
+        const lineNumber = lineIdx + 1;
+        const pos = ed.getScrolledVisiblePosition({ lineNumber, column: 1 });
+        if (pos) {
+          positions.push({
+            lineNumber,
+            hintIndex: fallbackHintIndex,
+            pixelY: pos.top + 9,
           });
         }
       }
@@ -128,11 +148,12 @@ export function CodeEditor({
     const lines = content.split('\n');
 
     lines.forEach((lineContent, lineIdx) => {
-      const blankRegex = /___BLANK___/g;
+      const tokenRegex = /___BLANK_(\d+)___|___BLANK___/g;
       let match;
-      while ((match = blankRegex.exec(lineContent)) !== null) {
+      while ((match = tokenRegex.exec(lineContent)) !== null) {
+        const tokenLength = match[0].length;
         newDecorations.push({
-          range: new monaco.Range(lineIdx + 1, match.index + 1, lineIdx + 1, match.index + 12),
+          range: new monaco.Range(lineIdx + 1, match.index + 1, lineIdx + 1, match.index + 1 + tokenLength),
           options: {
             inlineClassName: 'blank-marker-highlight',
             hoverMessage: { value: '**💡 Click the ? in the gutter to get a hint**' },
@@ -233,7 +254,7 @@ export function CodeEditor({
         options={{
           readOnly,
           minimap: { enabled: false },
-          fontSize: 12,
+          fontSize: 14,
           fontFamily: "'JetBrains Mono', monospace",
           lineNumbers: 'on',
           scrollBeyondLastLine: false,

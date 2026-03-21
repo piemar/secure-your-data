@@ -1,0 +1,12 @@
+aws_region   = "eu-west-1"
+environment  = "dev"
+project_name = "mongodb-gameday"
+
+tenant_id   = "tenant-acme"
+workshop_id = "workshop-123"
+expires_at  = "2026-12-31T18:00:00Z"
+
+tags = {
+  owner = "platform-team"
+}
+

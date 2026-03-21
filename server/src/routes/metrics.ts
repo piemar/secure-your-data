@@ -14,6 +14,8 @@ router.post('/event', authenticateToken, async (req: Request, res: Response) => 
     await db.collection(COLLECTIONS.METRICS_EVENTS).insertOne({
       type,
       userId: req.user!.userId,
+      tenantId: req.user!.tenantId,
+      workshopId: req.user!.workshopId || req.user!.sessionId || null,
       missionId: missionId || null,
       sessionId: req.user!.sessionId || null,
       data: data || {},

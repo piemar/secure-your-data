@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TypewriterText } from '@/components/TypewriterText';
-import { MatrixRain } from '@/components/MatrixRain';
 import { BootSequence } from '@/components/BootSequence';
-import { getPlayer, createPlayer } from '@/lib/game-store';
-import { generateHandle } from '@/lib/game-data';
+import { generateHandle } from '@/content/missions/mission';
 import { soundEngine } from '@/lib/sound-engine';
+import { useRole } from '@/contexts/RoleContext';
+import { AvatarPicker } from '@/components/AvatarPicker';
+import { getDefaultAvatarId } from '@/lib/avatars';
 import heistMascot from '@/assets/heist-mascot.png';
 
 const ASCII_SUBTITLE = `
@@ -20,17 +21,24 @@ const ASCII_SUBTITLE = `
 
 export default function Landing() {
   const navigate = useNavigate();
+  const { joinSession, isAuthenticated, loading } = useRole();
   const [handle, setHandle] = useState('');
+  const [email, setEmail] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [pin, setPin] = useState('');
+  const [avatarId, setAvatarId] = useState(getDefaultAvatarId());
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<'boot' | 'intro' | 'ready'>('boot');
   const [showInput, setShowInput] = useState(false);
   const [booted, setBooted] = useState(false);
 
   useEffect(() => {
-    const player = getPlayer();
-    if (player) {
+    if (!loading && isAuthenticated) {
       navigate('/dashboard');
     }
-  }, [navigate]);
+  }, [navigate, isAuthenticated, loading]);
 
   useEffect(() => {
     if (sessionStorage.getItem('heist-booted')) {
@@ -50,11 +58,32 @@ export default function Landing() {
     setHandle(generateHandle());
   }, []);
 
-  const handleConnect = () => {
-    if (!handle.trim()) return;
+  const handleConnect = async () => {
+    if (isSubmitting) return;
+    const normalizedHandle = handle.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedHandle || !normalizedEmail) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setError('Please provide a valid email address.');
+      return;
+    }
+
     soundEngine.play('success');
-    createPlayer(handle.trim());
-    navigate('/dashboard');
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      await joinSession(pin.trim(), normalizedHandle, normalizedEmail, {
+        firstName: firstName.trim() || undefined,
+        lastName: lastName.trim() || undefined,
+        avatarId,
+      });
+      navigate('/dashboard');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to start session';
+      setError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!booted) {
@@ -62,9 +91,7 @@ export default function Landing() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      <MatrixRain />
-
+    <div className="min-h-screen bg-background/70 flex flex-col items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute inset-0 circuit-pattern" />
       <div className="absolute inset-0 scanline pointer-events-none" />
 
@@ -136,9 +163,40 @@ export default function Landing() {
           )}
         </div>
 
-        {/* Handle input */}
+          {/* Login/session input */}
         {showInput && (
           <div className="space-y-4 animate-slide-up">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Input
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="first name (optional)"
+                className="font-mono bg-secondary/50 border-primary/30 focus:border-primary text-foreground placeholder:text-muted-foreground"
+                maxLength={80}
+              />
+              <Input
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="last name (optional)"
+                className="font-mono bg-secondary/50 border-primary/30 focus:border-primary text-foreground placeholder:text-muted-foreground"
+                maxLength={80}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Input
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@company.com"
+                  className="font-mono bg-secondary/50 border-primary/30 focus:border-primary text-foreground placeholder:text-muted-foreground"
+                  onKeyDown={(e) => e.key === 'Enter' && void handleConnect()}
+                  maxLength={160}
+                  autoFocus
+                />
+              </div>
+            </div>
+
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary font-mono text-sm">{'>'}</span>
@@ -147,9 +205,8 @@ export default function Landing() {
                   onChange={(e) => setHandle(e.target.value)}
                   placeholder="agent_handle"
                   className="pl-7 font-mono bg-secondary/50 border-primary/30 focus:border-primary text-foreground placeholder:text-muted-foreground"
-                  onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
+                  onKeyDown={(e) => e.key === 'Enter' && void handleConnect()}
                   maxLength={20}
-                  autoFocus
                 />
               </div>
               <Button
@@ -161,16 +218,34 @@ export default function Landing() {
               </Button>
             </div>
 
+            <Input
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              placeholder="workshop PIN (optional if email domain is mapped)"
+              className="font-mono bg-secondary/50 border-primary/30 focus:border-primary text-foreground placeholder:text-muted-foreground"
+              onKeyDown={(e) => e.key === 'Enter' && void handleConnect()}
+              maxLength={24}
+            />
+
+            <div className="rounded-md border border-primary/20 bg-secondary/20 p-3">
+              <p className="mb-2 text-left font-mono text-[10px] text-primary/80">SELECT AVATAR</p>
+              <AvatarPicker selectedId={avatarId} achievements={[]} onChange={setAvatarId} />
+            </div>
+
+            {error && (
+              <p className="text-[11px] text-destructive font-mono text-left">{error}</p>
+            )}
+
             <Button
-              onClick={handleConnect}
-              disabled={!handle.trim()}
+              onClick={() => void handleConnect()}
+              disabled={!handle.trim() || !email.trim() || isSubmitting}
               className="w-full font-mono font-bold tracking-wider animate-pulse-glow bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30"
             >
-              [ CONNECT ]
+              {isSubmitting ? '[ CONNECTING... ]' : '[ CONNECT ]'}
             </Button>
 
             <p className="text-[10px] text-muted-foreground font-mono">
-              ENCRYPTED TUNNEL READY • MONGODB GAMEDAY v2.0
+              EMAIL DOMAIN MAPS YOU TO YOUR WORKSHOP SESSION • MONGODB GAMEDAY v2.0
             </p>
           </div>
         )}

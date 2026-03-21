@@ -7,7 +7,7 @@ const BOOT_LINES = [
   { text: '> ESTABLISHING TUNNEL TO ATLAS CLUSTER... OK', delay: 1200 },
   { text: '> AUTHENTICATING AGENT CREDENTIALS... OK', delay: 1800 },
   { text: '> LOADING MISSION DATABASE... OK', delay: 2400 },
-  { text: '> MONGODB HEIST v2.0 — SYSTEMS NOMINAL', delay: 3000 },
+  { text: '> MONGODB GAMEDAY v2.0 — SYSTEMS NOMINAL', delay: 3000 },
   { text: '', delay: 3400 },
   { text: '> PRESS ANY KEY TO CONTINUE_', delay: 3600 },
 ];

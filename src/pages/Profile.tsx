@@ -4,7 +4,7 @@ import { HUDBar } from '@/components/HUDBar';
 import { AvatarPicker, AvatarDisplay } from '@/components/AvatarPicker';
 import { Player } from '@/lib/types';
 import { getPlayer, updatePlayer } from '@/lib/game-store';
-import { ACHIEVEMENTS, MISSIONS, RANK_THRESHOLDS } from '@/lib/game-data';
+import { ACHIEVEMENTS, MISSIONS, RANK_THRESHOLDS } from '@/content/missions/mission';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -46,7 +46,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background/70">
       <HUDBar player={player} />
 
       <div className="pt-16 pb-8 px-4 max-w-3xl mx-auto">

@@ -5,7 +5,11 @@ export interface JwtPayload {
   userId: string;
   handle: string;
   role: 'moderator' | 'attendee';
+  tenantId: string;
+  workshopId?: string;
   sessionId?: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 declare global {

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { ObjectId } from 'mongodb';
 import { getDb } from '../config/db.js';
 import { COLLECTIONS } from '../config/collections.js';
 import { authenticateToken } from '../middleware/auth.js';
@@ -27,9 +28,21 @@ router.post('/:missionId/complete', authenticateToken, async (req: Request, res:
     const { missionId } = req.params;
     const { xpEarned } = req.body;
     const db = getDb();
+    const workshopId = req.user?.workshopId || req.user?.sessionId;
+
+    if (typeof workshopId === 'string' && ObjectId.isValid(workshopId)) {
+      const workshop = await db.collection(COLLECTIONS.WORKSHOP_SESSIONS).findOne(
+        { _id: new ObjectId(workshopId), tenantId: req.user!.tenantId, archivedAt: { $exists: false } },
+        { projection: { missionIds: 1 } }
+      );
+      if (workshop && Array.isArray(workshop.missionIds) && !workshop.missionIds.includes(missionId)) {
+        res.status(403).json({ error: 'Mission is not enabled for this workshop session' });
+        return;
+      }
+    }
 
     const result = await db.collection(COLLECTIONS.PLAYER_PROGRESS).findOneAndUpdate(
-      { userId: req.user!.userId },
+      { userId: req.user!.userId, tenantId: req.user!.tenantId },
       {
         $addToSet: { completedMissions: missionId },
         $inc: { xp: xpEarned, totalScore: xpEarned },
@@ -47,7 +60,7 @@ router.post('/:missionId/complete', authenticateToken, async (req: Request, res:
     const newLevel = Math.floor((result.xp as number) / 250) + 1;
 
     await db.collection(COLLECTIONS.PLAYER_PROGRESS).updateOne(
-      { userId: req.user!.userId },
+      { userId: req.user!.userId, tenantId: req.user!.tenantId },
       { $set: { rank: newRank, level: newLevel } }
     );
 
@@ -55,6 +68,8 @@ router.post('/:missionId/complete', authenticateToken, async (req: Request, res:
     await db.collection(COLLECTIONS.METRICS_EVENTS).insertOne({
       type: 'mission_complete',
       userId: req.user!.userId,
+      tenantId: req.user!.tenantId,
+      workshopId: req.user!.workshopId || req.user!.sessionId || null,
       missionId,
       xpEarned,
       timestamp: new Date(),
@@ -74,6 +89,7 @@ router.get('/progress', authenticateToken, async (req: Request, res: Response) =
     const db = getDb();
     const progress = await db.collection(COLLECTIONS.PLAYER_PROGRESS).findOne({
       userId: req.user!.userId,
+      tenantId: req.user!.tenantId,
     });
 
     res.json({

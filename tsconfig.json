@@ -9,7 +9,7 @@
         "./src/*"
       ]
     },
-    "skipLibCheck": true,
+    "skipLibCheck ": true,
     "strictNullChecks": false
   },
   "files": [],

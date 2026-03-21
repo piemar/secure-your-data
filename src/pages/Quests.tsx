@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { HUDBar } from '@/components/HUDBar';
-import { MatrixRain } from '@/components/MatrixRain';
 import { Player, Quest } from '@/lib/types';
 import { getPlayer } from '@/lib/game-store';
-import { QUESTS, MISSIONS } from '@/lib/game-data';
+import { MISSIONS } from '@/content/missions/mission';
+import { QUESTS } from '@/content/quests/quest';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -23,8 +23,7 @@ export default function Quests() {
   if (!player) return null;
 
   return (
-    <div className="min-h-screen bg-background relative">
-      <MatrixRain />
+    <div className="min-h-screen bg-background/70 relative">
       <HUDBar player={player} />
 
       <div className="relative z-10 pt-16 pb-20 px-4 max-w-5xl mx-auto">

@@ -4,16 +4,18 @@ import { HUDBar } from '@/components/HUDBar';
 import { MissionCard } from '@/components/MissionCard';
 import { TiltCard } from '@/components/TiltCard';
 import { ActivityTicker } from '@/components/ActivityTicker';
-import { MatrixRain } from '@/components/MatrixRain';
 import { MissionNodeGraph } from '@/components/MissionNodeGraph';
 import { MissionSearch } from '@/components/MissionSearch';
 import { Player, MissionTier } from '@/lib/types';
 import { getPlayer } from '@/lib/game-store';
-import { MISSIONS, ACHIEVEMENTS, MOCK_LEADERBOARD_PLAYERS, QUESTS } from '@/lib/game-data';
+import { MISSIONS, ACHIEVEMENTS, MOCK_LEADERBOARD_PLAYERS } from '@/content/missions/mission';
+import { QUESTS } from '@/content/quests/quest';
 import { isMissionUnlocked, POV_LABELS } from '@/lib/mission-prerequisites';
+import { api } from '@/services/api';
 import { Badge } from '@/components/ui/badge';
 import { Lock, Map, LayoutGrid } from 'lucide-react';
 import heistMascot from '@/assets/heist-mascot.png';
+import { isMissionTierOnHold } from '@/lib/mission-tiers';
 
 const TIER_ORDER: MissionTier[] = ['recon', 'infiltration', 'exfiltration'];
 const TIER_NAMES: Record<MissionTier, string> = {
@@ -28,6 +30,8 @@ export default function Dashboard() {
   const [viewMode, setViewMode] = useState<'grid' | 'graph'>('grid');
   const [filteredMissionIds, setFilteredMissionIds] = useState<string[] | null>(null);
   const [highlightedMissionId, setHighlightedMissionId] = useState<string | null>(null);
+  const [sessionMissionIds, setSessionMissionIds] = useState<string[] | null>(null);
+  const [topPlayers, setTopPlayers] = useState<Array<{ handle: string; totalScore: number }>>(MOCK_LEADERBOARD_PLAYERS.slice(0, 5));
   const graphRef = useRef<{ scrollToNode: (id: string) => void }>(null);
 
   useEffect(() => {
@@ -35,6 +39,41 @@ export default function Dashboard() {
     if (!p) { navigate('/'); return; }
     setPlayer(p);
   }, [navigate]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadSessionContext = async () => {
+      try {
+        const me = await api.players.me() as { workshopId?: string | null; sessionId?: string | null };
+        const workshopId =
+          (typeof me.workshopId === 'string' && me.workshopId) ||
+          (typeof me.sessionId === 'string' && me.sessionId) ||
+          null;
+        if (workshopId) {
+          const workshop = await api.workshops.getById(workshopId) as { missionIds?: string[] };
+          if (mounted && Array.isArray(workshop.missionIds)) {
+            setSessionMissionIds(workshop.missionIds);
+          }
+        }
+        const leaders = await api.players.leaderboard(workshopId || undefined);
+        if (mounted && Array.isArray(leaders) && leaders.length > 0) {
+          const normalized = leaders
+            .map((p) => ({
+              handle: typeof p.handle === 'string' ? p.handle : 'unknown',
+              totalScore: typeof p.totalScore === 'number' ? p.totalScore : 0,
+            }))
+            .slice(0, 5);
+          setTopPlayers(normalized);
+        }
+      } catch {
+        // Keep local fallback data for offline/dev resilience.
+      }
+    };
+    void loadSessionContext();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleFilterChange = useCallback((ids: string[] | null) => {
     setFilteredMissionIds(ids);
@@ -52,9 +91,15 @@ export default function Dashboard() {
 
   if (!player) return null;
 
+  const activeMissions = MISSIONS.filter(m => !isMissionTierOnHold(m.id));
+  const baseMissionSet = sessionMissionIds
+    ? activeMissions.filter(m => sessionMissionIds.includes(m.id))
+    : activeMissions;
+
   const displayMissions = filteredMissionIds
-    ? MISSIONS.filter(m => filteredMissionIds.includes(m.id))
-    : MISSIONS;
+    ? baseMissionSet.filter(m => filteredMissionIds.includes(m.id))
+    : baseMissionSet;
+  const completedInScope = player.completedMissions.filter(id => baseMissionSet.some(m => m.id === id));
 
   const missionsByTier = TIER_ORDER.map(tier => ({
     tier,
@@ -62,23 +107,21 @@ export default function Dashboard() {
   })).filter(t => t.missions.length > 0);
 
   const unlockedAchievements = ACHIEVEMENTS.filter(a => player.achievements.includes(a.id));
-  const topPlayers = MOCK_LEADERBOARD_PLAYERS.slice(0, 5);
-
   const activeQuests = QUESTS.filter(q => {
     const done = q.missionIds.filter(id => player.completedMissions.includes(id)).length;
     return done > 0 && done < q.requiredMissions;
   });
 
   const getMascotMessage = () => {
-    const completed = player.completedMissions.length;
-    const total = MISSIONS.length;
+    const completed = completedInScope.length;
+    const total = Math.max(1, baseMissionSet.length);
     const pct = completed / total;
-    if (pct === 0) return "Ready for your first heist, agent?";
+    if (pct === 0) return 'Ready for your first gameday mission, agent?';
     if (pct < 0.25) return "Nice start! Keep cracking those databases!";
     if (pct < 0.5) return "You're getting dangerous, agent...";
     if (pct < 0.75) return "Over halfway! The data fears you now.";
     if (pct < 1) return "Almost legend status. Finish strong!";
-    return "ALL MISSIONS COMPLETE. You are the heist.";
+    return 'ALL MISSIONS COMPLETE. You own the gameday.';
   };
 
   const Sidebar = () => (
@@ -87,7 +130,7 @@ export default function Dashboard() {
       <div className="border border-primary/20 rounded-lg p-4 bg-card/80 backdrop-blur-sm flex items-center gap-3">
         <img
           src={heistMascot}
-          alt="Heist mascot"
+          alt="Gameday mascot"
           className="w-12 h-12 flex-shrink-0 drop-shadow-[0_0_8px_hsl(var(--primary)/0.4)]"
           style={{ animation: 'mascot-float 3s ease-in-out infinite' }}
         />
@@ -164,7 +207,7 @@ export default function Dashboard() {
           ['Rank', player.rank],
           ['Level', player.level.toString()],
           ['XP', player.xp.toLocaleString()],
-          ['Missions', `${player.completedMissions.length}/${MISSIONS.length}`],
+          ['Missions', `${completedInScope.length}/${baseMissionSet.length}`],
           ['Chaos Survived', player.chaosEventsSurvived.toString()],
         ].map(([label, value]) => (
           <div key={label} className="flex justify-between text-xs">
@@ -177,8 +220,7 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-background relative flex flex-col">
-      <MatrixRain />
+    <div className="min-h-screen bg-background/70 relative flex flex-col">
       <HUDBar player={player} />
 
       {/* Sticky header + search */}
@@ -188,11 +230,17 @@ export default function Dashboard() {
             <div>
               <h1 className="font-mono text-2xl font-bold text-primary text-glow">MISSION CONTROL</h1>
               <p className="font-mono text-xs text-muted-foreground mt-1">
-                {player.completedMissions.length}/{MISSIONS.length} MISSIONS COMPLETED •{' '}
+                {completedInScope.length}/{baseMissionSet.length} MISSIONS COMPLETED •{' '}
                 {ACHIEVEMENTS.length - unlockedAchievements.length} ACHIEVEMENTS REMAINING
               </p>
             </div>
-            <div className="flex gap-1">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => navigate('/workshop-admin')}
+                className="rounded border border-primary/40 px-2 py-1 font-mono text-[10px] text-primary hover:bg-primary/10"
+              >
+                WORKSHOP ADMIN
+              </button>
               <button
                 onClick={() => setViewMode('grid')}
                 className={`p-2 rounded transition-colors ${viewMode === 'grid' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
@@ -209,7 +257,7 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
-          <MissionSearch missions={MISSIONS} onFilterChange={handleFilterChange} onMissionClick={viewMode === 'graph' ? handleSearchMissionClick : undefined} />
+          <MissionSearch missions={activeMissions} onFilterChange={handleFilterChange} onMissionClick={viewMode === 'graph' ? handleSearchMissionClick : undefined} />
         </div>
       </div>
 

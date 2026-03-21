@@ -9,8 +9,11 @@ export type UserRole = 'moderator' | 'attendee';
 export interface UserDoc {
   _id?: string;
   handle: string;
+  email?: string;
   password: string; // bcrypt hash (empty for PIN-only users)
   role: UserRole;
+  tenantId: string;
+  workshopId?: string;
   createdAt: Date;
 }
 
@@ -28,6 +31,8 @@ export interface PlayerProgressDoc {
   _id?: string;
   userId: string;
   handle: string;
+  tenantId: string;
+  workshopId?: string;
   xp: number;
   rank: PlayerRank;
   level: number;
@@ -47,9 +52,18 @@ export interface PlayerProgressDoc {
 // ===== Workshop (ported from Secure Your Data) =====
 export type WorkshopStatus = 'active' | 'paused' | 'ended';
 
+export type WorkshopExecutionMode = 'sandbox_only' | 'atlas_connected' | 'hybrid';
+
 export interface WorkshopSessionDoc {
   _id?: string;
+  tenantId: string;
   name: string;
+  customerName?: string;
+  technicalChampionName?: string;
+  technicalChampionEmail?: string;
+  salesforceOpportunityId?: string;
+  allowedEmailDomains?: string[];
+  logoUrl?: string;
   templateId: string | null;
   missionIds: string[];
   pin: string;
@@ -57,6 +71,17 @@ export interface WorkshopSessionDoc {
   moderatorId: string;
   participants: string[]; // userId[]
   timeLimit: number | null; // seconds
+  executionMode?: WorkshopExecutionMode;
+  /** When set, overrides `SANDBOX_COLLECTION_PREFIX_MODE` for sandboxes keyed to this workshop session. */
+  sandboxCollectionPrefixMode?: boolean;
+  /**
+   * When set, overrides executionMode-derived policy for `POST /api/execute/cloud`.
+   * Omitted → inherit from executionMode (legacy workshops without executionMode still allow cloud).
+   */
+  cloudExecutionAllowed?: boolean;
+  archivedAt?: Date | null;
+  archivedBy?: string | null;
+  archiveReason?: string | null;
   createdAt: Date;
   updatedAt?: Date;
 }

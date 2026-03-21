@@ -15,11 +15,57 @@ services:
       - mongo
 
   mongo:
-    image: mongo:7
+    image: mongo:8
+    command:
+      - mongod
+      - --bind_ip_all
+      - --wiredTigerCacheSizeGB
+      - "${MONGO_WT_CACHE_GB:-0.25}"
     ports:
       - '27017:27017'
+    mem_limit: "${MONGO_MEM_LIMIT:-384m}"
+    cpus: "${MONGO_CPUS:-0.50}"
+    pids_limit: ${MONGO_PIDS_LIMIT:-256}
     volumes:
       - mongo_data:/data/db
 
+  sandbox-tools:
+    build:
+      context: .
+      dockerfile: sandbox/Dockerfile
+    profiles: ["sandbox"]
+    stdin_open: true
+    tty: true
+    mem_limit: "${SANDBOX_TOOLS_MEM_LIMIT:-256m}"
+    cpus: "${SANDBOX_TOOLS_CPUS:-0.50}"
+    pids_limit: ${SANDBOX_TOOLS_PIDS_LIMIT:-256}
+    environment:
+      - AWS_REGION=${AWS_REGION:-eu-west-1}
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongo:27017}
+    volumes:
+      - ../:/work
+    depends_on:
+      - mongo
+
+  ide:
+    image: codercom/code-server:latest
+    profiles: ["ide"]
+    ports:
+      - '13337:13337'
+    entrypoint:
+      - /bin/sh
+    command:
+      - -lc
+      - |
+        code-server --install-extension mongodb.mongodb-vscode >/tmp/code-server-extension.log 2>&1 || true
+        exec code-server --bind-addr 0.0.0.0:13337 --auth none /work
+    environment:
+      - DOCKER_USER=$USER
+    volumes:
+      - ../:/work
+      # Persist extensions, settings, and code-server state across container restarts (MongoDB extension bootstrap remains idempotent on start)
+      - ide_code_server_data:/home/coder/.local/share/code-server
+
 volumes:
   mongo_data:
+  ide_code_server_data:

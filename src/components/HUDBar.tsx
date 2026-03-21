@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Player } from '@/lib/types';
-import { RANK_THRESHOLDS } from '@/lib/game-data';
+import { RANK_THRESHOLDS } from '@/content/missions/mission';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { soundEngine } from '@/lib/sound-engine';
 import { AvatarDisplay } from '@/components/AvatarPicker';
@@ -53,8 +53,8 @@ export function HUDBar({ player, timeRemaining, systemStability = 100, showTimer
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
         {/* Logo / Home */}
         <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <span className="font-mono text-primary font-bold text-sm">MDB</span>
-          <span className="font-mono text-xs text-muted-foreground hidden sm:inline">HEIST</span>
+          <span className="font-mono text-primary font-bold text-sm">MongoDB</span>
+          <span className="font-mono text-xs text-muted-foreground hidden sm:inline">Gameday</span>
         </button>
 
         {/* Timer */}

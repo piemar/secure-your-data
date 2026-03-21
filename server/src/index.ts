@@ -6,7 +6,7 @@ import { createServer } from 'http';
 import { connectDB } from './config/db.js';
 import { apiLimiter } from './middleware/rateLimit.js';
 import { initSocketIO } from './socket/metrics.js';
-import { initSandboxClient } from './services/sandbox.js';
+import { initSandboxClient } from './sandbox/runtime/sandbox.js';
 import authRoutes from './routes/auth.js';
 import playerRoutes from './routes/players.js';
 import missionRoutes from './routes/missions.js';
@@ -14,9 +14,14 @@ import workshopRoutes from './routes/workshops.js';
 import metricsRoutes from './routes/metrics.js';
 import verifyRoutes from './routes/verify.js';
 import executeRoutes from './routes/execute.js';
+import terminalRoutes from './routes/terminal.js';
+import ideRoutes from './routes/ide.js';
+import { createIdeProxyRouter, attachIdeProxyUpgrade } from './middleware/ide-proxy.js';
 
 const app = express();
 const httpServer = createServer(app);
+
+attachIdeProxyUpgrade(httpServer);
 
 // Middleware
 app.use(helmet());
@@ -32,6 +37,9 @@ app.use('/api/workshops', workshopRoutes);
 app.use('/api/metrics', metricsRoutes);
 app.use('/api/verify', verifyRoutes);
 app.use('/api/execute', executeRoutes);
+app.use('/api/terminal', terminalRoutes);
+app.use('/api/ide', ideRoutes);
+app.use('/ide', createIdeProxyRouter());
 
 // Health check
 app.get('/api/health', (_req, res) => {

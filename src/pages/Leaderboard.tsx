@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { HUDBar } from '@/components/HUDBar';
 import { Player } from '@/lib/types';
 import { getPlayer } from '@/lib/game-store';
-import { MOCK_LEADERBOARD_PLAYERS, RANK_THRESHOLDS } from '@/lib/game-data';
+import { MOCK_LEADERBOARD_PLAYERS, RANK_THRESHOLDS } from '@/content/missions/mission';
 
 function getRankForXP(xp: number): string {
   let rank = 'Script Kiddie';
@@ -39,7 +39,7 @@ export default function Leaderboard() {
   ].sort((a, b) => b.totalScore - a.totalScore);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background/70">
       <HUDBar player={player} />
 
       <div className="pt-16 pb-8 px-4 max-w-3xl mx-auto">

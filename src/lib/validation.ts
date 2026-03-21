@@ -30,15 +30,24 @@ export interface ValidationResult {
   tier?: ValidationTier;
 }
 
+function stripLineAndBlockComments(code: string): string {
+  return code
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1');
+}
+
 /**
  * Client-side pattern validation (Tier 1 — instant).
  */
 export function validateCode(code: string, validation: ObjectiveValidation): ValidationResult {
   const matchedRules: string[] = [];
   const failedRules: string[] = [];
+  const codeWithoutComments = stripLineAndBlockComments(code);
 
   for (const rule of validation.rules) {
-    if (rule.pattern.test(code)) {
+    // Reset regex state in case a rule accidentally uses /g.
+    rule.pattern.lastIndex = 0;
+    if (rule.pattern.test(codeWithoutComments)) {
       matchedRules.push(rule.description);
     } else if (rule.required) {
       failedRules.push(rule.description);

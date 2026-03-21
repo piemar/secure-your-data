@@ -4,22 +4,16 @@
  * and destroySandbox on cleanup.
  */
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { api } from '@/services/api';
+import { api, type ExecuteCommandOutput, type ExecuteRunResponse } from '@/services/api';
 import { getMissionTier, ValidationTier } from '@/lib/mission-tiers';
 import { mergeValidationResults, ServerVerificationResult, ValidationResult } from '@/lib/validation';
 
-export interface ExecutionOutput {
-  command: string;
-  result: unknown;
-  error?: string;
-  timeMs?: number;
-  simulated?: boolean;
-  message?: string;
-}
+export type ExecutionOutput = ExecuteCommandOutput;
 
 export interface SandboxState {
   tier: ValidationTier;
   sandboxActive: boolean;
+  sandboxDbName: string | null;
   isCreating: boolean;
   isExecuting: boolean;
   isVerifying: boolean;
@@ -29,10 +23,28 @@ export interface SandboxState {
   totalExecutionTimeMs: number | null;
 }
 
+function normalizeExecutionOutput(result: ExecuteRunResponse): ExecuteCommandOutput[] {
+  const raw = Array.isArray(result.output) ? result.output : [];
+  if (raw.length > 0) return raw;
+  return [
+    {
+      command: '(summary)',
+      result: {
+        success: result.success,
+        tier: result.tier,
+        message: result.message || 'Execution completed with no explicit payload output.',
+        executionTimeMs: result.executionTimeMs ?? null,
+      },
+      ...(result.error ? { error: result.error } : {}),
+    },
+  ];
+}
+
 export function useSandboxExecution(missionId: string | undefined, sessionId?: string) {
   const [state, setState] = useState<SandboxState>({
     tier: missionId ? getMissionTier(missionId) : 'pattern',
     sandboxActive: false,
+    sandboxDbName: null,
     isCreating: false,
     isExecuting: false,
     isVerifying: false,
@@ -63,7 +75,7 @@ export function useSandboxExecution(missionId: string | undefined, sessionId?: s
   const createSandbox = useCallback(async () => {
     if (!missionId) return;
     const tier = getMissionTier(missionId);
-    if (tier !== 'execute') return; // Only Tier 2 needs sandbox
+    if (tier === 'simulate' || tier === 'hold') return;
 
     setState(prev => ({ ...prev, isCreating: true, executionError: null }));
     try {
@@ -72,13 +84,16 @@ export function useSandboxExecution(missionId: string | undefined, sessionId?: s
       setState(prev => ({
         ...prev,
         sandboxActive: result.created,
+        sandboxDbName: result.created && result.dbName ? result.dbName : prev.sandboxDbName,
         isCreating: false,
+        executionError: result.created ? null : (result.message || null),
       }));
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to create sandbox';
       setState(prev => ({
         ...prev,
         isCreating: false,
-        executionError: err.message || 'Failed to create sandbox',
+        executionError: message,
       }));
     }
   }, [missionId, sessionId]);
@@ -86,7 +101,14 @@ export function useSandboxExecution(missionId: string | undefined, sessionId?: s
   const executeCode = useCallback(async (code: string): Promise<ExecutionOutput[]> => {
     if (!missionId) return [];
     const tier = getMissionTier(missionId);
-    if (tier === 'pattern') return []; // No server execution for Tier 1
+    if (tier === 'hold') {
+      setState(prev => ({
+        ...prev,
+        executionError: 'This mission is on hold while Tier 3 validations are being rebuilt.',
+      }));
+      return [];
+    }
+    if (tier === 'simulate') return [];
 
     setState(prev => ({
       ...prev,
@@ -98,19 +120,22 @@ export function useSandboxExecution(missionId: string | undefined, sessionId?: s
 
     try {
       const result = await api.execute.run(code, missionId, sessionId);
+      const output = normalizeExecutionOutput(result);
+      const error = result.error || null;
       setState(prev => ({
         ...prev,
         isExecuting: false,
-        executionOutput: result.output || [],
+        executionOutput: output,
         totalExecutionTimeMs: result.executionTimeMs || null,
-        executionError: result.error || null,
+        executionError: error,
       }));
-      return result.output || [];
-    } catch (err: any) {
+      return output;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Execution failed';
       setState(prev => ({
         ...prev,
         isExecuting: false,
-        executionError: err.message || 'Execution failed',
+        executionError: message,
       }));
       return [];
     }
@@ -119,6 +144,13 @@ export function useSandboxExecution(missionId: string | undefined, sessionId?: s
   const verifyExecution = useCallback(async (): Promise<ServerVerificationResult[]> => {
     if (!missionId) return [];
     const tier = getMissionTier(missionId);
+    if (tier === 'hold') {
+      setState(prev => ({
+        ...prev,
+        executionError: 'Verification is disabled because this mission is currently on hold.',
+      }));
+      return [];
+    }
     if (tier !== 'execute') return [];
 
     setState(prev => ({ ...prev, isVerifying: true }));
@@ -131,11 +163,12 @@ export function useSandboxExecution(missionId: string | undefined, sessionId?: s
         serverResults,
       }));
       return serverResults;
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Verification failed';
       setState(prev => ({
         ...prev,
         isVerifying: false,
-        executionError: err.message || 'Verification failed',
+        executionError: message,
       }));
       return [];
     }
@@ -146,15 +179,18 @@ export function useSandboxExecution(missionId: string | undefined, sessionId?: s
    */
   const runFullValidation = useCallback(async (
     code: string,
-    patternResults: ValidationResult[]
+    patternResults: ValidationResult[],
+    options?: { skipExecute?: boolean }
   ): Promise<ValidationResult[]> => {
     if (!missionId) return patternResults;
     const tier = getMissionTier(missionId);
 
-    if (tier === 'pattern') return patternResults;
+    if (tier === 'hold') return patternResults;
 
-    // Execute user code
-    await executeCode(code);
+    // Execute user code unless caller already executed externally (e.g. PTY statement runner)
+    if (!options?.skipExecute) {
+      await executeCode(code);
+    }
 
     if (tier === 'simulate') {
       // For simulation, execution output is the result — no further verification
@@ -171,7 +207,7 @@ export function useSandboxExecution(missionId: string | undefined, sessionId?: s
     try {
       await api.execute.destroySandbox(sessionId);
       sandboxActiveRef.current = false;
-      setState(prev => ({ ...prev, sandboxActive: false }));
+      setState(prev => ({ ...prev, sandboxActive: false, sandboxDbName: null }));
     } catch {
       // Best effort
     }
@@ -184,6 +220,7 @@ export function useSandboxExecution(missionId: string | undefined, sessionId?: s
       executionError: null,
       serverResults: [],
       totalExecutionTimeMs: null,
+      sandboxDbName: prev.sandboxDbName,
     }));
   }, []);
 

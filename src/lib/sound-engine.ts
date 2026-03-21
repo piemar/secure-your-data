@@ -10,9 +10,21 @@ class SoundEngine {
 
   get muted() { return this._muted; }
 
-  private getCtx(): AudioContext {
-    if (!this.ctx) this.ctx = new AudioContext();
-    if (this.ctx.state === 'suspended') this.ctx.resume();
+  private canUseAudioNow(): boolean {
+    if (typeof window === 'undefined') return false;
+    const ua = window.navigator.userActivation;
+    return !!(ua?.isActive || ua?.hasBeenActive);
+  }
+
+  private getCtx(): AudioContext | null {
+    if (!this.ctx) {
+      if (!this.canUseAudioNow()) return null;
+      this.ctx = new AudioContext();
+    }
+    if (this.ctx.state === 'suspended') {
+      if (!this.canUseAudioNow()) return null;
+      void this.ctx.resume();
+    }
     return this.ctx;
   }
 
@@ -25,6 +37,7 @@ class SoundEngine {
     if (this._muted) return;
     try {
       const ctx = this.getCtx();
+      if (!ctx) return;
       const now = ctx.currentTime;
 
       switch (name) {

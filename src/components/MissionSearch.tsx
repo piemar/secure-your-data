@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Mission } from '@/lib/types';
 import { getMissionSearchTags } from '@/lib/mission-prerequisites';
@@ -15,12 +15,9 @@ export function MissionSearch({ missions, onFilterChange, onMissionClick }: Miss
   const [showDropdown, setShowDropdown] = useState(false);
 
   const filtered = useMemo(() => {
-    if (!query) {
-      onFilterChange(null);
-      return [];
-    }
+    if (!query) return [];
 
-    const results = missions.filter(m => {
+    return missions.filter(m => {
       const searchTags = getMissionSearchTags(m);
       const q = query.toLowerCase();
       return (
@@ -31,9 +28,15 @@ export function MissionSearch({ missions, onFilterChange, onMissionClick }: Miss
       );
     });
 
-    onFilterChange(results.map(m => m.id));
-    return results;
-  }, [query, missions, onFilterChange]);
+  }, [query, missions]);
+
+  useEffect(() => {
+    if (!query) {
+      onFilterChange(null);
+      return;
+    }
+    onFilterChange(filtered.map(m => m.id));
+  }, [query, filtered, onFilterChange]);
 
   return (
     <div className="relative">

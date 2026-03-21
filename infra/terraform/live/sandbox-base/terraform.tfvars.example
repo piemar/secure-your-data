@@ -1,0 +1,8 @@
+aws_region   = "eu-west-1"
+environment  = "dev"
+project_name = "mongodb-gameday"
+
+tags = {
+  owner = "platform-team"
+}
+

@@ -1,0 +1,224 @@
+name: infra
+
+on:
+  pull_request:
+    paths:
+      - 'infra/**'
+      - 'scripts/aws/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'infra/**'
+      - 'scripts/aws/**'
+  workflow_dispatch:
+    inputs:
+      target_stack:
+        description: Stack to apply
+        required: true
+        default: control-plane
+        type: choice
+        options:
+          - control-plane
+          - sandbox-base
+          - workshop
+          - all
+      workshop_id:
+        description: Workshop id (required for workshop stack)
+        required: false
+        type: string
+      tenant_id:
+        description: Tenant id (required for workshop stack)
+        required: false
+        type: string
+      expires_at:
+        description: Expiration timestamp for workshop stack (ISO8601)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  terraform-plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: [control-plane, sandbox-base, workshop]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Prepare tfvars
+        run: |
+          cp "infra/terraform/live/${{ matrix.stack }}/terraform.tfvars.example" \
+             "infra/terraform/live/${{ matrix.stack }}/terraform.tfvars"
+
+      - name: Terraform fmt check
+        run: terraform -chdir="infra/terraform/live/${{ matrix.stack }}" fmt -check -recursive
+
+      - name: Terraform init (no backend for CI plan)
+        run: terraform -chdir="infra/terraform/live/${{ matrix.stack }}" init -backend=false
+
+      - name: Terraform validate
+        run: terraform -chdir="infra/terraform/live/${{ matrix.stack }}" validate
+
+      - name: Terraform plan
+        run: |
+          terraform -chdir="infra/terraform/live/${{ matrix.stack }}" plan \
+            -input=false \
+            -lock=false \
+            -var-file="terraform.tfvars"
+
+  apply-control-plane:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: terraform-plan
+    environment: production
+    if: >-
+      vars.INFRA_APPLY_ENABLED == 'true' &&
+      (
+        github.event_name == 'push' ||
+        (github.event_name == 'workflow_dispatch' && (inputs.target_stack == 'control-plane' || inputs.target_stack == 'all'))
+      )
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Write control-plane tfvars from secret
+        run: |
+          if [[ -z "${{ secrets.TFVARS_CONTROL_PLANE }}" ]]; then
+            echo "Missing secret TFVARS_CONTROL_PLANE"
+            exit 1
+          fi
+          cat <<'EOF' > infra/terraform/live/control-plane/terraform.tfvars
+          ${{ secrets.TFVARS_CONTROL_PLANE }}
+          EOF
+
+      - name: Validate backend config placeholders replaced
+        run: |
+          if rg -q 'REPLACE_ME_' infra/terraform/live/control-plane/backend.hcl; then
+            echo "backend.hcl still contains REPLACE_ME placeholders."
+            exit 1
+          fi
+
+      - name: Apply control-plane
+        run: bash scripts/aws/deploy-control-plane.sh
+
+  apply-sandbox-base:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: terraform-plan
+    environment: production
+    if: >-
+      vars.INFRA_APPLY_ENABLED == 'true' &&
+      (
+        github.event_name == 'push' ||
+        (github.event_name == 'workflow_dispatch' && (inputs.target_stack == 'sandbox-base' || inputs.target_stack == 'all'))
+      )
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Write sandbox-base tfvars from secret
+        run: |
+          if [[ -z "${{ secrets.TFVARS_SANDBOX_BASE }}" ]]; then
+            echo "Missing secret TFVARS_SANDBOX_BASE"
+            exit 1
+          fi
+          cat <<'EOF' > infra/terraform/live/sandbox-base/terraform.tfvars
+          ${{ secrets.TFVARS_SANDBOX_BASE }}
+          EOF
+
+      - name: Validate backend config placeholders replaced
+        run: |
+          if rg -q 'REPLACE_ME_' infra/terraform/live/sandbox-base/backend.hcl; then
+            echo "backend.hcl still contains REPLACE_ME placeholders."
+            exit 1
+          fi
+
+      - name: Apply sandbox-base
+        run: bash scripts/aws/deploy-sandbox-base.sh
+
+  apply-workshop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: terraform-plan
+    environment: production
+    if: >-
+      vars.INFRA_APPLY_ENABLED == 'true' &&
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.target_stack == 'workshop' || inputs.target_stack == 'all')
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+    steps:
+      - name: Validate workshop inputs
+        run: |
+          if [[ -z "${{ inputs.workshop_id }}" || -z "${{ inputs.tenant_id }}" ]]; then
+            echo "workshop_id and tenant_id are required for workshop applies."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Write workshop tfvars from secret
+        run: |
+          if [[ -z "${{ secrets.TFVARS_WORKSHOP }}" ]]; then
+            echo "Missing secret TFVARS_WORKSHOP"
+            exit 1
+          fi
+          cat <<'EOF' > infra/terraform/live/workshop/terraform.tfvars
+          ${{ secrets.TFVARS_WORKSHOP }}
+          EOF
+
+      - name: Validate backend config placeholders replaced
+        run: |
+          if rg -q 'REPLACE_ME_TFSTATE_BUCKET|REPLACE_ME_REGION|REPLACE_ME_TF_LOCK_TABLE' infra/terraform/live/workshop/backend.hcl; then
+            echo "backend.hcl still contains REPLACE_ME placeholders."
+            exit 1
+          fi
+
+      - name: Apply workshop stack
+        run: |
+          bash scripts/aws/create-workshop-stack.sh \
+            "${{ inputs.workshop_id }}" \
+            "${{ inputs.tenant_id }}" \
+            "${{ inputs.expires_at }}"

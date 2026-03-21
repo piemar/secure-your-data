@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { generateHandle } from '@/lib/game-data';
+import { generateHandle } from '@/content/missions/mission';
 
 const EVENTS = [
   (h: string) => `${h} completed PHANTOM QUERY +500XP`,
   (h: string) => `${h} survived CHAOS EVENT: NODE FAILURE`,
   (h: string) => `${h} ranked up to SHARD COMMANDER`,
-  (h: string) => `${h} completed AGGREGATION HEIST +750XP`,
+  (h: string) => `${h} completed AGGREGATION GAMEDAY +750XP`,
   (h: string) => `${h} unlocked achievement: SPEED DEMON`,
   (h: string) => `${h} completed ENCRYPTION VAULT +600XP`,
   (h: string) => `${h} survived CHAOS EVENT: NETWORK PARTITION`,

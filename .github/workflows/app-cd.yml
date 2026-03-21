@@ -1,0 +1,170 @@
+name: app-cd
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      deploy_control_plane:
+        description: Deploy control-plane Terraform stack
+        required: false
+        default: true
+        type: boolean
+      deploy_sandbox_base:
+        description: Deploy sandbox-base Terraform stack
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-and-publish-images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push API image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: ${{ vars.ECR_REPO_API }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          if [[ -z "${REPOSITORY}" ]]; then
+            echo "Missing required repository variable: ECR_REPO_API"
+            exit 1
+          fi
+          IMAGE_URI="${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}"
+          docker build -t "${IMAGE_URI}" -f server/Dockerfile server
+          docker push "${IMAGE_URI}"
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            LATEST_URI="${REGISTRY}/${REPOSITORY}:latest"
+            docker tag "${IMAGE_URI}" "${LATEST_URI}"
+            docker push "${LATEST_URI}"
+          fi
+
+      - name: Build and push sandbox tools image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: ${{ vars.ECR_REPO_SANDBOX_TOOLS }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          if [[ -z "${REPOSITORY}" ]]; then
+            echo "Missing required repository variable: ECR_REPO_SANDBOX_TOOLS"
+            exit 1
+          fi
+          IMAGE_URI="${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}"
+          docker build -t "${IMAGE_URI}" -f server/sandbox/Dockerfile server
+          docker push "${IMAGE_URI}"
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            LATEST_URI="${REGISTRY}/${REPOSITORY}:latest"
+            docker tag "${IMAGE_URI}" "${LATEST_URI}"
+            docker push "${LATEST_URI}"
+          fi
+
+  deploy-control-plane:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: build-and-publish-images
+    environment: production
+    if: >-
+      vars.APP_DEPLOY_ENABLED == 'true' &&
+      (github.event_name != 'workflow_dispatch' || inputs.deploy_control_plane == true)
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Write control-plane tfvars from secret
+        run: |
+          if [[ -z "${{ secrets.TFVARS_CONTROL_PLANE }}" ]]; then
+            echo "Missing secret TFVARS_CONTROL_PLANE"
+            exit 1
+          fi
+          cat <<'EOF' > infra/terraform/live/control-plane/terraform.tfvars
+          ${{ secrets.TFVARS_CONTROL_PLANE }}
+          EOF
+
+      - name: Validate backend config placeholders replaced
+        run: |
+          if rg -q 'REPLACE_ME_' infra/terraform/live/control-plane/backend.hcl; then
+            echo "backend.hcl still contains REPLACE_ME placeholders."
+            echo "Update backend config before enabling deployment."
+            exit 1
+          fi
+
+      - name: Deploy control-plane stack
+        run: bash scripts/aws/deploy-control-plane.sh
+
+  deploy-sandbox-base:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: build-and-publish-images
+    environment: production
+    if: >-
+      vars.APP_DEPLOY_ENABLED == 'true' &&
+      (github.event_name != 'workflow_dispatch' || inputs.deploy_sandbox_base == true)
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Write sandbox-base tfvars from secret
+        run: |
+          if [[ -z "${{ secrets.TFVARS_SANDBOX_BASE }}" ]]; then
+            echo "Missing secret TFVARS_SANDBOX_BASE"
+            exit 1
+          fi
+          cat <<'EOF' > infra/terraform/live/sandbox-base/terraform.tfvars
+          ${{ secrets.TFVARS_SANDBOX_BASE }}
+          EOF
+
+      - name: Validate backend config placeholders replaced
+        run: |
+          if rg -q 'REPLACE_ME_' infra/terraform/live/sandbox-base/backend.hcl; then
+            echo "backend.hcl still contains REPLACE_ME placeholders."
+            echo "Update backend config before enabling deployment."
+            exit 1
+          fi
+
+      - name: Deploy sandbox-base stack
+        run: bash scripts/aws/deploy-sandbox-base.sh

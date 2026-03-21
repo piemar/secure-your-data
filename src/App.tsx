@@ -11,7 +11,9 @@ import MissionPage from "./pages/MissionPage";
 import Profile from "./pages/Profile";
 import Leaderboard from "./pages/Leaderboard";
 import Quests from "./pages/Quests";
+import WorkshopAdmin from "./pages/WorkshopAdmin";
 import NotFound from "./pages/NotFound";
+import { MatrixRain } from "@/components/MatrixRain";
 
 const queryClient = new QueryClient();
 
@@ -22,17 +24,27 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/mission/:missionId" element={<MissionPage />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/leaderboard" element={<Leaderboard />} />
-              <Route path="/quests" element={<Quests />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
+          <div className="relative min-h-screen overflow-hidden">
+            <MatrixRain />
+            <div className="relative z-10 min-h-screen">
+              <BrowserRouter
+                future={{
+                  v7_relativeSplatPath: true,
+                }}
+              >
+                <Routes>
+                  <Route path="/" element={<Landing />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/mission/:missionId" element={<MissionPage />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/leaderboard" element={<Leaderboard />} />
+                  <Route path="/quests" element={<Quests />} />
+                  <Route path="/workshop-admin" element={<WorkshopAdmin />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </div>
+          </div>
         </TooltipProvider>
       </WorkshopSessionProvider>
     </RoleProvider>

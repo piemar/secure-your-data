@@ -1,5 +1,5 @@
 import { Player, PlayerRank } from './types';
-import { RANK_THRESHOLDS } from './game-data';
+import { RANK_THRESHOLDS } from '@/content/missions/mission';
 
 const STORAGE_KEY = 'mongodb-heist-player';
 
@@ -40,6 +40,11 @@ export function createPlayer(handle: string): Player {
     hintXpPenalty: 0,
     avatarId: 'ghost',
   };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(player));
+  return player;
+}
+
+export function setPlayer(player: Player): Player {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(player));
   return player;
 }

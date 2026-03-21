@@ -259,42 +259,5 @@ export function requiresSimulation(code: string): boolean {
   return simulationHandlers.some(handler => handler(code) !== null);
 }
 
-/**
- * Get the validation tier for a mission.
- */
-export type ValidationTier = 'pattern' | 'execute' | 'simulate';
-
-export const MISSION_TIERS: Record<string, ValidationTier> = {
-  // Tier 2: Sandboxed Execution
-  'mission-12': 'execute',   // CRUD Boot Camp
-  'mission-1': 'execute',    // Phantom Index
-  'mission-3': 'execute',    // Aggregation Heist
-  'mission-5': 'execute',    // Schema Saboteur
-  'mission-6': 'execute',    // Rich Query Recon
-  'mission-8': 'execute',    // Analytics Extraction
-  'mission-13': 'execute',   // Geospatial Pursuit
-  'mission-14': 'execute',   // Graph Infiltration
-  'mission-15': 'execute',   // Change Stream Stakeout
-  'mission-16': 'execute',   // Transaction Lockout
-  'mission-18': 'execute',   // Time Series
-  'mission-20': 'execute',   // Schema Evolution
-
-  // Tier 3: Simulated / Cloud-Proxy
-  'mission-2': 'simulate',   // Shard Under Siege
-  'mission-9': 'simulate',   // Scale-Out Siege
-  'mission-10': 'simulate',  // Auto-HA Failover
-
-  // Tier 1: Pattern Only
-  'mission-4': 'pattern',    // Connection Storm
-  'mission-7': 'pattern',    // Encryption Lockdown (CSFLE — needs KMS)
-  'mission-11': 'pattern',   // Deployment Automation (Terraform)
-  'mission-17': 'pattern',   // Text Search (Atlas Search only)
-  'mission-19': 'pattern',   // Vector Heist (Atlas Vector Search only)
-
-  // Cloud missions (future)
-  'mission-21': 'pattern',   // Data Federation
-  'mission-22': 'pattern',   // KMS Key Rotation
-  'mission-23': 'pattern',   // Online Archive
-  'mission-24': 'pattern',   // Atlas Triggers
-  'mission-25': 'pattern',   // Search Index Ops
-};
+export type { ValidationTier } from '../config/mission-tiers.js';
+export { MISSION_TIERS } from '../config/mission-tiers.js';
